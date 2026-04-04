@@ -24,16 +24,21 @@ function logout() {
 }
 
 function setupEventListeners() {
-  document.getElementById('login-form').addEventListener('submit', (e) => {
-    e.preventDefault();
+  function attemptLogin() {
     const pw = document.getElementById('password').value;
     if (pw === CORRECT_PASSWORD) {
+      document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
       showApp();
     } else {
       document.getElementById('login-error').hidden = false;
       document.getElementById('password').value = '';
     }
+  }
+
+  document.getElementById('login-btn').addEventListener('click', attemptLogin);
+  document.getElementById('password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') attemptLogin();
   });
 
   // Logout (desktop)
