@@ -3,26 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>清翔会 - データ管理</title>
-  <link rel="stylesheet" href="styles.css?v=3">
-  <style>.modal[hidden] { display: none !important; }</style>
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#1a5276">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>清翔会</title>
+  <link rel="stylesheet" href="styles.css?v=4">
+  <style>.modal[hidden]{display:none!important}</style>
+  <meta name="theme-color" content="#333333">
 </head>
 <body>
-  <!-- ログイン画面 -->
+  <!-- Login -->
   <div id="login-screen" class="login-screen">
     <div class="login-card">
       <div class="login-logo">
         <div class="logo-icon">清</div>
         <h1>清翔会</h1>
-        <p>データ管理システム</p>
+        <p>Management System</p>
       </div>
       <div id="login-form">
         <div class="input-group">
-          <label for="password">パスワード</label>
+          <label for="password">Password</label>
           <input type="text" id="password" placeholder="パスワードを入力" autocomplete="off" style="-webkit-text-security:disc" inputmode="text">
         </div>
         <button type="button" class="btn-primary" id="login-btn">ログイン</button>
@@ -31,44 +28,36 @@
     </div>
   </div>
 
-  <!-- メインアプリ -->
+  <!-- App -->
   <div id="app" class="app" hidden>
-    <!-- ヘッダー（デスクトップ用） -->
+    <!-- Header -->
     <header class="header">
       <div class="header-left">
         <div class="logo-sm">清</div>
         <h1>清翔会</h1>
       </div>
-      <nav class="nav desktop-nav">
-        <button class="nav-btn active" data-view="dashboard">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-          一覧
-        </button>
-        <button class="nav-btn" data-view="compare">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-          比較
-        </button>
-        <button class="nav-btn" data-view="strategy">
-          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-          戦略
-        </button>
+      <nav class="desktop-nav">
+        <button class="nav-btn active" data-view="sales">売上</button>
+        <button class="nav-btn" data-view="numbers">数値</button>
+        <button class="nav-btn" data-view="tc">TC</button>
       </nav>
+      <div class="nav-spacer"></div>
       <button class="btn-logout" id="logout-btn">ログアウト</button>
     </header>
 
-    <!-- ボトムナビ（モバイル用） -->
+    <!-- Bottom Nav (mobile) -->
     <nav class="bottom-nav" id="bottom-nav">
-      <button class="bottom-nav-btn active" data-view="dashboard">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        <span>一覧</span>
+      <button class="bottom-nav-btn active" data-view="sales">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+        <span>売上</span>
       </button>
-      <button class="bottom-nav-btn" data-view="compare">
+      <button class="bottom-nav-btn" data-view="numbers">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
-        <span>比較</span>
+        <span>数値</span>
       </button>
-      <button class="bottom-nav-btn" data-view="strategy">
+      <button class="bottom-nav-btn" data-view="tc">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
-        <span>戦略</span>
+        <span>TC</span>
       </button>
       <button class="bottom-nav-btn" data-view="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -76,118 +65,253 @@
       </button>
     </nav>
 
-    <!-- ダッシュボード -->
-    <main id="view-dashboard" class="view">
+    <!-- ==================== 売上 ==================== -->
+    <main id="view-sales" class="view">
       <div class="page-header">
-        <h2>競合医院一覧</h2>
-        <div class="summary-stats">
-          <div class="stat-card">
-            <span class="stat-num" id="total-clinics">0</span>
-            <span class="stat-label">調査医院数</span>
+        <h2>売上管理</h2>
+      </div>
+
+      <div class="facility-tabs" id="sales-facility-tabs"></div>
+
+      <div class="stats-row" id="sales-stats"></div>
+
+      <!-- 入力フォーム -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">売上入力</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">月</label>
+            <input type="month" class="form-input" id="sales-month">
           </div>
-          <div class="stat-card">
-            <span class="stat-num" id="avg-score">0</span>
-            <span class="stat-label">平均スコア</span>
+          <div class="form-group">
+            <label class="form-label">自費売上</label>
+            <input type="number" class="form-input" id="sales-self" placeholder="0">
           </div>
-          <div class="stat-card">
-            <span class="stat-num" id="current-rate">30%</span>
-            <span class="stat-label">現在の成約率</span>
+          <div class="form-group">
+            <label class="form-label">保険売上</label>
+            <input type="number" class="form-input" id="sales-insurance" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">物販</label>
+            <input type="number" class="form-input" id="sales-product" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">広告費</label>
+            <input type="number" class="form-input" id="sales-ad" placeholder="0">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-dark" id="sales-save">保存</button>
+        </div>
+      </div>
+
+      <!-- 一覧 -->
+      <div class="card">
+        <div class="card-header">売上一覧</div>
+        <div class="data-table-wrap">
+          <table class="data-table" id="sales-table">
+            <thead>
+              <tr><th>月</th><th>自費</th><th>保険</th><th>物販</th><th>広告費</th><th>合計</th></tr>
+            </thead>
+            <tbody id="sales-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
+
+    <!-- ==================== 数値 ==================== -->
+    <main id="view-numbers" class="view" hidden>
+      <!-- Sub Nav -->
+      <div class="sub-nav">
+        <button class="sub-nav-btn active" data-sub="patients">初診管理</button>
+        <button class="sub-nav-btn" data-sub="rates">決定率</button>
+      </div>
+
+      <!-- 初診管理 -->
+      <div id="sub-patients">
+        <div class="page-header">
+          <h2>初診管理</h2>
+        </div>
+
+        <div class="facility-tabs" id="patients-facility-tabs"></div>
+        <div class="stats-row" id="patients-stats"></div>
+
+        <!-- 入力フォーム -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">新規登録</div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label class="form-label">来院日</label>
+              <input type="date" class="form-input" id="pt-date">
+            </div>
+            <div class="form-group">
+              <label class="form-label">名前</label>
+              <input type="text" class="form-input" id="pt-name" placeholder="患者名">
+            </div>
+            <div class="form-group">
+              <label class="form-label">目的</label>
+              <select class="form-select" id="pt-purpose">
+                <option>矯正相談</option>
+                <option>ブラックフィルム相談</option>
+                <option>保険初診</option>
+                <option>転院</option>
+                <option>その他</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">初診由来</label>
+              <select class="form-select" id="pt-source">
+                <option>Google検索</option>
+                <option>インスタ</option>
+                <option>紹介</option>
+                <option>広告</option>
+                <option>その他</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">カウンセラー</label>
+              <input type="text" class="form-input" id="pt-counselor" placeholder="スタッフ名">
+            </div>
+            <div class="form-group">
+              <label class="form-label">ドクター</label>
+              <input type="text" class="form-input" id="pt-doctor" placeholder="Dr名">
+            </div>
+            <div class="form-group">
+              <label class="form-label">ステータス</label>
+              <select class="form-select" id="pt-status">
+                <option>予約</option>
+                <option>来院</option>
+                <option>相談済</option>
+                <option>検査予約</option>
+                <option>診断済</option>
+                <option>成約</option>
+                <option>キャンセル</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">金額</label>
+              <input type="number" class="form-input" id="pt-amount" placeholder="0">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-dark" id="pt-save">登録</button>
+          </div>
+        </div>
+
+        <!-- 一覧 -->
+        <div class="card">
+          <div class="card-header">患者一覧</div>
+          <div class="data-table-wrap">
+            <table class="data-table" id="patients-table">
+              <thead>
+                <tr><th>日付</th><th>名前</th><th>目的</th><th>由来</th><th>カウンセラー</th><th>Dr</th><th>ステータス</th><th>金額</th></tr>
+              </thead>
+              <tbody id="patients-tbody"></tbody>
+            </table>
           </div>
         </div>
       </div>
-      <div class="clinic-grid" id="clinic-grid"></div>
+
+      <!-- 決定率 -->
+      <div id="sub-rates" hidden>
+        <div class="page-header">
+          <h2>決定率</h2>
+        </div>
+
+        <div class="stats-row" id="rates-stats"></div>
+
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">医院別</div>
+          <div class="bar-chart" id="rates-facility"></div>
+        </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">カウンセラー別</div>
+          <div class="bar-chart" id="rates-counselor"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">ドクター別</div>
+          <div class="bar-chart" id="rates-doctor"></div>
+        </div>
+      </div>
     </main>
 
-    <!-- 比較表 -->
-    <main id="view-compare" class="view" hidden>
-      <div class="page-header">
-        <h2>医院比較</h2>
-      </div>
-      <!-- デスクトップ: テーブル -->
-      <div class="compare-table-wrap desktop-only">
-        <table class="compare-table" id="compare-table"></table>
-      </div>
-      <!-- モバイル: カード形式 -->
-      <div class="compare-cards mobile-only" id="compare-cards"></div>
-    </main>
-
-    <!-- 戦略ノート -->
-    <main id="view-strategy" class="view" hidden>
-      <div class="page-header">
-        <h2>戦略ノート</h2>
-        <p class="page-desc">足立 & 小池 - カウンセリング改善戦略</p>
+    <!-- ==================== TC ==================== -->
+    <main id="view-tc" class="view" hidden>
+      <div class="sub-nav">
+        <button class="sub-nav-btn active" data-sub="competitors">競合調査</button>
+        <button class="sub-nav-btn" data-sub="strategy">戦略ノート</button>
       </div>
 
-      <div class="strategy-grid">
-        <div class="strategy-section">
-          <h3>目的</h3>
-          <div class="strategy-content">
-            <p>清翔会の成約率をあげて、広告の効果を最大限にする。</p>
-            <div class="kpi-box">
-              <div class="kpi">
-                <span class="kpi-label">現在の成約率</span>
-                <span class="kpi-value red">30%</span>
-              </div>
-              <div class="kpi">
-                <span class="kpi-label">目標成約率</span>
-                <span class="kpi-value green">???</span>
+      <!-- 競合調査 -->
+      <div id="sub-competitors">
+        <div class="page-header">
+          <h2>競合調査</h2>
+        </div>
+        <div class="stats-row">
+          <div class="stat-card"><span class="stat-num" id="tc-total">0</span><span class="stat-label">調査医院数</span></div>
+          <div class="stat-card"><span class="stat-num" id="tc-avg">0</span><span class="stat-label">平均スコア</span></div>
+        </div>
+        <div class="clinic-grid" id="clinic-grid"></div>
+      </div>
+
+      <!-- 戦略ノート -->
+      <div id="sub-strategy" hidden>
+        <div class="page-header">
+          <h2>戦略ノート</h2>
+          <p class="page-desc">カウンセリング改善戦略</p>
+        </div>
+        <div class="strategy-grid">
+          <div class="strategy-section">
+            <div class="card">
+              <div class="card-header">目的</div>
+              <p style="font-size:14px">清翔会の成約率をあげて、広告の効果を最大限にする。</p>
+              <div class="kpi-box" style="margin-top:14px">
+                <div class="kpi"><span class="kpi-label">現在の成約率</span><span class="kpi-value red">30%</span></div>
+                <div class="kpi"><span class="kpi-label">目標成約率</span><span class="kpi-value green">???</span></div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="strategy-section">
-          <h3>課題要因</h3>
-          <div class="strategy-content">
-            <ul class="issue-list">
-              <li><span class="tag tag-red">価格</span>他医院との比較・値段で選ばれない</li>
-              <li><span class="tag tag-orange">説明</span>説明不足、接遇面の問題</li>
-              <li><span class="tag tag-blue">技術</span>ドクター技術料、広告関連</li>
-            </ul>
+          <div class="strategy-section">
+            <div class="card">
+              <div class="card-header">課題要因</div>
+              <ul class="issue-list">
+                <li><span class="tag tag-red">価格</span>他医院との比較・値段で選ばれない</li>
+                <li><span class="tag tag-orange">説明</span>説明不足、接遇面の問題</li>
+                <li><span class="tag tag-blue">技術</span>ドクター技術料、広告関連</li>
+              </ul>
+            </div>
           </div>
-        </div>
-
-        <div class="strategy-section full-width">
-          <h3>競合から学んだ施策まとめ</h3>
-          <div class="strategy-content" id="suggestions-summary"></div>
-        </div>
-
-        <div class="strategy-section full-width">
-          <h3>アクションプラン</h3>
-          <div class="strategy-content">
-            <div class="action-columns">
-              <div class="action-col">
-                <h4>即実行（1-2週間）</h4>
-                <ul class="action-list" id="immediate-actions"></ul>
-              </div>
-              <div class="action-col">
-                <h4>短期（1-3ヶ月）</h4>
-                <ul class="action-list" id="short-actions"></ul>
-              </div>
-              <div class="action-col">
-                <h4>中長期（3ヶ月〜）</h4>
-                <ul class="action-list" id="long-actions"></ul>
+          <div class="strategy-section">
+            <div class="card">
+              <div class="card-header">競合から学んだ施策</div>
+              <div id="suggestions-summary"></div>
+            </div>
+          </div>
+          <div class="strategy-section">
+            <div class="card">
+              <div class="card-header">アクションプラン</div>
+              <div class="action-columns">
+                <div class="action-col"><h4>即実行</h4><ul class="action-list" id="immediate-actions"></ul></div>
+                <div class="action-col"><h4>短期</h4><ul class="action-list" id="short-actions"></ul></div>
+                <div class="action-col"><h4>中長期</h4><ul class="action-list" id="long-actions"></ul></div>
               </div>
             </div>
           </div>
-        </div>
-
-        <div class="strategy-section full-width">
-          <h3>メモ・相談事項</h3>
-          <div class="strategy-content">
-            <textarea id="strategy-notes" class="notes-area" placeholder="足立さん・小池さんのメモをここに記入...&#10;&#10;例：次回の会議で話し合いたいこと、気づいた点など"></textarea>
-            <button class="btn-save" id="save-notes">メモを保存</button>
-            <span id="save-status" class="save-status"></span>
+          <div class="strategy-section">
+            <div class="card">
+              <div class="card-header">メモ</div>
+              <textarea id="strategy-notes" class="notes-area" placeholder="メモを記入..."></textarea>
+              <button class="btn btn-dark btn-save" id="save-notes">保存</button>
+              <span id="save-status" class="save-status"></span>
+            </div>
           </div>
         </div>
       </div>
     </main>
 
-    <!-- 設定 -->
+    <!-- ==================== 設定 ==================== -->
     <main id="view-settings" class="view" hidden>
-      <div class="page-header">
-        <h2>設定</h2>
-      </div>
+      <div class="page-header"><h2>設定</h2></div>
       <div class="settings-list">
         <button class="settings-item" id="logout-btn-mobile">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
@@ -196,7 +320,7 @@
       </div>
     </main>
 
-    <!-- 医院詳細モーダル -->
+    <!-- Modal -->
     <div id="clinic-modal" class="modal" hidden>
       <div class="modal-overlay"></div>
       <div class="modal-content">
@@ -206,6 +330,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=2"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

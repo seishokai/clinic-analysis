@@ -1,15 +1,21 @@
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
+const FACILITIES = ['全体','エスカ','アール','ウィズ','ルミナス','茶屋','アサノ','知立','小牧','八事','大森','京都','銀座','訪問'];
 
 // === State ===
 let clinics = [];
-let currentView = 'dashboard';
+let currentView = 'sales';
+let currentSubView = {};
+let salesFacility = '全体';
+let patientsFacility = '全体';
+
+// === Storage helpers ===
+function loadData(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; } }
+function saveData(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
-  if (sessionStorage.getItem('authenticated') === 'true') {
-    showApp();
-  }
+  if (sessionStorage.getItem('authenticated') === 'true') showApp();
   setupEventListeners();
 });
 
@@ -35,38 +41,59 @@ function setupEventListeners() {
       document.getElementById('password').value = '';
     }
   }
-
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
-  document.getElementById('password').addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') attemptLogin();
-  });
-
-  // Logout (desktop)
+  document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
   document.getElementById('logout-btn').addEventListener('click', logout);
-
-  // Logout (mobile settings)
   document.getElementById('logout-btn-mobile').addEventListener('click', logout);
 
-  // Desktop navigation
-  document.querySelectorAll('.desktop-nav .nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchView(btn.dataset.view));
+  // Main nav
+  document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+  document.querySelectorAll('.bottom-nav-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
+
+  // Sub nav
+  document.querySelectorAll('.sub-nav-btn').forEach(b => {
+    b.addEventListener('click', () => {
+      const parent = b.closest('.sub-nav');
+      parent.querySelectorAll('.sub-nav-btn').forEach(s => s.classList.remove('active'));
+      b.classList.add('active');
+      const sub = b.dataset.sub;
+      const view = b.closest('.view') || b.closest('main');
+      // Find the parent main view
+      let mainView = parent.nextElementSibling;
+      let el = parent;
+      while (el && el.tagName !== 'MAIN') el = el.parentElement;
+      if (el) {
+        el.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== `sub-${sub}`);
+      }
+    });
   });
 
-  // Bottom navigation (mobile)
-  document.querySelectorAll('.bottom-nav-btn').forEach(btn => {
-    btn.addEventListener('click', () => switchView(btn.dataset.view));
-  });
-
-  // Modal close
+  // Modal
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.querySelector('.modal-overlay').addEventListener('click', closeModal);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
-  // Notes save
-  document.getElementById('save-notes').addEventListener('click', saveNotes);
+  // Sales
+  document.getElementById('sales-save').addEventListener('click', saveSalesEntry);
 
-  // Load saved notes
-  const saved = localStorage.getItem('strategy-notes');
-  if (saved) document.getElementById('strategy-notes').value = saved;
+  // Patients
+  document.getElementById('pt-save').addEventListener('click', savePatient);
+
+  // Notes
+  document.getElementById('save-notes').addEventListener('click', () => {
+    localStorage.setItem('strategy-notes', document.getElementById('strategy-notes').value);
+    const s = document.getElementById('save-status');
+    s.textContent = '保存しました';
+    setTimeout(() => s.textContent = '', 2000);
+  });
+  const savedNotes = localStorage.getItem('strategy-notes');
+  if (savedNotes) document.getElementById('strategy-notes').value = savedNotes;
+
+  // Set default month
+  const now = new Date();
+  const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  document.getElementById('sales-month').value = monthStr;
+  document.getElementById('pt-date').value = now.toISOString().split('T')[0];
 }
 
 function showApp() {
@@ -74,253 +101,292 @@ function showApp() {
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
   loadClinics();
+  renderFacilityTabs('sales-facility-tabs', salesFacility, f => { salesFacility = f; renderSales(); });
+  renderFacilityTabs('patients-facility-tabs', patientsFacility, f => { patientsFacility = f; renderPatients(); renderRates(); });
+  renderSales();
+  renderPatients();
+  renderRates();
 }
 
-// === Data Loading ===
+// === Navigation ===
+function switchView(view) {
+  currentView = view;
+  document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
+  window.scrollTo(0, 0);
+}
+
+// === Facility Tabs ===
+function renderFacilityTabs(containerId, active, onChange) {
+  const c = document.getElementById(containerId);
+  c.innerHTML = FACILITIES.map(f =>
+    `<button class="facility-tab${f === active ? ' active' : ''}" data-f="${f}">${f}</button>`
+  ).join('');
+  c.querySelectorAll('.facility-tab').forEach(b => {
+    b.addEventListener('click', () => {
+      c.querySelectorAll('.facility-tab').forEach(t => t.classList.remove('active'));
+      b.classList.add('active');
+      onChange(b.dataset.f);
+    });
+  });
+}
+
+// === Format ===
+function fmt(n) { return n ? Number(n).toLocaleString() : '0'; }
+function pct(a, b) { return b > 0 ? Math.round(a / b * 100) : 0; }
+
+// === Sales ===
+function getSalesData() { return loadData('sales-data', []); }
+
+function saveSalesEntry() {
+  const month = document.getElementById('sales-month').value;
+  if (!month) return;
+  const entry = {
+    id: Date.now(),
+    facility: salesFacility === '全体' ? 'エスカ' : salesFacility,
+    month,
+    selfPay: Number(document.getElementById('sales-self').value) || 0,
+    insurance: Number(document.getElementById('sales-insurance').value) || 0,
+    product: Number(document.getElementById('sales-product').value) || 0,
+    adCost: Number(document.getElementById('sales-ad').value) || 0,
+  };
+  const data = getSalesData();
+  data.push(entry);
+  saveData('sales-data', data);
+  ['sales-self','sales-insurance','sales-product','sales-ad'].forEach(id => document.getElementById(id).value = '');
+  renderSales();
+}
+
+function renderSales() {
+  const data = getSalesData();
+  const filtered = salesFacility === '全体' ? data : data.filter(d => d.facility === salesFacility);
+
+  const totalSelf = filtered.reduce((s, d) => s + d.selfPay, 0);
+  const totalIns = filtered.reduce((s, d) => s + d.insurance, 0);
+  const totalProd = filtered.reduce((s, d) => s + d.product, 0);
+  const totalAd = filtered.reduce((s, d) => s + d.adCost, 0);
+  const totalRev = totalSelf + totalIns + totalProd;
+
+  document.getElementById('sales-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalSelf)}</span><span class="stat-label">自費売上</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalIns)}</span><span class="stat-label">保険売上</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalProd)}</span><span class="stat-label">物販</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalAd)}</span><span class="stat-label">広告費</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalRev)}</span><span class="stat-label">売上合計</span></div>
+  `;
+
+  const tbody = document.getElementById('sales-tbody');
+  const sorted = [...filtered].sort((a, b) => b.month.localeCompare(a.month));
+  tbody.innerHTML = sorted.map(d => {
+    const total = d.selfPay + d.insurance + d.product;
+    return `<tr>
+      <td>${d.month}${salesFacility === '全体' ? ` <span style="color:var(--text-muted)">${d.facility}</span>` : ''}</td>
+      <td>¥${fmt(d.selfPay)}</td><td>¥${fmt(d.insurance)}</td><td>¥${fmt(d.product)}</td>
+      <td>¥${fmt(d.adCost)}</td><td><strong>¥${fmt(total)}</strong></td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+}
+
+// === Patients ===
+function getPatients() { return loadData('patients-data', []); }
+
+function savePatient() {
+  const name = document.getElementById('pt-name').value;
+  if (!name) return;
+  const entry = {
+    id: Date.now(),
+    facility: patientsFacility === '全体' ? 'エスカ' : patientsFacility,
+    visitDate: document.getElementById('pt-date').value,
+    name,
+    purpose: document.getElementById('pt-purpose').value,
+    source: document.getElementById('pt-source').value,
+    counselor: document.getElementById('pt-counselor').value,
+    doctor: document.getElementById('pt-doctor').value,
+    status: document.getElementById('pt-status').value,
+    amount: Number(document.getElementById('pt-amount').value) || 0,
+  };
+  const data = getPatients();
+  data.push(entry);
+  saveData('patients-data', data);
+  document.getElementById('pt-name').value = '';
+  document.getElementById('pt-amount').value = '';
+  renderPatients();
+  renderRates();
+}
+
+function renderPatients() {
+  const data = getPatients();
+  const filtered = patientsFacility === '全体' ? data : data.filter(d => d.facility === patientsFacility);
+
+  const total = filtered.length;
+  const consulted = filtered.filter(d => ['相談済','検査予約','診断済','成約'].includes(d.status)).length;
+  const decided = filtered.filter(d => d.status === '成約').length;
+  const totalAmt = filtered.filter(d => d.status === '成約').reduce((s, d) => s + d.amount, 0);
+
+  document.getElementById('patients-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-num">${total}</span><span class="stat-label">来院数</span></div>
+    <div class="stat-card"><span class="stat-num">${consulted}</span><span class="stat-label">相談数</span></div>
+    <div class="stat-card"><span class="stat-num">${decided}</span><span class="stat-label">成約数</span></div>
+    <div class="stat-card"><span class="stat-num">${pct(decided, consulted)}%</span><span class="stat-label">決定率</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-label">成約金額</span></div>
+  `;
+
+  const tbody = document.getElementById('patients-tbody');
+  const sorted = [...filtered].sort((a, b) => (b.visitDate || '').localeCompare(a.visitDate || ''));
+  const statusBadge = s => {
+    const cls = s === '成約' ? 'badge-success' : s === 'キャンセル' ? 'badge-danger' : ['検査予約','診断済'].includes(s) ? 'badge-warning' : 'badge-default';
+    return `<span class="badge ${cls}">${s}</span>`;
+  };
+  tbody.innerHTML = sorted.map(d => `<tr>
+    <td>${d.visitDate || '-'}</td><td>${d.name}</td><td>${d.purpose}</td><td>${d.source}</td>
+    <td>${d.counselor || '-'}</td><td>${d.doctor || '-'}</td><td>${statusBadge(d.status)}</td>
+    <td>${d.amount ? '¥' + fmt(d.amount) : '-'}</td>
+  </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+}
+
+// === Rates ===
+function renderRates() {
+  const data = getPatients();
+  const consulted = data.filter(d => ['相談済','検査予約','診断済','成約'].includes(d.status));
+  const decided = data.filter(d => d.status === '成約');
+
+  const totalRate = pct(decided.length, consulted.length);
+  document.getElementById('rates-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-num">${consulted.length}</span><span class="stat-label">総相談数</span></div>
+    <div class="stat-card"><span class="stat-num">${decided.length}</span><span class="stat-label">総成約数</span></div>
+    <div class="stat-card"><span class="stat-num">${totalRate}%</span><span class="stat-label">全体決定率</span></div>
+  `;
+
+  // By facility
+  renderBarChart('rates-facility', groupRate(data, 'facility'));
+  // By counselor
+  renderBarChart('rates-counselor', groupRate(data, 'counselor'));
+  // By doctor
+  renderBarChart('rates-doctor', groupRate(data, 'doctor'));
+}
+
+function groupRate(data, key) {
+  const groups = {};
+  data.forEach(d => {
+    const k = d[key] || '未設定';
+    if (!groups[k]) groups[k] = { consulted: 0, decided: 0 };
+    if (['相談済','検査予約','診断済','成約'].includes(d.status)) groups[k].consulted++;
+    if (d.status === '成約') groups[k].decided++;
+  });
+  return Object.entries(groups).map(([name, v]) => ({
+    name, rate: pct(v.decided, v.consulted), consulted: v.consulted, decided: v.decided
+  })).filter(d => d.consulted > 0).sort((a, b) => b.rate - a.rate);
+}
+
+function renderBarChart(id, data) {
+  const el = document.getElementById(id);
+  if (!data.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">データなし</p>'; return; }
+  el.innerHTML = data.map(d => `
+    <div class="bar-row">
+      <div class="bar-label">${d.name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate, 5)}%"><span>${d.rate}%</span></div></div>
+      <div class="bar-value">${d.decided}/${d.consulted}</div>
+    </div>
+  `).join('');
+}
+
+// === Clinics (TC) ===
 async function loadClinics() {
-  try {
-    const res = await fetch('data/clinics.json');
-    clinics = await res.json();
-  } catch {
-    clinics = [];
-  }
-  renderDashboard();
-  renderCompare();
-  renderCompareCards();
+  try { const r = await fetch('data/clinics.json'); clinics = await r.json(); } catch { clinics = []; }
+  renderCompetitors();
   renderStrategy();
 }
 
-// === Dashboard ===
-function renderDashboard() {
-  document.getElementById('total-clinics').textContent = clinics.length;
-  const avgAll = clinics.reduce((sum, c) => {
-    const s = c.scores;
-    return sum + (s.reception + s.counseling + s.hospitality + s.environment) / 4;
-  }, 0) / clinics.length;
-  document.getElementById('avg-score').textContent = avgAll.toFixed(1);
+function renderCompetitors() {
+  document.getElementById('tc-total').textContent = clinics.length;
+  const avgAll = clinics.length ? (clinics.reduce((s, c) => {
+    const sc = c.scores;
+    return s + (sc.reception + sc.counseling + sc.hospitality + sc.environment) / 4;
+  }, 0) / clinics.length).toFixed(1) : '0';
+  document.getElementById('tc-avg').textContent = avgAll;
 
   const grid = document.getElementById('clinic-grid');
   grid.innerHTML = clinics.map(c => {
     const s = c.scores;
     const avg = ((s.reception + s.counseling + s.hospitality + s.environment) / 4).toFixed(1);
-    const scoreClass = avg >= 4.5 ? 'score-high' : avg >= 3.5 ? 'score-mid' : 'score-low';
-
-    const categories = [
-      { label: '受付', score: s.reception, color: '#2980b9' },
-      { label: 'カウンセリング', score: s.counseling, color: '#27ae60' },
-      { label: '接遇', score: s.hospitality, color: '#8e44ad' },
-      { label: '院内環境', score: s.environment, color: '#f39c12' },
-    ];
-
+    const sc = avg >= 4.5 ? 'score-high' : avg >= 3.5 ? 'score-mid' : 'score-low';
     return `
       <div class="clinic-card" data-id="${c.id}">
         <div class="clinic-card-header">
           <h3>${c.name}</h3>
-          <div class="overall-score ${scoreClass}">${avg}</div>
+          <div class="overall-score ${sc}">${avg}</div>
         </div>
-        <div class="clinic-meta">
-          <span>${c.visitDate}</span>
-          <span>${c.address}</span>
-        </div>
+        <div class="clinic-meta">${c.visitDate} &middot; ${c.address}</div>
         <div class="score-bars">
-          ${categories.map(cat => `
+          ${[{l:'受付',v:s.reception},{l:'カウンセリング',v:s.counseling},{l:'接遇',v:s.hospitality},{l:'院内環境',v:s.environment}].map(x => `
             <div class="score-row">
-              <span class="label">${cat.label}</span>
-              <div class="score-bar">
-                <div class="score-bar-fill" style="width:${cat.score * 20}%;background:${cat.color}"></div>
-              </div>
-              <span class="value">${cat.score}</span>
+              <span class="label">${x.l}</span>
+              <div class="score-bar"><div class="score-bar-fill" style="width:${x.v*20}%"></div></div>
+              <span class="value">${x.v}</span>
             </div>
           `).join('')}
         </div>
         <div class="clinic-card-footer">${c.summary}</div>
-      </div>
-    `;
+      </div>`;
   }).join('');
 
   grid.querySelectorAll('.clinic-card').forEach(card => {
     card.addEventListener('click', () => {
-      const id = parseInt(card.dataset.id);
-      openClinicDetail(clinics.find(c => c.id === id));
+      openClinicDetail(clinics.find(c => c.id === parseInt(card.dataset.id)));
     });
   });
 }
 
-// === Compare Table (Desktop) ===
-function renderCompare() {
-  const table = document.getElementById('compare-table');
-  if (!table) return;
-  const headers = ['項目', ...clinics.map(c => c.name)];
-  const scoreColor = (s) => s >= 5 ? '#27ae60' : s >= 4 ? '#f39c12' : '#e74c3c';
-
-  const rows = [
-    {
-      label: '総合スコア',
-      values: clinics.map(c => {
-        const avg = ((c.scores.reception + c.scores.counseling + c.scores.hospitality + c.scores.environment) / 4).toFixed(1);
-        return `<span class="score-badge" style="background:${parseFloat(avg) >= 4.5 ? '#27ae60' : parseFloat(avg) >= 3.5 ? '#f39c12' : '#e74c3c'}">${avg}</span>`;
-      })
-    },
-    { label: '受付対応', values: clinics.map(c => `<span class="score-badge" style="background:${scoreColor(c.scores.reception)}">${c.scores.reception}</span>`) },
-    { label: 'カウンセリング', values: clinics.map(c => `<span class="score-badge" style="background:${scoreColor(c.scores.counseling)}">${c.scores.counseling}</span>`) },
-    { label: '接遇', values: clinics.map(c => `<span class="score-badge" style="background:${scoreColor(c.scores.hospitality)}">${c.scores.hospitality}</span>`) },
-    { label: '院内環境', values: clinics.map(c => `<span class="score-badge" style="background:${scoreColor(c.scores.environment)}">${c.scores.environment}</span>`) },
-    { label: '待ち時間', values: clinics.map(c => c.reception.waitTime) },
-    { label: '挨拶・表情', values: clinics.map(c => c.reception.greeting) },
-    { label: 'ヒアリング', values: clinics.map(c => c.counseling.hearing.deepDive) },
-    { label: '説明ツール', values: clinics.map(c => c.counseling.explanation.tools.join('<br>')) },
-    { label: '費用説明', values: clinics.map(c => c.counseling.proposal.pricing) },
-    { label: 'クロージング', values: clinics.map(c => c.counseling.closing.decisionPrompt) },
-    { label: '強み', values: clinics.map(c => c.strengths.join('<br>')) },
-    { label: '改善点', values: clinics.map(c => c.improvements.counseling) },
-  ];
-
-  table.innerHTML = `
-    <thead><tr>${headers.map(h => `<th>${h}</th>`).join('')}</tr></thead>
-    <tbody>${rows.map(r => `<tr><td>${r.label}</td>${r.values.map(v => `<td>${v}</td>`).join('')}</tr>`).join('')}</tbody>
-  `;
-}
-
-// === Compare Cards (Mobile) ===
-function renderCompareCards() {
-  const container = document.getElementById('compare-cards');
-  if (!container) return;
-
-  const scoreColor = (s) => s >= 5 ? '#27ae60' : s >= 4 ? '#f39c12' : '#e74c3c';
-
-  container.innerHTML = clinics.map(c => {
-    const s = c.scores;
-    const avg = ((s.reception + s.counseling + s.hospitality + s.environment) / 4).toFixed(1);
-
-    return `
-      <div class="compare-card">
-        <div class="compare-card-header">
-          <span>${c.name}</span>
-          <span class="card-avg">${avg}</span>
-        </div>
-        <div class="compare-card-body">
-          <div class="compare-card-scores">
-            <div class="compare-card-score">
-              <div class="cs-val" style="color:${scoreColor(s.reception)}">${s.reception}</div>
-              <span class="cs-label">受付</span>
-            </div>
-            <div class="compare-card-score">
-              <div class="cs-val" style="color:${scoreColor(s.counseling)}">${s.counseling}</div>
-              <span class="cs-label">カウンセリング</span>
-            </div>
-            <div class="compare-card-score">
-              <div class="cs-val" style="color:${scoreColor(s.hospitality)}">${s.hospitality}</div>
-              <span class="cs-label">接遇</span>
-            </div>
-            <div class="compare-card-score">
-              <div class="cs-val" style="color:${scoreColor(s.environment)}">${s.environment}</div>
-              <span class="cs-label">院内環境</span>
-            </div>
-          </div>
-          <dl class="compare-card-details">
-            <dt>待ち時間</dt><dd>${c.reception.waitTime}</dd>
-            <dt>費用説明</dt><dd>${c.counseling.proposal.pricing}</dd>
-            <dt>強み</dt><dd>${c.strengths.join('／')}</dd>
-            <dt>改善点</dt><dd>${c.improvements.counseling}</dd>
-          </dl>
-        </div>
-      </div>
-    `;
-  }).join('');
-}
-
-// === Strategy ===
 function renderStrategy() {
-  const container = document.getElementById('suggestions-summary');
-  container.innerHTML = clinics.map(c => {
+  document.getElementById('suggestions-summary').innerHTML = clinics.map(c => {
     if (!c.suggestions.adopt.length) return '';
-    return `
-      <div class="suggestion-by-clinic">
-        <h4>${c.name}</h4>
-        <ul>${c.suggestions.adopt.map(s => `<li>${s}</li>`).join('')}</ul>
-      </div>
-    `;
+    return `<div class="suggestion-by-clinic"><h4>${c.name}</h4><ul>${c.suggestions.adopt.map(s => `<li>${s}</li>`).join('')}</ul></div>`;
   }).join('');
 
-  const immediateActions = [
-    '担当DAが患者を待つ体制づくり',
-    '診察入ってからの患者への挨拶徹底',
-    'チェアー前にティッシュ・眼鏡入れ設置',
-    '待ち時間対策（iPad雑誌の準備）',
-  ];
-  const shortActions = [
-    'パッと見て分かる端的な資料の作成',
-    '口腔写真撮影時の器具使用方法の改善',
-    '受付とDAの連携強化で待ち時間削減',
-    '数値化した説明資料の導入（歯の大きさ等）',
-  ];
-  const longActions = [
-    'カウンセリングの2回制導入の検討',
-    '自院の強み・差別化ポイントの明確化',
-    '美容クリニック等との提携検討',
-    '成約率向上のためのクロージング研修',
-  ];
-
-  document.getElementById('immediate-actions').innerHTML = immediateActions.map(a => `<li>${a}</li>`).join('');
-  document.getElementById('short-actions').innerHTML = shortActions.map(a => `<li>${a}</li>`).join('');
-  document.getElementById('long-actions').innerHTML = longActions.map(a => `<li>${a}</li>`).join('');
+  document.getElementById('immediate-actions').innerHTML = [
+    '担当DAが患者を待つ体制づくり','診察入ってからの患者への挨拶徹底',
+    'チェアー前にティッシュ・眼鏡入れ設置','待ち時間対策（iPad雑誌の準備）',
+  ].map(a => `<li>${a}</li>`).join('');
+  document.getElementById('short-actions').innerHTML = [
+    'パッと見て分かる端的な資料の作成','口腔写真撮影時の器具使用方法の改善',
+    '受付とDAの連携強化で待ち時間削減','数値化した説明資料の導入',
+  ].map(a => `<li>${a}</li>`).join('');
+  document.getElementById('long-actions').innerHTML = [
+    'カウンセリングの2回制導入の検討','自院の強み・差別化ポイントの明確化',
+    '美容クリニック等との提携検討','成約率向上のためのクロージング研修',
+  ].map(a => `<li>${a}</li>`).join('');
 }
 
 // === Clinic Detail Modal ===
 function openClinicDetail(c) {
-  const modal = document.getElementById('clinic-modal');
   const body = document.getElementById('modal-body');
   const s = c.scores;
-  const scoreColor = (v) => v >= 5 ? '#27ae60' : v >= 4 ? '#f39c12' : '#e74c3c';
-
+  const sc = v => v >= 5 ? 'var(--text)' : v >= 4 ? 'var(--text-sub)' : 'var(--red)';
   body.innerHTML = `
     <div class="detail-header">
       <h2>${c.name}</h2>
-      <div class="detail-meta">
-        <span>${c.visitDate} ${c.visitTime}</span>
-        <span>${c.address}</span>
-      </div>
+      <div class="detail-meta">${c.visitDate} ${c.visitTime} &middot; ${c.address}</div>
     </div>
-
     <div class="detail-scores">
-      <div class="detail-score-card">
-        <div class="score-val" style="color:${scoreColor(s.reception)}">${s.reception}</div>
-        <span class="score-name">受付</span>
-      </div>
-      <div class="detail-score-card">
-        <div class="score-val" style="color:${scoreColor(s.counseling)}">${s.counseling}</div>
-        <span class="score-name">カウンセリング</span>
-      </div>
-      <div class="detail-score-card">
-        <div class="score-val" style="color:${scoreColor(s.hospitality)}">${s.hospitality}</div>
-        <span class="score-name">接遇</span>
-      </div>
-      <div class="detail-score-card">
-        <div class="score-val" style="color:${scoreColor(s.environment)}">${s.environment}</div>
-        <span class="score-name">院内環境</span>
-      </div>
+      ${[{n:'受付',v:s.reception},{n:'カウンセリング',v:s.counseling},{n:'接遇',v:s.hospitality},{n:'院内環境',v:s.environment}].map(x =>
+        `<div class="detail-score-card"><div class="score-val" style="color:${sc(x.v)}">${x.v}</div><span class="score-name">${x.n}</span></div>`
+      ).join('')}
     </div>
-
-    <div class="detail-section">
-      <h3>受付・第一印象</h3>
+    <div class="detail-section"><h3>受付・第一印象</h3>
       <dl class="detail-grid">
-        <dt>挨拶・表情</dt><dd>${c.reception.greeting}</dd>
+        <dt>挨拶</dt><dd>${c.reception.greeting}</dd>
         <dt>身だしなみ</dt><dd>${c.reception.appearance}</dd>
         <dt>待ち時間</dt><dd>${c.reception.waitTime}</dd>
         <dt>スムーズさ</dt><dd>${c.reception.smoothness}</dd>
       </dl>
-      <h4 style="margin-top:14px;font-size:12px;color:var(--text-light)">来院フロー</h4>
-      <ol class="detail-flow">
-        ${c.reception.flow.map(f => `<li>${f}</li>`).join('')}
-      </ol>
+      <h4 style="margin-top:12px;font-size:11px;color:var(--text-sub);text-transform:uppercase;letter-spacing:0.5px">来院フロー</h4>
+      <ol class="detail-flow">${c.reception.flow.map(f => `<li>${f}</li>`).join('')}</ol>
     </div>
-
-    <div class="detail-section">
-      <h3>カウンセリング</h3>
+    <div class="detail-section"><h3>カウンセリング</h3>
       <p style="margin-bottom:12px;font-size:13px;background:var(--bg);padding:12px;border-radius:8px">${c.counseling.impression}</p>
       <dl class="detail-grid">
-        <dt>主訴の深掘り</dt><dd>${c.counseling.hearing.deepDive}</dd>
-        <dt>生活背景</dt><dd>${c.counseling.hearing.lifestyle}</dd>
+        <dt>主訴深掘り</dt><dd>${c.counseling.hearing.deepDive}</dd>
         <dt>説明力</dt><dd>${c.counseling.explanation.clarity}</dd>
         <dt>専門用語</dt><dd>${c.counseling.explanation.terminology}</dd>
         <dt>治療選択肢</dt><dd>${c.counseling.proposal.options}</dd>
@@ -330,59 +396,39 @@ function openClinicDetail(c) {
         <dt>意思決定</dt><dd>${c.counseling.closing.decisionPrompt}</dd>
         <dt>次回予約</dt><dd>${c.counseling.closing.nextBooking}</dd>
       </dl>
-      <h4 style="margin-top:12px;font-size:12px;color:var(--text-light)">使用ツール</h4>
-      <ul class="detail-list">
-        ${c.counseling.explanation.tools.map(t => `<li>${t}</li>`).join('')}
-      </ul>
     </div>
-
-    <div class="detail-section">
-      <h3>接遇</h3>
+    <div class="detail-section"><h3>接遇</h3>
       <dl class="detail-grid">
         <dt>共感力</dt><dd>${c.hospitality.empathy}</dd>
-        <dt>傾聴姿勢</dt><dd>${c.hospitality.listening}</dd>
+        <dt>傾聴</dt><dd>${c.hospitality.listening}</dd>
         <dt>言葉遣い</dt><dd>${c.hospitality.language}</dd>
         <dt>距離感</dt><dd>${c.hospitality.distance}</dd>
       </dl>
     </div>
-
-    <div class="detail-section">
-      <h3>院内環境</h3>
+    <div class="detail-section"><h3>院内環境</h3>
       <dl class="detail-grid">
         <dt>清潔感</dt><dd>${c.environment.cleanliness}</dd>
         <dt>設備</dt><dd>${c.environment.equipment}</dd>
-        <dt>プライバシー</dt><dd>${c.environment.privacy}</dd>
         <dt>連携</dt><dd>${c.environment.teamwork}</dd>
       </dl>
     </div>
-
-    <div class="detail-section">
-      <h3>強み・差別化</h3>
+    <div class="detail-section"><h3>強み</h3>
       ${c.strengths.map(s => `<div class="strength-item">${s}</div>`).join('')}
-      ${c.impressivePoints.length ? '<h4 style="margin:10px 0 6px;font-size:12px;color:var(--text-light)">印象に残った点</h4>' : ''}
-      ${c.impressivePoints.map(p => `<div class="strength-item">${p}</div>`).join('')}
+      ${c.impressivePoints.length ? c.impressivePoints.map(p => `<div class="strength-item">${p}</div>`).join('') : ''}
     </div>
-
-    <div class="detail-section">
-      <h3>改善点</h3>
-      ${c.improvements.counseling !== '特になし' && c.improvements.counseling !== '1回目の段階では特になし' ? `<div class="improve-item"><strong>カウンセリング:</strong> ${c.improvements.counseling}</div>` : ''}
-      ${c.improvements.hospitality !== '特になし' && c.improvements.hospitality !== '特に問題なし' ? `<div class="improve-item"><strong>接遇:</strong> ${c.improvements.hospitality}</div>` : ''}
-      ${c.improvements.operation !== '特になし' && c.improvements.operation !== '特に問題なし' ? `<div class="improve-item"><strong>オペレーション:</strong> ${c.improvements.operation}</div>` : ''}
-      ${c.improvements.counseling === '特になし' || c.improvements.counseling === '1回目の段階では特になし' ? '<p style="font-size:13px;color:var(--text-light)">特に大きな改善点なし</p>' : ''}
+    <div class="detail-section"><h3>改善点</h3>
+      ${c.improvements.counseling && !['特になし','1回目の段階では特になし','特に問題なし'].includes(c.improvements.counseling) ? `<div class="improve-item">${c.improvements.counseling}</div>` : ''}
+      ${c.improvements.hospitality && !['特になし','特に問題なし'].includes(c.improvements.hospitality) ? `<div class="improve-item">${c.improvements.hospitality}</div>` : ''}
+      ${c.improvements.operation && !['特になし','特に問題なし'].includes(c.improvements.operation) ? `<div class="improve-item">${c.improvements.operation}</div>` : ''}
     </div>
-
-    <div class="detail-section">
-      <h3>自院への示唆</h3>
+    <div class="detail-section"><h3>自院への示唆</h3>
       ${c.suggestions.adopt.map(s => `<div class="strength-item">${s}</div>`).join('')}
     </div>
-
-    <div class="detail-section">
-      <h3>総合評価</h3>
-      <p style="font-size:14px;background:linear-gradient(135deg,#f0f7ff,#e8f8f0);padding:14px;border-radius:10px;line-height:1.8">${c.summary}</p>
+    <div class="detail-section"><h3>総合評価</h3>
+      <p style="font-size:14px;padding:14px;background:var(--bg);border-radius:8px;line-height:1.8">${c.summary}</p>
     </div>
   `;
-
-  modal.hidden = false;
+  document.getElementById('clinic-modal').hidden = false;
   document.body.style.overflow = 'hidden';
 }
 
@@ -390,36 +436,3 @@ function closeModal() {
   document.getElementById('clinic-modal').hidden = true;
   document.body.style.overflow = '';
 }
-
-// === View Switching ===
-function switchView(view) {
-  currentView = view;
-  // Update desktop nav
-  document.querySelectorAll('.desktop-nav .nav-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === view);
-  });
-  // Update bottom nav
-  document.querySelectorAll('.bottom-nav-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.view === view);
-  });
-  // Show/hide views
-  document.querySelectorAll('.view').forEach(v => {
-    v.hidden = v.id !== `view-${view}`;
-  });
-  // Scroll to top on view switch
-  window.scrollTo(0, 0);
-}
-
-// === Notes ===
-function saveNotes() {
-  const notes = document.getElementById('strategy-notes').value;
-  localStorage.setItem('strategy-notes', notes);
-  const status = document.getElementById('save-status');
-  status.textContent = '保存しました';
-  setTimeout(() => status.textContent = '', 2000);
-}
-
-// === Keyboard shortcuts ===
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeModal();
-});
