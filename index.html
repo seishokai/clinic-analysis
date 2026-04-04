@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>清翔会 - データ管理</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#1a5276">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+</head>
+<body>
+  <!-- ログイン画面 -->
+  <div id="login-screen" class="login-screen">
+    <div class="login-card">
+      <div class="login-logo">
+        <div class="logo-icon">清</div>
+        <h1>清翔会</h1>
+        <p>データ管理システム</p>
+      </div>
+      <form id="login-form" autocomplete="off">
+        <div class="input-group">
+          <label for="password">パスワード</label>
+          <input type="password" id="password" placeholder="パスワードを入力" autocomplete="off">
+        </div>
+        <button type="submit" class="btn-primary">ログイン</button>
+        <p id="login-error" class="error-msg" hidden>パスワードが正しくありません</p>
+      </form>
+    </div>
+  </div>
+
+  <!-- メインアプリ -->
+  <div id="app" class="app" hidden>
+    <!-- ヘッダー（デスクトップ用） -->
+    <header class="header">
+      <div class="header-left">
+        <div class="logo-sm">清</div>
+        <h1>清翔会</h1>
+      </div>
+      <nav class="nav desktop-nav">
+        <button class="nav-btn active" data-view="dashboard">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+          一覧
+        </button>
+        <button class="nav-btn" data-view="compare">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+          比較
+        </button>
+        <button class="nav-btn" data-view="strategy">
+          <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+          戦略
+        </button>
+      </nav>
+      <button class="btn-logout" id="logout-btn">ログアウト</button>
+    </header>
+
+    <!-- ボトムナビ（モバイル用） -->
+    <nav class="bottom-nav" id="bottom-nav">
+      <button class="bottom-nav-btn active" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        <span>一覧</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="compare">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
+        <span>比較</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="strategy">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        <span>戦略</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+        <span>設定</span>
+      </button>
+    </nav>
+
+    <!-- ダッシュボード -->
+    <main id="view-dashboard" class="view">
+      <div class="page-header">
+        <h2>競合医院一覧</h2>
+        <div class="summary-stats">
+          <div class="stat-card">
+            <span class="stat-num" id="total-clinics">0</span>
+            <span class="stat-label">調査医院数</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num" id="avg-score">0</span>
+            <span class="stat-label">平均スコア</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-num" id="current-rate">30%</span>
+            <span class="stat-label">現在の成約率</span>
+          </div>
+        </div>
+      </div>
+      <div class="clinic-grid" id="clinic-grid"></div>
+    </main>
+
+    <!-- 比較表 -->
+    <main id="view-compare" class="view" hidden>
+      <div class="page-header">
+        <h2>医院比較</h2>
+      </div>
+      <!-- デスクトップ: テーブル -->
+      <div class="compare-table-wrap desktop-only">
+        <table class="compare-table" id="compare-table"></table>
+      </div>
+      <!-- モバイル: カード形式 -->
+      <div class="compare-cards mobile-only" id="compare-cards"></div>
+    </main>
+
+    <!-- 戦略ノート -->
+    <main id="view-strategy" class="view" hidden>
+      <div class="page-header">
+        <h2>戦略ノート</h2>
+        <p class="page-desc">足立 & 小池 - カウンセリング改善戦略</p>
+      </div>
+
+      <div class="strategy-grid">
+        <div class="strategy-section">
+          <h3>目的</h3>
+          <div class="strategy-content">
+            <p>清翔会の成約率をあげて、広告の効果を最大限にする。</p>
+            <div class="kpi-box">
+              <div class="kpi">
+                <span class="kpi-label">現在の成約率</span>
+                <span class="kpi-value red">30%</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-label">目標成約率</span>
+                <span class="kpi-value green">???</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="strategy-section">
+          <h3>課題要因</h3>
+          <div class="strategy-content">
+            <ul class="issue-list">
+              <li><span class="tag tag-red">価格</span>他医院との比較・値段で選ばれない</li>
+              <li><span class="tag tag-orange">説明</span>説明不足、接遇面の問題</li>
+              <li><span class="tag tag-blue">技術</span>ドクター技術料、広告関連</li>
+            </ul>
+          </div>
+        </div>
+
+        <div class="strategy-section full-width">
+          <h3>競合から学んだ施策まとめ</h3>
+          <div class="strategy-content" id="suggestions-summary"></div>
+        </div>
+
+        <div class="strategy-section full-width">
+          <h3>アクションプラン</h3>
+          <div class="strategy-content">
+            <div class="action-columns">
+              <div class="action-col">
+                <h4>即実行（1-2週間）</h4>
+                <ul class="action-list" id="immediate-actions"></ul>
+              </div>
+              <div class="action-col">
+                <h4>短期（1-3ヶ月）</h4>
+                <ul class="action-list" id="short-actions"></ul>
+              </div>
+              <div class="action-col">
+                <h4>中長期（3ヶ月〜）</h4>
+                <ul class="action-list" id="long-actions"></ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="strategy-section full-width">
+          <h3>メモ・相談事項</h3>
+          <div class="strategy-content">
+            <textarea id="strategy-notes" class="notes-area" placeholder="足立さん・小池さんのメモをここに記入...&#10;&#10;例：次回の会議で話し合いたいこと、気づいた点など"></textarea>
+            <button class="btn-save" id="save-notes">メモを保存</button>
+            <span id="save-status" class="save-status"></span>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- 設定 -->
+    <main id="view-settings" class="view" hidden>
+      <div class="page-header">
+        <h2>設定</h2>
+      </div>
+      <div class="settings-list">
+        <button class="settings-item" id="logout-btn-mobile">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+          <span>ログアウト</span>
+        </button>
+      </div>
+    </main>
+
+    <!-- 医院詳細モーダル -->
+    <div id="clinic-modal" class="modal" hidden>
+      <div class="modal-overlay"></div>
+      <div class="modal-content">
+        <button class="modal-close" id="modal-close">&times;</button>
+        <div id="modal-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
