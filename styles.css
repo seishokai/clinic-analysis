@@ -248,15 +248,19 @@ body {
   color: white;
   flex-shrink: 0;
 }
-.score-high { background: var(--accent); }
-.score-mid { background: #9ca3af; }
-.score-low { background: var(--red); }
+.score-high { background: linear-gradient(135deg, #1a1a1a, #444); }
+.score-mid { background: linear-gradient(135deg, #9ca3af, #6b7280); }
+.score-low { background: linear-gradient(135deg, #dc2626, #b91c1c); }
 .clinic-meta { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; }
 .score-bars { display: flex; flex-direction: column; gap: 6px; }
 .score-row { display: flex; align-items: center; gap: 8px; }
 .score-row .label { font-size: 11px; color: var(--text-sub); width: 70px; }
 .score-bar { flex: 1; height: 4px; background: var(--border-light); border-radius: 2px; overflow: hidden; }
-.score-bar-fill { height: 100%; border-radius: 2px; background: var(--accent); }
+.score-bar-fill { height: 100%; border-radius: 2px; }
+.score-bar-fill.bar-reception { background: #6366f1; }
+.score-bar-fill.bar-counseling { background: #0ea5e9; }
+.score-bar-fill.bar-hospitality { background: #a855f7; }
+.score-bar-fill.bar-environment { background: #f59e0b; }
 .score-row .value { font-size: 11px; font-weight: 600; width: 16px; text-align: right; }
 .clinic-card-footer {
   margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-light);
@@ -331,7 +335,7 @@ body {
 .bar-row { display: flex; align-items: center; gap: 12px; }
 .bar-label { font-size: 13px; width: 100px; flex-shrink: 0; }
 .bar-track { flex: 1; height: 24px; background: var(--bg); border-radius: 4px; overflow: hidden; position: relative; }
-.bar-fill { height: 100%; background: var(--accent); border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; min-width: 30px; }
+.bar-fill { height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); border-radius: 4px; display: flex; align-items: center; justify-content: flex-end; padding-right: 8px; min-width: 30px; }
 .bar-fill span { font-size: 11px; font-weight: 600; color: white; }
 .bar-value { font-size: 13px; font-weight: 600; width: 50px; text-align: right; }
 

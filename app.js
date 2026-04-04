@@ -319,10 +319,10 @@ function renderCompetitors() {
         </div>
         <div class="clinic-meta">${c.visitDate} &middot; ${c.address}</div>
         <div class="score-bars">
-          ${[{l:'受付',v:s.reception},{l:'カウンセリング',v:s.counseling},{l:'接遇',v:s.hospitality},{l:'院内環境',v:s.environment}].map(x => `
+          ${[{l:'受付',v:s.reception,c:'bar-reception'},{l:'カウンセリング',v:s.counseling,c:'bar-counseling'},{l:'接遇',v:s.hospitality,c:'bar-hospitality'},{l:'院内環境',v:s.environment,c:'bar-environment'}].map(x => `
             <div class="score-row">
               <span class="label">${x.l}</span>
-              <div class="score-bar"><div class="score-bar-fill" style="width:${x.v*20}%"></div></div>
+              <div class="score-bar"><div class="score-bar-fill ${x.c}" style="width:${x.v*20}%"></div></div>
               <span class="value">${x.v}</span>
             </div>
           `).join('')}
