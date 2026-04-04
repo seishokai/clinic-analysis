@@ -219,16 +219,20 @@ function renderPatients() {
   const data = getPatients();
   const filtered = patientsFacility === '全体' ? data : data.filter(d => d.facility === patientsFacility);
 
-  const total = filtered.length;
+  const reserved = filtered.filter(d => d.status !== 'キャンセル').length;
+  const visited = filtered.filter(d => d.status !== '予約' && d.status !== 'キャンセル').length;
   const consulted = filtered.filter(d => ['相談済','検査予約','診断済','成約'].includes(d.status)).length;
   const decided = filtered.filter(d => d.status === '成約').length;
   const totalAmt = filtered.filter(d => d.status === '成約').reduce((s, d) => s + d.amount, 0);
+  const avgUnit = decided > 0 ? Math.round(totalAmt / decided) : 0;
 
   document.getElementById('patients-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-num">${total}</span><span class="stat-label">来院数</span></div>
-    <div class="stat-card"><span class="stat-num">${consulted}</span><span class="stat-label">相談数</span></div>
+    <div class="stat-card"><span class="stat-num">${reserved}</span><span class="stat-label">予約数</span></div>
+    <div class="stat-card"><span class="stat-num">${visited}</span><span class="stat-label">来院数</span></div>
+    <div class="stat-card"><span class="stat-num">${pct(visited, reserved)}%</span><span class="stat-label">来院率</span></div>
     <div class="stat-card"><span class="stat-num">${decided}</span><span class="stat-label">成約数</span></div>
-    <div class="stat-card"><span class="stat-num">${pct(decided, consulted)}%</span><span class="stat-label">決定率</span></div>
+    <div class="stat-card"><span class="stat-num">${pct(decided, visited)}%</span><span class="stat-label">決定率</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(avgUnit)}</span><span class="stat-label">決定単価</span></div>
     <div class="stat-card"><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-label">成約金額</span></div>
   `;
 
@@ -251,11 +255,16 @@ function renderRates() {
   const consulted = data.filter(d => ['相談済','検査予約','診断済','成約'].includes(d.status));
   const decided = data.filter(d => d.status === '成約');
 
-  const totalRate = pct(decided.length, consulted.length);
+  const allVisited = data.filter(d => d.status !== '予約' && d.status !== 'キャンセル');
+  const totalAmt = decided.reduce((s, d) => s + d.amount, 0);
+  const avgUnit = decided.length > 0 ? Math.round(totalAmt / decided.length) : 0;
   document.getElementById('rates-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-num">${consulted.length}</span><span class="stat-label">総相談数</span></div>
-    <div class="stat-card"><span class="stat-num">${decided.length}</span><span class="stat-label">総成約数</span></div>
-    <div class="stat-card"><span class="stat-num">${totalRate}%</span><span class="stat-label">全体決定率</span></div>
+    <div class="stat-card"><span class="stat-num">${data.length}</span><span class="stat-label">予約数</span></div>
+    <div class="stat-card"><span class="stat-num">${allVisited.length}</span><span class="stat-label">来院数</span></div>
+    <div class="stat-card"><span class="stat-num">${pct(allVisited.length, data.length)}%</span><span class="stat-label">来院率</span></div>
+    <div class="stat-card"><span class="stat-num">${decided.length}</span><span class="stat-label">成約数</span></div>
+    <div class="stat-card"><span class="stat-num">${pct(decided.length, allVisited.length)}%</span><span class="stat-label">決定率</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(avgUnit)}</span><span class="stat-label">決定単価</span></div>
   `;
 
   // By facility
