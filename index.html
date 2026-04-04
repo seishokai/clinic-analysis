@@ -37,6 +37,7 @@
       <nav class="desktop-nav">
         <button class="nav-btn active" data-view="sales">売上</button>
         <button class="nav-btn" data-view="numbers">数値</button>
+        <button class="nav-btn" data-view="reviews">口コミ</button>
         <button class="nav-btn" data-view="tc">TC</button>
       </nav>
       <div class="nav-spacer"></div>
@@ -52,6 +53,10 @@
       <button class="bottom-nav-btn" data-view="numbers">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10M12 20V4M6 20v-6"/></svg>
         <span>数値</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="reviews">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+        <span>口コミ</span>
       </button>
       <button class="bottom-nav-btn" data-view="tc">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
@@ -229,6 +234,81 @@
         <div class="card">
           <div class="card-header">ドクター別</div>
           <div class="bar-chart" id="rates-doctor"></div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ==================== 口コミ ==================== -->
+    <main id="view-reviews" class="view" hidden>
+      <div class="page-header">
+        <h2>口コミ管理</h2>
+        <p class="page-desc">Google口コミの推移を追跡</p>
+      </div>
+
+      <div class="facility-tabs" id="reviews-facility-tabs"></div>
+
+      <div class="stats-row" id="reviews-stats"></div>
+
+      <!-- 入力フォーム -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">月次データ入力</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">月</label>
+            <input type="month" class="form-input" id="rev-month">
+          </div>
+          <div class="form-group">
+            <label class="form-label">口コミ数（累計）</label>
+            <input type="number" class="form-input" id="rev-count" placeholder="0">
+          </div>
+          <div class="form-group">
+            <label class="form-label">評価点</label>
+            <input type="number" class="form-input" id="rev-rating" placeholder="4.5" step="0.1" min="1" max="5">
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-dark" id="rev-save">保存</button>
+        </div>
+      </div>
+
+      <!-- 推移グラフ -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">評価推移</div>
+        <div id="reviews-chart" style="min-height:200px"></div>
+      </div>
+
+      <!-- コメント入力 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">口コミコメント</div>
+        <div class="form-grid" style="grid-template-columns:1fr">
+          <div class="form-group">
+            <label class="form-label">新しいコメントを追加</label>
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+                <select class="form-select" id="comment-rating">
+                  <option value="5">★★★★★</option>
+                  <option value="4">★★★★☆</option>
+                  <option value="3">★★★☆☆</option>
+                  <option value="2">★★☆☆☆</option>
+                  <option value="1">★☆☆☆☆</option>
+                </select>
+                <textarea class="form-input" id="comment-text" rows="2" placeholder="口コミ内容を貼り付け..." style="resize:vertical"></textarea>
+              </div>
+              <button class="btn btn-dark" id="comment-save" style="margin-top:0">追加</button>
+            </div>
+          </div>
+        </div>
+        <div id="comments-list" style="margin-top:16px"></div>
+      </div>
+
+      <!-- データ一覧 -->
+      <div class="card">
+        <div class="card-header">月次データ</div>
+        <div class="data-table-wrap">
+          <table class="data-table">
+            <thead><tr><th>月</th><th>口コミ数</th><th>増減</th><th>評価</th></tr></thead>
+            <tbody id="reviews-tbody"></tbody>
+          </table>
         </div>
       </div>
     </main>

@@ -8,6 +8,7 @@ let currentView = 'sales';
 let currentSubView = {};
 let salesFacility = '全体';
 let patientsFacility = '全体';
+let reviewsFacility = '全体';
 
 // === Storage helpers ===
 function loadData(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; } }
@@ -79,6 +80,11 @@ function setupEventListeners() {
   // Patients
   document.getElementById('pt-save').addEventListener('click', savePatient);
 
+  // Reviews
+  document.getElementById('rev-save').addEventListener('click', saveReviewEntry);
+  document.getElementById('comment-save').addEventListener('click', saveComment);
+  document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
   // Notes
   document.getElementById('save-notes').addEventListener('click', () => {
     localStorage.setItem('strategy-notes', document.getElementById('strategy-notes').value);
@@ -103,9 +109,11 @@ function showApp() {
   loadClinics();
   renderFacilityTabs('sales-facility-tabs', salesFacility, f => { salesFacility = f; renderSales(); });
   renderFacilityTabs('patients-facility-tabs', patientsFacility, f => { patientsFacility = f; renderPatients(); renderRates(); });
+  renderFacilityTabs('reviews-facility-tabs', reviewsFacility, f => { reviewsFacility = f; renderReviews(); });
   renderSales();
   renderPatients();
   renderRates();
+  renderReviews();
 }
 
 // === Navigation ===
@@ -444,4 +452,122 @@ function openClinicDetail(c) {
 function closeModal() {
   document.getElementById('clinic-modal').hidden = true;
   document.body.style.overflow = '';
+}
+
+// === Reviews ===
+function getReviews() { return loadData('reviews-data', []); }
+function getComments() { return loadData('reviews-comments', []); }
+
+function saveReviewEntry() {
+  const month = document.getElementById('rev-month').value;
+  const count = Number(document.getElementById('rev-count').value);
+  const rating = Number(document.getElementById('rev-rating').value);
+  if (!month || !count) return;
+  const data = getReviews();
+  const existing = data.findIndex(d => d.facility === (reviewsFacility === '全体' ? 'エスカ' : reviewsFacility) && d.month === month);
+  const entry = { facility: reviewsFacility === '全体' ? 'エスカ' : reviewsFacility, month, count, rating };
+  if (existing >= 0) data[existing] = entry; else data.push(entry);
+  saveData('reviews-data', data);
+  document.getElementById('rev-count').value = '';
+  document.getElementById('rev-rating').value = '';
+  renderReviews();
+}
+
+function saveComment() {
+  const text = document.getElementById('comment-text').value.trim();
+  if (!text) return;
+  const data = getComments();
+  data.push({
+    id: Date.now(),
+    facility: reviewsFacility === '全体' ? 'エスカ' : reviewsFacility,
+    rating: Number(document.getElementById('comment-rating').value),
+    text,
+    date: new Date().toISOString().split('T')[0]
+  });
+  saveData('reviews-comments', data);
+  document.getElementById('comment-text').value = '';
+  renderReviews();
+}
+
+function renderReviews() {
+  const data = getReviews();
+  const comments = getComments();
+  const filtered = reviewsFacility === '全体' ? data : data.filter(d => d.facility === reviewsFacility);
+  const filteredComments = reviewsFacility === '全体' ? comments : comments.filter(c => c.facility === reviewsFacility);
+  const sorted = [...filtered].sort((a, b) => a.month.localeCompare(b.month));
+
+  // Stats
+  const latest = sorted[sorted.length - 1];
+  const prev = sorted[sorted.length - 2];
+  const monthDiff = latest && prev ? latest.count - prev.count : 0;
+  document.getElementById('reviews-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-num">${latest ? latest.count : 0}</span><span class="stat-label">口コミ数</span></div>
+    <div class="stat-card"><span class="stat-num">${latest ? latest.rating.toFixed(1) : '-'}</span><span class="stat-label">評価</span></div>
+    <div class="stat-card"><span class="stat-num" style="color:${monthDiff > 0 ? 'var(--green)' : monthDiff < 0 ? 'var(--red)' : 'var(--text)'}">
+      ${monthDiff > 0 ? '+' : ''}${monthDiff}</span><span class="stat-label">前月比</span></div>
+    <div class="stat-card"><span class="stat-num">${filteredComments.length}</span><span class="stat-label">コメント数</span></div>
+  `;
+
+  // Chart (simple CSS bar chart)
+  const chartEl = document.getElementById('reviews-chart');
+  if (sorted.length === 0) {
+    chartEl.innerHTML = '<p style="color:var(--text-muted);font-size:13px;text-align:center;padding:40px 0">データを入力すると推移グラフが表示されます</p>';
+  } else {
+    const maxRating = 5;
+    chartEl.innerHTML = `
+      <div style="display:flex;align-items:flex-end;gap:4px;height:160px;padding:0 4px">
+        ${sorted.map(d => {
+          const h = (d.rating / maxRating) * 140;
+          const color = d.rating >= 4.5 ? '#6366f1' : d.rating >= 4.0 ? '#0ea5e9' : d.rating >= 3.0 ? '#f59e0b' : '#dc2626';
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span style="font-size:11px;font-weight:600">${d.rating.toFixed(1)}</span>
+            <div style="width:100%;height:${h}px;background:${color};border-radius:4px 4px 0 0;min-width:20px"></div>
+            <span style="font-size:9px;color:var(--text-muted);white-space:nowrap">${d.month.slice(5)}\u6708</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:flex-end;gap:4px;height:120px;padding:0 4px">
+        ${sorted.map((d, i) => {
+          const maxCount = Math.max(...sorted.map(s => s.count));
+          const h = maxCount > 0 ? (d.count / maxCount) * 100 : 0;
+          const diff = i > 0 ? d.count - sorted[i - 1].count : 0;
+          return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">
+            <span style="font-size:10px;font-weight:600">${d.count}<span style="font-size:9px;color:${diff > 0 ? 'var(--green)' : 'var(--text-muted)'}">${diff > 0 ? '+' + diff : ''}</span></span>
+            <div style="width:100%;height:${h}px;background:var(--accent);border-radius:4px 4px 0 0;min-width:20px;opacity:0.7"></div>
+            <span style="font-size:9px;color:var(--text-muted)">${d.month.slice(5)}\u6708</span>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:16px;margin-top:8px;font-size:11px;color:var(--text-sub)">
+        <span>上: 評価推移</span><span>下: 口コミ数推移</span>
+      </div>
+    `;
+  }
+
+  // Comments
+  const commentsEl = document.getElementById('comments-list');
+  const sortedComments = [...filteredComments].sort((a, b) => b.date.localeCompare(a.date));
+  commentsEl.innerHTML = sortedComments.map(c => {
+    const stars = '★'.repeat(c.rating) + '☆'.repeat(5 - c.rating);
+    return `<div style="padding:12px;margin-bottom:8px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light)">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px">
+        <span style="color:#f59e0b;font-size:13px">${stars}</span>
+        <span style="font-size:11px;color:var(--text-muted)">${c.date}${reviewsFacility === '全体' ? ' · ' + c.facility : ''}</span>
+      </div>
+      <p style="font-size:13px;line-height:1.5">${c.text}</p>
+    </div>`;
+  }).join('') || '<p style="color:var(--text-muted);font-size:13px">コメントなし</p>';
+
+  // Table
+  const tbody = document.getElementById('reviews-tbody');
+  const reversed = [...sorted].reverse();
+  tbody.innerHTML = reversed.map((d, i) => {
+    const prev = reversed[i + 1];
+    const diff = prev ? d.count - prev.count : 0;
+    const diffStr = diff > 0 ? `<span style="color:var(--green)">+${diff}</span>` : diff < 0 ? `<span style="color:var(--red)">${diff}</span>` : '-';
+    return `<tr>
+      <td>${d.month}${reviewsFacility === '全体' ? ` <span style="color:var(--text-muted)">${d.facility}</span>` : ''}</td>
+      <td>${d.count}</td><td>${diffStr}</td><td>${d.rating.toFixed(1)}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 }
