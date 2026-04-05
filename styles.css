@@ -219,8 +219,9 @@ body {
   border-radius: var(--radius);
   padding: 16px 20px;
 }
-.stat-num { font-size: 28px; font-weight: 700; color: var(--text); }
-.stat-label { font-size: 11px; color: var(--text-sub); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.3px; }
+.stat-num { font-size: 28px; font-weight: 700; color: var(--text); display: block; }
+.stat-yoy { font-size: 12px; font-weight: 600; margin-top: 2px; display: block; }
+.stat-label { font-size: 11px; color: var(--text-sub); margin-top: 6px; display: block; text-transform: uppercase; letter-spacing: 0.3px; }
 
 /* === Clinic Grid === */
 .clinic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }

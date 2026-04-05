@@ -424,11 +424,11 @@ function renderSales() {
   };
 
   document.getElementById('sales-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalSelf)}${yoyStr(totalSelf, prevSelf)}</span><span class="stat-label">自費売上</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalIns)}${yoyStr(totalIns, prevIns)}</span><span class="stat-label">保険売上</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalProd)}</span><span class="stat-label">物販</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalAd)}</span><span class="stat-label">広告費</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalRev)}${yoyStr(totalRev, prevRev)}</span><span class="stat-label">売上合計</span></div>
+    <div class="stat-card"><span class="stat-label">自費売上</span><span class="stat-num">¥${fmt(totalSelf)}</span><span class="stat-yoy">${yoyStr(totalSelf, prevSelf)}</span></div>
+    <div class="stat-card"><span class="stat-label">保険売上</span><span class="stat-num">¥${fmt(totalIns)}</span><span class="stat-yoy">${yoyStr(totalIns, prevIns)}</span></div>
+    <div class="stat-card"><span class="stat-label">物販</span><span class="stat-num">¥${fmt(totalProd)}</span></div>
+    <div class="stat-card"><span class="stat-label">広告費</span><span class="stat-num">¥${fmt(totalAd)}</span></div>
+    <div class="stat-card"><span class="stat-label">売上合計</span><span class="stat-num">¥${fmt(totalRev)}</span><span class="stat-yoy">${yoyStr(totalRev, prevRev)}</span></div>
   `;
 
   // === スプレッドシート風 月別テーブル ===
@@ -444,6 +444,42 @@ function renderSales() {
   let mtHtml = `<thead><tr><th style="position:sticky;left:0;z-index:3;background:#1a1a1a;color:white">施設</th><th style="background:#1a1a1a;color:white">項目</th>`;
   fiscalLabels.forEach(l => { mtHtml += `<th>${l}</th>`; });
   mtHtml += `<th>通期</th><th>前年比</th></tr></thead><tbody>`;
+
+  // 全体合計行を先頭に追加（全体表示時のみ）
+  if (salesFacility === '全体') {
+    const allRows = [
+      { label: '医院売上', calc: d => d.selfPay + d.insurance + d.product },
+      { label: '自費売上', calc: d => d.selfPay },
+      { label: '保険売上', calc: d => d.insurance },
+      { label: '物販', calc: d => d.product },
+    ];
+    allRows.forEach((row, ri) => {
+      const isFirst = ri === 0;
+      const rowBg = isFirst ? 'background:#e2e3e5;font-weight:700' : ri % 2 === 0 ? 'background:#f0f1f3' : 'background:#f5f5f5';
+      mtHtml += `<tr style="${rowBg}">`;
+      if (isFirst) mtHtml += `<td rowspan="4" style="font-weight:800;font-size:14px;background:#333;color:white;position:sticky;left:0;z-index:1;border-right:2px solid var(--border);vertical-align:middle">全体</td>`;
+      mtHtml += `<td style="font-size:11px;color:${isFirst ? 'var(--text)' : 'var(--text-sub)'};white-space:nowrap;${isFirst ? 'font-weight:700' : ''}">${row.label}</td>`;
+      let yearTotal = 0, prevTotal = 0;
+      fiscalMonths.forEach(m => {
+        const monthKey = parseInt(m) >= 7 ? `${startY}-${m}` : `${startY + 1}-${m}`;
+        const val = yearData.filter(d => d.month === monthKey).reduce((s, d) => s + row.calc(d), 0);
+        yearTotal += val;
+        if (val > 0) {
+          const prevMonthKey = parseInt(m) >= 7 ? `${startY - 1}-${m}` : `${startY}-${m}`;
+          prevTotal += prevYearData.filter(d => d.month === prevMonthKey).reduce((s, d) => s + row.calc(d), 0);
+        }
+        const fmtVal = val ? (val >= 1000000 ? `${(val/10000).toFixed(0)}万` : fmt(val)) : '-';
+        mtHtml += `<td style="text-align:right;font-size:12px;font-weight:${isFirst ? '700' : '500'};${val ? '' : 'color:var(--text-muted)'}">${fmtVal}</td>`;
+      });
+      const fmtTotal = yearTotal ? (yearTotal >= 1000000 ? `${(yearTotal/10000).toFixed(0)}万` : fmt(yearTotal)) : '-';
+      const yoy = prevTotal > 0 ? Math.round((yearTotal / prevTotal - 1) * 100) : null;
+      const yoyStr = yoy !== null ? `<span style="color:${yoy >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700">${yoy >= 0 ? '+' : ''}${yoy}%</span>` : '-';
+      mtHtml += `<td style="text-align:right;font-weight:700;font-size:13px;background:#e8e9eb;border-left:2px solid var(--border)">${fmtTotal}</td>`;
+      mtHtml += `<td style="text-align:center;font-size:13px;background:#e8e9eb">${yoyStr}</td></tr>`;
+    });
+    // 区切り線
+    mtHtml += `<tr><td colspan="16" style="padding:0;height:3px;background:var(--accent)"></td></tr>`;
+  }
 
   facilityList.forEach(fac => {
     const facData = yearData.filter(d => d.facility === fac);
