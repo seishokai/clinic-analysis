@@ -7,6 +7,7 @@ let clinics = [];
 let currentView = 'sales';
 let currentSubView = {};
 let salesFacility = '全体';
+let salesYear = '2025';
 let patientsFacility = '全体';
 let reviewsFacility = '全体';
 
@@ -80,6 +81,9 @@ function setupEventListeners() {
   // Patients
   document.getElementById('pt-save').addEventListener('click', savePatient);
 
+  // Sales year filter
+  document.getElementById('sales-year').addEventListener('change', e => { salesYear = e.target.value; renderSales(); });
+
   // Reviews
   document.getElementById('rev-save').addEventListener('click', saveReviewEntry);
   document.getElementById('comment-save').addEventListener('click', saveComment);
@@ -103,7 +107,7 @@ function setupEventListeners() {
 }
 
 function seedSalesData() {
-  if (loadData('sales-seeded', false)) return;
+  if (loadData('sales-seeded-v2', false)) return;
   const d = [
     // エスカ 7-12月
     {facility:'エスカ',month:'2025-07',insurance:10784633,selfPay:32195524,product:298338,adCost:0},
@@ -187,8 +191,134 @@ function seedSalesData() {
     {facility:'京都',month:'2025-11',insurance:2225839,selfPay:10436988,product:14928,adCost:0},
     {facility:'京都',month:'2025-12',insurance:2756365,selfPay:15773248,product:27565,adCost:0},
   ].map((d,i) => ({...d, id: i+1}));
-  saveData('sales-data', d);
-  saveData('sales-seeded', true);
+  // 24期 (2024.7-2025.6) 前期
+  const prev = [
+    // エスカ
+    {facility:'エスカ',month:'2024-07',insurance:10706023,selfPay:32807092,product:324645,adCost:0},
+    {facility:'エスカ',month:'2024-08',insurance:8656287,selfPay:34701410,product:331308,adCost:0},
+    {facility:'エスカ',month:'2024-09',insurance:9222462,selfPay:26237866,product:265091,adCost:0},
+    {facility:'エスカ',month:'2024-10',insurance:11457247,selfPay:32002662,product:267652,adCost:0},
+    {facility:'エスカ',month:'2024-11',insurance:8961511,selfPay:20229015,product:218047,adCost:0},
+    {facility:'エスカ',month:'2024-12',insurance:8749237,selfPay:20849566,product:311846,adCost:0},
+    {facility:'エスカ',month:'2025-01',insurance:8994992,selfPay:27666152,product:294657,adCost:0},
+    {facility:'エスカ',month:'2025-02',insurance:8843964,selfPay:26809813,product:207736,adCost:0},
+    {facility:'エスカ',month:'2025-03',insurance:11432135,selfPay:32553953,product:273055,adCost:0},
+    {facility:'エスカ',month:'2025-04',insurance:9755427,selfPay:41426550,product:246916,adCost:0},
+    {facility:'エスカ',month:'2025-05',insurance:9568864,selfPay:30735625,product:243927,adCost:0},
+    {facility:'エスカ',month:'2025-06',insurance:9709479,selfPay:31199913,product:247476,adCost:0},
+    // アール
+    {facility:'アール',month:'2024-07',insurance:6165198,selfPay:29039447,product:142390,adCost:0},
+    {facility:'アール',month:'2024-08',insurance:6430153,selfPay:27617781,product:199672,adCost:0},
+    {facility:'アール',month:'2024-09',insurance:5565081,selfPay:19962507,product:94241,adCost:0},
+    {facility:'アール',month:'2024-10',insurance:6298923,selfPay:25411975,product:112645,adCost:0},
+    {facility:'アール',month:'2024-11',insurance:5106601,selfPay:21350672,product:140982,adCost:0},
+    {facility:'アール',month:'2024-12',insurance:5822595,selfPay:33876009,product:182555,adCost:0},
+    {facility:'アール',month:'2025-01',insurance:5619916,selfPay:19712837,product:122481,adCost:0},
+    {facility:'アール',month:'2025-02',insurance:3567955,selfPay:21563888,product:150200,adCost:0},
+    {facility:'アール',month:'2025-03',insurance:6720522,selfPay:24521858,product:146367,adCost:0},
+    {facility:'アール',month:'2025-04',insurance:5155654,selfPay:15745837,product:148667,adCost:0},
+    {facility:'アール',month:'2025-05',insurance:4730599,selfPay:21386290,product:175221,adCost:0},
+    {facility:'アール',month:'2025-06',insurance:6102000,selfPay:18320915,product:184057,adCost:0},
+    // ウィズ
+    {facility:'ウィズ',month:'2024-07',insurance:4646159,selfPay:34461952,product:325029,adCost:0},
+    {facility:'ウィズ',month:'2024-08',insurance:3899456,selfPay:37195137,product:330018,adCost:0},
+    {facility:'ウィズ',month:'2024-09',insurance:4066480,selfPay:32326085,product:154054,adCost:0},
+    {facility:'ウィズ',month:'2024-10',insurance:5295804,selfPay:29985612,product:329116,adCost:0},
+    {facility:'ウィズ',month:'2024-11',insurance:3967482,selfPay:29255699,product:104216,adCost:0},
+    {facility:'ウィズ',month:'2024-12',insurance:4690514,selfPay:26465009,product:102599,adCost:0},
+    {facility:'ウィズ',month:'2025-01',insurance:4591256,selfPay:30355028,product:125881,adCost:0},
+    {facility:'ウィズ',month:'2025-02',insurance:4862753,selfPay:33514109,product:104762,adCost:0},
+    {facility:'ウィズ',month:'2025-03',insurance:5319279,selfPay:39353245,product:277180,adCost:0},
+    {facility:'ウィズ',month:'2025-04',insurance:4959707,selfPay:29348118,product:148020,adCost:0},
+    {facility:'ウィズ',month:'2025-05',insurance:5043383,selfPay:21643818,product:195202,adCost:0},
+    {facility:'ウィズ',month:'2025-06',insurance:3644596,selfPay:36056855,product:1569708,adCost:0},
+    // ルミナス
+    {facility:'ルミナス',month:'2024-07',insurance:7020481,selfPay:8094101,product:60060,adCost:0},
+    {facility:'ルミナス',month:'2024-08',insurance:6754322,selfPay:7229500,product:56083,adCost:0},
+    {facility:'ルミナス',month:'2024-09',insurance:7474929,selfPay:7936071,product:45699,adCost:0},
+    {facility:'ルミナス',month:'2024-10',insurance:7088765,selfPay:7846054,product:41839,adCost:0},
+    {facility:'ルミナス',month:'2024-11',insurance:6603463,selfPay:3220682,product:41789,adCost:0},
+    {facility:'ルミナス',month:'2024-12',insurance:6644678,selfPay:4777253,product:52529,adCost:0},
+    {facility:'ルミナス',month:'2025-01',insurance:6168041,selfPay:5003863,product:27327,adCost:0},
+    {facility:'ルミナス',month:'2025-02',insurance:5968074,selfPay:10043375,product:37563,adCost:0},
+    {facility:'ルミナス',month:'2025-03',insurance:6420356,selfPay:6285882,product:48758,adCost:0},
+    {facility:'ルミナス',month:'2025-04',insurance:6625648,selfPay:6964365,product:61111,adCost:0},
+    {facility:'ルミナス',month:'2025-05',insurance:6862560,selfPay:6875404,product:52411,adCost:0},
+    {facility:'ルミナス',month:'2025-06',insurance:6841934,selfPay:13067664,product:56722,adCost:0},
+    // 茶屋
+    {facility:'茶屋',month:'2024-07',insurance:8410214,selfPay:11958503,product:56838,adCost:0},
+    {facility:'茶屋',month:'2024-08',insurance:6805577,selfPay:11326777,product:44618,adCost:0},
+    {facility:'茶屋',month:'2024-09',insurance:7347278,selfPay:11413512,product:41799,adCost:0},
+    {facility:'茶屋',month:'2024-10',insurance:8537815,selfPay:5301613,product:43464,adCost:0},
+    {facility:'茶屋',month:'2024-11',insurance:5747460,selfPay:13529178,product:46674,adCost:0},
+    {facility:'茶屋',month:'2024-12',insurance:8103911,selfPay:9527449,product:51651,adCost:0},
+    {facility:'茶屋',month:'2025-01',insurance:9542320,selfPay:7504288,product:33747,adCost:0},
+    {facility:'茶屋',month:'2025-02',insurance:7857774,selfPay:9221927,product:66821,adCost:0},
+    {facility:'茶屋',month:'2025-03',insurance:9926814,selfPay:11403438,product:65891,adCost:0},
+    {facility:'茶屋',month:'2025-04',insurance:8754679,selfPay:8347240,product:104402,adCost:0},
+    {facility:'茶屋',month:'2025-05',insurance:7946434,selfPay:6849185,product:58240,adCost:0},
+    {facility:'茶屋',month:'2025-06',insurance:10005547,selfPay:7675529,product:79562,adCost:0},
+    // アサノ
+    {facility:'アサノ',month:'2024-07',insurance:1126698,selfPay:0,product:1700,adCost:0},
+    {facility:'アサノ',month:'2024-08',insurance:1260100,selfPay:10509,product:482,adCost:0},
+    {facility:'アサノ',month:'2024-09',insurance:1644775,selfPay:0,product:5082,adCost:0},
+    {facility:'アサノ',month:'2024-10',insurance:1762688,selfPay:90682,product:1182,adCost:0},
+    {facility:'アサノ',month:'2024-11',insurance:3135150,selfPay:12000,product:1755,adCost:0},
+    {facility:'アサノ',month:'2024-12',insurance:1593983,selfPay:84896,product:255,adCost:0},
+    {facility:'アサノ',month:'2025-01',insurance:1761419,selfPay:66213,product:2491,adCost:0},
+    {facility:'アサノ',month:'2025-02',insurance:1854913,selfPay:117000,product:1254,adCost:0},
+    {facility:'アサノ',month:'2025-03',insurance:1494898,selfPay:199544,product:1882,adCost:0},
+    {facility:'アサノ',month:'2025-04',insurance:1956367,selfPay:6000,product:691,adCost:0},
+    {facility:'アサノ',month:'2025-05',insurance:2167327,selfPay:67008,product:1027,adCost:0},
+    {facility:'アサノ',month:'2025-06',insurance:2767541,selfPay:46625,product:4200,adCost:0},
+    // 知立
+    {facility:'知立',month:'2024-07',insurance:4648320,selfPay:7938320,product:46953,adCost:0},
+    {facility:'知立',month:'2024-08',insurance:4199146,selfPay:11796183,product:54539,adCost:0},
+    {facility:'知立',month:'2024-09',insurance:5380403,selfPay:9749773,product:51735,adCost:0},
+    {facility:'知立',month:'2024-10',insurance:5184839,selfPay:8159619,product:65112,adCost:0},
+    {facility:'知立',month:'2024-11',insurance:5255503,selfPay:13697682,product:70737,adCost:0},
+    {facility:'知立',month:'2024-12',insurance:5619449,selfPay:16779409,product:80417,adCost:0},
+    {facility:'知立',month:'2025-01',insurance:5456301,selfPay:14770865,product:52211,adCost:0},
+    {facility:'知立',month:'2025-02',insurance:5396551,selfPay:16929673,product:56519,adCost:0},
+    {facility:'知立',month:'2025-03',insurance:6090643,selfPay:19948409,product:70265,adCost:0},
+    {facility:'知立',month:'2025-04',insurance:5672023,selfPay:21526320,product:69926,adCost:0},
+    {facility:'知立',month:'2025-05',insurance:6006939,selfPay:19225819,product:76389,adCost:0},
+    {facility:'知立',month:'2025-06',insurance:6389932,selfPay:20881947,product:78140,adCost:0},
+    // 小牧
+    {facility:'小牧',month:'2024-07',insurance:5589440,selfPay:19611594,product:47346,adCost:0},
+    {facility:'小牧',month:'2024-08',insurance:4591126,selfPay:17286810,product:76354,adCost:0},
+    {facility:'小牧',month:'2024-09',insurance:4646293,selfPay:13089999,product:47216,adCost:0},
+    {facility:'小牧',month:'2024-10',insurance:4670008,selfPay:8514408,product:77284,adCost:0},
+    {facility:'小牧',month:'2024-11',insurance:4827155,selfPay:12032199,product:71378,adCost:0},
+    {facility:'小牧',month:'2024-12',insurance:5536365,selfPay:14793283,product:92969,adCost:0},
+    {facility:'小牧',month:'2025-01',insurance:5547099,selfPay:16339602,product:84562,adCost:0},
+    {facility:'小牧',month:'2025-02',insurance:5568289,selfPay:19899363,product:83146,adCost:0},
+    {facility:'小牧',month:'2025-03',insurance:7085798,selfPay:26521067,product:106733,adCost:0},
+    {facility:'小牧',month:'2025-04',insurance:5863344,selfPay:15955705,product:70295,adCost:0},
+    {facility:'小牧',month:'2025-05',insurance:6523237,selfPay:19087067,product:52825,adCost:0},
+    {facility:'小牧',month:'2025-06',insurance:5673396,selfPay:23702341,product:86924,adCost:0},
+    // 八事(24/8開院)
+    {facility:'八事',month:'2024-08',insurance:8076620,selfPay:720000,product:7784,adCost:0},
+    {facility:'八事',month:'2024-09',insurance:9204310,selfPay:656000,product:8598,adCost:0},
+    {facility:'八事',month:'2024-10',insurance:9767904,selfPay:1202286,product:4837,adCost:0},
+    {facility:'八事',month:'2024-11',insurance:10337519,selfPay:201000,product:8291,adCost:0},
+    {facility:'八事',month:'2024-12',insurance:9980427,selfPay:1278702,product:24701,adCost:0},
+    {facility:'八事',month:'2025-01',insurance:9483294,selfPay:477506,product:11145,adCost:0},
+    {facility:'八事',month:'2025-02',insurance:10213539,selfPay:1798838,product:15974,adCost:0},
+    {facility:'八事',month:'2025-03',insurance:11695083,selfPay:1768105,product:14082,adCost:0},
+    {facility:'八事',month:'2025-04',insurance:12507698,selfPay:719561,product:16538,adCost:0},
+    {facility:'八事',month:'2025-05',insurance:11729259,selfPay:1083526,product:21092,adCost:0},
+    {facility:'八事',month:'2025-06',insurance:14523596,selfPay:2020057,product:17029,adCost:0},
+    // 岩田(25/1開院)
+    {facility:'岩田',month:'2025-01',insurance:6858430,selfPay:481509,product:62481,adCost:0},
+    {facility:'岩田',month:'2025-02',insurance:6859110,selfPay:237500,product:62595,adCost:0},
+    {facility:'岩田',month:'2025-03',insurance:8355135,selfPay:113500,product:87189,adCost:0},
+    {facility:'岩田',month:'2025-04',insurance:7699965,selfPay:706536,product:65112,adCost:0},
+    {facility:'岩田',month:'2025-05',insurance:7555106,selfPay:308728,product:52953,adCost:0},
+    {facility:'岩田',month:'2025-06',insurance:7907876,selfPay:333324,product:92231,adCost:0},
+  ].map((d,i) => ({...d, id: 1000+i}));
+  saveData('sales-data', [...d, ...prev]);
+  saveData('sales-seeded-v2', true);
 }
 
 function showApp() {
@@ -256,9 +386,22 @@ function saveSalesEntry() {
   renderSales();
 }
 
+function fiscalFilter(data, year) {
+  const startY = parseInt(year);
+  const start = `${startY}-07`;
+  const end = `${startY + 1}-06`;
+  return data.filter(d => d.month >= start && d.month <= end);
+}
+
 function renderSales() {
   const data = getSalesData();
-  const filtered = salesFacility === '全体' ? data : data.filter(d => d.facility === salesFacility);
+  const yearData = fiscalFilter(data, salesYear);
+  const filtered = salesFacility === '全体' ? yearData : yearData.filter(d => d.facility === salesFacility);
+
+  // 前年データ
+  const prevYear = String(parseInt(salesYear) - 1);
+  const prevYearData = fiscalFilter(data, prevYear);
+  const prevFiltered = salesFacility === '全体' ? prevYearData : prevYearData.filter(d => d.facility === salesFacility);
 
   const totalSelf = filtered.reduce((s, d) => s + d.selfPay, 0);
   const totalIns = filtered.reduce((s, d) => s + d.insurance, 0);
@@ -266,22 +409,66 @@ function renderSales() {
   const totalAd = filtered.reduce((s, d) => s + d.adCost, 0);
   const totalRev = totalSelf + totalIns + totalProd;
 
+  const prevSelf = prevFiltered.reduce((s, d) => s + d.selfPay, 0);
+  const prevIns = prevFiltered.reduce((s, d) => s + d.insurance, 0);
+  const prevRev = prevFiltered.reduce((s, d) => s + d.selfPay + d.insurance + d.product, 0);
+
+  const yoyStr = (cur, prev) => {
+    if (!prev) return '';
+    const diff = Math.round((cur / prev - 1) * 100);
+    const color = diff >= 0 ? 'var(--green)' : 'var(--red)';
+    return `<span style="font-size:12px;color:${color};margin-left:4px">${diff >= 0 ? '+' : ''}${diff}%</span>`;
+  };
+
   document.getElementById('sales-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalSelf)}</span><span class="stat-label">自費売上</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalIns)}</span><span class="stat-label">保険売上</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalSelf)}${yoyStr(totalSelf, prevSelf)}</span><span class="stat-label">自費売上</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalIns)}${yoyStr(totalIns, prevIns)}</span><span class="stat-label">保険売上</span></div>
     <div class="stat-card"><span class="stat-num">¥${fmt(totalProd)}</span><span class="stat-label">物販</span></div>
     <div class="stat-card"><span class="stat-num">¥${fmt(totalAd)}</span><span class="stat-label">広告費</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalRev)}</span><span class="stat-label">売上合計</span></div>
+    <div class="stat-card"><span class="stat-num">¥${fmt(totalRev)}${yoyStr(totalRev, prevRev)}</span><span class="stat-label">売上合計</span></div>
   `;
 
+  // テーブル: 月別に前年比を表示
   const tbody = document.getElementById('sales-tbody');
-  const sorted = [...filtered].sort((a, b) => b.month.localeCompare(a.month));
-  tbody.innerHTML = sorted.map(d => {
+  // 施設別にグルーピングして月ごとに集計
+  const monthlyMap = {};
+  filtered.forEach(d => {
+    const key = d.month;
+    if (!monthlyMap[key]) monthlyMap[key] = { selfPay: 0, insurance: 0, product: 0, adCost: 0 };
+    monthlyMap[key].selfPay += d.selfPay;
+    monthlyMap[key].insurance += d.insurance;
+    monthlyMap[key].product += d.product;
+    monthlyMap[key].adCost += d.adCost;
+  });
+  const prevMonthlyMap = {};
+  prevFiltered.forEach(d => {
+    // 前年同月に変換: 2024-07 -> 2025-07
+    const m = parseInt(d.month.slice(5));
+    const newMonth = m >= 7 ? `${parseInt(d.month.slice(0,4))+1}-${String(m).padStart(2,'0')}` : `${d.month.slice(0,4)}-${String(m).padStart(2,'0')}`;
+    // 実際は同じ月番号で比較
+    const key = d.month;
+    if (!prevMonthlyMap[key]) prevMonthlyMap[key] = { selfPay: 0, insurance: 0, product: 0, adCost: 0 };
+    prevMonthlyMap[key].selfPay += d.selfPay;
+    prevMonthlyMap[key].insurance += d.insurance;
+    prevMonthlyMap[key].product += d.product;
+    prevMonthlyMap[key].adCost += d.adCost;
+  });
+
+  const sorted = Object.entries(monthlyMap).sort(([a],[b]) => b.localeCompare(a));
+  tbody.innerHTML = sorted.map(([month, d]) => {
     const total = d.selfPay + d.insurance + d.product;
+    // 前年同月を探す
+    const prevM = parseInt(month.slice(5));
+    const prevMonthKey = `${parseInt(month.slice(0,4))-1}-${String(prevM).padStart(2,'0')}`;
+    const p = prevMonthlyMap[prevMonthKey];
+    const prevTotal = p ? p.selfPay + p.insurance + p.product : 0;
+    const yoy = prevTotal ? Math.round((total / prevTotal - 1) * 100) : null;
+    const yoyBadge = yoy !== null ? `<span class="badge ${yoy >= 0 ? 'badge-success' : 'badge-danger'}" style="margin-left:6px">${yoy >= 0 ? '+' : ''}${yoy}%</span>` : '';
+
     return `<tr>
-      <td>${d.month}${salesFacility === '全体' ? ` <span style="color:var(--text-muted)">${d.facility}</span>` : ''}</td>
+      <td>${month}</td>
       <td>¥${fmt(d.selfPay)}</td><td>¥${fmt(d.insurance)}</td><td>¥${fmt(d.product)}</td>
-      <td>¥${fmt(d.adCost)}</td><td><strong>¥${fmt(total)}</strong></td>
+      <td>¥${fmt(d.adCost)}</td><td><strong>¥${fmt(total)}</strong>${yoyBadge}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 }
