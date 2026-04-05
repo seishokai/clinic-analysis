@@ -409,9 +409,12 @@ function renderSales() {
   const totalAd = filtered.reduce((s, d) => s + d.adCost, 0);
   const totalRev = totalSelf + totalIns + totalProd;
 
-  const prevSelf = prevFiltered.reduce((s, d) => s + d.selfPay, 0);
-  const prevIns = prevFiltered.reduce((s, d) => s + d.insurance, 0);
-  const prevRev = prevFiltered.reduce((s, d) => s + d.selfPay + d.insurance + d.product, 0);
+  // 前年同月までの累計比較: 今期のデータがある月だけを前年でも集計
+  const currentMonthNums = [...new Set(filtered.map(d => d.month.slice(5)))]; // ['07','08',...]
+  const prevSameMonths = prevFiltered.filter(d => currentMonthNums.includes(d.month.slice(5)));
+  const prevSelf = prevSameMonths.reduce((s, d) => s + d.selfPay, 0);
+  const prevIns = prevSameMonths.reduce((s, d) => s + d.insurance, 0);
+  const prevRev = prevSameMonths.reduce((s, d) => s + d.selfPay + d.insurance + d.product, 0);
 
   const yoyStr = (cur, prev) => {
     if (!prev) return '';
