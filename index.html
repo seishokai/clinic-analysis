@@ -35,10 +35,10 @@
         <span class="logo-text">SEISHOKAI</span>
       </div>
       <nav class="desktop-nav">
-        <button class="nav-btn active" data-view="sales">売上</button>
+        <button class="nav-btn active" data-view="tc">TC</button>
+        <button class="nav-btn" data-view="sales">売上</button>
         <button class="nav-btn" data-view="numbers">数値</button>
         <button class="nav-btn" data-view="reviews">口コミ</button>
-        <button class="nav-btn" data-view="tc">TC</button>
       </nav>
       <div class="nav-spacer"></div>
       <button class="btn-logout" id="logout-btn">ログアウト</button>
@@ -46,7 +46,11 @@
 
     <!-- Bottom Nav (mobile) -->
     <nav class="bottom-nav" id="bottom-nav">
-      <button class="bottom-nav-btn active" data-view="sales">
+      <button class="bottom-nav-btn active" data-view="tc">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
+        <span>TC</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="sales">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
         <span>売上</span>
       </button>
@@ -58,7 +62,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
         <span>口コミ</span>
       </button>
-      <button class="bottom-nav-btn" data-view="tc">
+      <button class="bottom-nav-btn" data-view="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
         <span>TC</span>
       </button>
@@ -69,7 +73,7 @@
     </nav>
 
     <!-- ==================== 売上 ==================== -->
-    <main id="view-sales" class="view">
+    <main id="view-sales" class="view" hidden>
       <div class="page-header">
         <h2>売上管理</h2>
       </div>
@@ -330,7 +334,7 @@
     </main>
 
     <!-- ==================== TC ==================== -->
-    <main id="view-tc" class="view" hidden>
+    <main id="view-tc" class="view">
       <div class="sub-nav">
         <button class="sub-nav-btn active" data-sub="competitors">競合調査</button>
         <button class="sub-nav-btn" data-sub="strategy">戦略ノート</button>

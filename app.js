@@ -4,7 +4,7 @@ const FACILITIES = ['全体','エスカ','アール','ウィズ','ルミナス',
 
 // === State ===
 let clinics = [];
-let currentView = 'sales';
+let currentView = 'tc';
 let currentSubView = {};
 let salesFacility = '全体';
 let salesYear = '2025';
@@ -441,7 +441,7 @@ function renderSales() {
   const facilityList = salesFacility === '全体' ? FACILITIES.filter(f => f !== '全体') : [salesFacility];
 
   // ヘッダー
-  let mtHtml = `<thead><tr><th style="position:sticky;left:0;z-index:2;background:var(--accent)">施設</th><th style="position:sticky;left:0;z-index:2;background:var(--accent)">項目</th>`;
+  let mtHtml = `<thead><tr><th style="position:sticky;left:0;z-index:3;background:#1a1a1a;color:white">施設</th><th style="background:#1a1a1a;color:white">項目</th>`;
   fiscalLabels.forEach(l => { mtHtml += `<th>${l}</th>`; });
   mtHtml += `<th>通期</th><th>前年比</th></tr></thead><tbody>`;
 
@@ -458,9 +458,10 @@ function renderSales() {
 
     rows.forEach((row, ri) => {
       const isFirst = ri === 0;
-      mtHtml += `<tr>`;
-      if (isFirst) mtHtml += `<td rowspan="4" style="font-weight:600;background:#f8f9fa;position:sticky;left:0;border-right:1px solid var(--border)">${fac}</td>`;
-      mtHtml += `<td style="font-size:11px;color:var(--text-sub);white-space:nowrap">${row.label}</td>`;
+      const rowBg = isFirst ? 'background:#f0f1f3;font-weight:600' : ri % 2 === 0 ? 'background:#fafafa' : '';
+      mtHtml += `<tr style="${rowBg}">`;
+      if (isFirst) mtHtml += `<td rowspan="4" style="font-weight:700;font-size:13px;background:#e8e9eb;position:sticky;left:0;z-index:1;border-right:2px solid var(--border);vertical-align:middle">${fac}</td>`;
+      mtHtml += `<td style="font-size:11px;color:${isFirst ? 'var(--text)' : 'var(--text-sub)'};white-space:nowrap;${isFirst ? 'font-weight:600' : ''}">${row.label}</td>`;
 
       let yearTotal = 0;
       let prevTotal = 0;
@@ -480,9 +481,9 @@ function renderSales() {
 
       const fmtTotal = yearTotal ? (yearTotal >= 1000000 ? `${(yearTotal/10000).toFixed(0)}万` : fmt(yearTotal)) : '-';
       const yoy = prevTotal > 0 ? Math.round((yearTotal / prevTotal - 1) * 100) : null;
-      const yoyStr = yoy !== null ? `<span style="color:${yoy >= 0 ? 'var(--green)' : 'var(--red)'}">${yoy >= 0 ? '+' : ''}${yoy}%</span>` : '-';
-      mtHtml += `<td style="text-align:right;font-weight:600;font-size:12px">${fmtTotal}</td>`;
-      mtHtml += `<td style="text-align:right;font-size:12px">${yoyStr}</td>`;
+      const yoyStr = yoy !== null ? `<span style="color:${yoy >= 0 ? 'var(--green)' : 'var(--red)'}; font-weight:700">${yoy >= 0 ? '+' : ''}${yoy}%</span>` : '-';
+      mtHtml += `<td style="text-align:right;font-weight:700;font-size:12px;background:#f5f5f5;border-left:2px solid var(--border)">${fmtTotal}</td>`;
+      mtHtml += `<td style="text-align:center;font-size:12px;background:#f5f5f5">${yoyStr}</td>`;
       mtHtml += `</tr>`;
     });
   });
