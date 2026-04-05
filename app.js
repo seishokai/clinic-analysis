@@ -608,19 +608,23 @@ function renderPatients() {
 
   const reserved = filtered.filter(d => d.status !== 'キャンセル').length;
   const visited = filtered.filter(d => d.status !== '予約' && d.status !== 'キャンセル').length;
-  const consulted = filtered.filter(d => ['相談済','検査予約','診断済','成約'].includes(d.status)).length;
   const decided = filtered.filter(d => d.status === '成約').length;
   const totalAmt = filtered.filter(d => d.status === '成約').reduce((s, d) => s + d.amount, 0);
   const avgUnit = decided > 0 ? Math.round(totalAmt / decided) : 0;
+  const ortho = filtered.filter(d => d.purpose === '矯正相談').length;
+  const implant = filtered.filter(d => d.purpose === 'インプラント相談').length;
+  const bf = filtered.filter(d => d.purpose === 'BF相談').length;
+  const lovelier = filtered.filter(d => d.purpose === 'ラブリエ相談').length;
 
   document.getElementById('patients-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-num">${reserved}</span><span class="stat-label">予約数</span></div>
-    <div class="stat-card"><span class="stat-num">${visited}</span><span class="stat-label">来院数</span></div>
-    <div class="stat-card"><span class="stat-num">${pct(visited, reserved)}%</span><span class="stat-label">来院率</span></div>
-    <div class="stat-card"><span class="stat-num">${decided}</span><span class="stat-label">成約数</span></div>
-    <div class="stat-card"><span class="stat-num">${pct(decided, visited)}%</span><span class="stat-label">決定率</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(avgUnit)}</span><span class="stat-label">決定単価</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-label">成約金額</span></div>
+    <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${reserved}</span></div>
+    <div class="stat-card"><span class="stat-label">矯正相談</span><span class="stat-num">${ortho}</span></div>
+    <div class="stat-card"><span class="stat-label">インプラント</span><span class="stat-num">${implant}</span></div>
+    <div class="stat-card"><span class="stat-label">BF相談</span><span class="stat-num">${bf}</span></div>
+    <div class="stat-card"><span class="stat-label">ラブリエ</span><span class="stat-num">${lovelier}</span></div>
+    <div class="stat-card"><span class="stat-label">成約数</span><span class="stat-num">${decided}</span></div>
+    <div class="stat-card"><span class="stat-label">決定率</span><span class="stat-num">${pct(decided, visited)}%</span></div>
+    <div class="stat-card"><span class="stat-label">決定単価</span><span class="stat-num">¥${fmt(avgUnit)}</span></div>
   `;
 
   const tbody = document.getElementById('patients-tbody');
