@@ -107,7 +107,7 @@ function setupEventListeners() {
 }
 
 function seedSalesData() {
-  if (loadData('sales-seeded-v2', false)) return;
+  if (loadData('sales-seeded-v3', false)) return;
   const d = [
     // エスカ 7-12月
     {facility:'エスカ',month:'2025-07',insurance:10784633,selfPay:32195524,product:298338,adCost:0},
@@ -318,7 +318,7 @@ function seedSalesData() {
     {facility:'岩田',month:'2025-06',insurance:7907876,selfPay:333324,product:92231,adCost:0},
   ].map((d,i) => ({...d, id: 1000+i}));
   saveData('sales-data', [...d, ...prev]);
-  saveData('sales-seeded-v2', true);
+  saveData('sales-seeded-v3', true);
 }
 
 function showApp() {
