@@ -431,7 +431,66 @@ function renderSales() {
     <div class="stat-card"><span class="stat-num">¥${fmt(totalRev)}${yoyStr(totalRev, prevRev)}</span><span class="stat-label">売上合計</span></div>
   `;
 
-  // テーブル: 月別に前年比を表示
+  // === スプレッドシート風 月別テーブル ===
+  const monthlyTable = document.getElementById('sales-monthly-table');
+  const fiscalMonths = ['07','08','09','10','11','12','01','02','03','04','05','06'];
+  const fiscalLabels = ['7月','8月','9月','10月','11月','12月','1月','2月','3月','4月','5月','6月'];
+  const startY = parseInt(salesYear);
+
+  // 施設リスト（全体の場合は全施設、それ以外は選択施設のみ）
+  const facilityList = salesFacility === '全体' ? FACILITIES.filter(f => f !== '全体') : [salesFacility];
+
+  // ヘッダー
+  let mtHtml = `<thead><tr><th style="position:sticky;left:0;z-index:2;background:var(--accent)">施設</th><th style="position:sticky;left:0;z-index:2;background:var(--accent)">項目</th>`;
+  fiscalLabels.forEach(l => { mtHtml += `<th>${l}</th>`; });
+  mtHtml += `<th>通期</th><th>前年比</th></tr></thead><tbody>`;
+
+  facilityList.forEach(fac => {
+    const facData = yearData.filter(d => d.facility === fac);
+    const prevFacData = prevYearData.filter(d => d.facility === fac);
+
+    const rows = [
+      { label: '医院売上', key: 'total', calc: d => d.selfPay + d.insurance + d.product },
+      { label: '自費売上', key: 'selfPay', calc: d => d.selfPay },
+      { label: '保険売上', key: 'insurance', calc: d => d.insurance },
+      { label: '物販', key: 'product', calc: d => d.product },
+    ];
+
+    rows.forEach((row, ri) => {
+      const isFirst = ri === 0;
+      mtHtml += `<tr>`;
+      if (isFirst) mtHtml += `<td rowspan="4" style="font-weight:600;background:#f8f9fa;position:sticky;left:0;border-right:1px solid var(--border)">${fac}</td>`;
+      mtHtml += `<td style="font-size:11px;color:var(--text-sub);white-space:nowrap">${row.label}</td>`;
+
+      let yearTotal = 0;
+      let prevTotal = 0;
+      fiscalMonths.forEach(m => {
+        const monthKey = parseInt(m) >= 7 ? `${startY}-${m}` : `${startY + 1}-${m}`;
+        const entry = facData.find(d => d.month === monthKey);
+        const val = entry ? row.calc(entry) : 0;
+        yearTotal += val;
+
+        const prevMonthKey = parseInt(m) >= 7 ? `${startY - 1}-${m}` : `${startY}-${m}`;
+        const prevEntry = prevFacData.find(d => d.month === prevMonthKey);
+        prevTotal += prevEntry ? row.calc(prevEntry) : 0;
+
+        const fmtVal = val ? (val >= 1000000 ? `${(val/10000).toFixed(0)}万` : fmt(val)) : '-';
+        mtHtml += `<td style="text-align:right;font-size:12px;${val ? '' : 'color:var(--text-muted)'}">${fmtVal}</td>`;
+      });
+
+      const fmtTotal = yearTotal ? (yearTotal >= 1000000 ? `${(yearTotal/10000).toFixed(0)}万` : fmt(yearTotal)) : '-';
+      const yoy = prevTotal > 0 ? Math.round((yearTotal / prevTotal - 1) * 100) : null;
+      const yoyStr = yoy !== null ? `<span style="color:${yoy >= 0 ? 'var(--green)' : 'var(--red)'}">${yoy >= 0 ? '+' : ''}${yoy}%</span>` : '-';
+      mtHtml += `<td style="text-align:right;font-weight:600;font-size:12px">${fmtTotal}</td>`;
+      mtHtml += `<td style="text-align:right;font-size:12px">${yoyStr}</td>`;
+      mtHtml += `</tr>`;
+    });
+  });
+
+  mtHtml += `</tbody>`;
+  monthlyTable.innerHTML = mtHtml;
+
+  // === 従来のテーブル ===
   const tbody = document.getElementById('sales-tbody');
   // 施設別にグルーピングして月ごとに集計
   const monthlyMap = {};
