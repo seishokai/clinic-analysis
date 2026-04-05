@@ -471,9 +471,12 @@ function renderSales() {
         const val = entry ? row.calc(entry) : 0;
         yearTotal += val;
 
-        const prevMonthKey = parseInt(m) >= 7 ? `${startY - 1}-${m}` : `${startY}-${m}`;
-        const prevEntry = prevFacData.find(d => d.month === prevMonthKey);
-        prevTotal += prevEntry ? row.calc(prevEntry) : 0;
+        // 前年同月は、今期にデータがある月だけ集計
+        if (val > 0) {
+          const prevMonthKey = parseInt(m) >= 7 ? `${startY - 1}-${m}` : `${startY}-${m}`;
+          const prevEntry = prevFacData.find(d => d.month === prevMonthKey);
+          prevTotal += prevEntry ? row.calc(prevEntry) : 0;
+        }
 
         const fmtVal = val ? (val >= 1000000 ? `${(val/10000).toFixed(0)}万` : fmt(val)) : '-';
         mtHtml += `<td style="text-align:right;font-size:12px;${val ? '' : 'color:var(--text-muted)'}">${fmtVal}</td>`;
