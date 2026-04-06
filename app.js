@@ -325,7 +325,7 @@ function seedSalesData() {
 }
 
 function seedConsultationData() {
-  if (loadData('consult-seeded-v2', false)) return;
+  if (loadData('consult-seeded-v3', false)) return;
   // 24期 矯正相談データ（施設別・月別・種類別）
   const facilities = {
     'エスカ': {consult:[109,74,90,101,88,62,96,98,110,110,98,87],decide:[53,39,41,36,40,33,41,44,62,52,36,51],kr_c:[4,5,8,10,4,3,1,1,1,2,2,2],kr_d:[2,1,4,2,1,1,0,0,1,1,1,0],ws_c:[4,8,5,11,16,8,11,16,17,7,5,4],ws_d:[2,2,1,2,4,0,2,4,6,3,2,2],bx_c:[19,15,30,24,17,13,27,23,34,30,33,26],bx_d:[5,4,10,7,6,6,8,7,19,12,7,11]},
@@ -363,7 +363,45 @@ function seedConsultationData() {
   });
 
   saveData('consultation-data', entries);
-  saveData('consult-seeded-v2', true);
+
+  // ドクター矯正データ（2025年1月〜11月）
+  const drData = [
+    {name:'小池',consult:[25,31,41,43,35,27,25,23,13,33,20],decide:[19,19,33,26,22,19,17,18,10,18,11]},
+    {name:'越知',consult:[23,22,23,20,20,19,20,8,6,7,12],decide:[7,10,15,7,13,16,7,4,4,5,2]},
+    {name:'荒木',consult:[19,22,21,18,17,23,33,34,25,29,15],decide:[6,7,4,9,2,8,7,8,10,8,4]},
+    {name:'山田',consult:[12,19,11,15,7,9,10,12,15,16,10],decide:[10,12,9,11,6,7,10,5,6,10,8]},
+    {name:'古田',consult:[42,43,31,41,38,36,27,28,26,30,23],decide:[16,22,13,11,17,12,8,8,4,21,12]},
+    {name:'小倉',consult:[24,24,24,1,0,2,0,0,0,1,0],decide:[11,16,17,1,1,1,0,1,1,2,1]},
+    {name:'原',consult:[41,43,21,38,40,26,28,33,41,34,30],decide:[23,23,19,16,24,21,21,18,25,14,15]},
+    {name:'竹内耀',consult:[68,66,48,58,49,74,49,41,21,23,28],decide:[32,33,17,24,18,23,20,23,15,10,12]},
+    {name:'大西麻',consult:[72,85,99,83,85,67,51,42,51,32,21],decide:[26,36,35,26,29,45,14,8,18,17,11]},
+    {name:'田村',consult:[26,27,23,0,5,33,17,15,25,6,7],decide:[15,5,11,1,4,7,8,6,19,6,3]},
+    {name:'立松',consult:[19,25,26,46,37,50,29,32,31,20,21],decide:[8,12,12,14,21,24,17,10,18,14,12]},
+    {name:'武内',consult:[25,32,31,20,33,16,31,20,18,21,20],decide:[11,11,15,10,10,8,9,10,9,9,3]},
+    {name:'長谷川',consult:[17,17,25,21,41,30,36,34,37,33,30],decide:[11,11,15,9,12,15,18,13,15,8,12]},
+    {name:'永江',consult:[13,24,22,22,8,17,29,15,24,24,8],decide:[10,6,9,7,3,8,11,9,5,9,3]},
+    {name:'加藤',consult:[21,25,20,28,21,23,2,42,27,30,40],decide:[10,6,10,11,3,11,1,11,9,16,15]},
+    {name:'竹内玲',consult:[3,3,5,10,10,4,16,14,17,12,11],decide:[4,0,3,5,4,2,6,2,7,6,5]},
+    {name:'西村',consult:[10,1,6,14,10,14,15,13,18,9,8],decide:[8,0,2,8,7,8,4,5,9,5,7]},
+    {name:'鈴木',consult:[6,13,14,15,17,9,15,5,13,7,2],decide:[1,5,8,5,2,3,3,3,4,3,2]},
+    {name:'中山',consult:[12,27,20,19,10,19,18,15,33,49,41],decide:[4,11,5,5,2,4,8,7,20,26,23]},
+    {name:'星野',consult:[0,0,0,1,4,12,10,21,10,9,10],decide:[0,0,0,0,3,6,2,3,5,1,3]},
+    {name:'綱島',consult:[0,0,0,2,1,4,10,11,13,10,17],decide:[0,0,0,0,0,1,2,1,9,9,6]},
+    {name:'向田',consult:[0,0,0,2,0,2,5,10,14,21,14],decide:[0,0,0,0,0,0,4,2,5,11,2]},
+    {name:'清水',consult:[0,0,0,0,0,17,15,18,16,2,7],decide:[0,0,0,0,0,7,4,1,7,3,1]},
+  ];
+  const drMonths = ['2025-01','2025-02','2025-03','2025-04','2025-05','2025-06','2025-07','2025-08','2025-09','2025-10','2025-11'];
+  const drEntries = [];
+  drData.forEach(dr => {
+    drMonths.forEach((m, i) => {
+      if (dr.consult[i] > 0) {
+        drEntries.push({name: dr.name, month: m, consult: dr.consult[i], decide: dr.decide[i]});
+      }
+    });
+  });
+  saveData('doctor-data', drEntries);
+
+  saveData('consult-seeded-v3', true);
 }
 
 function showApp() {
@@ -809,7 +847,28 @@ function renderRates() {
     (arr.length ? arr.map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%;${colors[cat]}"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('') : '<p style="font-size:12px;color:var(--text-muted)">データなし</p>')
   ).join('');
 
-  renderBarChart('rates-doctor', groupRate(pData, 'doctor'));
+  // ドクター別（Excelデータ優先）
+  const drData = loadData('doctor-data', []);
+  if (drData.length > 0) {
+    let filteredDr = drData;
+    if (ratesYear !== 'all') {
+      filteredDr = drData.filter(d => {
+        const y = parseInt(ratesYear);
+        return d.month >= `${y}-07` && d.month <= `${y+1}-06`;
+      });
+    }
+    const drGroups = {};
+    filteredDr.forEach(d => {
+      if (!drGroups[d.name]) drGroups[d.name] = { c: 0, d: 0 };
+      drGroups[d.name].c += d.consult;
+      drGroups[d.name].d += d.decide;
+    });
+    renderBarChart('rates-doctor', Object.entries(drGroups).map(([name, v]) => ({
+      name, rate: pct(v.d, v.c), decided: v.d, consulted: v.c
+    })).filter(d => d.consulted >= 10).sort((a, b) => b.rate - a.rate));
+  } else {
+    renderBarChart('rates-doctor', groupRate(pData, 'doctor'));
+  }
 }
 
 function groupRate(data, key) {
