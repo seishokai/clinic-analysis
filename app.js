@@ -1062,14 +1062,34 @@ function renderCompetitors() {
           `).join('')}
         </div>
         <div class="clinic-card-footer">${c.summary}</div>
+        <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <button class="btn btn-outline doc-add-btn" data-clinic="${c.name}" style="font-size:11px;padding:6px 12px;min-height:32px">+ 資料追加</button>
+            <span style="font-size:11px;color:var(--text-muted)" id="doc-count-${c.id}"></span>
+          </div>
+          <div class="clinic-docs" id="clinic-docs-${c.id}"></div>
+        </div>
       </div>`;
   }).join('');
 
+  // 資料追加ボタン
+  grid.querySelectorAll('.doc-add-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openDocModal(btn.dataset.clinic);
+    });
+  });
+
+  // カード本体クリック
   grid.querySelectorAll('.clinic-card').forEach(card => {
-    card.addEventListener('click', () => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.doc-add-btn') || e.target.closest('.resource-item') || e.target.closest('.resource-delete')) return;
       openClinicDetail(clinics.find(c => c.id === parseInt(card.dataset.id)));
     });
   });
+
+  // 各カードに資料表示
+  renderClinicDocs();
 }
 
 function renderStrategy() {
@@ -1174,6 +1194,14 @@ function closeModal() {
 // === Documents ===
 function getDocuments() { return loadData('documents-data', []); }
 
+function openDocModal(clinicName) {
+  document.getElementById('doc-clinic').value = clinicName;
+  document.getElementById('doc-modal-title').textContent = clinicName + ' に資料を追加';
+  document.getElementById('doc-name').value = '';
+  document.getElementById('doc-url').value = '';
+  document.getElementById('doc-modal').hidden = false;
+}
+
 function saveDocument() {
   const name = document.getElementById('doc-name').value.trim();
   const url = document.getElementById('doc-url').value.trim();
@@ -1188,52 +1216,45 @@ function saveDocument() {
     date: new Date().toISOString().split('T')[0]
   });
   saveData('documents-data', docs);
-  document.getElementById('doc-name').value = '';
-  document.getElementById('doc-url').value = '';
-  document.getElementById('doc-clinic').value = '';
+  document.getElementById('doc-modal').hidden = true;
   renderDocuments();
+  renderClinicDocs();
 }
 
 function deleteDocument(id) {
   const docs = getDocuments().filter(d => d.id !== id);
   saveData('documents-data', docs);
   renderDocuments();
+  renderClinicDocs();
 }
 
 function renderDocuments() {
   const docs = getDocuments();
   document.getElementById('tc-docs').textContent = docs.length;
+}
 
-  const container = document.getElementById('docs-list');
-  if (!docs.length) {
-    container.innerHTML = '<p style="color:var(--text-muted);font-size:13px">資料が登録されていません</p>';
-    return;
-  }
+function renderClinicDocs() {
+  const docs = getDocuments();
+  const iconClass = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'doc-pdf' : type === '録音' ? 'doc-audio' : type === '写真' ? 'doc-photo' : 'doc-other';
+  const iconText = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'PDF' : type === '録音' ? '♪' : type === '写真' ? '📷' : '📄';
 
-  const iconClass = (type) => {
-    if (['見積書','パンフレット','カウンセリング資料'].includes(type)) return 'doc-pdf';
-    if (type === '録音') return 'doc-audio';
-    if (type === '写真') return 'doc-photo';
-    return 'doc-other';
-  };
-  const iconText = (type) => {
-    if (['見積書','パンフレット','カウンセリング資料'].includes(type)) return 'PDF';
-    if (type === '録音') return '♪';
-    if (type === '写真') return '📷';
-    return '📄';
-  };
-
-  const sorted = [...docs].sort((a, b) => b.date.localeCompare(a.date));
-  container.innerHTML = sorted.map(d => `
-    <a href="${d.url}" target="_blank" rel="noopener" class="resource-item">
-      <div class="resource-icon ${iconClass(d.type)}">${iconText(d.type)}</div>
-      <div class="resource-meta">
-        <div class="doc-title">${d.name}</div>
-        <div class="doc-sub">${d.type}${d.clinic ? ' · ' + d.clinic : ''} · ${d.date}</div>
-      </div>
-      <button class="resource-delete" onclick="event.preventDefault();event.stopPropagation();deleteDocument(${d.id})">×</button>
-    </a>
-  `).join('');
+  clinics.forEach(c => {
+    const el = document.getElementById('clinic-docs-' + c.id);
+    const countEl = document.getElementById('doc-count-' + c.id);
+    if (!el) return;
+    const clinicDocs = docs.filter(d => d.clinic === c.name);
+    if (countEl) countEl.textContent = clinicDocs.length > 0 ? clinicDocs.length + '件' : '';
+    el.innerHTML = clinicDocs.map(d => `
+      <a href="${d.url}" target="_blank" rel="noopener" class="resource-item" style="padding:8px 10px;margin-bottom:4px" onclick="event.stopPropagation()">
+        <div class="resource-icon ${iconClass(d.type)}" style="width:28px;height:28px;font-size:11px">${iconText(d.type)}</div>
+        <div class="resource-meta">
+          <div class="doc-title" style="font-size:12px">${d.name}</div>
+          <div class="doc-sub" style="font-size:10px">${d.type}</div>
+        </div>
+        <button class="resource-delete" style="width:24px;height:24px;font-size:12px" onclick="event.preventDefault();event.stopPropagation();deleteDocument(${d.id})">×</button>
+      </a>
+    `).join('');
+  });
 }
 
 // === Reviews ===
