@@ -84,6 +84,9 @@ function setupEventListeners() {
   // Sales year filter
   document.getElementById('sales-year').addEventListener('change', e => { salesYear = e.target.value; renderSales(); });
 
+  // Rates year filter
+  document.getElementById('rates-year').addEventListener('change', () => renderRates());
+
   // Reviews
   document.getElementById('rev-save').addEventListener('click', saveReviewEntry);
   document.getElementById('comment-save').addEventListener('click', saveComment);
@@ -685,81 +688,128 @@ function renderPatients() {
 
 // === Rates ===
 function renderRates() {
-  // スプレッドシートの相談データを優先的に使う
-  const cData = loadData('consultation-data', []);
+  const allCData = loadData('consultation-data', []);
   const pData = getPatients();
+  const ratesYear = document.getElementById('rates-year').value;
 
-  if (cData.length > 0) {
-    // スプレッドシートデータで表示
-    const totalC = cData.reduce((s, d) => s + d.consult, 0);
-    const totalD = cData.reduce((s, d) => s + d.decide, 0);
-    const totalKR_C = cData.reduce((s, d) => s + d.kr_c, 0);
-    const totalKR_D = cData.reduce((s, d) => s + d.kr_d, 0);
-    const totalWS_C = cData.reduce((s, d) => s + d.ws_c, 0);
-    const totalWS_D = cData.reduce((s, d) => s + d.ws_d, 0);
-    const totalBX_C = cData.reduce((s, d) => s + d.bx_c, 0);
-    const totalBX_D = cData.reduce((s, d) => s + d.bx_d, 0);
-
-    document.getElementById('rates-stats').innerHTML = `
-      <div class="stat-card"><span class="stat-label">相談数</span><span class="stat-num">${fmt(totalC)}</span></div>
-      <div class="stat-card"><span class="stat-label">決定数</span><span class="stat-num">${fmt(totalD)}</span></div>
-      <div class="stat-card"><span class="stat-label">決定率</span><span class="stat-num">${pct(totalD, totalC)}%</span></div>
-      <div class="stat-card"><span class="stat-label">キレイライン</span><span class="stat-num">${pct(totalKR_D, totalKR_C)}%</span></div>
-      <div class="stat-card"><span class="stat-label">ウィスマイル</span><span class="stat-num">${pct(totalWS_D, totalWS_C)}%</span></div>
-      <div class="stat-card"><span class="stat-label">ビンクス</span><span class="stat-num">${pct(totalBX_D, totalBX_C)}%</span></div>
-    `;
-
-    // 施設別決定率
-    const facGroups = {};
-    cData.forEach(d => {
-      if (!facGroups[d.facility]) facGroups[d.facility] = { c: 0, d: 0 };
-      facGroups[d.facility].c += d.consult;
-      facGroups[d.facility].d += d.decide;
+  // 年度フィルター
+  let cData = allCData;
+  if (ratesYear !== 'all') {
+    cData = allCData.filter(d => {
+      const y = parseInt(ratesYear);
+      return d.month >= `${y}-07` && d.month <= `${y+1}-06`;
     });
-    const facRates = Object.entries(facGroups).map(([name, v]) => ({
-      name, rate: pct(v.d, v.c), decided: v.d, consulted: v.c
-    })).sort((a, b) => b.rate - a.rate);
-    renderBarChart('rates-facility', facRates);
-
-    // KR/WS/ビンクス別の施設比較をカウンセラー欄に表示
-    const catData = {};
-    ['KR','WS','ビンクス'].forEach(cat => {
-      const cKey = cat === 'KR' ? 'kr_c' : cat === 'WS' ? 'ws_c' : 'bx_c';
-      const dKey = cat === 'KR' ? 'kr_d' : cat === 'WS' ? 'ws_d' : 'bx_d';
-      const groups = {};
-      cData.forEach(d => {
-        if (!groups[d.facility]) groups[d.facility] = { c: 0, d: 0 };
-        groups[d.facility].c += d[cKey];
-        groups[d.facility].d += d[dKey];
-      });
-      catData[cat] = Object.entries(groups).map(([name, v]) => ({
-        name, rate: pct(v.d, v.c), decided: v.d, consulted: v.c
-      })).filter(d => d.consulted > 0).sort((a, b) => b.rate - a.rate);
-    });
-
-    document.getElementById('rates-counselor').innerHTML =
-      '<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">キレイライン 施設別</div>' +
-      catData['KR'].map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('') +
-      '<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin:16px 0 8px">ウィスマイル 施設別</div>' +
-      catData['WS'].map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('') +
-      '<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin:16px 0 8px">ビンクス 施設別</div>' +
-      catData['ビンクス'].map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%;background:linear-gradient(90deg,#f59e0b,#fbbf24)"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('');
-
-    // ドクター欄は手動入力データから
-    renderBarChart('rates-doctor', groupRate(pData, 'doctor'));
-  } else {
-    // 手動入力データのみ
-    const allVisited = pData.filter(d => d.status !== '予約' && d.status !== 'キャンセル');
-    const decided = pData.filter(d => d.status === '成約');
-    document.getElementById('rates-stats').innerHTML = `
-      <div class="stat-card"><span class="stat-label">来院数</span><span class="stat-num">${allVisited.length}</span></div>
-      <div class="stat-card"><span class="stat-label">成約数</span><span class="stat-num">${decided.length}</span></div>
-      <div class="stat-card"><span class="stat-label">決定率</span><span class="stat-num">${pct(decided.length, allVisited.length)}%</span></div>
-    `;
-    renderBarChart('rates-facility', groupRate(pData, 'facility'));
-    renderBarChart('rates-counselor', groupRate(pData, 'counselor'));
-    renderBarChart('rates-doctor', groupRate(pData, 'doctor'));
   }
+
+  if (cData.length === 0) {
+    document.getElementById('rates-stats').innerHTML = '<div class="stat-card"><span class="stat-label">データなし</span></div>';
+    document.getElementById('rates-monthly-table').innerHTML = '';
+    return;
+  }
+
+  const sum = (arr, key) => arr.reduce((s, d) => s + d[key], 0);
+  const totalC = sum(cData,'consult'), totalD = sum(cData,'decide');
+
+  document.getElementById('rates-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">相談数</span><span class="stat-num">${fmt(totalC)}</span></div>
+    <div class="stat-card"><span class="stat-label">決定数</span><span class="stat-num">${fmt(totalD)}</span></div>
+    <div class="stat-card"><span class="stat-label">決定率</span><span class="stat-num">${pct(totalD, totalC)}%</span></div>
+    <div class="stat-card"><span class="stat-label">キレイライン</span><span class="stat-num">${pct(sum(cData,'kr_d'), sum(cData,'kr_c'))}%</span></div>
+    <div class="stat-card"><span class="stat-label">ウィスマイル</span><span class="stat-num">${pct(sum(cData,'ws_d'), sum(cData,'ws_c'))}%</span></div>
+    <div class="stat-card"><span class="stat-label">ビンクス</span><span class="stat-num">${pct(sum(cData,'bx_d'), sum(cData,'bx_c'))}%</span></div>
+  `;
+
+  // === 月別テーブル（スプレッドシート風） ===
+  const mTable = document.getElementById('rates-monthly-table');
+  const fiscalM = ['07','08','09','10','11','12','01','02','03','04','05','06'];
+  const fiscalL = ['7月','8月','9月','10月','11月','12月','1月','2月','3月','4月','5月','6月'];
+  const facList = [...new Set(cData.map(d => d.facility))];
+
+  let html = `<thead><tr><th style="position:sticky;left:0;z-index:3;background:#1a1a1a;color:white">医院</th><th style="background:#1a1a1a;color:white">項目</th>`;
+  fiscalL.forEach(l => { html += `<th style="background:#1a1a1a;color:white">${l}</th>`; });
+  html += `<th style="background:#1a1a1a;color:white">通期</th><th style="background:#1a1a1a;color:white">決定率</th></tr></thead><tbody>`;
+
+  // 全体行
+  const allMonths = {};
+  fiscalM.forEach(m => { allMonths[m] = { c: 0, d: 0 }; });
+  cData.forEach(d => { const m = d.month.slice(5); if (allMonths[m]) { allMonths[m].c += d.consult; allMonths[m].d += d.decide; } });
+  ['相談数','決定数'].forEach((label, ri) => {
+    const bg = ri === 0 ? 'background:#e2e3e5;font-weight:700' : 'background:#f0f1f3';
+    html += `<tr style="${bg}">`;
+    if (ri === 0) html += `<td rowspan="2" style="font-weight:800;background:#333;color:white;position:sticky;left:0;z-index:1;vertical-align:middle">全体</td>`;
+    html += `<td style="font-size:11px;${ri===0?'font-weight:700':''}">${label}</td>`;
+    let total = 0;
+    fiscalM.forEach(m => {
+      const v = ri === 0 ? allMonths[m].c : allMonths[m].d;
+      total += v;
+      html += `<td style="text-align:right;font-size:12px;${v?'':'color:var(--text-muted)'}">${v || '-'}</td>`;
+    });
+    const rate = ri === 1 ? `${pct(total, fiscalM.reduce((s,m) => s + allMonths[m].c, 0))}%` : '';
+    html += `<td style="text-align:right;font-weight:700;font-size:12px;background:#e8e9eb;border-left:2px solid var(--border)">${fmt(total)}</td>`;
+    html += `<td style="text-align:center;font-size:12px;background:#e8e9eb;font-weight:700">${rate}</td></tr>`;
+  });
+  html += `<tr><td colspan="16" style="padding:0;height:3px;background:var(--accent)"></td></tr>`;
+
+  // 施設別行
+  facList.forEach(fac => {
+    const facData = cData.filter(d => d.facility === fac);
+    const mData = {};
+    fiscalM.forEach(m => { mData[m] = { c: 0, d: 0 }; });
+    facData.forEach(d => { const m = d.month.slice(5); if (mData[m]) { mData[m].c += d.consult; mData[m].d += d.decide; } });
+
+    ['相談数','決定数'].forEach((label, ri) => {
+      const bg = ri === 0 ? 'background:#f0f1f3;font-weight:600' : '';
+      html += `<tr style="${bg}">`;
+      if (ri === 0) html += `<td rowspan="2" style="font-weight:700;font-size:13px;background:#e8e9eb;position:sticky;left:0;z-index:1;border-right:2px solid var(--border);vertical-align:middle">${fac}</td>`;
+      html += `<td style="font-size:11px;color:${ri===0?'var(--text)':'var(--text-sub)'};${ri===0?'font-weight:600':''}">${label}</td>`;
+      let total = 0;
+      fiscalM.forEach(m => {
+        const v = ri === 0 ? mData[m].c : mData[m].d;
+        total += v;
+        html += `<td style="text-align:right;font-size:12px;${v?'':'color:var(--text-muted)'}">${v || '-'}</td>`;
+      });
+      const tC = fiscalM.reduce((s,m) => s + mData[m].c, 0);
+      const tD = fiscalM.reduce((s,m) => s + mData[m].d, 0);
+      const rate = ri === 1 ? `<span style="color:${pct(tD,tC)>=50?'var(--green)':'var(--red)'};font-weight:700">${pct(tD,tC)}%</span>` : '';
+      html += `<td style="text-align:right;font-weight:700;font-size:12px;background:#f5f5f5;border-left:2px solid var(--border)">${fmt(total)}</td>`;
+      html += `<td style="text-align:center;font-size:12px;background:#f5f5f5">${rate}</td></tr>`;
+    });
+  });
+  html += '</tbody>';
+  mTable.innerHTML = html;
+
+  // === 施設別バーチャート ===
+  const facGroups = {};
+  cData.forEach(d => {
+    if (!facGroups[d.facility]) facGroups[d.facility] = { c: 0, d: 0 };
+    facGroups[d.facility].c += d.consult;
+    facGroups[d.facility].d += d.decide;
+  });
+  renderBarChart('rates-facility', Object.entries(facGroups).map(([name, v]) => ({
+    name, rate: pct(v.d, v.c), decided: v.d, consulted: v.c
+  })).sort((a, b) => b.rate - a.rate));
+
+  // === 種類別 ===
+  const catData = {};
+  [['キレイライン','kr_c','kr_d'],['ウィスマイル','ws_c','ws_d'],['ビンクス','bx_c','bx_d']].forEach(([cat,cK,dK]) => {
+    const groups = {};
+    cData.forEach(d => {
+      if (!groups[d.facility]) groups[d.facility] = { c: 0, d: 0 };
+      groups[d.facility].c += d[cK];
+      groups[d.facility].d += d[dK];
+    });
+    catData[cat] = Object.entries(groups).map(([name, v]) => ({
+      name, rate: pct(v.d, v.c), decided: v.d, consulted: v.c
+    })).filter(d => d.consulted > 0).sort((a, b) => b.rate - a.rate);
+  });
+
+  const colors = { 'キレイライン': '', 'ウィスマイル': 'background:linear-gradient(90deg,#0ea5e9,#38bdf8)', 'ビンクス': 'background:linear-gradient(90deg,#f59e0b,#fbbf24)' };
+  document.getElementById('rates-counselor').innerHTML = Object.entries(catData).map(([cat, arr]) =>
+    `<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin:${cat==='キレイライン'?'0':'16px'} 0 8px">${cat} 施設別</div>` +
+    (arr.length ? arr.map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%;${colors[cat]}"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('') : '<p style="font-size:12px;color:var(--text-muted)">データなし</p>')
+  ).join('');
+
+  renderBarChart('rates-doctor', groupRate(pData, 'doctor'));
 }
 
 function groupRate(data, key) {

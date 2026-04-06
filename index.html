@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -243,14 +243,31 @@
           <h2>決定率</h2>
         </div>
 
+        <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
+          <label class="form-label" style="margin:0">年度</label>
+          <select class="form-select" id="rates-year" style="width:auto">
+            <option value="all">全期間</option>
+            <option value="2025">25期 (2025.7-2026.6)</option>
+            <option value="2024">24期 (2024.7-2025.6)</option>
+          </select>
+        </div>
+
         <div class="stats-row" id="rates-stats"></div>
+
+        <!-- 月別テーブル -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">月別推移</div>
+          <div class="data-table-wrap">
+            <table class="data-table" id="rates-monthly-table"></table>
+          </div>
+        </div>
 
         <div class="card" style="margin-bottom:20px">
           <div class="card-header">医院別</div>
           <div class="bar-chart" id="rates-facility"></div>
         </div>
         <div class="card" style="margin-bottom:20px">
-          <div class="card-header">種類別（KR / WS / ビンクス）</div>
+          <div class="card-header">種類別（キレイライン / ウィスマイル / ビンクス）</div>
           <div class="bar-chart" id="rates-counselor"></div>
         </div>
         <div class="card">
@@ -430,6 +447,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>
