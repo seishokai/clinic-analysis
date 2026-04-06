@@ -321,11 +321,35 @@ function seedSalesData() {
   saveData('sales-seeded-v3', true);
 }
 
+function seedConsultationData() {
+  if (loadData('consult-seeded-v1', false)) return;
+  // 24期 矯正相談データ（施設別・月別・種類別）
+  const facilities = {
+    'エスカ': {consult:[109,74,90,101,88,62,96,98,110,110,98,87],decide:[53,39,41,36,40,33,41,44,62,52,36,51],kr_c:[4,5,8,10,4,3,1,1,1,2,2,2],kr_d:[2,1,4,2,1,1,0,0,1,1,1,0],ws_c:[4,8,5,11,16,8,11,16,17,7,5,4],ws_d:[2,2,1,2,4,0,2,4,6,3,2,2],bx_c:[19,15,30,24,17,13,27,23,34,30,33,26],bx_d:[5,4,10,7,6,6,8,7,19,12,7,11]},
+    'アール': {consult:[94,65,80,74,83,82,92,103,87,81,78,66],decide:[38,42,45,42,43,44,50,41,39,39,47,29],kr_c:[7,6,10,7,4,6,4,5,3,1,1,3],kr_d:[4,2,8,3,1,2,1,2,0,0,1,1],ws_c:[5,1,6,13,20,13,8,19,28,16,7,8],ws_d:[0,1,1,3,6,1,5,6,7,6,2,1],bx_c:[6,6,12,11,8,17,27,23,4,15,20,11],bx_d:[1,7,8,6,4,9,13,12,0,4,9,2]},
+    'ウィズ': {consult:[122,86,97,72,104,110,92,126,92,96,84,97],decide:[82,59,64,56,66,68,45,57,69,34,46,56],kr_c:[12,10,14,6,2,4,4,5,2,5,4,2],kr_d:[4,4,4,2,0,0,1,0,2,2,1,1],ws_c:[10,21,34,47,63,22,27,43,19,26,19,20],ws_d:[10,6,7,15,25,7,10,15,10,3,9,12],bx_c:[0,0,16,17,9,0,6,14,15,13,4,5],bx_d:[0,0,5,7,2,0,0,0,5,4,4,2]},
+    'ルミナス': {consult:[25,12,14,11,11,9,16,21,18,23,13,10],decide:[18,8,10,9,9,5,14,14,11,17,10,8],kr_c:[3,0,3,1,1,1,2,1,2,1,0,1],kr_d:[3,0,1,0,0,0,0,0,0,0,0,0],ws_c:[0,2,0,0,1,1,1,3,2,1,1,0],ws_d:[0,0,0,0,0,0,0,1,0,0,0,0],bx_c:[3,1,4,1,1,0,2,7,0,4,0,4],bx_d:[3,0,2,2,1,0,2,4,0,2,0,0]},
+    '茶屋': {consult:[32,34,36,45,52,22,22,35,30,30,22,31],decide:[18,16,14,20,18,18,10,12,9,12,10,15],kr_c:[2,7,3,6,4,1,2,3,1,0,4,0],kr_d:[0,3,1,1,0,1,0,0,0,0,0,0],ws_c:[4,8,10,8,17,15,9,13,17,10,6,20],ws_d:[0,3,2,0,5,4,1,0,3,1,0,2],bx_c:[0,0,0,0,0,0,0,0,0,0,0,0],bx_d:[0,0,0,0,0,0,0,0,0,0,0,0]},
+    '小牧': {consult:[50,38,33,18,27,108,99,88,71,81,72,83],decide:[37,24,24,12,21,42,50,45,30,31,41,29],kr_c:[0,0,0,1,0,0,1,4,2,1,2,2],kr_d:[0,0,0,0,0,0,0,1,0,0,0,2],ws_c:[2,8,4,4,11,11,11,5,8,0,8,20],ws_d:[1,4,1,2,16,1,2,0,0,0,1,6],bx_c:[0,0,0,0,0,0,0,0,0,0,0,0],bx_d:[0,0,0,0,0,0,0,0,0,0,0,0]},
+    '知立': {consult:[40,39,46,46,67,98,95,114,137,117,113,114],decide:[29,18,18,27,39,26,35,43,49,31,40,67],kr_c:[0,0,0,0,0,0,8,5,4,1,3,3],kr_d:[0,0,0,0,0,0,3,2,0,0,1,2],ws_c:[12,10,15,15,28,26,18,31,30,11,36,25],ws_d:[1,3,4,2,9,5,4,6,10,3,6,12],bx_c:[0,0,0,0,0,0,0,0,0,0,0,0],bx_d:[0,0,0,0,0,0,0,0,0,0,0,0]},
+  };
+  const months24 = ['2024-07','2024-08','2024-09','2024-10','2024-11','2024-12','2025-01','2025-02','2025-03','2025-04','2025-05','2025-06'];
+  const entries = [];
+  Object.entries(facilities).forEach(([fac, data]) => {
+    months24.forEach((m, i) => {
+      entries.push({facility:fac,month:m,consult:data.consult[i],decide:data.decide[i],kr_c:data.kr_c[i],kr_d:data.kr_d[i],ws_c:data.ws_c[i],ws_d:data.ws_d[i],bx_c:data.bx_c[i],bx_d:data.bx_d[i]});
+    });
+  });
+  saveData('consultation-data', entries);
+  saveData('consult-seeded-v1', true);
+}
+
 function showApp() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
   seedSalesData();
+  seedConsultationData();
   loadClinics();
   renderFacilityTabs('sales-facility-tabs', salesFacility, f => { salesFacility = f; renderSales(); });
   renderFacilityTabs('patients-facility-tabs', patientsFacility, f => { patientsFacility = f; renderPatients(); renderRates(); });
@@ -642,28 +666,81 @@ function renderPatients() {
 
 // === Rates ===
 function renderRates() {
-  const data = getPatients();
-  const consulted = data.filter(d => ['相談済','検査予約','診断済','成約'].includes(d.status));
-  const decided = data.filter(d => d.status === '成約');
+  // スプレッドシートの相談データを優先的に使う
+  const cData = loadData('consultation-data', []);
+  const pData = getPatients();
 
-  const allVisited = data.filter(d => d.status !== '予約' && d.status !== 'キャンセル');
-  const totalAmt = decided.reduce((s, d) => s + d.amount, 0);
-  const avgUnit = decided.length > 0 ? Math.round(totalAmt / decided.length) : 0;
-  document.getElementById('rates-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-num">${data.length}</span><span class="stat-label">予約数</span></div>
-    <div class="stat-card"><span class="stat-num">${allVisited.length}</span><span class="stat-label">来院数</span></div>
-    <div class="stat-card"><span class="stat-num">${pct(allVisited.length, data.length)}%</span><span class="stat-label">来院率</span></div>
-    <div class="stat-card"><span class="stat-num">${decided.length}</span><span class="stat-label">成約数</span></div>
-    <div class="stat-card"><span class="stat-num">${pct(decided.length, allVisited.length)}%</span><span class="stat-label">決定率</span></div>
-    <div class="stat-card"><span class="stat-num">¥${fmt(avgUnit)}</span><span class="stat-label">決定単価</span></div>
-  `;
+  if (cData.length > 0) {
+    // スプレッドシートデータで表示
+    const totalC = cData.reduce((s, d) => s + d.consult, 0);
+    const totalD = cData.reduce((s, d) => s + d.decide, 0);
+    const totalKR_C = cData.reduce((s, d) => s + d.kr_c, 0);
+    const totalKR_D = cData.reduce((s, d) => s + d.kr_d, 0);
+    const totalWS_C = cData.reduce((s, d) => s + d.ws_c, 0);
+    const totalWS_D = cData.reduce((s, d) => s + d.ws_d, 0);
+    const totalBX_C = cData.reduce((s, d) => s + d.bx_c, 0);
+    const totalBX_D = cData.reduce((s, d) => s + d.bx_d, 0);
 
-  // By facility
-  renderBarChart('rates-facility', groupRate(data, 'facility'));
-  // By counselor
-  renderBarChart('rates-counselor', groupRate(data, 'counselor'));
-  // By doctor
-  renderBarChart('rates-doctor', groupRate(data, 'doctor'));
+    document.getElementById('rates-stats').innerHTML = `
+      <div class="stat-card"><span class="stat-label">相談数</span><span class="stat-num">${fmt(totalC)}</span></div>
+      <div class="stat-card"><span class="stat-label">決定数</span><span class="stat-num">${fmt(totalD)}</span></div>
+      <div class="stat-card"><span class="stat-label">決定率</span><span class="stat-num">${pct(totalD, totalC)}%</span></div>
+      <div class="stat-card"><span class="stat-label">KR決定率</span><span class="stat-num">${pct(totalKR_D, totalKR_C)}%</span></div>
+      <div class="stat-card"><span class="stat-label">WS決定率</span><span class="stat-num">${pct(totalWS_D, totalWS_C)}%</span></div>
+      <div class="stat-card"><span class="stat-label">ビンクス決定率</span><span class="stat-num">${pct(totalBX_D, totalBX_C)}%</span></div>
+    `;
+
+    // 施設別決定率
+    const facGroups = {};
+    cData.forEach(d => {
+      if (!facGroups[d.facility]) facGroups[d.facility] = { c: 0, d: 0 };
+      facGroups[d.facility].c += d.consult;
+      facGroups[d.facility].d += d.decide;
+    });
+    const facRates = Object.entries(facGroups).map(([name, v]) => ({
+      name, rate: pct(v.d, v.c), decided: v.d, consulted: v.c
+    })).sort((a, b) => b.rate - a.rate);
+    renderBarChart('rates-facility', facRates);
+
+    // KR/WS/ビンクス別の施設比較をカウンセラー欄に表示
+    const catData = {};
+    ['KR','WS','ビンクス'].forEach(cat => {
+      const cKey = cat === 'KR' ? 'kr_c' : cat === 'WS' ? 'ws_c' : 'bx_c';
+      const dKey = cat === 'KR' ? 'kr_d' : cat === 'WS' ? 'ws_d' : 'bx_d';
+      const groups = {};
+      cData.forEach(d => {
+        if (!groups[d.facility]) groups[d.facility] = { c: 0, d: 0 };
+        groups[d.facility].c += d[cKey];
+        groups[d.facility].d += d[dKey];
+      });
+      catData[cat] = Object.entries(groups).map(([name, v]) => ({
+        name, rate: pct(v.d, v.c), decided: v.d, consulted: v.c
+      })).filter(d => d.consulted > 0).sort((a, b) => b.rate - a.rate);
+    });
+
+    document.getElementById('rates-counselor').innerHTML =
+      '<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">KR 施設別</div>' +
+      catData['KR'].map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('') +
+      '<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin:16px 0 8px">WS 施設別</div>' +
+      catData['WS'].map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('') +
+      '<div style="font-size:12px;font-weight:600;color:var(--text-sub);margin:16px 0 8px">ビンクス 施設別</div>' +
+      catData['ビンクス'].map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%;background:linear-gradient(90deg,#f59e0b,#fbbf24)"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('');
+
+    // ドクター欄は手動入力データから
+    renderBarChart('rates-doctor', groupRate(pData, 'doctor'));
+  } else {
+    // 手動入力データのみ
+    const allVisited = pData.filter(d => d.status !== '予約' && d.status !== 'キャンセル');
+    const decided = pData.filter(d => d.status === '成約');
+    document.getElementById('rates-stats').innerHTML = `
+      <div class="stat-card"><span class="stat-label">来院数</span><span class="stat-num">${allVisited.length}</span></div>
+      <div class="stat-card"><span class="stat-label">成約数</span><span class="stat-num">${decided.length}</span></div>
+      <div class="stat-card"><span class="stat-label">決定率</span><span class="stat-num">${pct(decided.length, allVisited.length)}%</span></div>
+    `;
+    renderBarChart('rates-facility', groupRate(pData, 'facility'));
+    renderBarChart('rates-counselor', groupRate(pData, 'counselor'));
+    renderBarChart('rates-doctor', groupRate(pData, 'doctor'));
+  }
 }
 
 function groupRate(data, key) {
