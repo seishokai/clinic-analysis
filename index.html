@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -224,7 +224,7 @@
       </div>
 
       <!-- グローバルフィルター -->
-      <div style="display:flex;gap:12px;padding:12px 24px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap" id="tc-filters">
+      <div style="display:flex;gap:12px;padding:12px 24px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;position:sticky;top:56px;z-index:50" id="tc-filters">
         <div style="display:flex;gap:6px;align-items:center">
           <label class="form-label" style="margin:0;min-width:auto">年度</label>
           <select class="form-select" id="tc-year" style="width:auto;padding:8px 12px;font-size:13px">
@@ -396,6 +396,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>
