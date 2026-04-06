@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=12">
+  <link rel="stylesheet" href="styles.css?v=13">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -217,27 +217,37 @@
     <!-- ==================== TC ==================== -->
     <main id="view-tc" class="view">
       <div class="sub-nav">
-        <button class="sub-nav-btn active" data-sub="rates">決定率</button>
+        <button class="sub-nav-btn active" data-sub="rates">決定</button>
         <button class="sub-nav-btn" data-sub="patients">初診管理</button>
         <button class="sub-nav-btn" data-sub="competitors">競合調査</button>
         <button class="sub-nav-btn" data-sub="strategy">戦略ノート</button>
       </div>
 
-      <!-- 決定率 -->
-      <div id="sub-rates">
-        <div class="page-header"><h2>決定率</h2></div>
-        <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
-          <label class="form-label" style="margin:0">年度</label>
-          <select class="form-select" id="rates-year" style="width:auto">
+      <!-- グローバルフィルター -->
+      <div style="display:flex;gap:12px;padding:12px 24px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap" id="tc-filters">
+        <div style="display:flex;gap:6px;align-items:center">
+          <label class="form-label" style="margin:0;min-width:auto">年度</label>
+          <select class="form-select" id="tc-year" style="width:auto;padding:8px 12px;font-size:13px">
             <option value="all">全期間</option>
-            <option value="2025">25期 (2025.7-2026.6)</option>
-            <option value="2024">24期 (2024.7-2025.6)</option>
-            <option value="2023">23期 (2023.7-2024.6)</option>
-            <option value="2022">22期 (2022.7-2023.6)</option>
-            <option value="2021">21期 (2021.7-2022.6)</option>
-            <option value="2020">20期 (2020.7-2021.6)</option>
+            <option value="2025" selected>25期</option>
+            <option value="2024">24期</option>
+            <option value="2023">23期</option>
+            <option value="2022">22期</option>
+            <option value="2021">21期</option>
+            <option value="2020">20期</option>
           </select>
         </div>
+        <div style="display:flex;gap:6px;align-items:center">
+          <label class="form-label" style="margin:0;min-width:auto">医院</label>
+          <select class="form-select" id="tc-facility" style="width:auto;padding:8px 12px;font-size:13px">
+            <option value="全体">全体</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- 決定率 -->
+      <div id="sub-rates">
+        <div class="page-header"><h2>決定</h2></div>
         <div class="stats-row" id="rates-stats"></div>
         <div class="card" style="margin-bottom:20px">
           <div class="card-header">月別推移</div>
@@ -266,7 +276,6 @@
       <!-- 初診管理 -->
       <div id="sub-patients" hidden>
         <div class="page-header"><h2>初診管理</h2></div>
-        <div class="facility-tabs" id="patients-facility-tabs"></div>
         <div class="stats-row" id="patients-stats"></div>
         <div class="card" style="margin-bottom:20px">
           <div class="card-header">新規登録</div>
@@ -387,6 +396,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=12"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

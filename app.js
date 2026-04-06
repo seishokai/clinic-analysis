@@ -84,8 +84,13 @@ function setupEventListeners() {
   // Sales year filter
   document.getElementById('sales-year').addEventListener('change', e => { salesYear = e.target.value; renderSales(); });
 
-  // Rates year filter
-  document.getElementById('rates-year').addEventListener('change', () => renderRates());
+  // TC global filters
+  const tcYearEl = document.getElementById('tc-year');
+  const tcFacEl = document.getElementById('tc-facility');
+  // Populate facility dropdown
+  FACILITIES.forEach(f => { if (f !== '全体') { const o = document.createElement('option'); o.value = f; o.textContent = f; tcFacEl.appendChild(o); } });
+  tcYearEl.addEventListener('change', () => { renderRates(); renderPatients(); });
+  tcFacEl.addEventListener('change', () => { renderRates(); renderPatients(); });
 
   // Reviews
   document.getElementById('rev-save').addEventListener('click', saveReviewEntry);
@@ -729,7 +734,7 @@ function savePatient() {
   if (!name) return;
   const entry = {
     id: Date.now(),
-    facility: patientsFacility === '全体' ? 'エスカ' : patientsFacility,
+    facility: document.getElementById('tc-facility').value === '全体' ? 'エスカ' : document.getElementById('tc-facility').value,
     visitDate: document.getElementById('pt-date').value,
     name,
     purpose: document.getElementById('pt-purpose').value,
@@ -750,7 +755,8 @@ function savePatient() {
 
 function renderPatients() {
   const data = getPatients();
-  const filtered = patientsFacility === '全体' ? data : data.filter(d => d.facility === patientsFacility);
+  const ptFac = document.getElementById('tc-facility').value;
+  const filtered = ptFac === '全体' ? data : data.filter(d => d.facility === ptFac);
 
   const reserved = filtered.filter(d => d.status !== 'キャンセル').length;
   const visited = filtered.filter(d => d.status !== '予約' && d.status !== 'キャンセル').length;
@@ -790,7 +796,8 @@ function renderPatients() {
 function renderRates() {
   const allCData = loadData('consultation-data', []);
   const pData = getPatients();
-  const ratesYear = document.getElementById('rates-year').value;
+  const ratesYear = document.getElementById('tc-year').value;
+  const ratesFac = document.getElementById('tc-facility').value;
 
   // 年度フィルター
   let cData = allCData;
@@ -799,6 +806,10 @@ function renderRates() {
       const y = parseInt(ratesYear);
       return d.month >= `${y}-07` && d.month <= `${y+1}-06`;
     });
+  }
+  // 医院フィルター
+  if (ratesFac !== '全体') {
+    cData = cData.filter(d => d.facility === ratesFac);
   }
 
   if (cData.length === 0) {
@@ -810,13 +821,18 @@ function renderRates() {
   const sum = (arr, key) => arr.reduce((s, d) => s + d[key], 0);
   const totalC = sum(cData,'consult'), totalD = sum(cData,'decide');
 
+  const krC = sum(cData,'kr_c'), krD = sum(cData,'kr_d');
+  const wsC = sum(cData,'ws_c'), wsD = sum(cData,'ws_d');
+  const bxC = sum(cData,'bx_c'), bxD = sum(cData,'bx_d');
+  const subStat = (label, d, c) => `<div class="stat-card"><span class="stat-label">${label}</span><span class="stat-num">${pct(d,c)}%</span><span class="stat-yoy" style="color:var(--text-sub)">${d}/${c}件</span></div>`;
+
   document.getElementById('rates-stats').innerHTML = `
     <div class="stat-card"><span class="stat-label">相談数</span><span class="stat-num">${fmt(totalC)}</span></div>
     <div class="stat-card"><span class="stat-label">決定数</span><span class="stat-num">${fmt(totalD)}</span></div>
     <div class="stat-card"><span class="stat-label">決定率</span><span class="stat-num">${pct(totalD, totalC)}%</span></div>
-    <div class="stat-card"><span class="stat-label">キレイライン</span><span class="stat-num">${pct(sum(cData,'kr_d'), sum(cData,'kr_c'))}%</span></div>
-    <div class="stat-card"><span class="stat-label">ウィスマイル</span><span class="stat-num">${pct(sum(cData,'ws_d'), sum(cData,'ws_c'))}%</span></div>
-    <div class="stat-card"><span class="stat-label">ビンクス</span><span class="stat-num">${pct(sum(cData,'bx_d'), sum(cData,'bx_c'))}%</span></div>
+    ${subStat('キレイライン', krD, krC)}
+    ${subStat('ウィスマイル', wsD, wsC)}
+    ${subStat('ビンクス', bxD, bxC)}
   `;
 
   // === 月別テーブル（スプレッドシート風） ===
