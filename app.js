@@ -97,6 +97,9 @@ function setupEventListeners() {
   document.getElementById('comment-save').addEventListener('click', saveComment);
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
+  // Documents
+  document.getElementById('doc-save').addEventListener('click', saveDocument);
+
   // Notes
   document.getElementById('save-notes').addEventListener('click', () => {
     localStorage.setItem('strategy-notes', document.getElementById('strategy-notes').value);
@@ -478,6 +481,7 @@ function showApp() {
   renderPatients();
   renderRates();
   renderReviews();
+  renderDocuments();
 }
 
 // === Navigation ===
@@ -1165,6 +1169,71 @@ function openClinicDetail(c) {
 function closeModal() {
   document.getElementById('clinic-modal').hidden = true;
   document.body.style.overflow = '';
+}
+
+// === Documents ===
+function getDocuments() { return loadData('documents-data', []); }
+
+function saveDocument() {
+  const name = document.getElementById('doc-name').value.trim();
+  const url = document.getElementById('doc-url').value.trim();
+  if (!name || !url) return;
+  const docs = getDocuments();
+  docs.push({
+    id: Date.now(),
+    name,
+    type: document.getElementById('doc-type').value,
+    clinic: document.getElementById('doc-clinic').value.trim(),
+    url,
+    date: new Date().toISOString().split('T')[0]
+  });
+  saveData('documents-data', docs);
+  document.getElementById('doc-name').value = '';
+  document.getElementById('doc-url').value = '';
+  document.getElementById('doc-clinic').value = '';
+  renderDocuments();
+}
+
+function deleteDocument(id) {
+  const docs = getDocuments().filter(d => d.id !== id);
+  saveData('documents-data', docs);
+  renderDocuments();
+}
+
+function renderDocuments() {
+  const docs = getDocuments();
+  document.getElementById('tc-docs').textContent = docs.length;
+
+  const container = document.getElementById('docs-list');
+  if (!docs.length) {
+    container.innerHTML = '<p style="color:var(--text-muted);font-size:13px">資料が登録されていません</p>';
+    return;
+  }
+
+  const iconClass = (type) => {
+    if (['見積書','パンフレット','カウンセリング資料'].includes(type)) return 'doc-pdf';
+    if (type === '録音') return 'doc-audio';
+    if (type === '写真') return 'doc-photo';
+    return 'doc-other';
+  };
+  const iconText = (type) => {
+    if (['見積書','パンフレット','カウンセリング資料'].includes(type)) return 'PDF';
+    if (type === '録音') return '♪';
+    if (type === '写真') return '📷';
+    return '📄';
+  };
+
+  const sorted = [...docs].sort((a, b) => b.date.localeCompare(a.date));
+  container.innerHTML = sorted.map(d => `
+    <a href="${d.url}" target="_blank" rel="noopener" class="resource-item">
+      <div class="resource-icon ${iconClass(d.type)}">${iconText(d.type)}</div>
+      <div class="resource-meta">
+        <div class="doc-title">${d.name}</div>
+        <div class="doc-sub">${d.type}${d.clinic ? ' · ' + d.clinic : ''} · ${d.date}</div>
+      </div>
+      <button class="resource-delete" onclick="event.preventDefault();event.stopPropagation();deleteDocument(${d.id})">×</button>
+    </a>
+  `).join('');
 }
 
 // === Reviews ===

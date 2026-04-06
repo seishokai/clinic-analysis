@@ -426,9 +426,18 @@ body {
 
 /* === Resource Links === */
 .resource-list { list-style: none; }
-.resource-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 6px; background: var(--bg); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; border: 1px solid var(--border-light); }
+.resource-item { display: flex; align-items: center; gap: 12px; padding: 14px 16px; margin-bottom: 8px; background: var(--bg); border-radius: var(--radius-sm); font-size: 13px; cursor: pointer; border: 1px solid var(--border-light); transition: border-color 0.15s; text-decoration: none; color: var(--text); }
 .resource-item:hover { border-color: var(--accent); }
-.resource-icon { width: 32px; height: 32px; background: var(--accent); color: white; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.resource-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 16px; flex-shrink: 0; color: white; }
+.resource-icon.doc-pdf { background: #dc2626; }
+.resource-icon.doc-audio { background: #6366f1; }
+.resource-icon.doc-photo { background: #0ea5e9; }
+.resource-icon.doc-other { background: var(--accent); }
+.resource-meta { flex: 1; }
+.resource-meta .doc-title { font-weight: 600; font-size: 14px; }
+.resource-meta .doc-sub { font-size: 11px; color: var(--text-sub); margin-top: 2px; }
+.resource-delete { width: 32px; height: 32px; border: 1px solid var(--border); background: transparent; border-radius: 6px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 14px; color: var(--text-muted); flex-shrink: 0; }
+.resource-delete:hover { border-color: var(--red); color: var(--red); }
 
 /* === Settings === */
 .settings-list { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }

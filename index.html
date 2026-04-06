@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=15">
+  <link rel="stylesheet" href="styles.css?v=16">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -316,7 +316,43 @@
         <div class="stats-row">
           <div class="stat-card"><span class="stat-num" id="tc-total">0</span><span class="stat-label">調査医院数</span></div>
           <div class="stat-card"><span class="stat-num" id="tc-avg">0</span><span class="stat-label">平均スコア</span></div>
+          <div class="stat-card"><span class="stat-num" id="tc-docs">0</span><span class="stat-label">資料数</span></div>
         </div>
+
+        <!-- 資料管理 -->
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">資料管理</div>
+          <div class="form-grid" style="margin-bottom:16px">
+            <div class="form-group">
+              <label class="form-label">資料名</label>
+              <input type="text" class="form-input" id="doc-name" placeholder="例: 名古屋ステーション歯科 見積書">
+            </div>
+            <div class="form-group">
+              <label class="form-label">種類</label>
+              <select class="form-select" id="doc-type">
+                <option>見積書</option>
+                <option>パンフレット</option>
+                <option>録音</option>
+                <option>写真</option>
+                <option>カウンセリング資料</option>
+                <option>その他</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">医院名</label>
+              <input type="text" class="form-input" id="doc-clinic" placeholder="例: 名古屋ステーション歯科">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Google Drive URL</label>
+              <input type="url" class="form-input" id="doc-url" placeholder="https://drive.google.com/...">
+            </div>
+          </div>
+          <div class="form-actions">
+            <button class="btn btn-dark" id="doc-save">登録</button>
+          </div>
+          <div id="docs-list" style="margin-top:20px"></div>
+        </div>
+
         <div class="clinic-grid" id="clinic-grid"></div>
       </div>
 
@@ -396,6 +432,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=15"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>
