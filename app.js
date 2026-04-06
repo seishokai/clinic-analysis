@@ -847,8 +847,62 @@ function renderRates() {
     (arr.length ? arr.map(d => `<div class="bar-row"><div class="bar-label">${d.name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(d.rate,5)}%;${colors[cat]}"><span>${d.rate}%</span></div></div><div class="bar-value">${d.decided}/${d.consulted}</div></div>`).join('') : '<p style="font-size:12px;color:var(--text-muted)">データなし</p>')
   ).join('');
 
-  // ドクター別（Excelデータ優先）
+  // ドクター月別テーブル
   const drData = loadData('doctor-data', []);
+  const drTable = document.getElementById('doctor-monthly-table');
+  if (drData.length > 0) {
+    let filteredDr = drData;
+    if (ratesYear !== 'all') {
+      filteredDr = drData.filter(d => {
+        const y = parseInt(ratesYear);
+        return d.month >= `${y}-07` && d.month <= `${y+1}-06`;
+      });
+    }
+    // 月リスト
+    const drMonths = [...new Set(filteredDr.map(d => d.month))].sort();
+    const drMonthLabels = drMonths.map(m => m.slice(5) + '月');
+    // ドクターリスト（カウンセリング数10件以上）
+    const drNames = {};
+    filteredDr.forEach(d => {
+      if (!drNames[d.name]) drNames[d.name] = { c: 0, d: 0 };
+      drNames[d.name].c += d.consult;
+      drNames[d.name].d += d.decide;
+    });
+    const activeNames = Object.entries(drNames).filter(([,v]) => v.c >= 10).sort((a,b) => pct(b[1].d,b[1].c) - pct(a[1].d,a[1].c));
+
+    let dHtml = `<thead><tr><th style="position:sticky;left:0;z-index:3;background:#1a1a1a;color:white">ドクター</th><th style="background:#1a1a1a;color:white">項目</th>`;
+    drMonthLabels.forEach(l => { dHtml += `<th style="background:#1a1a1a;color:white">${l}</th>`; });
+    dHtml += `<th style="background:#1a1a1a;color:white">合計</th><th style="background:#1a1a1a;color:white">決定率</th></tr></thead><tbody>`;
+
+    activeNames.forEach(([name, totals]) => {
+      const drMonthData = {};
+      drMonths.forEach(m => { drMonthData[m] = { c: 0, d: 0 }; });
+      filteredDr.filter(d => d.name === name).forEach(d => {
+        if (drMonthData[d.month]) { drMonthData[d.month].c += d.consult; drMonthData[d.month].d += d.decide; }
+      });
+
+      ['カウンセリング','資料取り'].forEach((label, ri) => {
+        const bg = ri === 0 ? 'background:#f0f1f3;font-weight:600' : '';
+        dHtml += `<tr style="${bg}">`;
+        if (ri === 0) dHtml += `<td rowspan="2" style="font-weight:700;font-size:13px;background:#e8e9eb;position:sticky;left:0;z-index:1;border-right:2px solid var(--border);vertical-align:middle">${name}</td>`;
+        dHtml += `<td style="font-size:11px;color:${ri===0?'var(--text)':'var(--text-sub)'};white-space:nowrap">${label}</td>`;
+        drMonths.forEach(m => {
+          const v = ri === 0 ? drMonthData[m].c : drMonthData[m].d;
+          dHtml += `<td style="text-align:right;font-size:12px;${v?'':'color:var(--text-muted)'}">${v || '-'}</td>`;
+        });
+        const total = ri === 0 ? totals.c : totals.d;
+        const rate = ri === 1 ? `<span style="color:${pct(totals.d,totals.c)>=50?'var(--green)':'var(--red)'};font-weight:700">${pct(totals.d,totals.c)}%</span>` : '';
+        dHtml += `<td style="text-align:right;font-weight:700;font-size:12px;background:#f5f5f5;border-left:2px solid var(--border)">${total}</td>`;
+        dHtml += `<td style="text-align:center;font-size:12px;background:#f5f5f5">${rate}</td></tr>`;
+      });
+    });
+    dHtml += '</tbody>';
+    drTable.innerHTML = dHtml;
+  } else {
+    drTable.innerHTML = '';
+  }
+
+  // ドクター別バーチャート（Excelデータ優先）
   if (drData.length > 0) {
     let filteredDr = drData;
     if (ratesYear !== 'all') {

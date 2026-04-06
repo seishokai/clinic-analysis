@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=10">
+  <link rel="stylesheet" href="styles.css?v=11">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -247,8 +247,14 @@
           <div class="card-header">種類別（キレイライン / ウィスマイル / ビンクス）</div>
           <div class="bar-chart" id="rates-counselor"></div>
         </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">ドクター別 月別推移</div>
+          <div class="data-table-wrap">
+            <table class="data-table" id="doctor-monthly-table"></table>
+          </div>
+        </div>
         <div class="card">
-          <div class="card-header">ドクター別</div>
+          <div class="card-header">ドクター別 決定率</div>
           <div class="bar-chart" id="rates-doctor"></div>
         </div>
       </div>
@@ -377,6 +383,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
