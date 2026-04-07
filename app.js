@@ -1520,35 +1520,22 @@ function renderBookings() {
   // ステータス変更イベント
   if (isAdmin) {
     tbody.querySelectorAll('.bk-status-select').forEach(sel => {
-      sel.addEventListener('change', async (e) => {
+      sel.addEventListener('change', (e) => {
         const name = sel.dataset.name;
         const applyDate = sel.dataset.apply;
         const newStatus = sel.value;
-        sel.disabled = true;
-        sel.style.opacity = '0.5';
-        try {
-          await fetch(GAS_API_URL, {
-            method: 'POST',
-            mode: 'no-cors',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name, applyDate, status: newStatus })
-          });
-          // ローカルデータも更新
-          const match = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
-          if (match) match.status = newStatus;
-          sel.style.opacity = '1';
-          sel.disabled = false;
-          // 統計を再計算
-          const total2 = bookingsData.length;
-          const cancelled2 = bookingsData.filter(d => d.status === 'キャンセル').length;
-          const pending2 = bookingsData.filter(d => !d.status || d.status === '未対応').length;
-          document.getElementById('bk-stats').querySelector('.stat-card:nth-child(2) .stat-num').textContent = pending2;
-          document.getElementById('bk-stats').querySelector('.stat-card:nth-child(3) .stat-num').textContent = cancelled2;
-        } catch (err) {
-          sel.style.opacity = '1';
-          sel.disabled = false;
-          console.error('Update error:', err);
-        }
+        // 即座にローカル更新
+        const match = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
+        if (match) match.status = newStatus;
+        sel.style.borderColor = 'var(--green)';
+        setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+        // バックグラウンドでAPI送信（待たない）
+        fetch(GAS_API_URL, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name, applyDate, status: newStatus })
+        }).catch(err => console.error('Update error:', err));
       });
     });
   }
