@@ -1686,22 +1686,22 @@ function renderBookings() {
   tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => {
     const overdue = isOverdue(d);
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
-    <td style="white-space:nowrap;font-size:11px">${d.applyDate ? d.applyDate.slice(5, 10) : '-'}</td>
-    <td style="white-space:nowrap;font-size:11px">${d.bookDate ? d.bookDate.replace(/^2026\//,'').slice(0, 5) : '-'}${overdue ? ' <span style="color:var(--red);font-weight:700;font-size:9px">!</span>' : ''}</td>
-    <td style="white-space:nowrap;font-size:12px">${d.name}</td>
-    <td style="font-size:11px;white-space:nowrap">${shortService(d.service)}</td>
-    <td style="font-size:11px;white-space:nowrap">${shortFac(d.facility)}</td>
-    <td style="font-size:11px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
-    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis">${isAdmin ? (d.email || '-') : '***'}</td>
-    <td style="font-size:11px;color:var(--text-sub)">${d.source || '-'}</td>
-    <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:11px;padding:4px 8px;min-width:90px">
+    <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${d.applyDate ? d.applyDate.slice(5) : '-'}</td>
+    <td style="white-space:nowrap;font-size:10px">${d.bookDate ? d.bookDate.replace(/^2026\//,'').replace(/\//g,'/') : '-'}${overdue ? '<span style="color:var(--red);font-weight:700">!</span>' : ''}</td>
+    <td style="white-space:nowrap;font-size:11px;font-weight:500">${d.name}</td>
+    <td style="font-size:10px;white-space:nowrap">${shortService(d.service)}</td>
+    <td style="font-size:10px;white-space:nowrap">${shortFac(d.facility)}</td>
+    <td style="font-size:10px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
+    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis">${isAdmin ? (d.email || '-') : '***'}</td>
+    <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${d.source || '-'}</td>
+    <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
       <option ${d.status==='成約'?'selected':''}>成約</option>
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
     </select>` : statusBadge(d.status)}</td>
-    <td>${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:11px;padding:4px 8px;min-width:80px">
+    <td>${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px">
       <option value="">-</option>
       <option ${d.contractService==='BF'?'selected':''}>BF</option>
       <option ${d.contractService==='矯正(表)'?'selected':''}>矯正(表)</option>
@@ -1710,9 +1710,9 @@ function renderBookings() {
       <option ${d.contractService==='ﾗﾌﾞﾘｴ'?'selected':''}>ﾗﾌﾞﾘｴ</option>
       <option ${d.contractService==='ｲﾝﾌﾟﾗﾝﾄ'?'selected':''}>ｲﾝﾌﾟﾗﾝﾄ</option>
     </select>` : (d.contractService || '-')}</td>
-    <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount||''}" placeholder="0" style="font-size:11px;padding:4px 8px;width:90px">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
-    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:11px;padding:4px 8px;width:120px">` : (d.paymentMonth || '-')}</td>
-    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:11px;padding:4px 8px;width:120px">` : (d.incentiveMonth || '-')}</td>
+    <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:70px">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
+    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.paymentMonth || '-')}</td>
+    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
   </tr>`}).join('') || '<tr><td colspan="13" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > 200) {

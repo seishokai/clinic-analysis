@@ -272,13 +272,13 @@ body {
 /* === Tables === */
 .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
 .data-table th {
-  text-align: left; padding: 10px 12px;
-  font-size: 11px; font-weight: 600; color: var(--text-sub);
+  text-align: left; padding: 6px 8px;
+  font-size: 10px; font-weight: 600; color: var(--text-sub);
   text-transform: uppercase; letter-spacing: 0.3px;
   border-bottom: 2px solid var(--border);
   white-space: nowrap;
 }
-.data-table td { padding: 10px 12px; border-bottom: 1px solid var(--border-light); vertical-align: top; }
+.data-table td { padding: 6px 8px; border-bottom: 1px solid var(--border-light); vertical-align: middle; }
 .data-table tr:hover td { background: #fafafa; }
 .data-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 
