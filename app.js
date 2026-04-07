@@ -52,9 +52,13 @@ function logout() {
   document.getElementById('login-screen').style.display = '';
   document.getElementById('password').value = '';
   document.getElementById('login-error').hidden = true;
-  // ナビリセット
+  // ナビ・ヘッダーリセット
   document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => b.style.display = '');
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.style.display = '');
+  const hdr = document.querySelector('.header');
+  hdr.classList.remove('role-promo', 'role-custom');
+  const userBadge = hdr.querySelector('.header-user');
+  if (userBadge) userBadge.remove();
 }
 
 function setupEventListeners() {
@@ -98,6 +102,7 @@ function setupEventListeners() {
         sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
         sessionStorage.setItem('customEditRole', matched.role || 'view');
         sessionStorage.setItem('customAgency', matched.agency || '');
+        sessionStorage.setItem('customName', matched.name || '');
         showApp();
         return;
       }
@@ -595,6 +600,28 @@ function showApp() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
+
+  // ヘッダーのロール表示
+  const header = document.querySelector('.header');
+  header.classList.remove('role-promo', 'role-custom');
+  const existingUser = header.querySelector('.header-user');
+  if (existingUser) existingUser.remove();
+  if (userRole === 'promo') {
+    header.classList.add('role-promo');
+    const span = document.createElement('span');
+    span.className = 'header-user';
+    span.textContent = promoFilter + ' でログイン中';
+    header.querySelector('.nav-spacer').after(span);
+  } else if (userRole === 'custom') {
+    header.classList.add('role-custom');
+    const customName = sessionStorage.getItem('customName') || '';
+    if (customName) {
+      const span = document.createElement('span');
+      span.className = 'header-user';
+      span.textContent = customName + ' でログイン中';
+      header.querySelector('.nav-spacer').after(span);
+    }
+  }
 
   // プロモユーザーの場合、予約タブのみ表示
   userRole = sessionStorage.getItem('role') || 'admin';

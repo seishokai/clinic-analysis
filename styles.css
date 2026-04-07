@@ -95,6 +95,11 @@ body {
   top: 0;
   z-index: 100;
 }
+.header.role-promo { background: #f0fdf4; border-bottom-color: #bbf7d0; }
+.header.role-promo .logo-text { color: #15803d; }
+.header.role-custom { background: #eff6ff; border-bottom-color: #bfdbfe; }
+.header.role-custom .logo-text { color: #1d4ed8; }
+.header-user { font-size: 11px; color: var(--text-sub); background: var(--bg); padding: 4px 10px; border-radius: 12px; white-space: nowrap; }
 .header-left { display: flex; align-items: center; gap: 10px; margin-right: 24px; }
 .logo-text {
   font-size: 14px;
