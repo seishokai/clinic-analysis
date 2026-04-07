@@ -1741,8 +1741,12 @@ function populateBookingFilters() {
   const facEl = document.getElementById('bk-facility');
   facEl.innerHTML = '<option value="">医院:全て</option>' + facilities.map(f => `<option>${f}</option>`).join('');
 
+  // プロモを件数順にソート
+  const promoCounts2 = {};
+  filteredForOptions.forEach(d => { if (d.source) promoCounts2[d.source] = (promoCounts2[d.source]||0) + 1; });
+  const promosSorted = promos.sort((a, b) => (promoCounts2[b]||0) - (promoCounts2[a]||0));
   const promoEl = document.getElementById('bk-promo');
-  promoEl.innerHTML = '<option value="">プロモ:全て</option>' + promos.map(p => `<option>${p}</option>`).join('');
+  promoEl.innerHTML = '<option value="">プロモ:全て</option>' + promosSorted.map(p => `<option value="${p}">${p} (${promoCounts2[p]||0})</option>`).join('');
 
   const svcEl = document.getElementById('bk-service');
   svcEl.innerHTML = '<option value="">相談:全て</option>' + services.map(s => `<option>${s}</option>`).join('');
