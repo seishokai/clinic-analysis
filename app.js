@@ -1881,6 +1881,31 @@ function renderPromoDash() {
 function showPromoDetail(promoName) {
   const data = bookingsData.filter(d => (d.source || '(なし)') === promoName);
   const bkExtra = loadData('bk-extra', {});
+  // shortFac for promo detail
+  const sFac = (f) => {
+    if (!f) return '-';
+    if (f.includes('銀座')) return 'BF銀座';
+    if (f.includes('ウィズ') || f.includes('WITH') || f.includes('ワイズ')) return 'ウィズ';
+    if (f.includes('エスカ')) return 'エスカ';
+    if (f.includes('アール')) return 'アール';
+    if (f.includes('ルミナス')) return 'ルミナス';
+    if (f.includes('茶屋')) return '茶屋';
+    if (f.includes('小牧')) return '小牧';
+    if (f.includes('知立')) return '知立';
+    if (f.includes('八事')) return '八事';
+    if (f.includes('岩田')) return '岩田';
+    if (f.includes('大森')) return '大森';
+    if (f.includes('京都')) return '京都';
+    return f.length > 8 ? f.slice(0,8)+'…' : f;
+  };
+  const sService = (s) => {
+    if (!s) return '-';
+    if (s.includes('ラミネート') || s.includes('ブラックフィルム')) return 'BF';
+    if (s.includes('矯正')) return '矯正';
+    if (s.includes('セラミック')) return 'セラミック';
+    if (s.includes('インプラント')) return 'インプラント';
+    return s.replace(/相談|無料|　/g, '').slice(0, 6);
+  };
 
   document.getElementById('promo-detail').hidden = false;
   document.getElementById('promo-detail-title').textContent = promoName;
@@ -1906,26 +1931,14 @@ function showPromoDetail(promoName) {
 
   // 医院別内訳
   const facGroups = {};
-  data.forEach(d => {
-    const f = d.facility || '不明';
-    if (!facGroups[f]) facGroups[f] = 0;
-    facGroups[f]++;
-  });
+  data.forEach(d => { const f = sFac(d.facility); if (!facGroups[f]) facGroups[f] = 0; facGroups[f]++; });
   renderBarChart('promo-detail-facility', Object.entries(facGroups).sort((a,b) => b[1]-a[1]).map(([name, count]) => ({
-    name: name.length > 15 ? name.slice(0,15) + '…' : name, rate: Math.round(count/total*100), decided: count, consulted: total
+    name, rate: Math.round(count/total*100), decided: count, consulted: total
   })));
 
-  // 施術別内訳
+  // 相談別内訳
   const svcGroups = {};
-  data.forEach(d => {
-    let s = d.service || '不明';
-    if (s.includes('ラミネート') || s.includes('ブラックフィルム')) s = 'BF相談';
-    else if (s.includes('矯正')) s = '矯正相談';
-    else if (s.includes('セラミック')) s = 'セラミック';
-    else if (s.includes('インプラント')) s = 'インプラント';
-    if (!svcGroups[s]) svcGroups[s] = 0;
-    svcGroups[s]++;
-  });
+  data.forEach(d => { const s = sService(d.service); if (!svcGroups[s]) svcGroups[s] = 0; svcGroups[s]++; });
   const svcEl = document.getElementById('promo-detail-service');
   svcEl.innerHTML = Object.entries(svcGroups).sort((a,b) => b[1]-a[1]).map(([name, count]) =>
     `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/total*100),5)}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"><span>${Math.round(count/total*100)}%</span></div></div><div class="bar-value">${count}</div></div>`
@@ -1941,10 +1954,10 @@ function showPromoDetail(promoName) {
   };
   const sorted2 = [...data].sort((a,b) => (b.bookDate||'').localeCompare(a.bookDate||''));
   document.getElementById('promo-detail-tbody').innerHTML = sorted2.map(d => `<tr>
-    <td style="font-size:12px;white-space:nowrap">${d.bookDate ? d.bookDate.slice(0,10) : '-'}</td>
-    <td>${d.name}</td>
-    <td style="font-size:12px">${d.service && d.service.length > 10 ? d.service.slice(0,10)+'…' : (d.service||'-')}</td>
-    <td style="font-size:12px">${d.facility && d.facility.length > 12 ? d.facility.slice(0,12)+'…' : (d.facility||'-')}</td>
+    <td style="font-size:11px;white-space:nowrap">${d.bookDate ? d.bookDate.slice(0,10) : '-'}</td>
+    <td style="font-size:11px;white-space:nowrap">${d.name}</td>
+    <td style="font-size:11px">${sService(d.service)}</td>
+    <td style="font-size:11px">${sFac(d.facility)}</td>
     <td>${statusBadge(d.status)}</td>
   </tr>`).join('');
 
