@@ -1781,6 +1781,12 @@ function populateBookingFilters() {
   const svcEl = document.getElementById('bk-service');
   svcEl.innerHTML = '<option value="">相談:全て</option>' + services.map(s => `<option>${s}</option>`).join('');
 
+  // プロモ・カスタムユーザーはQuick行を非表示
+  const quickEl = document.getElementById('bk-quick-promos');
+  if (quickEl && (userRole === 'promo' || userRole === 'custom')) {
+    quickEl.style.display = 'none';
+    return;
+  }
   // クイックプロモボタン（上位5件）
   const promoCounts = {};
   bookingsData.forEach(d => { if (d.source) { promoCounts[d.source] = (promoCounts[d.source]||0) + 1; } });
