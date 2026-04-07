@@ -74,7 +74,10 @@ function setupEventListeners() {
         sessionStorage.setItem('authenticated', 'true');
         sessionStorage.setItem('role', 'custom');
         sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
-        sessionStorage.setItem('customPromos', JSON.stringify(matched.promos));
+        sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
+        sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
+        sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
+        sessionStorage.setItem('customEditRole', matched.role || 'view');
         showApp();
         return;
       }
@@ -1305,10 +1308,12 @@ function createAccount() {
   if (document.getElementById('adm-perm-sales').checked) perms.push('sales');
   if (document.getElementById('adm-perm-bookings').checked) perms.push('bookings');
   if (!perms.length) { alert('閲覧タブを1つ以上選択してください'); return; }
-  const promoSelect = document.getElementById('adm-promos');
-  const selectedPromos = [...promoSelect.selectedOptions].map(o => o.value);
+  const selectedPromos = [...document.getElementById('adm-promos').selectedOptions].map(o => o.value);
+  const selectedServices = [...document.getElementById('adm-services').selectedOptions].map(o => o.value);
+  const selectedFacilities = [...document.getElementById('adm-facilities').selectedOptions].map(o => o.value);
+  const role = document.getElementById('adm-role').value;
   const pw = generatePassword();
-  const account = { id: Date.now(), name, password: pw, permissions: perms, promos: selectedPromos, created: new Date().toISOString().slice(0,10) };
+  const account = { id: Date.now(), name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities, created: new Date().toISOString().slice(0,10) };
   const accounts = getAccounts();
   accounts.push(account);
   saveData('admin-accounts', accounts);
@@ -1335,8 +1340,11 @@ function renderAccounts() {
         <button class="resource-delete" onclick="deleteAccount(${a.id})" style="width:28px;height:28px;font-size:13px">×</button>
       </div>
       <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px">
-        閲覧: ${a.permissions.map(p => p==='tc'?'TC':p==='sales'?'売上':'予約').join(', ')}
-        ${a.promos.length ? ' | プロモ: ' + a.promos.join(', ') : ''}
+        <span class="badge ${a.role==='edit'?'badge-success':'badge-default'}" style="margin-right:4px">${a.role==='edit'?'編集':'閲覧のみ'}</span>
+        ${a.permissions.map(p => p==='tc'?'TC':p==='sales'?'売上':'予約').join(', ')}
+        ${a.promos && a.promos.length ? '<br>プロモ: ' + a.promos.join(', ') : ''}
+        ${a.services && a.services.length ? '<br>施術: ' + a.services.map(s=>s.length>15?s.slice(0,15)+'…':s).join(', ') : ''}
+        ${a.facilities && a.facilities.length ? '<br>店舗: ' + a.facilities.map(f=>f.length>10?f.slice(0,10)+'…':f).join(', ') : ''}
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <div style="font-size:12px;background:var(--card);padding:6px 12px;border-radius:6px;border:1px solid var(--border)">
@@ -1477,11 +1485,21 @@ async function loadBookings() {
     populateBookingFilters();
     renderBookings();
     renderPromoDash();
-    // 管理タブのプロモ選択肢を更新
+    // 管理タブの選択肢を更新
     const admPromos = document.getElementById('adm-promos');
+    const admServices = document.getElementById('adm-services');
+    const admFacilities = document.getElementById('adm-facilities');
     if (admPromos) {
       const promos = [...new Set(bookingsData.map(d => d.source).filter(Boolean))].sort();
       admPromos.innerHTML = promos.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
+    if (admServices) {
+      const svcs = [...new Set(bookingsData.map(d => d.service).filter(Boolean))].sort();
+      admServices.innerHTML = svcs.map(s => `<option value="${s}">${s.length>20?s.slice(0,20)+'…':s}</option>`).join('');
+    }
+    if (admFacilities) {
+      const facs = [...new Set(bookingsData.map(d => d.facility).filter(Boolean))].sort();
+      admFacilities.innerHTML = facs.map(f => `<option value="${f}">${f.length>15?f.slice(0,15)+'…':f}</option>`).join('');
     }
   } catch (e) {
     console.error('Bookings load error:', e);
@@ -1570,12 +1588,19 @@ function renderBookings() {
     filtered = filtered.filter(d => d.source && d.source.toLowerCase().includes(promoFilter.toLowerCase()));
     document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
   }
-  // カスタムユーザーのプロモ制限
+  // カスタムユーザーの制限
   if (userRole === 'custom') {
     const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
+    const cServices = JSON.parse(sessionStorage.getItem('customServices') || '[]');
+    const cFacilities = JSON.parse(sessionStorage.getItem('customFacilities') || '[]');
     if (cPromos.length > 0) {
       filtered = filtered.filter(d => d.source && cPromos.some(p => d.source.toLowerCase().includes(p.toLowerCase())));
-      document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
+    }
+    if (cServices.length > 0) {
+      filtered = filtered.filter(d => d.service && cServices.some(s => d.service.includes(s)));
+    }
+    if (cFacilities.length > 0) {
+      filtered = filtered.filter(d => d.facility && cFacilities.some(f => d.facility.includes(f)));
     }
   }
   if (facFilterVal) filtered = filtered.filter(d => d.facility === facFilterVal);
@@ -1682,7 +1707,7 @@ function renderBookings() {
     return bd < today;
   };
 
-  const isAdmin = userRole === 'admin';
+  const isAdmin = userRole === 'admin' || (userRole === 'custom' && sessionStorage.getItem('customEditRole') === 'edit');
   tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => {
     const overdue = isOverdue(d);
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">

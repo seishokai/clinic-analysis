@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=33">
+  <link rel="stylesheet" href="styles.css?v=34">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -537,6 +537,13 @@
             <input type="text" class="form-input" id="adm-name" placeholder="例: ヒカルさん用">
           </div>
           <div class="form-group">
+            <label class="form-label">権限</label>
+            <select class="form-select" id="adm-role">
+              <option value="view">閲覧のみ</option>
+              <option value="edit">編集・閲覧</option>
+            </select>
+          </div>
+          <div class="form-group">
             <label class="form-label">閲覧タブ</label>
             <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
               <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-tc" value="tc"> TC</label>
@@ -545,8 +552,16 @@
             </div>
           </div>
           <div class="form-group">
-            <label class="form-label">予約プロモ制限（複数選択可）</label>
-            <select class="form-select" id="adm-promos" multiple style="min-height:120px"></select>
+            <label class="form-label">プロモ制限（複数可）</label>
+            <select class="form-select" id="adm-promos" multiple style="min-height:100px"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">施術制限（複数可）</label>
+            <select class="form-select" id="adm-services" multiple style="min-height:80px"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">店舗制限（複数可）</label>
+            <select class="form-select" id="adm-facilities" multiple style="min-height:80px"></select>
           </div>
         </div>
         <div class="form-actions">
@@ -581,6 +596,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=33"></script>
+  <script src="app.js?v=34"></script>
 </body>
 </html>
