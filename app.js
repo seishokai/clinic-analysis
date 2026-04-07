@@ -1,5 +1,17 @@
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
+// プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
+const PROMO_PASSWORDS = {
+  'hikaru': 'hikaru',
+  'third': 'third',
+  'murase': 'murase',
+  'sasaki': 'sasaki',
+  'ceramic': 'ceramic',
+  'implant': 'implant',
+  'blackfilm': 'blackfilm',
+};
+let userRole = 'admin'; // 'admin' or 'promo'
+let promoFilter = ''; // プロモ別ログイン時のフィルター
 const FACILITIES = ['全体','エスカ','アール','ウィズ','ルミナス','茶屋','アサノ','知立','小牧','八事','岩田','大森','京都','銀座','訪問'];
 
 // === State ===
@@ -37,6 +49,17 @@ function setupEventListeners() {
     if (pw === CORRECT_PASSWORD) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'admin');
+      userRole = 'admin';
+      promoFilter = '';
+      showApp();
+    } else if (PROMO_PASSWORDS[pw]) {
+      document.getElementById('password').value = '';
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'promo');
+      sessionStorage.setItem('promoFilter', PROMO_PASSWORDS[pw]);
+      userRole = 'promo';
+      promoFilter = PROMO_PASSWORDS[pw];
       showApp();
     } else {
       document.getElementById('login-error').hidden = false;
@@ -481,6 +504,24 @@ function showApp() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
+
+  // プロモユーザーの場合、予約タブのみ表示
+  userRole = sessionStorage.getItem('role') || 'admin';
+  promoFilter = sessionStorage.getItem('promoFilter') || '';
+  if (userRole === 'promo') {
+    // ナビを非表示にして予約タブだけ表示
+    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
+      b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
+    });
+    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+      b.style.display = ['bookings','settings'].includes(b.dataset.view) ? '' : 'none';
+    });
+    document.getElementById('tc-filters') && (document.getElementById('tc-filters').style.display = 'none');
+    switchView('bookings');
+    loadBookings();
+    return;
+  }
+
   seedSalesData();
   seedConsultationData();
   loadClinics();
@@ -1386,15 +1427,21 @@ function populateBookingFilters() {
 }
 
 function renderBookings() {
-  const facFilter = document.getElementById('bk-facility').value;
-  const promoFilter = document.getElementById('bk-promo').value;
+  const facFilterVal = document.getElementById('bk-facility').value;
+  const promoFilterVal = document.getElementById('bk-promo').value;
   const svcFilter = document.getElementById('bk-service').value;
   const statusFilter = document.getElementById('bk-status').value;
   const monthFilter = document.getElementById('bk-month').value;
 
   let filtered = bookingsData;
-  if (facFilter) filtered = filtered.filter(d => d.facility === facFilter);
-  if (promoFilter) filtered = filtered.filter(d => d.source === promoFilter);
+  // プロモユーザーの場合、自分のプロモのみ表示
+  if (userRole === 'promo' && promoFilter) {
+    filtered = filtered.filter(d => d.source && d.source.toLowerCase().includes(promoFilter.toLowerCase()));
+    // プロモフィルターを非表示
+    document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
+  }
+  if (facFilterVal) filtered = filtered.filter(d => d.facility === facFilterVal);
+  if (promoFilterVal) filtered = filtered.filter(d => d.source === promoFilterVal);
   if (svcFilter) filtered = filtered.filter(d => d.service === svcFilter);
   if (statusFilter) {
     if (statusFilter === '未対応') filtered = filtered.filter(d => !d.status || d.status === '未対応');
