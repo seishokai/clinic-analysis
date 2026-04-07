@@ -2116,22 +2116,33 @@ function exportCSV() {
 
 function renderPromoDash() {
   const bkExtra = loadData('bk-extra', {});
+  let dashData = bookingsData;
+  // プロモ・カスタムユーザーの制限
+  if (userRole === 'promo' && promoFilter) {
+    dashData = dashData.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
+  }
+  if (userRole === 'custom') {
+    const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
+    const cServices = JSON.parse(sessionStorage.getItem('customServices') || '[]');
+    const cFacilities = JSON.parse(sessionStorage.getItem('customFacilities') || '[]');
+    if (cPromos.length) dashData = dashData.filter(d => d.source && cPromos.includes(d.source));
+    if (cServices.length) dashData = dashData.filter(d => d.service && cServices.some(s => d.service.includes(s)));
+    if (cFacilities.length) dashData = dashData.filter(d => d.facility && cFacilities.some(f => d.facility.includes(f)));
+  }
   const promoGroups = {};
-  bookingsData.forEach(d => {
+  dashData.forEach(d => {
     const p = d.source || '(なし)';
     if (!promoGroups[p]) promoGroups[p] = { total: 0, cancelled: 0, visited: 0, contracted: 0, amount: 0 };
     promoGroups[p].total++;
     if (d.status === 'キャンセル') promoGroups[p].cancelled++;
     if (d.status === '来院済' || d.status === '成約') promoGroups[p].visited++;
     if (d.status === '成約') promoGroups[p].contracted++;
-    const key = d.name + '|' + d.applyDate;
-    if (bkExtra[key] && bkExtra[key].contractAmount) promoGroups[key] && (promoGroups[p].amount += Number(bkExtra[key].contractAmount));
   });
-  // 金額を正しく集計
+  // 金額集計
   Object.keys(bkExtra).forEach(key => {
     if (bkExtra[key].contractAmount) {
       const [name, apply] = key.split('|');
-      const match = bookingsData.find(d => d.name === name && d.applyDate === apply);
+      const match = dashData.find(d => d.name === name && d.applyDate === apply);
       if (match) {
         const p = match.source || '(なし)';
         if (promoGroups[p]) promoGroups[p].amount += Number(bkExtra[key].contractAmount);
