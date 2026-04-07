@@ -548,6 +548,7 @@ function switchView(view) {
 // === Facility Tabs ===
 function renderFacilityTabs(containerId, active, onChange) {
   const c = document.getElementById(containerId);
+  if (!c) return;
   c.innerHTML = FACILITIES.map(f =>
     `<button class="facility-tab${f === active ? ' active' : ''}" data-f="${f}">${f}</button>`
   ).join('');
