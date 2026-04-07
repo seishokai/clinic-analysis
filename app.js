@@ -21,7 +21,7 @@ const FACILITIES = ['全体','エスカ','アール','ウィズ','ルミナス',
 
 // === State ===
 let clinics = [];
-let currentView = 'tc';
+let currentView = 'bookings';
 let currentSubView = {};
 let salesFacility = '全体';
 let salesYear = '2025';
@@ -165,22 +165,8 @@ function setupEventListeners() {
 
   // Bookings filters
   // Quick filter buttons
-  document.getElementById('bk-yesterday').addEventListener('click', () => {
-    const y = new Date(); y.setDate(y.getDate() - 1);
-    document.getElementById('bk-status').value = '';
-    window._bkDateFilter = y.toISOString().slice(0,10);
-    renderBookings();
-  });
-  document.getElementById('bk-today').addEventListener('click', () => {
-    const t = new Date();
-    document.getElementById('bk-status').value = '';
-    window._bkDateFilter = t.toISOString().slice(0,10);
-    renderBookings();
-  });
-  document.getElementById('bk-tomorrow').addEventListener('click', () => {
-    const tm = new Date(); tm.setDate(tm.getDate() + 1);
-    document.getElementById('bk-status').value = '';
-    window._bkDateFilter = tm.toISOString().slice(0,10);
+  document.getElementById('bk-overdue-btn').addEventListener('click', () => {
+    document.getElementById('bk-status').value = '要対応';
     renderBookings();
   });
   document.getElementById('bk-reset').addEventListener('click', () => {
@@ -1959,7 +1945,8 @@ function renderBookings() {
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
-    <td style="white-space:nowrap;font-size:10px">${fmtBookDate(d.bookDate)}${overdue ? '<span style="color:var(--red);font-weight:700">!</span>' : ''}</td>
+    <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
+      ${fmtBookDate(d.bookDate)}</td>
     <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">${d.name}</td>
     <td style="font-size:10px;white-space:nowrap">${shortService(d.service)}</td>
     <td style="font-size:10px;white-space:nowrap">${shortFac(d.facility)}</td>
@@ -2038,6 +2025,24 @@ function renderBookings() {
         saveExtra(inp.dataset.name, inp.dataset.apply, inp.dataset.field, inp.value);
         inp.style.borderColor = 'var(--green)';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+      });
+    });
+
+    // 予約日クリックで変更
+    tbody.querySelectorAll('.bk-edit-date').forEach(td => {
+      td.addEventListener('click', () => {
+        const idx = parseInt(td.dataset.idx);
+        const d = sorted[idx];
+        if (!d) return;
+        const newDate = prompt('新しい予約日時を入力\n例: 2026/4/20 15:00', d.bookDate || '');
+        if (newDate && newDate !== d.bookDate) {
+          d.bookDate = newDate;
+          td.innerHTML = fmtBookDate(newDate);
+          td.style.borderColor = 'var(--green)';
+          setTimeout(() => { td.style.borderColor = ''; }, 1500);
+          // DBにも保存
+          sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, book_date: newDate }, { onConflict: 'name,apply_date' }).then(() => {});
+        }
       });
     });
   }
