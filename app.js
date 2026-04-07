@@ -150,6 +150,14 @@ function setupEventListeners() {
 
   // Admin
   document.getElementById('adm-create').addEventListener('click', createAccount);
+  document.querySelectorAll('.adm-toggle-all').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const sel = document.getElementById(btn.dataset.target);
+      const allSelected = [...sel.options].every(o => o.selected);
+      [...sel.options].forEach(o => o.selected = !allSelected);
+      btn.textContent = allSelected ? '全選択' : '解除';
+    });
+  });
   renderAccounts();
 
   // Add clinic
