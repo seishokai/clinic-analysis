@@ -1359,6 +1359,7 @@ function renderClinicDocs() {
 
 // === Bookings ===
 const BK_SHEET_ID = '10misKpAtMitwIagGDUoMvQS7U9pfEQ0ODxG8A7DLzaQ';
+const GAS_API_URL = 'https://script.google.com/macros/s/AKfycbw5VtL4GCD7sJgRqIKd52THJNaFCf7FNJ2UGs1HNysoJf-knYyXa7sPGj6D5p7t60Vt2A/exec';
 let bookingsData = [];
 
 async function loadBookings() {
@@ -1495,18 +1496,61 @@ function renderBookings() {
 
   const shortFac = (f) => f && f.length > 12 ? f.slice(0, 12) + '…' : (f || '-');
 
-  tbody.innerHTML = sorted.slice(0, 200).map(d => `<tr>
+  const isAdmin = userRole === 'admin';
+  tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => `<tr>
     <td style="white-space:nowrap;font-size:12px">${d.applyDate ? d.applyDate.slice(0, 10) : '-'}</td>
     <td style="white-space:nowrap;font-size:12px">${d.bookDate ? d.bookDate.slice(0, 10) : '-'}</td>
     <td>${d.name}</td>
     <td style="font-size:12px">${shortService(d.service)}</td>
     <td style="font-size:12px">${shortFac(d.facility)}</td>
     <td style="font-size:11px;color:var(--text-sub)">${d.source || '-'}</td>
-    <td>${statusBadge(d.status)}</td>
+    <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:11px;padding:4px 8px;min-width:90px">
+      <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
+      <option ${d.status==='確認済'?'selected':''}>確認済</option>
+      <option ${d.status==='来院済'?'selected':''}>来院済</option>
+      <option ${d.status==='成約'?'selected':''}>成約</option>
+      <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
+    </select>` : statusBadge(d.status)}</td>
   </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > 200) {
     tbody.innerHTML += `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
+  }
+
+  // ステータス変更イベント
+  if (isAdmin) {
+    tbody.querySelectorAll('.bk-status-select').forEach(sel => {
+      sel.addEventListener('change', async (e) => {
+        const name = sel.dataset.name;
+        const applyDate = sel.dataset.apply;
+        const newStatus = sel.value;
+        sel.disabled = true;
+        sel.style.opacity = '0.5';
+        try {
+          await fetch(GAS_API_URL, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name, applyDate, status: newStatus })
+          });
+          // ローカルデータも更新
+          const match = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
+          if (match) match.status = newStatus;
+          sel.style.opacity = '1';
+          sel.disabled = false;
+          // 統計を再計算
+          const total2 = bookingsData.length;
+          const cancelled2 = bookingsData.filter(d => d.status === 'キャンセル').length;
+          const pending2 = bookingsData.filter(d => !d.status || d.status === '未対応').length;
+          document.getElementById('bk-stats').querySelector('.stat-card:nth-child(2) .stat-num').textContent = pending2;
+          document.getElementById('bk-stats').querySelector('.stat-card:nth-child(3) .stat-num').textContent = cancelled2;
+        } catch (err) {
+          sel.style.opacity = '1';
+          sel.disabled = false;
+          console.error('Update error:', err);
+        }
+      });
+    });
   }
 }
 
