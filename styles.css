@@ -100,6 +100,25 @@ body {
 .header.role-custom { background: #eff6ff; border-bottom-color: #bfdbfe; }
 .header.role-custom .logo-text { color: #1d4ed8; }
 .header-user { font-size: 11px; color: var(--text-sub); background: var(--bg); padding: 4px 10px; border-radius: 12px; white-space: nowrap; }
+
+/* Toast notification */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  background: var(--accent); color: white; padding: 10px 24px;
+  border-radius: 8px; font-size: 13px; font-weight: 500;
+  z-index: 9999; opacity: 0; transition: opacity 0.3s;
+  pointer-events: none; box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.toast.show { opacity: 1; }
+.toast.error { background: var(--red); }
+
+/* Copy button */
+.copy-btn {
+  font-size: 10px; padding: 2px 8px; border: 1px solid var(--border);
+  background: var(--bg); border-radius: 4px; cursor: pointer;
+  color: var(--text-sub); margin-left: 6px;
+}
+.copy-btn:hover { border-color: var(--accent); color: var(--text); }
 .header-left { display: flex; align-items: center; gap: 10px; margin-right: 24px; }
 .logo-text {
   font-size: 14px;

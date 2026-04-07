@@ -3,6 +3,14 @@ const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// === Toast ===
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(() => t.className = 'toast', 2000);
+}
+
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
 // プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
@@ -186,6 +194,7 @@ function setupEventListeners() {
     document.getElementById('bk-month').value = '';
     window._bkDateFilter = null;
     window._bkProgressFilter = false;
+    window._bkDisplayLimit = 200;
     renderBookings();
   });
 
@@ -1485,11 +1494,15 @@ async function createAccount() {
   const pw = generatePassword();
   await sb.from('accounts').insert({ name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities, agency });
   document.getElementById('adm-name').value = '';
+  if (document.getElementById('adm-agency')) document.getElementById('adm-agency').value = '';
+  showToast('アカウントを発行しました: ' + pw);
   renderAccounts();
 }
 
 async function deleteAccount(id) {
+  if (!confirm('このアカウントを削除しますか？')) return;
   await sb.from('accounts').delete().eq('id', id);
+  showToast('アカウントを削除しました');
   renderAccounts();
 }
 
@@ -1515,10 +1528,10 @@ async function renderAccounts() {
       </div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
         <div style="font-size:12px;background:var(--card);padding:6px 12px;border-radius:6px;border:1px solid var(--border)">
-          <span style="color:var(--text-sub)">URL:</span> <span style="user-select:all">${baseUrl}</span>
+          <span style="color:var(--text-sub)">URL:</span> <span style="user-select:all">${baseUrl}</span><button class="copy-btn" onclick="navigator.clipboard.writeText('${baseUrl}');showToast('URLをコピーしました')">コピー</button>
         </div>
         <div style="font-size:12px;background:var(--card);padding:6px 12px;border-radius:6px;border:1px solid var(--border)">
-          <span style="color:var(--text-sub)">PW:</span> <strong style="user-select:all;color:var(--text)">${a.password}</strong>
+          <span style="color:var(--text-sub)">PW:</span> <strong style="user-select:all;color:var(--text)">${a.password}</strong><button class="copy-btn" onclick="navigator.clipboard.writeText('${a.password}');showToast('コピーしました')">コピー</button>
         </div>
       </div>
       <div style="font-size:10px;color:var(--text-muted);margin-top:6px">発行日: ${a.created}</div>
@@ -1595,12 +1608,15 @@ async function saveDocument() {
     clinic: document.getElementById('doc-clinic').value.trim(), url
   });
   document.getElementById('doc-modal').hidden = true;
+  showToast('資料を登録しました');
   renderDocuments();
   renderClinicDocs();
 }
 
 async function deleteDocument(id) {
+  if (!confirm('この資料を削除しますか？')) return;
   await sb.from('documents').delete().eq('id', id);
+  showToast('資料を削除しました');
   renderDocuments();
   renderClinicDocs();
 }
@@ -1984,7 +2000,8 @@ function renderBookings() {
   };
 
   const isAdmin = userRole === 'admin' || (userRole === 'custom' && sessionStorage.getItem('customEditRole') === 'edit');
-  tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => {
+  const displayLimit = window._bkDisplayLimit || 200;
+  tbody.innerHTML = sorted.slice(0, displayLimit).map((d, idx) => {
     const overdue = isOverdue(d);
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
@@ -2018,8 +2035,8 @@ function renderBookings() {
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
   </tr>`}).join('') || '<tr><td colspan="14" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
-  if (sorted.length > 200) {
-    tbody.innerHTML += `<tr><td colspan="14" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
+  if (sorted.length > displayLimit) {
+    tbody.innerHTML += `<tr><td colspan="14" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
   }
 
   // ステータス変更イベント
@@ -2033,7 +2050,7 @@ function renderBookings() {
         if (match) match.status = newStatus;
         sel.style.borderColor = 'var(--green)';
         setTimeout(() => { sel.style.borderColor = ''; }, 1000);
-        sb.from('booking_status').upsert({ name, apply_date: applyDate, status: newStatus }, { onConflict: 'name,apply_date' }).then(() => {});
+        sb.from('booking_status').upsert({ name, apply_date: applyDate, status: newStatus }, { onConflict: 'name,apply_date' }).then(({error}) => { if (error) showToast('DB保存失敗: ' + error.message, true); });
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
       });
     });
@@ -2072,29 +2089,42 @@ function renderBookings() {
       });
     });
 
-    // 予約日クリックで変更
+    // 予約日クリックで変更（インライン入力）
     tbody.querySelectorAll('.bk-edit-date').forEach(td => {
       td.addEventListener('click', () => {
         const idx = parseInt(td.dataset.idx);
         const d = sorted[idx];
-        if (!d) return;
-        const newDate = prompt('新しい予約日時を入力\n例: 2026/4/20 15:00', d.bookDate || '');
-        if (newDate && newDate !== d.bookDate) {
-          d.bookDate = newDate;
-          td.innerHTML = fmtBookDate(newDate);
-          td.style.borderColor = 'var(--green)';
-          setTimeout(() => { td.style.borderColor = ''; }, 1500);
-          // DBにも保存
-          sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, book_date: newDate }, { onConflict: 'name,apply_date' }).then(() => {});
-        }
+        if (!d || td.querySelector('input')) return;
+        const orig = td.textContent.trim();
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = d.bookDate || '';
+        input.style.cssText = 'font-size:10px;width:100px;padding:2px 4px;border:1px solid var(--accent);border-radius:4px';
+        input.placeholder = '例: 2026/4/20 15:00';
+        td.innerHTML = '';
+        td.appendChild(input);
+        input.focus();
+        input.select();
+        const save = () => {
+          const newDate = input.value.trim();
+          if (newDate && newDate !== d.bookDate) {
+            d.bookDate = newDate;
+            td.innerHTML = fmtBookDate(newDate);
+            showToast('予約日を変更しました');
+            sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, book_date: newDate }, { onConflict: 'name,apply_date' }).then(() => {});
+          } else {
+            td.innerHTML = orig;
+          }
+        };
+        input.addEventListener('blur', save);
+        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { input.value = d.bookDate || ''; input.blur(); } });
       });
     });
   }
 }
 
 function exportCSV() {
-  const pw = prompt('CSV出力パスワードを入力してください');
-  if (pw !== '5858') { alert('パスワードが正しくありません'); return; }
+  if (userRole !== 'admin') { showToast('管理者のみCSV出力可能です', true); return; }
   const headers = ['申込日','予約日','名前','施術','医院','電話番号','メール','流入元','ステータス'];
   const rows = bookingsData.map(d => [
     d.applyDate, d.bookDate, d.name, d.service, d.facility,
@@ -2386,11 +2416,14 @@ async function saveAdBudget() {
     other_amount: Number(document.getElementById('ad-other-amount').value) || 0
   });
   ['ad-total','ad-fee','ad-google','ad-yahoo','ad-meta','ad-tiktok','ad-seo','ad-other-name','ad-other-amount'].forEach(id => document.getElementById(id).value = '');
+  showToast('広告予算を登録しました');
   renderAdBudgets();
 }
 
 async function deleteAdBudget(id) {
+  if (!confirm('この広告予算を削除しますか？')) return;
   await sb.from('ad_budgets').delete().eq('id', id);
+  showToast('広告予算を削除しました');
   renderAdBudgets();
 }
 
