@@ -1,3 +1,8 @@
+// === Supabase ===
+const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
 // プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
@@ -48,7 +53,7 @@ function logout() {
 }
 
 function setupEventListeners() {
-  function attemptLogin() {
+  async function attemptLogin() {
     const pw = document.getElementById('password').value;
     if (pw === CORRECT_PASSWORD) {
       document.getElementById('password').value = '';
@@ -66,9 +71,9 @@ function setupEventListeners() {
       promoFilter = PROMO_PASSWORDS[pw];
       showApp();
     } else {
-      // 管理タブで発行したアカウントをチェック
-      const accounts = JSON.parse(localStorage.getItem('admin-accounts') || '[]');
-      const matched = accounts.find(a => a.password === pw);
+      // 管理タブで発行したアカウントをチェック（DB）
+      const { data: dbAccounts } = await sb.from('accounts').select('*').eq('password', pw);
+      const matched = dbAccounts && dbAccounts[0];
       if (matched) {
         document.getElementById('password').value = '';
         sessionStorage.setItem('authenticated', 'true');
@@ -147,6 +152,12 @@ function setupEventListeners() {
   });
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
   document.getElementById('bk-csv').addEventListener('click', exportCSV);
+
+  // Ad Budget
+  document.getElementById('ad-save').addEventListener('click', saveAdBudget);
+  document.getElementById('ad-filter-agency').addEventListener('change', renderAdBudgets);
+  document.getElementById('ad-filter-month').addEventListener('change', renderAdBudgets);
+  document.getElementById('ad-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
   // Admin
   document.getElementById('adm-create').addEventListener('click', createAccount);
@@ -571,6 +582,7 @@ function showApp() {
     if (perms.includes('bookings')) loadBookings();
     if (perms.includes('tc')) { seedConsultationData(); loadClinics(); }
     if (perms.includes('sales')) { seedSalesData(); renderSales(); }
+    if (perms.includes('adbudget')) renderAdBudgets();
     return;
   }
 
@@ -586,6 +598,7 @@ function showApp() {
   renderReviews();
   renderDocuments();
   loadBookings();
+  renderAdBudgets();
 }
 
 // === Navigation ===
@@ -1306,39 +1319,39 @@ function generatePassword() {
   return pw;
 }
 
-function getAccounts() { return loadData('admin-accounts', []); }
+async function getAccountsFromDB() {
+  const { data } = await sb.from('accounts').select('*').order('created_at', { ascending: false });
+  return data || [];
+}
 
-function createAccount() {
+async function createAccount() {
   const name = document.getElementById('adm-name').value.trim();
   if (!name) return;
   const perms = [];
   if (document.getElementById('adm-perm-tc').checked) perms.push('tc');
   if (document.getElementById('adm-perm-sales').checked) perms.push('sales');
   if (document.getElementById('adm-perm-bookings').checked) perms.push('bookings');
+  if (document.getElementById('adm-perm-adbudget') && document.getElementById('adm-perm-adbudget').checked) perms.push('adbudget');
   if (!perms.length) { alert('閲覧タブを1つ以上選択してください'); return; }
   const selectedPromos = [...document.getElementById('adm-promos').selectedOptions].map(o => o.value);
   const selectedServices = [...document.getElementById('adm-services').selectedOptions].map(o => o.value);
   const selectedFacilities = [...document.getElementById('adm-facilities').selectedOptions].map(o => o.value);
   const role = document.getElementById('adm-role').value;
   const pw = generatePassword();
-  const account = { id: Date.now(), name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities, created: new Date().toISOString().slice(0,10) };
-  const accounts = getAccounts();
-  accounts.push(account);
-  saveData('admin-accounts', accounts);
+  await sb.from('accounts').insert({ name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities });
   document.getElementById('adm-name').value = '';
   renderAccounts();
 }
 
-function deleteAccount(id) {
-  const accounts = getAccounts().filter(a => a.id !== id);
-  saveData('admin-accounts', accounts);
+async function deleteAccount(id) {
+  await sb.from('accounts').delete().eq('id', id);
   renderAccounts();
 }
 
-function renderAccounts() {
+async function renderAccounts() {
   const el = document.getElementById('adm-accounts-list');
   if (!el) return;
-  const accounts = getAccounts();
+  const accounts = await getAccountsFromDB();
   if (!accounts.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">発行済みアカウントなし</p>'; return; }
   const baseUrl = location.origin + location.pathname;
   el.innerHTML = accounts.map(a => `
@@ -1372,8 +1385,11 @@ function closeModal() {
   document.body.style.overflow = '';
 }
 
-// === Documents ===
-function getDocuments() { return loadData('documents-data', []); }
+// === Documents (Supabase) ===
+async function getDocuments() {
+  const { data } = await sb.from('documents').select('*').order('created_at', { ascending: false });
+  return data || [];
+}
 
 function saveNewClinic() {
   const name = document.getElementById('nc-name').value.trim();
@@ -1424,39 +1440,32 @@ function openDocModal(clinicName, type) {
   document.getElementById('doc-modal').hidden = false;
 }
 
-function saveDocument() {
+async function saveDocument() {
   const name = document.getElementById('doc-name').value.trim();
   const url = document.getElementById('doc-url').value.trim();
   if (!name || !url) return;
-  const docs = getDocuments();
-  docs.push({
-    id: Date.now(),
-    name,
-    type: document.getElementById('doc-type').value,
-    clinic: document.getElementById('doc-clinic').value.trim(),
-    url,
-    date: new Date().toISOString().split('T')[0]
+  await sb.from('documents').insert({
+    name, type: document.getElementById('doc-type').value,
+    clinic: document.getElementById('doc-clinic').value.trim(), url
   });
-  saveData('documents-data', docs);
   document.getElementById('doc-modal').hidden = true;
   renderDocuments();
   renderClinicDocs();
 }
 
-function deleteDocument(id) {
-  const docs = getDocuments().filter(d => d.id !== id);
-  saveData('documents-data', docs);
+async function deleteDocument(id) {
+  await sb.from('documents').delete().eq('id', id);
   renderDocuments();
   renderClinicDocs();
 }
 
-function renderDocuments() {
-  const docs = getDocuments();
+async function renderDocuments() {
+  const docs = await getDocuments();
   document.getElementById('tc-docs').textContent = docs.length;
 }
 
-function renderClinicDocs() {
-  const docs = getDocuments();
+async function renderClinicDocs() {
+  const docs = await getDocuments();
   const iconClass = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'doc-pdf' : type === '録音' ? 'doc-audio' : type === '写真' ? 'doc-photo' : type === 'データ' ? 'doc-data' : 'doc-other';
   const iconText = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'PDF' : type === '録音' ? '♪' : type === '写真' ? '📷' : type === 'データ' ? '📊' : '📄';
 
@@ -1830,11 +1839,8 @@ function renderBookings() {
         if (match) match.status = newStatus;
         sel.style.borderColor = 'var(--green)';
         setTimeout(() => { sel.style.borderColor = ''; }, 1000);
-        fetch(GAS_API_URL, {
-          method: 'POST', mode: 'no-cors',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name, applyDate, status: newStatus })
-        }).catch(err => console.error('Update error:', err));
+        sb.from('booking_status').upsert({ name, apply_date: applyDate, status: newStatus }, { onConflict: 'name,apply_date' }).then(() => {});
+        fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
       });
     });
 
@@ -1845,6 +1851,11 @@ function renderBookings() {
       if (!bkExtra[key]) bkExtra[key] = {};
       bkExtra[key][field] = value;
       saveData('bk-extra', bkExtra);
+      // DBにも保存
+      const dbField = field === 'contractService' ? 'contract_service' : field === 'contractAmount' ? 'contract_amount' : field === 'paymentMonth' ? 'payment_month' : 'incentive_month';
+      const update = { name, apply_date: apply };
+      update[dbField] = field === 'contractAmount' ? Number(value) || 0 : value;
+      sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' }).then(() => {});
     };
     // セレクト
     tbody.querySelectorAll('.bk-field-select').forEach(sel => {
@@ -2038,6 +2049,77 @@ function showPromoDetail(promoName) {
 
   // スクロール
   document.getElementById('promo-detail').scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// === Ad Budget (Supabase) ===
+async function saveAdBudget() {
+  const agency = document.getElementById('ad-agency').value.trim();
+  const month = document.getElementById('ad-month').value;
+  if (!agency || !month) return;
+  await sb.from('ad_budgets').insert({
+    agency, month, ad_type: document.getElementById('ad-type').value,
+    total_budget: Number(document.getElementById('ad-total').value) || 0,
+    fee: Number(document.getElementById('ad-fee').value) || 0,
+    google: Number(document.getElementById('ad-google').value) || 0,
+    yahoo: Number(document.getElementById('ad-yahoo').value) || 0,
+    meta: Number(document.getElementById('ad-meta').value) || 0,
+    tiktok: Number(document.getElementById('ad-tiktok').value) || 0,
+    seo: Number(document.getElementById('ad-seo').value) || 0,
+    other_name: document.getElementById('ad-other-name').value,
+    other_amount: Number(document.getElementById('ad-other-amount').value) || 0
+  });
+  ['ad-total','ad-fee','ad-google','ad-yahoo','ad-meta','ad-tiktok','ad-seo','ad-other-name','ad-other-amount'].forEach(id => document.getElementById(id).value = '');
+  renderAdBudgets();
+}
+
+async function deleteAdBudget(id) {
+  await sb.from('ad_budgets').delete().eq('id', id);
+  renderAdBudgets();
+}
+
+async function renderAdBudgets() {
+  const { data } = await sb.from('ad_budgets').select('*').order('month', { ascending: false });
+  const allData = data || [];
+
+  // フィルター
+  const agencyFilter = document.getElementById('ad-filter-agency').value;
+  const monthFilter = document.getElementById('ad-filter-month').value;
+  let filtered = allData;
+  if (agencyFilter) filtered = filtered.filter(d => d.agency === agencyFilter);
+  if (monthFilter) filtered = filtered.filter(d => d.month === monthFilter);
+
+  // フィルター選択肢更新
+  const agencies = [...new Set(allData.map(d => d.agency))].sort();
+  const months = [...new Set(allData.map(d => d.month))].sort().reverse();
+  document.getElementById('ad-filter-agency').innerHTML = '<option value="">代理店:全て</option>' + agencies.map(a => `<option ${a===agencyFilter?'selected':''}>${a}</option>`).join('');
+  document.getElementById('ad-filter-month').innerHTML = '<option value="">月:全て</option>' + months.map(m => `<option ${m===monthFilter?'selected':''}>${m}</option>`).join('');
+
+  // 統計
+  const totalBudget = filtered.reduce((s, d) => s + Number(d.total_budget), 0);
+  const totalFee = filtered.reduce((s, d) => s + Number(d.fee), 0);
+  const totalMedia = filtered.reduce((s, d) => s + Number(d.google) + Number(d.yahoo) + Number(d.meta) + Number(d.tiktok) + Number(d.seo) + Number(d.other_amount), 0);
+  document.getElementById('ad-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">総予算</span><span class="stat-num">¥${fmt(totalBudget)}</span></div>
+    <div class="stat-card"><span class="stat-label">手数料合計</span><span class="stat-num">¥${fmt(totalFee)}</span></div>
+    <div class="stat-card"><span class="stat-label">媒体費合計</span><span class="stat-num">¥${fmt(totalMedia)}</span></div>
+    <div class="stat-card"><span class="stat-label">登録件数</span><span class="stat-num">${filtered.length}</span></div>
+  `;
+
+  // テーブル
+  document.getElementById('ad-tbody').innerHTML = filtered.map(d => `<tr>
+    <td style="font-size:12px;font-weight:600">${d.agency}</td>
+    <td style="font-size:11px">${d.month}</td>
+    <td style="font-size:11px">${d.ad_type}</td>
+    <td style="font-size:11px;font-weight:600">¥${fmt(d.total_budget)}</td>
+    <td style="font-size:11px">¥${fmt(d.fee)}</td>
+    <td style="font-size:11px">¥${fmt(d.google)}</td>
+    <td style="font-size:11px">¥${fmt(d.yahoo)}</td>
+    <td style="font-size:11px">¥${fmt(d.meta)}</td>
+    <td style="font-size:11px">¥${fmt(d.tiktok)}</td>
+    <td style="font-size:11px">¥${fmt(d.seo)}</td>
+    <td style="font-size:11px">${d.other_name ? d.other_name + ' ¥' + fmt(d.other_amount) : '-'}</td>
+    <td><button class="resource-delete" onclick="deleteAdBudget(${d.id})" style="width:24px;height:24px;font-size:11px">×</button></td>
+  </tr>`).join('') || '<tr><td colspan="12" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 }
 
 // === Reviews ===
