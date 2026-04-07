@@ -44,17 +44,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // === Auth ===
 function logout() {
-  sessionStorage.removeItem('authenticated');
+  sessionStorage.clear();
+  userRole = 'admin';
+  promoFilter = '';
   document.getElementById('app').hidden = true;
   document.getElementById('login-screen').hidden = false;
   document.getElementById('login-screen').style.display = '';
   document.getElementById('password').value = '';
   document.getElementById('login-error').hidden = true;
+  // ナビリセット
+  document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => b.style.display = '');
+  document.querySelectorAll('.bottom-nav-btn').forEach(b => b.style.display = '');
 }
 
 function setupEventListeners() {
   async function attemptLogin() {
     const pw = document.getElementById('password').value;
+    const loginBtn = document.getElementById('login-btn');
+    loginBtn.textContent = 'ログイン中...';
+    loginBtn.disabled = true;
     if (pw === CORRECT_PASSWORD) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
@@ -83,11 +91,14 @@ function setupEventListeners() {
         sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
         sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
         sessionStorage.setItem('customEditRole', matched.role || 'view');
+        sessionStorage.setItem('customAgency', matched.agency || '');
         showApp();
         return;
       }
       document.getElementById('login-error').hidden = false;
       document.getElementById('password').value = '';
+      loginBtn.textContent = 'ログイン';
+      loginBtn.disabled = false;
     }
   }
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
@@ -147,6 +158,12 @@ function setupEventListeners() {
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
   // Bookings filters
+  // Search with debounce
+  let searchTimer;
+  document.getElementById('bk-search').addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(renderBookings, 300);
+  });
   ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-month'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderBookings);
   });
@@ -611,6 +628,8 @@ function switchView(view) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
   window.scrollTo(0, 0);
+  const titles = {tc:'TC',sales:'売上',bookings:'予約',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
+  document.title = '清翔会 - ' + (titles[view] || '');
 }
 
 // === Facility Tabs ===
@@ -1409,8 +1428,9 @@ async function createAccount() {
   const selectedServices = [...document.getElementById('adm-services').selectedOptions].map(o => o.value);
   const selectedFacilities = [...document.getElementById('adm-facilities').selectedOptions].map(o => o.value);
   const role = document.getElementById('adm-role').value;
+  const agency = document.getElementById('adm-agency') ? document.getElementById('adm-agency').value.trim() : '';
   const pw = generatePassword();
-  await sb.from('accounts').insert({ name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities });
+  await sb.from('accounts').insert({ name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities, agency });
   document.getElementById('adm-name').value = '';
   renderAccounts();
 }
@@ -1435,6 +1455,7 @@ async function renderAccounts() {
       <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px">
         <span class="badge ${a.role==='edit'?'badge-success':'badge-default'}" style="margin-right:4px">${a.role==='edit'?'編集':'閲覧のみ'}</span>
         ${a.permissions.map(p => p==='tc'?'TC':p==='sales'?'売上':'予約').join(', ')}
+        ${a.agency ? '<br>代理店: ' + a.agency : ''}
         ${a.promos && a.promos.length ? '<br>プロモ: ' + a.promos.join(', ') : ''}
         ${a.services && a.services.length ? '<br>施術: ' + a.services.map(s=>s.length>15?s.slice(0,15)+'…':s).join(', ') : ''}
         ${a.facilities && a.facilities.length ? '<br>店舗: ' + a.facilities.map(f=>f.length>10?f.slice(0,10)+'…':f).join(', ') : ''}
@@ -1612,7 +1633,7 @@ async function loadBookings() {
     }
   } catch (e) {
     console.error('Bookings load error:', e);
-    document.getElementById('bk-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データ取得に失敗しました</td></tr>';
+    document.getElementById('bk-tbody').innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--red)">データ取得失敗。更新ボタンを押してください。</td></tr>';
   }
 }
 
@@ -1722,6 +1743,7 @@ function populateBookingFilters() {
 }
 
 function renderBookings() {
+  const searchVal = (document.getElementById('bk-search').value || '').trim().toLowerCase();
   const toolFilter = document.getElementById('bk-tool').value;
   const facFilterVal = document.getElementById('bk-facility').value;
   const promoFilterVal = document.getElementById('bk-promo').value;
@@ -1730,6 +1752,7 @@ function renderBookings() {
   const monthFilter = document.getElementById('bk-month').value;
 
   let filtered = bookingsData;
+  if (searchVal) filtered = filtered.filter(d => d.name && d.name.toLowerCase().includes(searchVal));
   if (toolFilter) filtered = filtered.filter(d => d.tool === toolFilter);
   // プロモユーザーの場合、自分のプロモのみ表示
   if (userRole === 'promo' && promoFilter) {
@@ -1794,6 +1817,7 @@ function renderBookings() {
     <div class="stat-card"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span></div>
     <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
     <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${total > 0 ? Math.round((total - cancelled - pending) / total * 100) : 0}%</span></div>
     <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
     <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
   `;
@@ -2151,7 +2175,18 @@ async function deleteAdBudget(id) {
 
 async function renderAdBudgets() {
   const { data } = await sb.from('ad_budgets').select('*').order('month', { ascending: false });
-  const allData = data || [];
+  let allData = data || [];
+
+  // カスタムユーザーの代理店制限
+  if (userRole === 'custom') {
+    const myAgency = sessionStorage.getItem('customAgency') || '';
+    if (myAgency) {
+      allData = allData.filter(d => d.agency === myAgency);
+      // 代理店名を自動入力
+      const agencyInput = document.getElementById('ad-agency');
+      if (agencyInput) { agencyInput.value = myAgency; agencyInput.readOnly = true; }
+    }
+  }
 
   // フィルター
   const agencyFilter = document.getElementById('ad-filter-agency').value;

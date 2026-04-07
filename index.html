@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=44">
+  <link rel="stylesheet" href="styles.css?v=45">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -158,6 +158,7 @@
 
       <!-- フィルター -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <input type="text" class="form-input" id="bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
         <select class="form-select" id="bk-tool" style="width:auto;padding:6px 8px;font-size:11px"><option value="">ツール:全て</option><option value="DXHUB">DXHUB</option><option value="セレクト">セレクト</option></select>
         <select class="form-select" id="bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
         <select class="form-select" id="bk-promo" style="width:auto;padding:6px 8px;font-size:11px"><option value="">プロモ:全て</option></select>
@@ -590,6 +591,10 @@
             <input type="text" class="form-input" id="adm-name" placeholder="例: ヒカルさん用">
           </div>
           <div class="form-group">
+            <label class="form-label">代理店名（広告用）</label>
+            <input type="text" class="form-input" id="adm-agency" placeholder="例: LIZ（空欄=全て閲覧可）">
+          </div>
+          <div class="form-group">
             <label class="form-label">権限</label>
             <select class="form-select" id="adm-role">
               <option value="view">閲覧のみ</option>
@@ -650,6 +655,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=44"></script>
+  <script src="app.js?v=45"></script>
 </body>
 </html>
