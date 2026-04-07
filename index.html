@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=19">
+  <link rel="stylesheet" href="styles.css?v=20">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -37,6 +37,7 @@
       <nav class="desktop-nav">
         <button class="nav-btn active" data-view="tc">TC</button>
         <button class="nav-btn" data-view="sales">売上</button>
+        <button class="nav-btn" data-view="bookings">予約</button>
         <button class="nav-btn" data-view="reviews">口コミ</button>
       </nav>
       <div class="nav-spacer"></div>
@@ -52,6 +53,10 @@
       <button class="bottom-nav-btn" data-view="sales">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
         <span>売上</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="bookings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        <span>予約</span>
       </button>
       <button class="bottom-nav-btn" data-view="reviews">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
@@ -138,6 +143,71 @@
     </main>
 
     <!-- 数値タブは廃止、中身はTCタブに統合 -->
+
+    <!-- ==================== 予約管理 ==================== -->
+    <main id="view-bookings" class="view" hidden>
+      <div class="page-header">
+        <h2>予約・来院管理</h2>
+        <p class="page-desc">スプレッドシートからリアルタイム取得</p>
+      </div>
+
+      <div class="stats-row" id="bk-stats"></div>
+
+      <!-- フィルター -->
+      <div class="card" style="margin-bottom:20px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <div class="form-group" style="min-width:140px">
+            <label class="form-label">医院</label>
+            <select class="form-select" id="bk-facility"><option value="">全て</option></select>
+          </div>
+          <div class="form-group" style="min-width:140px">
+            <label class="form-label">プロモーション</label>
+            <select class="form-select" id="bk-promo"><option value="">全て</option></select>
+          </div>
+          <div class="form-group" style="min-width:140px">
+            <label class="form-label">施術</label>
+            <select class="form-select" id="bk-service"><option value="">全て</option></select>
+          </div>
+          <div class="form-group" style="min-width:140px">
+            <label class="form-label">ステータス</label>
+            <select class="form-select" id="bk-status">
+              <option value="">全て</option>
+              <option value="未対応">未対応</option>
+              <option value="確認済">確認済</option>
+              <option value="来院済">来院済</option>
+              <option value="成約">成約</option>
+              <option value="キャンセル">キャンセル</option>
+            </select>
+          </div>
+          <div class="form-group" style="min-width:120px">
+            <label class="form-label">期間</label>
+            <input type="month" class="form-input" id="bk-month" style="font-size:13px">
+          </div>
+          <button class="btn btn-dark" id="bk-refresh" style="margin-top:18px;min-height:36px;padding:8px 16px;font-size:12px">更新</button>
+        </div>
+      </div>
+
+      <!-- データテーブル -->
+      <div class="card">
+        <div class="card-header">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+        <div class="data-table-wrap">
+          <table class="data-table" id="bk-table">
+            <thead>
+              <tr>
+                <th>申込日</th>
+                <th>予約日</th>
+                <th>名前</th>
+                <th>施術</th>
+                <th>医院</th>
+                <th>流入元</th>
+                <th>ステータス</th>
+              </tr>
+            </thead>
+            <tbody id="bk-tbody"></tbody>
+          </table>
+        </div>
+      </div>
+    </main>
 
     <!-- ==================== 口コミ ==================== -->
     <main id="view-reviews" class="view" hidden>
@@ -467,6 +537,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=20"></script>
 </body>
 </html>

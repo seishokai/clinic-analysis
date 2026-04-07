@@ -97,6 +97,12 @@ function setupEventListeners() {
   document.getElementById('comment-save').addEventListener('click', saveComment);
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
+  // Bookings filters
+  ['bk-facility','bk-promo','bk-service','bk-status','bk-month'].forEach(id => {
+    document.getElementById(id).addEventListener('change', renderBookings);
+  });
+  document.getElementById('bk-refresh').addEventListener('click', loadBookings);
+
   // Add clinic
   document.getElementById('add-clinic-btn').addEventListener('click', () => { document.getElementById('clinic-add-modal').hidden = false; });
   document.getElementById('nc-save').addEventListener('click', saveNewClinic);
@@ -486,6 +492,7 @@ function showApp() {
   renderRates();
   renderReviews();
   renderDocuments();
+  loadBookings();
 }
 
 // === Navigation ===
@@ -1307,6 +1314,153 @@ function renderClinicDocs() {
       </a>
     `).join('');
   });
+}
+
+// === Bookings ===
+const BK_SHEET_ID = '10misKpAtMitwIagGDUoMvQS7U9pfEQ0ODxG8A7DLzaQ';
+let bookingsData = [];
+
+async function loadBookings() {
+  try {
+    const url = `https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=%E5%85%83%E3%83%87%E3%83%BC%E3%82%BF`;
+    const res = await fetch(url);
+    const csv = await res.text();
+    bookingsData = parseCSV(csv);
+    populateBookingFilters();
+    renderBookings();
+  } catch (e) {
+    console.error('Bookings load error:', e);
+    document.getElementById('bk-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データ取得に失敗しました</td></tr>';
+  }
+}
+
+function parseCSV(csv) {
+  const lines = csv.split('\n');
+  if (lines.length < 2) return [];
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 5 || !cols[2]) continue;
+    rows.push({
+      applyDate: cols[0] || '',
+      bookDate: cols[1] || '',
+      name: cols[2] || '',
+      service: cols[3] || '',
+      facility: cols[4] || '',
+      email: cols[5] || '',
+      phone: cols[6] || '',
+      source: cols[7] || '',
+      status: cols[8] || '未対応'
+    });
+  }
+  return rows;
+}
+
+function parseCSVLine(line) {
+  const result = [];
+  let current = '';
+  let inQuotes = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQuotes = !inQuotes; }
+    else if (c === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
+    else { current += c; }
+  }
+  result.push(current.trim());
+  return result;
+}
+
+function populateBookingFilters() {
+  const facilities = [...new Set(bookingsData.map(d => d.facility).filter(Boolean))].sort();
+  const promos = [...new Set(bookingsData.map(d => d.source).filter(Boolean))].sort();
+  const services = [...new Set(bookingsData.map(d => d.service).filter(Boolean))].sort();
+
+  const facEl = document.getElementById('bk-facility');
+  facEl.innerHTML = '<option value="">全て</option>' + facilities.map(f => `<option>${f}</option>`).join('');
+
+  const promoEl = document.getElementById('bk-promo');
+  promoEl.innerHTML = '<option value="">全て</option>' + promos.map(p => `<option>${p}</option>`).join('');
+
+  const svcEl = document.getElementById('bk-service');
+  svcEl.innerHTML = '<option value="">全て</option>' + services.map(s => `<option>${s}</option>`).join('');
+}
+
+function renderBookings() {
+  const facFilter = document.getElementById('bk-facility').value;
+  const promoFilter = document.getElementById('bk-promo').value;
+  const svcFilter = document.getElementById('bk-service').value;
+  const statusFilter = document.getElementById('bk-status').value;
+  const monthFilter = document.getElementById('bk-month').value;
+
+  let filtered = bookingsData;
+  if (facFilter) filtered = filtered.filter(d => d.facility === facFilter);
+  if (promoFilter) filtered = filtered.filter(d => d.source === promoFilter);
+  if (svcFilter) filtered = filtered.filter(d => d.service === svcFilter);
+  if (statusFilter) {
+    if (statusFilter === '未対応') filtered = filtered.filter(d => !d.status || d.status === '未対応');
+    else filtered = filtered.filter(d => d.status === statusFilter);
+  }
+  if (monthFilter) {
+    filtered = filtered.filter(d => {
+      const bd = d.bookDate.replace(/\//g, '-').slice(0, 7);
+      return bd === monthFilter;
+    });
+  }
+
+  // Stats
+  const total = filtered.length;
+  const cancelled = filtered.filter(d => d.status === 'キャンセル').length;
+  const pending = filtered.filter(d => !d.status || d.status === '未対応').length;
+  const visited = filtered.filter(d => d.status === '来院済').length;
+  const contracted = filtered.filter(d => d.status === '成約').length;
+
+  document.getElementById('bk-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
+    <div class="stat-card"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span></div>
+    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
+    <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+  `;
+
+  document.getElementById('bk-count').textContent = `${filtered.length}件`;
+
+  // Table
+  const tbody = document.getElementById('bk-tbody');
+  const sorted = [...filtered].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
+
+  const statusBadge = (s) => {
+    if (!s || s === '未対応') return '<span class="badge badge-default">未対応</span>';
+    if (s === 'キャンセル') return '<span class="badge badge-danger">キャンセル</span>';
+    if (s === '来院済') return '<span class="badge badge-warning">来院済</span>';
+    if (s === '成約') return '<span class="badge badge-success">成約</span>';
+    if (s === '確認済') return '<span class="badge badge-default" style="border-color:#6366f1;color:#6366f1">確認済</span>';
+    return `<span class="badge badge-default">${s}</span>`;
+  };
+
+  const shortService = (s) => {
+    if (!s) return '-';
+    if (s.includes('ラミネート') || s.includes('ブラックフィルム')) return 'BF相談';
+    if (s.includes('矯正')) return '矯正相談';
+    if (s.includes('セラミック')) return 'セラミック';
+    if (s.includes('インプラント')) return 'インプラント';
+    return s.length > 10 ? s.slice(0, 10) + '…' : s;
+  };
+
+  const shortFac = (f) => f && f.length > 12 ? f.slice(0, 12) + '…' : (f || '-');
+
+  tbody.innerHTML = sorted.slice(0, 200).map(d => `<tr>
+    <td style="white-space:nowrap;font-size:12px">${d.applyDate ? d.applyDate.slice(0, 10) : '-'}</td>
+    <td style="white-space:nowrap;font-size:12px">${d.bookDate ? d.bookDate.slice(0, 10) : '-'}</td>
+    <td>${d.name}</td>
+    <td style="font-size:12px">${shortService(d.service)}</td>
+    <td style="font-size:12px">${shortFac(d.facility)}</td>
+    <td style="font-size:11px;color:var(--text-sub)">${d.source || '-'}</td>
+    <td>${statusBadge(d.status)}</td>
+  </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+
+  if (sorted.length > 200) {
+    tbody.innerHTML += `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
+  }
 }
 
 // === Reviews ===
