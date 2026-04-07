@@ -1626,13 +1626,19 @@ function renderPromoDash() {
     <div class="stat-card"><span class="stat-label">総成約</span><span class="stat-num" style="color:var(--green)">${contractedAll}</span></div>
   `;
 
-  // バーチャート
-  renderBarChart('promo-dash-bookings', sorted.slice(0, 20).map(([name, v]) => ({
-    name: name.length > 20 ? name.slice(0, 20) + '…' : name,
-    rate: Math.round(v.total / totalAll * 100),
-    decided: v.total,
-    consulted: totalAll
-  })));
+  // バーチャート（クリック可能）
+  const chartEl = document.getElementById('promo-dash-bookings');
+  chartEl.innerHTML = sorted.slice(0, 20).map(([name, v]) => {
+    const pct2 = Math.round(v.total / totalAll * 100);
+    return `<div class="bar-row" style="cursor:pointer" data-promo="${name}">
+      <div class="bar-label">${name.length > 20 ? name.slice(0, 20) + '…' : name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(pct2, 3)}%"><span>${pct2}%</span></div></div>
+      <div class="bar-value">${v.total}/${totalAll}</div>
+    </div>`;
+  }).join('');
+  chartEl.querySelectorAll('.bar-row[data-promo]').forEach(row => {
+    row.addEventListener('click', () => showPromoDetail(row.dataset.promo));
+  });
 
   // テーブル
   document.getElementById('promo-dash-tbody').innerHTML = sorted.map(([name, v]) => {
@@ -1647,6 +1653,80 @@ function renderPromoDash() {
       <td>${v.amount ? '¥' + fmt(v.amount) : '-'}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+}
+
+function showPromoDetail(promoName) {
+  const data = bookingsData.filter(d => (d.source || '(なし)') === promoName);
+  const bkExtra = loadData('bk-extra', {});
+
+  document.getElementById('promo-detail').hidden = false;
+  document.getElementById('promo-detail-title').textContent = promoName;
+
+  const total = data.length;
+  const cancelled = data.filter(d => d.status === 'キャンセル').length;
+  const visited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const contracted = data.filter(d => d.status === '成約').length;
+  let totalAmt = 0;
+  data.forEach(d => {
+    const key = d.name + '|' + d.applyDate;
+    if (bkExtra[key] && bkExtra[key].contractAmount) totalAmt += Number(bkExtra[key].contractAmount);
+  });
+
+  document.getElementById('promo-detail-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
+    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
+    <div class="stat-card"><span class="stat-label">来院</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+    <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num">${visited > 0 ? pct(contracted, visited) : 0}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmt)}</span></div>
+  `;
+
+  // 医院別内訳
+  const facGroups = {};
+  data.forEach(d => {
+    const f = d.facility || '不明';
+    if (!facGroups[f]) facGroups[f] = 0;
+    facGroups[f]++;
+  });
+  renderBarChart('promo-detail-facility', Object.entries(facGroups).sort((a,b) => b[1]-a[1]).map(([name, count]) => ({
+    name: name.length > 15 ? name.slice(0,15) + '…' : name, rate: Math.round(count/total*100), decided: count, consulted: total
+  })));
+
+  // 施術別内訳
+  const svcGroups = {};
+  data.forEach(d => {
+    let s = d.service || '不明';
+    if (s.includes('ラミネート') || s.includes('ブラックフィルム')) s = 'BF相談';
+    else if (s.includes('矯正')) s = '矯正相談';
+    else if (s.includes('セラミック')) s = 'セラミック';
+    else if (s.includes('インプラント')) s = 'インプラント';
+    if (!svcGroups[s]) svcGroups[s] = 0;
+    svcGroups[s]++;
+  });
+  const svcEl = document.getElementById('promo-detail-service');
+  svcEl.innerHTML = Object.entries(svcGroups).sort((a,b) => b[1]-a[1]).map(([name, count]) =>
+    `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/total*100),5)}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"><span>${Math.round(count/total*100)}%</span></div></div><div class="bar-value">${count}</div></div>`
+  ).join('');
+
+  // 予約一覧
+  const statusBadge = (s) => {
+    if (!s || s === '未対応') return '<span class="badge badge-default">未対応</span>';
+    if (s === 'キャンセル') return '<span class="badge badge-danger">キャンセル</span>';
+    if (s === '来院済') return '<span class="badge badge-warning">来院済</span>';
+    if (s === '成約') return '<span class="badge badge-success">成約</span>';
+    return `<span class="badge badge-default">${s}</span>`;
+  };
+  const sorted2 = [...data].sort((a,b) => (b.bookDate||'').localeCompare(a.bookDate||''));
+  document.getElementById('promo-detail-tbody').innerHTML = sorted2.map(d => `<tr>
+    <td style="font-size:12px;white-space:nowrap">${d.bookDate ? d.bookDate.slice(0,10) : '-'}</td>
+    <td>${d.name}</td>
+    <td style="font-size:12px">${d.service && d.service.length > 10 ? d.service.slice(0,10)+'…' : (d.service||'-')}</td>
+    <td style="font-size:12px">${d.facility && d.facility.length > 12 ? d.facility.slice(0,12)+'…' : (d.facility||'-')}</td>
+    <td>${statusBadge(d.status)}</td>
+  </tr>`).join('');
+
+  // スクロール
+  document.getElementById('promo-detail').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 // === Reviews ===
