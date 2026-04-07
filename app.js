@@ -2152,10 +2152,22 @@ function renderPromoDash() {
   const totalAll = sorted.reduce((s, [, v]) => s + v.total, 0);
   const contractedAll = sorted.reduce((s, [, v]) => s + v.contracted, 0);
 
+  const cancelledAll = sorted.reduce((s, [, v]) => s + v.cancelled, 0);
+  const visitedAll = sorted.reduce((s, [, v]) => s + v.visited, 0);
+  const amountAll = sorted.reduce((s, [, v]) => s + v.amount, 0);
+  const visitRate = totalAll > 0 ? Math.round((totalAll - cancelledAll) / totalAll * 100) : 0;
+  const contractRate = visitedAll > 0 ? Math.round(contractedAll / visitedAll * 100) : 0;
+  const avgUnit = contractedAll > 0 ? Math.round(amountAll / contractedAll) : 0;
+
   document.getElementById('promo-dash-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-label">プロモ数</span><span class="stat-num">${sorted.length}</span></div>
-    <div class="stat-card"><span class="stat-label">総予約数</span><span class="stat-num">${totalAll}</span></div>
-    <div class="stat-card"><span class="stat-label">総成約</span><span class="stat-num" style="color:var(--green)">${contractedAll}</span></div>
+    <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${totalAll}</span></div>
+    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelledAll}</span></div>
+    <div class="stat-card"><span class="stat-label">来院数</span><span class="stat-num">${visitedAll}</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${visitRate}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約数</span><span class="stat-num" style="color:var(--green)">${contractedAll}</span></div>
+    <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num" style="color:${contractRate>=30?'var(--green)':'var(--red)'}">${contractRate}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約単価</span><span class="stat-num">¥${fmt(avgUnit)}</span></div>
+    <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(amountAll)}</span></div>
   `;
 
   // バーチャート（クリック可能）
@@ -2199,30 +2211,68 @@ function renderPromoDash() {
     if (s.includes('インプラント')) return 'インプラント';
     return s.replace(/相談|無料|　/g, '').slice(0, 6);
   };
+  const facDetail = {};
   dashData.forEach(d => {
-    const f = sFac2(d.facility); facChart[f] = (facChart[f]||0) + 1;
+    const f = sFac2(d.facility);
+    if (!facDetail[f]) facDetail[f] = { total: 0, cancelled: 0, visited: 0, contracted: 0 };
+    facDetail[f].total++;
+    if (d.status === 'キャンセル') facDetail[f].cancelled++;
+    if (d.status === '来院済' || d.status === '成約') facDetail[f].visited++;
+    if (d.status === '成約') facDetail[f].contracted++;
     const s = sSvc2(d.service); svcChart[s] = (svcChart[s]||0) + 1;
   });
   const totalDash = dashData.length;
-  renderBarChart('promo-facility-chart', Object.entries(facChart).sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,rate:Math.round(count/totalDash*100),decided:count,consulted:totalDash})));
+  // 医院別チャート（予約数バー + 成約率テキスト）
+  const facChartEl = document.getElementById('promo-facility-chart');
+  const facSorted = Object.entries(facDetail).sort((a,b) => b[1].total - a[1].total);
+  facChartEl.innerHTML = facSorted.map(([name, v]) => {
+    const vr = v.total > 0 ? Math.round((v.total - v.cancelled) / v.total * 100) : 0;
+    const cr = v.visited > 0 ? pct(v.contracted, v.visited) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label">${name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(v.total/totalDash*100),3)}%"><span>${Math.round(v.total/totalDash*100)}%</span></div></div>
+      <div class="bar-value" style="min-width:120px;font-size:10px">${v.total}件 来院${vr}% 成約${cr}%</div>
+    </div>`;
+  }).join('') || '<p style="color:var(--text-muted);font-size:13px">データなし</p>';
+  // 相談別集計（成約率も出す）
+  const svcDetail = {};
+  dashData.forEach(d => {
+    const s = sSvc2(d.service);
+    if (!svcDetail[s]) svcDetail[s] = { total: 0, cancelled: 0, visited: 0, contracted: 0 };
+    svcDetail[s].total++;
+    if (d.status === 'キャンセル') svcDetail[s].cancelled++;
+    if (d.status === '来院済' || d.status === '成約') svcDetail[s].visited++;
+    if (d.status === '成約') svcDetail[s].contracted++;
+  });
   const svcEl2 = document.getElementById('promo-service-chart');
-  svcEl2.innerHTML = Object.entries(svcChart).sort((a,b)=>b[1]-a[1]).map(([name,count])=>
-    `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/totalDash*100),3)}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"><span>${Math.round(count/totalDash*100)}%</span></div></div><div class="bar-value">${count}</div></div>`
-  ).join('') || '<p style="color:var(--text-muted);font-size:13px">データなし</p>';
+  const svcSorted = Object.entries(svcDetail).sort((a,b) => b[1].total - a[1].total);
+  svcEl2.innerHTML = svcSorted.map(([name, v]) => {
+    const vr = v.total > 0 ? Math.round((v.total - v.cancelled) / v.total * 100) : 0;
+    const cr = v.visited > 0 ? pct(v.contracted, v.visited) : 0;
+    return `<div class="bar-row">
+      <div class="bar-label">${name}</div>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(v.total/totalDash*100),3)}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"><span>${Math.round(v.total/totalDash*100)}%</span></div></div>
+      <div class="bar-value" style="min-width:120px;font-size:10px">${v.total}件 来院${vr}% 成約${cr}%</div>
+    </div>`;
+  }).join('') || '<p style="color:var(--text-muted);font-size:13px">データなし</p>';
 
   // テーブル
   document.getElementById('promo-dash-tbody').innerHTML = sorted.map(([name, v]) => {
-    const rate = v.visited > 0 ? pct(v.contracted, v.visited) : 0;
+    const vRate = v.total > 0 ? Math.round((v.total - v.cancelled) / v.total * 100) : 0;
+    const cRate = v.visited > 0 ? pct(v.contracted, v.visited) : 0;
+    const unit = v.contracted > 0 ? Math.round(v.amount / v.contracted) : 0;
     return `<tr>
       <td style="font-size:12px">${name}</td>
       <td>${v.total}</td>
       <td style="color:var(--red)">${v.cancelled}</td>
       <td>${v.visited}</td>
+      <td>${vRate}%</td>
       <td style="color:var(--green)">${v.contracted}</td>
-      <td><span style="color:${rate>=30?'var(--green)':'var(--red)'};font-weight:600">${rate}%</span></td>
+      <td><span style="color:${cRate>=30?'var(--green)':'var(--red)'};font-weight:600">${cRate}%</span></td>
+      <td>${unit ? '¥' + fmt(unit) : '-'}</td>
       <td>${v.amount ? '¥' + fmt(v.amount) : '-'}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 }
 
 function showPromoDetail(promoName) {
@@ -2267,12 +2317,18 @@ function showPromoDetail(promoName) {
     if (bkExtra[key] && bkExtra[key].contractAmount) totalAmt += Number(bkExtra[key].contractAmount);
   });
 
+  const detailVisitRate = total > 0 ? Math.round((total - cancelled) / total * 100) : 0;
+  const detailContractRate = visited > 0 ? pct(contracted, visited) : 0;
+  const detailUnit = contracted > 0 ? Math.round(totalAmt / contracted) : 0;
+
   document.getElementById('promo-detail-stats').innerHTML = `
     <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
     <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
     <div class="stat-card"><span class="stat-label">来院</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${detailVisitRate}%</span></div>
     <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
-    <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num">${visited > 0 ? pct(contracted, visited) : 0}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num" style="color:${detailContractRate>=30?'var(--green)':'var(--red)'}">${detailContractRate}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約単価</span><span class="stat-num">¥${fmt(detailUnit)}</span></div>
     <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmt)}</span></div>
   `;
 
