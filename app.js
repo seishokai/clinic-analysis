@@ -1614,13 +1614,13 @@ function populateBookingFilters() {
   const services = [...new Set(filteredForOptions.map(d => d.service).filter(Boolean))].sort();
 
   const facEl = document.getElementById('bk-facility');
-  facEl.innerHTML = '<option value="">全て</option>' + facilities.map(f => `<option>${f}</option>`).join('');
+  facEl.innerHTML = '<option value="">医院:全て</option>' + facilities.map(f => `<option>${f}</option>`).join('');
 
   const promoEl = document.getElementById('bk-promo');
-  promoEl.innerHTML = '<option value="">全て</option>' + promos.map(p => `<option>${p}</option>`).join('');
+  promoEl.innerHTML = '<option value="">プロモ:全て</option>' + promos.map(p => `<option>${p}</option>`).join('');
 
   const svcEl = document.getElementById('bk-service');
-  svcEl.innerHTML = '<option value="">全て</option>' + services.map(s => `<option>${s}</option>`).join('');
+  svcEl.innerHTML = '<option value="">相談:全て</option>' + services.map(s => `<option>${s}</option>`).join('');
 
   // クイックプロモボタン（上位5件）
   const promoCounts = {};

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=41">
+  <link rel="stylesheet" href="styles.css?v=42">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -178,7 +178,7 @@
       <!-- データテーブル -->
       <div class="card" style="padding:12px">
         <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-        <div class="data-table-wrap">
+        <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
           <table class="data-table compact" id="bk-table">
             <thead>
               <tr>
@@ -598,6 +598,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=41"></script>
+  <script src="app.js?v=42"></script>
 </body>
 </html>

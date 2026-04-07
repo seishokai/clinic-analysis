@@ -191,7 +191,7 @@ body {
 .view.view-wide { max-width: 100%; padding: 8px; }
 .data-table.compact td, .data-table.compact th { padding: 4px 5px; vertical-align: middle; }
 .data-table.compact { table-layout: fixed; width: 100%; }
-.data-table.compact th { text-align: center; }
+.data-table.compact th { text-align: center; position: sticky; top: 0; background: var(--card); z-index: 10; border-bottom: 2px solid var(--border); }
 .data-table.compact td { text-align: center; }
 .view[hidden] { display: none !important; }
 .page-header { margin-bottom: 20px; }
