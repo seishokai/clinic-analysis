@@ -158,6 +158,35 @@ function setupEventListeners() {
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
   // Bookings filters
+  // Quick filter buttons
+  document.getElementById('bk-overdue').addEventListener('click', () => {
+    document.getElementById('bk-status').value = '要対応';
+    renderBookings();
+  });
+  document.getElementById('bk-yesterday').addEventListener('click', () => {
+    const y = new Date(); y.setDate(y.getDate() - 1);
+    document.getElementById('bk-status').value = '';
+    window._bkDateFilter = y.toISOString().slice(0,10);
+    renderBookings();
+  });
+  document.getElementById('bk-today').addEventListener('click', () => {
+    const t = new Date();
+    document.getElementById('bk-status').value = '';
+    window._bkDateFilter = t.toISOString().slice(0,10);
+    renderBookings();
+  });
+  document.getElementById('bk-reset').addEventListener('click', () => {
+    document.getElementById('bk-status').value = '';
+    document.getElementById('bk-search').value = '';
+    document.getElementById('bk-tool').value = '';
+    document.getElementById('bk-facility').value = '';
+    document.getElementById('bk-promo').value = '';
+    document.getElementById('bk-service').value = '';
+    document.getElementById('bk-month').value = '';
+    window._bkDateFilter = null;
+    renderBookings();
+  });
+
   // Search with debounce
   let searchTimer;
   document.getElementById('bk-search').addEventListener('input', () => {
@@ -1789,6 +1818,18 @@ function renderBookings() {
       const bd = d.bookDate.replace(/\//g, '-').slice(0, 7);
       return bd === monthFilter;
     });
+  }
+  // 日付ピンポイントフィルター（昨日/今日ボタン用）
+  if (window._bkDateFilter) {
+    const df = window._bkDateFilter;
+    filtered = filtered.filter(d => {
+      if (!d.bookDate) return false;
+      const m = d.bookDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!m) return false;
+      const bd = `${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`;
+      return bd === df;
+    });
+    window._bkDateFilter = null; // 1回限り
   }
 
   // Stats
