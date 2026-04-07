@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=54">
+  <link rel="stylesheet" href="styles.css?v=55">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -154,7 +154,7 @@
         <h2>予約・来院管理</h2>
       </div>
 
-      <div class="stats-row" id="bk-stats" style="gap:6px;margin-bottom:8px"></div>
+      <div class="stats-row" id="bk-stats" style="gap:6px;margin-bottom:8px"><div class="stat-card"><span class="stat-label">読み込み中...</span></div></div>
 
       <!-- フィルター -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
@@ -182,7 +182,7 @@
 
       <!-- データテーブル -->
       <div class="card" style="padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+        <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)">読み込み中...</span></div>
         <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
           <table class="data-table compact" id="bk-table">
             <thead>
@@ -657,6 +657,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=54"></script>
+  <script src="app.js?v=55"></script>
 </body>
 </html>
