@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=35">
+  <link rel="stylesheet" href="styles.css?v=36">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -152,7 +152,7 @@
         <h2>予約・来院管理</h2>
       </div>
 
-      <div class="stats-row" id="bk-stats"></div>
+      <div class="stats-row" id="bk-stats" style="gap:6px;margin-bottom:8px"></div>
 
       <!-- フィルター -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
@@ -178,22 +178,22 @@
       <div class="card" style="padding:12px">
         <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)"></span></div>
         <div class="data-table-wrap">
-          <table class="data-table" id="bk-table">
+          <table class="data-table compact" id="bk-table">
             <thead>
               <tr>
-                <th>申込日</th>
-                <th>予約日</th>
-                <th>名前</th>
-                <th>相談</th>
-                <th>医院</th>
-                <th>電話</th>
-                <th>メール</th>
-                <th>流入元</th>
-                <th>ステータス</th>
-                <th>成約施術</th>
-                <th>成約金額</th>
-                <th>入金月</th>
-                <th>インセ支払月</th>
+                <th style="width:50px">申込日</th>
+                <th style="width:50px">予約日</th>
+                <th style="width:70px">名前</th>
+                <th style="width:30px">相談</th>
+                <th style="width:50px">医院</th>
+                <th style="width:80px">電話</th>
+                <th style="width:100px">メール</th>
+                <th style="width:80px">流入元</th>
+                <th style="width:70px">ステータス</th>
+                <th style="width:65px">成約施術</th>
+                <th style="width:65px">成約金額</th>
+                <th style="width:75px">入金月</th>
+                <th style="width:75px">インセ月</th>
               </tr>
             </thead>
             <tbody id="bk-tbody"></tbody>
@@ -596,6 +596,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>
