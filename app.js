@@ -29,7 +29,11 @@ function saveData(key, data) { localStorage.setItem(key, JSON.stringify(data)); 
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
-  if (sessionStorage.getItem('authenticated') === 'true') showApp();
+  if (sessionStorage.getItem('authenticated') === 'true') {
+    userRole = sessionStorage.getItem('role') || 'admin';
+    promoFilter = sessionStorage.getItem('promoFilter') || '';
+    showApp();
+  }
   setupEventListeners();
 });
 
@@ -62,6 +66,18 @@ function setupEventListeners() {
       promoFilter = PROMO_PASSWORDS[pw];
       showApp();
     } else {
+      // 管理タブで発行したアカウントをチェック
+      const accounts = JSON.parse(localStorage.getItem('admin-accounts') || '[]');
+      const matched = accounts.find(a => a.password === pw);
+      if (matched) {
+        document.getElementById('password').value = '';
+        sessionStorage.setItem('authenticated', 'true');
+        sessionStorage.setItem('role', 'custom');
+        sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
+        sessionStorage.setItem('customPromos', JSON.stringify(matched.promos));
+        showApp();
+        return;
+      }
       document.getElementById('login-error').hidden = false;
       document.getElementById('password').value = '';
     }
@@ -128,6 +144,10 @@ function setupEventListeners() {
   });
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
   document.getElementById('bk-csv').addEventListener('click', exportCSV);
+
+  // Admin
+  document.getElementById('adm-create').addEventListener('click', createAccount);
+  renderAccounts();
 
   // Add clinic
   document.getElementById('add-clinic-btn').addEventListener('click', () => { document.getElementById('clinic-add-modal').hidden = false; });
@@ -512,7 +532,6 @@ function showApp() {
   userRole = sessionStorage.getItem('role') || 'admin';
   promoFilter = sessionStorage.getItem('promoFilter') || '';
   if (userRole === 'promo') {
-    // ナビを非表示にして予約タブだけ表示
     document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
       b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
     });
@@ -522,6 +541,25 @@ function showApp() {
     document.getElementById('tc-filters') && (document.getElementById('tc-filters').style.display = 'none');
     switchView('bookings');
     loadBookings();
+    return;
+  }
+
+  if (userRole === 'custom') {
+    const perms = JSON.parse(sessionStorage.getItem('customPerms') || '[]');
+    const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
+    promoFilter = cPromos.length ? cPromos[0] : '';
+    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
+      b.style.display = perms.includes(b.dataset.view) ? '' : 'none';
+    });
+    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+      b.style.display = perms.includes(b.dataset.view) || b.dataset.view === 'settings' ? '' : 'none';
+    });
+    const tcFilters = document.getElementById('tc-filters');
+    if (tcFilters && !perms.includes('tc')) tcFilters.style.display = 'none';
+    switchView(perms[0] || 'bookings');
+    if (perms.includes('bookings')) loadBookings();
+    if (perms.includes('tc')) { seedConsultationData(); loadClinics(); }
+    if (perms.includes('sales')) { seedSalesData(); renderSales(); }
     return;
   }
 
@@ -1249,6 +1287,70 @@ function openClinicDetail(c) {
   document.body.style.overflow = 'hidden';
 }
 
+// === Admin: Account Management ===
+function generatePassword() {
+  const chars = 'abcdefghijkmnpqrstuvwxyz23456789';
+  let pw = '';
+  for (let i = 0; i < 8; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+  return pw;
+}
+
+function getAccounts() { return loadData('admin-accounts', []); }
+
+function createAccount() {
+  const name = document.getElementById('adm-name').value.trim();
+  if (!name) return;
+  const perms = [];
+  if (document.getElementById('adm-perm-tc').checked) perms.push('tc');
+  if (document.getElementById('adm-perm-sales').checked) perms.push('sales');
+  if (document.getElementById('adm-perm-bookings').checked) perms.push('bookings');
+  if (!perms.length) { alert('閲覧タブを1つ以上選択してください'); return; }
+  const promoSelect = document.getElementById('adm-promos');
+  const selectedPromos = [...promoSelect.selectedOptions].map(o => o.value);
+  const pw = generatePassword();
+  const account = { id: Date.now(), name, password: pw, permissions: perms, promos: selectedPromos, created: new Date().toISOString().slice(0,10) };
+  const accounts = getAccounts();
+  accounts.push(account);
+  saveData('admin-accounts', accounts);
+  document.getElementById('adm-name').value = '';
+  renderAccounts();
+}
+
+function deleteAccount(id) {
+  const accounts = getAccounts().filter(a => a.id !== id);
+  saveData('admin-accounts', accounts);
+  renderAccounts();
+}
+
+function renderAccounts() {
+  const el = document.getElementById('adm-accounts-list');
+  if (!el) return;
+  const accounts = getAccounts();
+  if (!accounts.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">発行済みアカウントなし</p>'; return; }
+  const baseUrl = location.origin + location.pathname;
+  el.innerHTML = accounts.map(a => `
+    <div style="padding:16px;margin-bottom:10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong style="font-size:14px">${a.name}</strong>
+        <button class="resource-delete" onclick="deleteAccount(${a.id})" style="width:28px;height:28px;font-size:13px">×</button>
+      </div>
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px">
+        閲覧: ${a.permissions.map(p => p==='tc'?'TC':p==='sales'?'売上':'予約').join(', ')}
+        ${a.promos.length ? ' | プロモ: ' + a.promos.join(', ') : ''}
+      </div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div style="font-size:12px;background:var(--card);padding:6px 12px;border-radius:6px;border:1px solid var(--border)">
+          <span style="color:var(--text-sub)">URL:</span> <span style="user-select:all">${baseUrl}</span>
+        </div>
+        <div style="font-size:12px;background:var(--card);padding:6px 12px;border-radius:6px;border:1px solid var(--border)">
+          <span style="color:var(--text-sub)">PW:</span> <strong style="user-select:all;color:var(--text)">${a.password}</strong>
+        </div>
+      </div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:6px">発行日: ${a.created}</div>
+    </div>
+  `).join('');
+}
+
 function closeModal() {
   document.getElementById('clinic-modal').hidden = true;
   document.body.style.overflow = '';
@@ -1375,6 +1477,12 @@ async function loadBookings() {
     populateBookingFilters();
     renderBookings();
     renderPromoDash();
+    // 管理タブのプロモ選択肢を更新
+    const admPromos = document.getElementById('adm-promos');
+    if (admPromos) {
+      const promos = [...new Set(bookingsData.map(d => d.source).filter(Boolean))].sort();
+      admPromos.innerHTML = promos.map(p => `<option value="${p}">${p}</option>`).join('');
+    }
   } catch (e) {
     console.error('Bookings load error:', e);
     document.getElementById('bk-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データ取得に失敗しました</td></tr>';
@@ -1460,8 +1568,15 @@ function renderBookings() {
   // プロモユーザーの場合、自分のプロモのみ表示
   if (userRole === 'promo' && promoFilter) {
     filtered = filtered.filter(d => d.source && d.source.toLowerCase().includes(promoFilter.toLowerCase()));
-    // プロモフィルターを非表示
     document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
+  }
+  // カスタムユーザーのプロモ制限
+  if (userRole === 'custom') {
+    const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
+    if (cPromos.length > 0) {
+      filtered = filtered.filter(d => d.source && cPromos.some(p => d.source.toLowerCase().includes(p.toLowerCase())));
+      document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
+    }
   }
   if (facFilterVal) filtered = filtered.filter(d => d.facility === facFilterVal);
   if (promoFilterVal) filtered = filtered.filter(d => d.source === promoFilterVal);
@@ -1527,11 +1642,11 @@ function renderBookings() {
 
   const shortService = (s) => {
     if (!s) return '-';
-    if (s.includes('ラミネート') || s.includes('ブラックフィルム')) return 'BF相談';
-    if (s.includes('矯正')) return '矯正相談';
+    if (s.includes('ラミネート') || s.includes('ブラックフィルム')) return 'BF';
+    if (s.includes('矯正')) return '矯正';
     if (s.includes('セラミック')) return 'セラミック';
     if (s.includes('インプラント')) return 'インプラント';
-    return s.length > 10 ? s.slice(0, 10) + '…' : s;
+    return s.replace(/相談|無料|　/g, '').slice(0, 6);
   };
 
   const shortFac = (f) => {
@@ -1571,13 +1686,13 @@ function renderBookings() {
   tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => {
     const overdue = isOverdue(d);
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
-    <td style="white-space:nowrap;font-size:12px">${d.applyDate ? d.applyDate.slice(0, 10) : '-'}</td>
-    <td style="white-space:nowrap;font-size:12px">${d.bookDate ? d.bookDate.slice(0, 10) : '-'}${overdue ? ' <span style="color:var(--red);font-weight:700;font-size:10px">要対応</span>' : ''}</td>
-    <td>${d.name}</td>
-    <td style="font-size:12px">${shortService(d.service)}</td>
-    <td style="font-size:12px">${shortFac(d.facility)}</td>
+    <td style="white-space:nowrap;font-size:11px">${d.applyDate ? d.applyDate.slice(5, 10) : '-'}</td>
+    <td style="white-space:nowrap;font-size:11px">${d.bookDate ? d.bookDate.replace(/^2026\//,'').slice(0, 5) : '-'}${overdue ? ' <span style="color:var(--red);font-weight:700;font-size:9px">!</span>' : ''}</td>
+    <td style="white-space:nowrap;font-size:12px">${d.name}</td>
+    <td style="font-size:11px;white-space:nowrap">${shortService(d.service)}</td>
+    <td style="font-size:11px;white-space:nowrap">${shortFac(d.facility)}</td>
     <td style="font-size:11px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
-    <td style="font-size:11px;color:var(--text-sub);max-width:150px;overflow:hidden;text-overflow:ellipsis">${isAdmin ? (d.email || '-') : '***'}</td>
+    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:120px;overflow:hidden;text-overflow:ellipsis">${isAdmin ? (d.email || '-') : '***'}</td>
     <td style="font-size:11px;color:var(--text-sub)">${d.source || '-'}</td>
     <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:11px;padding:4px 8px;min-width:90px">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=30">
+  <link rel="stylesheet" href="styles.css?v=31">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -38,7 +38,7 @@
         <button class="nav-btn active" data-view="tc">TC</button>
         <button class="nav-btn" data-view="sales">売上</button>
         <button class="nav-btn" data-view="bookings">予約</button>
-        <button class="nav-btn" data-view="reviews">口コミ</button>
+        <button class="nav-btn" data-view="admin">管理</button>
       </nav>
       <div class="nav-spacer"></div>
       <button class="btn-logout" id="logout-btn">ログアウト</button>
@@ -58,9 +58,9 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>予約</span>
       </button>
-      <button class="bottom-nav-btn" data-view="reviews">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-        <span>口コミ</span>
+      <button class="bottom-nav-btn" data-view="admin">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+        <span>管理</span>
       </button>
       <button class="bottom-nav-btn" data-view="settings">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
@@ -271,87 +271,13 @@
       </div>
     </main>
 
-    <!-- ==================== 口コミ ==================== -->
-    <main id="view-reviews" class="view" hidden>
-      <div class="page-header">
-        <h2>口コミ管理</h2>
-        <p class="page-desc">Google口コミの推移を追跡</p>
-      </div>
-
-      <div class="facility-tabs" id="reviews-facility-tabs"></div>
-
-      <div class="stats-row" id="reviews-stats"></div>
-
-      <!-- 入力フォーム -->
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header">月次データ入力</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">月</label>
-            <input type="month" class="form-input" id="rev-month">
-          </div>
-          <div class="form-group">
-            <label class="form-label">口コミ数（累計）</label>
-            <input type="number" class="form-input" id="rev-count" placeholder="0">
-          </div>
-          <div class="form-group">
-            <label class="form-label">評価点</label>
-            <input type="number" class="form-input" id="rev-rating" placeholder="4.5" step="0.1" min="1" max="5">
-          </div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-dark" id="rev-save">保存</button>
-        </div>
-      </div>
-
-      <!-- 推移グラフ -->
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header">評価推移</div>
-        <div id="reviews-chart" style="min-height:200px"></div>
-      </div>
-
-      <!-- コメント入力 -->
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header">口コミコメント</div>
-        <div class="form-grid" style="grid-template-columns:1fr">
-          <div class="form-group">
-            <label class="form-label">新しいコメントを追加</label>
-            <div style="display:flex;gap:8px;align-items:flex-start">
-              <div style="flex:1;display:flex;flex-direction:column;gap:8px">
-                <select class="form-select" id="comment-rating">
-                  <option value="5">★★★★★</option>
-                  <option value="4">★★★★☆</option>
-                  <option value="3">★★★☆☆</option>
-                  <option value="2">★★☆☆☆</option>
-                  <option value="1">★☆☆☆☆</option>
-                </select>
-                <textarea class="form-input" id="comment-text" rows="2" placeholder="口コミ内容を貼り付け..." style="resize:vertical"></textarea>
-              </div>
-              <button class="btn btn-dark" id="comment-save" style="margin-top:0">追加</button>
-            </div>
-          </div>
-        </div>
-        <div id="comments-list" style="margin-top:16px"></div>
-      </div>
-
-      <!-- データ一覧 -->
-      <div class="card">
-        <div class="card-header">月次データ</div>
-        <div class="data-table-wrap">
-          <table class="data-table">
-            <thead><tr><th>月</th><th>口コミ数</th><th>増減</th><th>評価</th></tr></thead>
-            <tbody id="reviews-tbody"></tbody>
-          </table>
-        </div>
-      </div>
-    </main>
-
     <!-- ==================== TC ==================== -->
     <main id="view-tc" class="view">
       <div class="sub-nav">
         <button class="sub-nav-btn active" data-sub="rates">決定</button>
         <button class="sub-nav-btn" data-sub="patients">初診管理</button>
         <button class="sub-nav-btn" data-sub="competitors">競合調査</button>
+        <button class="sub-nav-btn" data-sub="reviews">口コミ</button>
         <button class="sub-nav-btn" data-sub="strategy">戦略ノート</button>
       </div>
 
@@ -524,6 +450,43 @@
       </div>
 
       <!-- 戦略ノート -->
+      <!-- 口コミ（TCタブ内） -->
+      <div id="sub-reviews" hidden>
+        <div class="page-header"><h2>口コミ管理</h2></div>
+        <div class="facility-tabs" id="reviews-facility-tabs"></div>
+        <div class="stats-row" id="reviews-stats"></div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">月次データ入力</div>
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">月</label><input type="month" class="form-input" id="rev-month"></div>
+            <div class="form-group"><label class="form-label">口コミ数（累計）</label><input type="number" class="form-input" id="rev-count" placeholder="0"></div>
+            <div class="form-group"><label class="form-label">評価点</label><input type="number" class="form-input" id="rev-rating" placeholder="4.5" step="0.1" min="1" max="5"></div>
+          </div>
+          <div class="form-actions"><button class="btn btn-dark" id="rev-save">保存</button></div>
+        </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">評価推移</div>
+          <div id="reviews-chart" style="min-height:200px"></div>
+        </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">口コミコメント</div>
+          <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px">
+            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
+              <select class="form-select" id="comment-rating"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select>
+              <textarea class="form-input" id="comment-text" rows="2" placeholder="口コミ内容を貼り付け..." style="resize:vertical"></textarea>
+            </div>
+            <button class="btn btn-dark" id="comment-save">追加</button>
+          </div>
+          <div id="comments-list"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">月次データ</div>
+          <div class="data-table-wrap">
+            <table class="data-table"><thead><tr><th>月</th><th>口コミ数</th><th>増減</th><th>評価</th></tr></thead><tbody id="reviews-tbody"></tbody></table>
+          </div>
+        </div>
+      </div>
+
       <div id="sub-strategy" hidden>
         <div class="page-header">
           <h2>戦略ノート</h2>
@@ -579,6 +542,43 @@
     </main>
 
     <!-- ==================== 設定 ==================== -->
+    <!-- ==================== 管理 ==================== -->
+    <main id="view-admin" class="view" hidden>
+      <div class="page-header"><h2>権限管理</h2><p class="page-desc">閲覧用アカウントの発行・管理</p></div>
+
+      <!-- 新規発行 -->
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">新規アカウント発行</div>
+        <div class="form-grid">
+          <div class="form-group">
+            <label class="form-label">アカウント名</label>
+            <input type="text" class="form-input" id="adm-name" placeholder="例: ヒカルさん用">
+          </div>
+          <div class="form-group">
+            <label class="form-label">閲覧タブ</label>
+            <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
+              <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-tc" value="tc"> TC</label>
+              <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-sales" value="sales"> 売上</label>
+              <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-bookings" value="bookings" checked> 予約</label>
+            </div>
+          </div>
+          <div class="form-group">
+            <label class="form-label">予約プロモ制限（複数選択可）</label>
+            <select class="form-select" id="adm-promos" multiple style="min-height:120px"></select>
+          </div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-dark" id="adm-create">発行</button>
+        </div>
+      </div>
+
+      <!-- 発行済みリスト -->
+      <div class="card">
+        <div class="card-header">発行済みアカウント</div>
+        <div id="adm-accounts-list"></div>
+      </div>
+    </main>
+
     <main id="view-settings" class="view" hidden>
       <div class="page-header"><h2>設定</h2></div>
       <div class="settings-list">
@@ -599,6 +599,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=30"></script>
+  <script src="app.js?v=31"></script>
 </body>
 </html>
