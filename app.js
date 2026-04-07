@@ -2172,6 +2172,44 @@ function renderPromoDash() {
     row.addEventListener('click', () => showPromoDetail(row.dataset.promo));
   });
 
+  // 医院別集計
+  const facChart = {};
+  const svcChart = {};
+  const sFac2 = (f) => {
+    if (!f) return '不明';
+    if (f.includes('銀座')) return 'BF銀座';
+    if (f.includes('ウィズ') || f.includes('WITH') || f.includes('ワイズ')) return 'ウィズ';
+    if (f.includes('エスカ')) return 'エスカ';
+    if (f.includes('アール')) return 'アール';
+    if (f.includes('ルミナス')) return 'ルミナス';
+    if (f.includes('茶屋')) return '茶屋';
+    if (f.includes('小牧')) return '小牧';
+    if (f.includes('知立')) return '知立';
+    if (f.includes('八事')) return '八事';
+    if (f.includes('岩田')) return '岩田';
+    if (f.includes('大森')) return '大森';
+    if (f.includes('京都')) return '京都';
+    return f.length > 8 ? f.slice(0,8) : f;
+  };
+  const sSvc2 = (s) => {
+    if (!s) return '不明';
+    if (s.includes('ラミネート') || s.includes('ブラックフィルム')) return 'BF';
+    if (s.includes('矯正')) return '矯正';
+    if (s.includes('セラミック')) return 'セラミック';
+    if (s.includes('インプラント')) return 'インプラント';
+    return s.replace(/相談|無料|　/g, '').slice(0, 6);
+  };
+  dashData.forEach(d => {
+    const f = sFac2(d.facility); facChart[f] = (facChart[f]||0) + 1;
+    const s = sSvc2(d.service); svcChart[s] = (svcChart[s]||0) + 1;
+  });
+  const totalDash = dashData.length;
+  renderBarChart('promo-facility-chart', Object.entries(facChart).sort((a,b)=>b[1]-a[1]).map(([name,count])=>({name,rate:Math.round(count/totalDash*100),decided:count,consulted:totalDash})));
+  const svcEl2 = document.getElementById('promo-service-chart');
+  svcEl2.innerHTML = Object.entries(svcChart).sort((a,b)=>b[1]-a[1]).map(([name,count])=>
+    `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/totalDash*100),3)}%;background:linear-gradient(90deg,#0ea5e9,#38bdf8)"><span>${Math.round(count/totalDash*100)}%</span></div></div><div class="bar-value">${count}</div></div>`
+  ).join('') || '<p style="color:var(--text-muted);font-size:13px">データなし</p>';
+
   // テーブル
   document.getElementById('promo-dash-tbody').innerHTML = sorted.map(([name, v]) => {
     const rate = v.visited > 0 ? pct(v.contracted, v.visited) : 0;
