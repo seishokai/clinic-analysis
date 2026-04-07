@@ -159,6 +159,9 @@ function setupEventListeners() {
   document.getElementById('ad-filter-month').addEventListener('change', renderAdBudgets);
   document.getElementById('ad-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
+  // Migrate localStorage data to Supabase (one-time)
+  migrateToSupabase();
+
   // Admin
   document.getElementById('adm-create').addEventListener('click', createAccount);
   document.querySelectorAll('.adm-toggle-all').forEach(btn => {
@@ -1309,6 +1312,75 @@ function openClinicDetail(c) {
   `;
   document.getElementById('clinic-modal').hidden = false;
   document.body.style.overflow = 'hidden';
+}
+
+// === Migrate localStorage to Supabase (one-time) ===
+async function migrateToSupabase() {
+  if (localStorage.getItem('migrated-to-supabase')) return;
+  try {
+    // Accounts
+    const accounts = JSON.parse(localStorage.getItem('admin-accounts') || '[]');
+    if (accounts.length) {
+      for (const a of accounts) {
+        // Check if already exists
+        const { data: existing } = await sb.from('accounts').select('id').eq('password', a.password);
+        if (!existing || !existing.length) {
+          await sb.from('accounts').insert({
+            name: a.name, password: a.password, role: a.role || 'view',
+            permissions: a.permissions || [], promos: a.promos || [],
+            services: a.services || [], facilities: a.facilities || []
+          }).catch(() => {});
+        }
+      }
+    }
+    // Documents
+    const docs = JSON.parse(localStorage.getItem('documents-data') || '[]');
+    if (docs.length) {
+      for (const d of docs) {
+        await sb.from('documents').insert({
+          name: d.name, type: d.type, clinic: d.clinic || '', url: d.url
+        }).catch(() => {});
+      }
+    }
+    // Booking extra (status, contract info)
+    const bkExtra = JSON.parse(localStorage.getItem('bk-extra') || '{}');
+    for (const [key, val] of Object.entries(bkExtra)) {
+      const [name, apply] = key.split('|');
+      if (name && apply) {
+        await sb.from('booking_status').upsert({
+          name, apply_date: apply,
+          status: val.status || '',
+          contract_service: val.contractService || '',
+          contract_amount: Number(val.contractAmount) || 0,
+          payment_month: val.paymentMonth || '',
+          incentive_month: val.incentiveMonth || ''
+        }, { onConflict: 'name,apply_date' }).catch(() => {});
+      }
+    }
+    // Reviews
+    const reviews = JSON.parse(localStorage.getItem('reviews-data') || '[]');
+    if (reviews.length) {
+      for (const r of reviews) {
+        await sb.from('reviews').insert({
+          facility: r.facility, month: r.month, count: r.count, rating: r.rating
+        }).catch(() => {});
+      }
+    }
+    // Review comments
+    const comments = JSON.parse(localStorage.getItem('reviews-comments') || '[]');
+    if (comments.length) {
+      for (const c of comments) {
+        await sb.from('review_comments').insert({
+          facility: c.facility, rating: c.rating, text: c.text, date: c.date || ''
+        }).catch(() => {});
+      }
+    }
+    localStorage.setItem('migrated-to-supabase', 'true');
+    console.log('Migration to Supabase complete');
+    renderAccounts();
+  } catch (e) {
+    console.error('Migration error:', e);
+  }
 }
 
 // === Admin: Account Management ===
