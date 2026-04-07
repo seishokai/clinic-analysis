@@ -97,6 +97,10 @@ function setupEventListeners() {
   document.getElementById('comment-save').addEventListener('click', saveComment);
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
+  // Add clinic
+  document.getElementById('add-clinic-btn').addEventListener('click', () => { document.getElementById('clinic-add-modal').hidden = false; });
+  document.getElementById('nc-save').addEventListener('click', saveNewClinic);
+
   // Documents
   document.getElementById('doc-save').addEventListener('click', saveDocument);
 
@@ -1028,6 +1032,9 @@ function renderBarChart(id, data) {
 // === Clinics (TC) ===
 async function loadClinics() {
   try { const r = await fetch('data/clinics.json'); clinics = await r.json(); } catch { clinics = []; }
+  // localStorageの追加医院をマージ
+  const added = loadData('added-clinics', []);
+  clinics = [...clinics, ...added];
   renderCompetitors();
   renderStrategy();
 }
@@ -1197,6 +1204,46 @@ function closeModal() {
 
 // === Documents ===
 function getDocuments() { return loadData('documents-data', []); }
+
+function saveNewClinic() {
+  const name = document.getElementById('nc-name').value.trim();
+  if (!name) return;
+  const newClinic = {
+    id: Date.now(),
+    name,
+    visitDate: document.getElementById('nc-date').value,
+    visitTime: document.getElementById('nc-time').value,
+    address: document.getElementById('nc-address').value,
+    staff: { da: document.getElementById('nc-da').value, dr: document.getElementById('nc-dr').value },
+    bookingMethod: "ウェブ",
+    scores: {
+      reception: parseInt(document.getElementById('nc-s1').value),
+      counseling: parseInt(document.getElementById('nc-s2').value),
+      hospitality: parseInt(document.getElementById('nc-s3').value),
+      environment: parseInt(document.getElementById('nc-s4').value)
+    },
+    reception: { greeting: "", appearance: "", waitTime: "", flow: [], smoothness: "" },
+    counseling: { impression: "", hearing: { deepDive: "", lifestyle: "" }, explanation: { clarity: "", terminology: "", tools: [] }, proposal: { options: "", proscons: "", pricing: document.getElementById('nc-pricing').value }, closing: { anxietyRelief: "", decisionPrompt: "", nextBooking: "" } },
+    hospitality: { empathy: "", listening: "", language: "", distance: "" },
+    environment: { cleanliness: "", equipment: "", privacy: "", teamwork: "" },
+    strengths: document.getElementById('nc-strengths').value.split('\n').filter(s => s.trim()),
+    impressivePoints: [],
+    improvements: { counseling: document.getElementById('nc-improvements').value, hospitality: "", operation: "" },
+    suggestions: { adopt: [], immediate: "", longterm: "" },
+    summary: document.getElementById('nc-summary').value,
+    pricing: document.getElementById('nc-pricing').value
+  };
+  // localStorageに追加医院を保存
+  const added = loadData('added-clinics', []);
+  added.push(newClinic);
+  saveData('added-clinics', added);
+  // clinics配列に追加して再描画
+  clinics.push(newClinic);
+  renderCompetitors();
+  document.getElementById('clinic-add-modal').hidden = true;
+  // フォームリセット
+  ['nc-name','nc-time','nc-address','nc-da','nc-dr','nc-pricing','nc-strengths','nc-improvements','nc-summary'].forEach(id => document.getElementById(id).value = '');
+}
 
 function openDocModal(clinicName, type) {
   document.getElementById('doc-clinic').value = clinicName;

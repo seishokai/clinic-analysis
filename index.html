@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=18">
+  <link rel="stylesheet" href="styles.css?v=19">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -319,7 +319,43 @@
           <div class="stat-card"><span class="stat-num" id="tc-docs">0</span><span class="stat-label">資料数</span></div>
         </div>
 
+        <!-- 医院追加ボタン -->
+        <div style="margin-bottom:20px">
+          <button class="btn btn-dark" id="add-clinic-btn">+ 医院を追加</button>
+        </div>
+
         <div class="clinic-grid" id="clinic-grid"></div>
+
+        <!-- 医院追加モーダル -->
+        <div id="clinic-add-modal" class="modal" hidden>
+          <div class="modal-overlay" onclick="document.getElementById('clinic-add-modal').hidden=true"></div>
+          <div class="modal-content" style="max-width:600px;padding:24px;max-height:90vh;overflow-y:auto">
+            <button class="modal-close" onclick="document.getElementById('clinic-add-modal').hidden=true">&times;</button>
+            <h3 style="font-size:16px;margin-bottom:16px">新しい医院を追加</h3>
+            <div style="display:flex;flex-direction:column;gap:12px">
+              <div class="form-grid">
+                <div class="form-group"><label class="form-label">医院名</label><input type="text" class="form-input" id="nc-name" placeholder="例: ○○歯科・矯正歯科"></div>
+                <div class="form-group"><label class="form-label">訪問日</label><input type="date" class="form-input" id="nc-date"></div>
+                <div class="form-group"><label class="form-label">訪問時間</label><input type="text" class="form-input" id="nc-time" placeholder="例: 10:00〜11:00"></div>
+                <div class="form-group"><label class="form-label">住所</label><input type="text" class="form-input" id="nc-address" placeholder="例: 名古屋市中村区..."></div>
+                <div class="form-group"><label class="form-label">DA担当</label><input type="text" class="form-input" id="nc-da" placeholder="例: 佐々木さん"></div>
+                <div class="form-group"><label class="form-label">Dr担当</label><input type="text" class="form-input" id="nc-dr" placeholder="例: 伊藤先生"></div>
+              </div>
+              <div style="font-size:13px;font-weight:600;color:var(--text-sub);margin-top:8px">評価（5段階）</div>
+              <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
+                <div class="form-group"><label class="form-label">受付</label><select class="form-select" id="nc-s1"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+                <div class="form-group"><label class="form-label">カウンセリング</label><select class="form-select" id="nc-s2"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+                <div class="form-group"><label class="form-label">接遇</label><select class="form-select" id="nc-s3"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+                <div class="form-group"><label class="form-label">院内環境</label><select class="form-select" id="nc-s4"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
+              </div>
+              <div class="form-group"><label class="form-label">料金情報</label><input type="text" class="form-input" id="nc-pricing" placeholder="例: 見積もり配布、パンフレット説明"></div>
+              <div class="form-group"><label class="form-label">強み</label><textarea class="form-input" id="nc-strengths" rows="2" placeholder="1行1つ。例:&#10;Dr.のカウンセリングが良い&#10;清潔感がある" style="resize:vertical"></textarea></div>
+              <div class="form-group"><label class="form-label">改善点</label><textarea class="form-input" id="nc-improvements" rows="2" placeholder="カウンセリングの改善点" style="resize:vertical"></textarea></div>
+              <div class="form-group"><label class="form-label">総合評価</label><textarea class="form-input" id="nc-summary" rows="2" placeholder="総合的なコメント" style="resize:vertical"></textarea></div>
+              <button class="btn btn-dark" id="nc-save" style="width:100%">登録</button>
+            </div>
+          </div>
+        </div>
 
         <!-- 資料登録モーダル -->
         <div id="doc-modal" class="modal" hidden>
@@ -431,6 +467,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=18"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>
