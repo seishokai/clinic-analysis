@@ -1732,6 +1732,13 @@ function renderBookings() {
     return `<span class="badge badge-default">${s}</span>`;
   };
 
+  const fmtDateShort = (d) => {
+    if (!d) return '-';
+    // "2026/04/08 00:49" or "2026年4月13日(月)渕嶋予夏" or "4/8 17:00"
+    const m = d.match(/(\d{1,2})[\/月](\d{1,2})/);
+    if (m) return m[1] + '/' + m[2];
+    return d.slice(0, 5);
+  };
   const shortService = (s) => {
     if (!s) return '-';
     if (s.includes('ラミネート') || s.includes('ブラックフィルム')) return 'BF';
@@ -1779,13 +1786,13 @@ function renderBookings() {
     const overdue = isOverdue(d);
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
-    <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${d.applyDate ? d.applyDate.slice(5) : '-'}</td>
-    <td style="white-space:nowrap;font-size:10px">${d.bookDate ? d.bookDate.replace(/^2026\//,'').replace(/\//g,'/') : '-'}${overdue ? '<span style="color:var(--red);font-weight:700">!</span>' : ''}</td>
-    <td style="white-space:nowrap;font-size:11px;font-weight:500">${d.name}</td>
+    <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtDateShort(d.applyDate)}</td>
+    <td style="white-space:nowrap;font-size:10px">${fmtDateShort(d.bookDate)}${overdue ? '<span style="color:var(--red);font-weight:700">!</span>' : ''}</td>
+    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">${d.name}</td>
     <td style="font-size:10px;white-space:nowrap">${shortService(d.service)}</td>
     <td style="font-size:10px;white-space:nowrap">${shortFac(d.facility)}</td>
     <td style="font-size:10px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
-    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis">${isAdmin ? (d.email || '-') : '***'}</td>
+    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? (d.email || '-') : '***'}</td>
     <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${d.source || '-'}</td>
     <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
