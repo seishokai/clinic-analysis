@@ -432,6 +432,7 @@ body {
 .resource-icon.doc-pdf { background: #dc2626; }
 .resource-icon.doc-audio { background: #6366f1; }
 .resource-icon.doc-photo { background: #0ea5e9; }
+.resource-icon.doc-data { background: #22c55e; }
 .resource-icon.doc-other { background: var(--accent); }
 .resource-meta { flex: 1; }
 .resource-meta .doc-title { font-weight: 600; font-size: 14px; }

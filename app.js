@@ -1062,9 +1062,13 @@ function renderCompetitors() {
           `).join('')}
         </div>
         <div class="clinic-card-footer">${c.summary}</div>
+        ${c.pricing ? `<div style="margin-top:10px;padding:8px 12px;background:var(--bg);border-radius:8px;font-size:12px;color:var(--text-sub)"><strong style="color:var(--text)">料金:</strong> ${c.pricing}</div>` : ''}
         <div style="margin-top:12px;padding-top:12px;border-top:1px solid var(--border-light)">
-          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
-            <button class="btn btn-outline doc-add-btn" data-clinic="${c.name}" style="font-size:11px;padding:6px 12px;min-height:32px">+ 資料追加</button>
+          <div style="display:flex;gap:6px;align-items:center;margin-bottom:8px;flex-wrap:wrap">
+            <button class="btn btn-outline doc-add-btn" data-clinic="${c.name}" data-type="見積書" style="font-size:11px;padding:5px 10px;min-height:28px">+ 見積書</button>
+            <button class="btn btn-outline doc-add-btn" data-clinic="${c.name}" data-type="パンフレット" style="font-size:11px;padding:5px 10px;min-height:28px">+ 資料</button>
+            <button class="btn btn-outline doc-add-btn" data-clinic="${c.name}" data-type="録音" style="font-size:11px;padding:5px 10px;min-height:28px">+ 録音</button>
+            <button class="btn btn-outline doc-add-btn" data-clinic="${c.name}" data-type="データ" style="font-size:11px;padding:5px 10px;min-height:28px">+ データ</button>
             <span style="font-size:11px;color:var(--text-muted)" id="doc-count-${c.id}"></span>
           </div>
           <div class="clinic-docs" id="clinic-docs-${c.id}"></div>
@@ -1076,7 +1080,7 @@ function renderCompetitors() {
   grid.querySelectorAll('.doc-add-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
-      openDocModal(btn.dataset.clinic);
+      openDocModal(btn.dataset.clinic, btn.dataset.type);
     });
   });
 
@@ -1194,9 +1198,10 @@ function closeModal() {
 // === Documents ===
 function getDocuments() { return loadData('documents-data', []); }
 
-function openDocModal(clinicName) {
+function openDocModal(clinicName, type) {
   document.getElementById('doc-clinic').value = clinicName;
-  document.getElementById('doc-modal-title').textContent = clinicName + ' に資料を追加';
+  document.getElementById('doc-modal-title').textContent = clinicName + ' - ' + type + 'を追加';
+  document.getElementById('doc-type').value = type || '見積書';
   document.getElementById('doc-name').value = '';
   document.getElementById('doc-url').value = '';
   document.getElementById('doc-modal').hidden = false;
@@ -1235,8 +1240,8 @@ function renderDocuments() {
 
 function renderClinicDocs() {
   const docs = getDocuments();
-  const iconClass = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'doc-pdf' : type === '録音' ? 'doc-audio' : type === '写真' ? 'doc-photo' : 'doc-other';
-  const iconText = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'PDF' : type === '録音' ? '♪' : type === '写真' ? '📷' : '📄';
+  const iconClass = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'doc-pdf' : type === '録音' ? 'doc-audio' : type === '写真' ? 'doc-photo' : type === 'データ' ? 'doc-data' : 'doc-other';
+  const iconText = (type) => ['見積書','パンフレット','カウンセリング資料'].includes(type) ? 'PDF' : type === '録音' ? '♪' : type === '写真' ? '📷' : type === 'データ' ? '📊' : '📄';
 
   clinics.forEach(c => {
     const el = document.getElementById('clinic-docs-' + c.id);
