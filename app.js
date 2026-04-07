@@ -1641,30 +1641,23 @@ let bookingsData = [];
 
 async function loadBookings() {
   try {
-    // 元データ (DXHUB)
-    const url = `https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=%E5%85%83%E3%83%87%E3%83%BC%E3%82%BF`;
-    const res = await fetch(url);
-    const csv = await res.text();
-    const dxhubData = parseCSV(csv).map(d => ({...d, tool: 'DXHUB'}));
+    document.getElementById('bk-count').textContent = '読み込み中...';
 
-    // セレクトタイプ
+    // 全シートを並列で取得（高速化）
     const selectSheets = [
       {sheet: '%E9%8A%80%E5%BA%A7%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: 'BF銀座'},
       {sheet: '%E3%82%A6%E3%82%A3%E3%82%BA%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: 'ウィズ'},
       {sheet: '%E4%BA%AC%E9%83%BD%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: '京都'},
       {sheet: '%E3%83%AB%E3%83%9F%E3%83%8A%E3%82%B9%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: 'ルミナス'},
     ];
-    let selectData = [];
-    for (const s of selectSheets) {
-      try {
-        const sRes = await fetch(`https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${s.sheet}`);
-        const sCsv = await sRes.text();
-        const rows = parseSelectCSV(sCsv, s.facility);
-        selectData = selectData.concat(rows);
-      } catch(e) { console.warn('Select sheet error:', s.facility, e); }
-    }
 
-    bookingsData = [...dxhubData, ...selectData];
+    const allFetches = [
+      fetch(`https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=%E5%85%83%E3%83%87%E3%83%BC%E3%82%BF`).then(r => r.text()).then(csv => parseCSV(csv).map(d => ({...d, tool: 'DXHUB'}))),
+      ...selectSheets.map(s => fetch(`https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${s.sheet}`).then(r => r.text()).then(csv => parseSelectCSV(csv, s.facility)).catch(() => []))
+    ];
+
+    const results = await Promise.all(allFetches);
+    bookingsData = results.flat();
     populateBookingFilters();
     renderBookings();
     renderPromoDash();
