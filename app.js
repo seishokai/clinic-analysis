@@ -1552,9 +1552,21 @@ function parseCSVLine(line) {
 }
 
 function populateBookingFilters() {
-  const facilities = [...new Set(bookingsData.map(d => d.facility).filter(Boolean))].sort();
-  const promos = [...new Set(bookingsData.map(d => d.source).filter(Boolean))].sort();
-  const services = [...new Set(bookingsData.map(d => d.service).filter(Boolean))].sort();
+  let filteredForOptions = bookingsData;
+  // カスタム・プロモユーザーの場合、自分のデータのみでフィルター選択肢を作る
+  if (userRole === 'custom') {
+    const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
+    const cServices = JSON.parse(sessionStorage.getItem('customServices') || '[]');
+    const cFacilities = JSON.parse(sessionStorage.getItem('customFacilities') || '[]');
+    if (cPromos.length) filteredForOptions = filteredForOptions.filter(d => d.source && cPromos.includes(d.source));
+    if (cServices.length) filteredForOptions = filteredForOptions.filter(d => d.service && cServices.includes(d.service));
+    if (cFacilities.length) filteredForOptions = filteredForOptions.filter(d => d.facility && cFacilities.includes(d.facility));
+  } else if (userRole === 'promo' && promoFilter) {
+    filteredForOptions = filteredForOptions.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
+  }
+  const facilities = [...new Set(filteredForOptions.map(d => d.facility).filter(Boolean))].sort();
+  const promos = [...new Set(filteredForOptions.map(d => d.source).filter(Boolean))].sort();
+  const services = [...new Set(filteredForOptions.map(d => d.service).filter(Boolean))].sort();
 
   const facEl = document.getElementById('bk-facility');
   facEl.innerHTML = '<option value="">全て</option>' + facilities.map(f => `<option>${f}</option>`).join('');
@@ -1593,22 +1605,22 @@ function renderBookings() {
   let filtered = bookingsData;
   // プロモユーザーの場合、自分のプロモのみ表示
   if (userRole === 'promo' && promoFilter) {
-    filtered = filtered.filter(d => d.source && d.source.toLowerCase().includes(promoFilter.toLowerCase()));
+    filtered = filtered.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
     document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
   }
-  // カスタムユーザーの制限
+  // カスタムユーザーの制限（完全一致）
   if (userRole === 'custom') {
     const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
     const cServices = JSON.parse(sessionStorage.getItem('customServices') || '[]');
     const cFacilities = JSON.parse(sessionStorage.getItem('customFacilities') || '[]');
     if (cPromos.length > 0) {
-      filtered = filtered.filter(d => d.source && cPromos.some(p => d.source.toLowerCase().includes(p.toLowerCase())));
+      filtered = filtered.filter(d => d.source && cPromos.includes(d.source));
     }
     if (cServices.length > 0) {
-      filtered = filtered.filter(d => d.service && cServices.some(s => d.service.includes(s)));
+      filtered = filtered.filter(d => d.service && cServices.includes(d.service));
     }
     if (cFacilities.length > 0) {
-      filtered = filtered.filter(d => d.facility && cFacilities.some(f => d.facility.includes(f)));
+      filtered = filtered.filter(d => d.facility && cFacilities.includes(d.facility));
     }
   }
   if (facFilterVal) filtered = filtered.filter(d => d.facility === facFilterVal);
