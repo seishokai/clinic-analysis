@@ -142,7 +142,7 @@ function setupEventListeners() {
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
   // Bookings filters
-  ['bk-facility','bk-promo','bk-service','bk-status','bk-month'].forEach(id => {
+  ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-month'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderBookings);
   });
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
@@ -1486,10 +1486,30 @@ let bookingsData = [];
 
 async function loadBookings() {
   try {
+    // 元データ (DXHUB)
     const url = `https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=%E5%85%83%E3%83%87%E3%83%BC%E3%82%BF`;
     const res = await fetch(url);
     const csv = await res.text();
-    bookingsData = parseCSV(csv);
+    const dxhubData = parseCSV(csv).map(d => ({...d, tool: 'DXHUB'}));
+
+    // セレクトタイプ
+    const selectSheets = [
+      {sheet: '%E9%8A%80%E5%BA%A7%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: 'BF銀座'},
+      {sheet: '%E3%82%A6%E3%82%A3%E3%82%BA%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: 'ウィズ'},
+      {sheet: '%E4%BA%AC%E9%83%BD%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: '京都'},
+      {sheet: '%E3%83%AB%E3%83%9F%E3%83%8A%E3%82%B9%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', facility: 'ルミナス'},
+    ];
+    let selectData = [];
+    for (const s of selectSheets) {
+      try {
+        const sRes = await fetch(`https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${s.sheet}`);
+        const sCsv = await sRes.text();
+        const rows = parseSelectCSV(sCsv, s.facility);
+        selectData = selectData.concat(rows);
+      } catch(e) { console.warn('Select sheet error:', s.facility, e); }
+    }
+
+    bookingsData = [...dxhubData, ...selectData];
     populateBookingFilters();
     renderBookings();
     renderPromoDash();
@@ -1551,6 +1571,31 @@ function parseCSVLine(line) {
   return result;
 }
 
+function parseSelectCSV(csv, facility) {
+  const lines = csv.split('\n');
+  if (lines.length < 2) return [];
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (cols.length < 3 || !cols[2]) continue;
+    // 電話番号フォーマット
+    let phone = (cols[3] || '').replace(/[-\s]/g, '');
+    rows.push({
+      tool: 'セレクト',
+      applyDate: cols[0] || '',
+      bookDate: cols[1] || '',
+      name: cols[2] || '',
+      service: '矯正無料相談',
+      facility: facility,
+      email: cols[4] || '',
+      phone: phone,
+      source: 'セレクトタイプ',
+      status: ''
+    });
+  }
+  return rows;
+}
+
 function populateBookingFilters() {
   let filteredForOptions = bookingsData;
   // カスタム・プロモユーザーの場合、自分のデータのみでフィルター選択肢を作る
@@ -1596,6 +1641,7 @@ function populateBookingFilters() {
 }
 
 function renderBookings() {
+  const toolFilter = document.getElementById('bk-tool').value;
   const facFilterVal = document.getElementById('bk-facility').value;
   const promoFilterVal = document.getElementById('bk-promo').value;
   const svcFilter = document.getElementById('bk-service').value;
@@ -1603,6 +1649,7 @@ function renderBookings() {
   const monthFilter = document.getElementById('bk-month').value;
 
   let filtered = bookingsData;
+  if (toolFilter) filtered = filtered.filter(d => d.tool === toolFilter);
   // プロモユーザーの場合、自分のプロモのみ表示
   if (userRole === 'promo' && promoFilter) {
     filtered = filtered.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
@@ -1731,6 +1778,7 @@ function renderBookings() {
   tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => {
     const overdue = isOverdue(d);
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
+    <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${d.applyDate ? d.applyDate.slice(5) : '-'}</td>
     <td style="white-space:nowrap;font-size:10px">${d.bookDate ? d.bookDate.replace(/^2026\//,'').replace(/\//g,'/') : '-'}${overdue ? '<span style="color:var(--red);font-weight:700">!</span>' : ''}</td>
     <td style="white-space:nowrap;font-size:11px;font-weight:500">${d.name}</td>
@@ -1758,10 +1806,10 @@ function renderBookings() {
     <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:70px">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.paymentMonth || '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
-  </tr>`}).join('') || '<tr><td colspan="13" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  </tr>`}).join('') || '<tr><td colspan="14" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > 200) {
-    tbody.innerHTML += `<tr><td colspan="13" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
+    tbody.innerHTML += `<tr><td colspan="14" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
   }
 
   // ステータス変更イベント
