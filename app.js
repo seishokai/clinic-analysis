@@ -90,6 +90,8 @@ function setupEventListeners() {
       if (el) {
         el.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== `sub-${sub}`);
       }
+      // プロモ別タブ切替時にデータ更新
+      if (sub === 'bk-promo-dash' && bookingsData.length > 0) renderPromoDash();
     });
   });
 
