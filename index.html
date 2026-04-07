@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=29">
+  <link rel="stylesheet" href="styles.css?v=30">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -173,6 +173,7 @@
             <label class="form-label">ステータス</label>
             <select class="form-select" id="bk-status">
               <option value="">全て</option>
+              <option value="要対応">要対応（期限切れ未対応）</option>
               <option value="未対応">未対応</option>
               <option value="確認済">確認済</option>
               <option value="来院済">来院済</option>
@@ -185,6 +186,9 @@
             <input type="month" class="form-input" id="bk-month" style="font-size:13px">
           </div>
           <button class="btn btn-dark" id="bk-refresh" style="margin-top:18px;min-height:36px;padding:8px 16px;font-size:12px">更新</button>
+          <button class="btn btn-outline" id="bk-csv" style="margin-top:18px;min-height:36px;padding:8px 16px;font-size:12px">CSV出力</button>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px" id="bk-quick-promos">
         </div>
       </div>
 
@@ -595,6 +599,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

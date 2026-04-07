@@ -127,6 +127,7 @@ function setupEventListeners() {
     document.getElementById(id).addEventListener('change', renderBookings);
   });
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
+  document.getElementById('bk-csv').addEventListener('click', exportCSV);
 
   // Add clinic
   document.getElementById('add-clinic-btn').addEventListener('click', () => { document.getElementById('clinic-add-modal').hidden = false; });
@@ -1429,6 +1430,23 @@ function populateBookingFilters() {
 
   const svcEl = document.getElementById('bk-service');
   svcEl.innerHTML = '<option value="">全て</option>' + services.map(s => `<option>${s}</option>`).join('');
+
+  // クイックプロモボタン（上位5件）
+  const promoCounts = {};
+  bookingsData.forEach(d => { if (d.source) { promoCounts[d.source] = (promoCounts[d.source]||0) + 1; } });
+  const top5 = Object.entries(promoCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
+  const quickEl = document.getElementById('bk-quick-promos');
+  if (quickEl) {
+    quickEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px">Quick:</span>' + top5.map(([name]) =>
+      `<button class="btn btn-outline bk-quick-promo" style="font-size:10px;padding:3px 8px;min-height:24px">${name.length > 18 ? name.slice(0,18)+'…' : name}</button>`
+    ).join('');
+    quickEl.querySelectorAll('.bk-quick-promo').forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        promoEl.value = top5[i][0];
+        renderBookings();
+      });
+    });
+  }
 }
 
 function renderBookings() {
@@ -1449,7 +1467,10 @@ function renderBookings() {
   if (promoFilterVal) filtered = filtered.filter(d => d.source === promoFilterVal);
   if (svcFilter) filtered = filtered.filter(d => d.service === svcFilter);
   if (statusFilter) {
-    if (statusFilter === '未対応') filtered = filtered.filter(d => !d.status || d.status === '未対応');
+    if (statusFilter === '要対応') {
+      const td = new Date(); td.setHours(0,0,0,0);
+      filtered = filtered.filter(d => (!d.status || d.status === '未対応') && d.bookDate && new Date(d.bookDate.replace(/\//g,'-')) < td);
+    } else if (statusFilter === '未対応') filtered = filtered.filter(d => !d.status || d.status === '未対応');
     else filtered = filtered.filter(d => d.status === statusFilter);
   }
   if (monthFilter) {
@@ -1471,8 +1492,17 @@ function renderBookings() {
   let totalAmount = 0;
   Object.values(bkExtraStats).forEach(v => { if (v.contractAmount) totalAmount += Number(v.contractAmount); });
 
+  // 未対応アラート数
+  const todayCheck = new Date(); todayCheck.setHours(0,0,0,0);
+  const overdueCount = filtered.filter(d => {
+    if (d.status && d.status !== '未対応') return false;
+    if (!d.bookDate) return false;
+    return new Date(d.bookDate.replace(/\//g, '-')) < todayCheck;
+  }).length;
+
   document.getElementById('bk-stats').innerHTML = `
     <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
+    ${overdueCount > 0 ? `<div class="stat-card" style="border-color:var(--red)"><span class="stat-label" style="color:var(--red)">要対応</span><span class="stat-num" style="color:var(--red)">${overdueCount}</span></div>` : ''}
     <div class="stat-card"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span></div>
     <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
     <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
@@ -1504,16 +1534,49 @@ function renderBookings() {
     return s.length > 10 ? s.slice(0, 10) + '…' : s;
   };
 
-  const shortFac = (f) => f && f.length > 12 ? f.slice(0, 12) + '…' : (f || '-');
+  const shortFac = (f) => {
+    if (!f) return '-';
+    const map = {'BF銀座歯科・矯正歯科':'BF銀座','BF銀座歯科　矯正歯科':'BF銀座','WITH DENTAL CLINIC':'ウィズ','名古屋エスカ歯科・矯正歯科':'エスカ','名古屋アール歯科・矯正歯科':'アール','名古屋ルミナス歯科・矯正歯科':'ルミナス','名古屋茶屋歯科・矯正歯科':'茶屋','小牧歯科・矯正歯科':'小牧','知立歯科・矯正歯科':'知立','八事歯科・矯正歯科':'八事','岩田歯科・矯正歯科':'岩田','大森歯科・矯正歯科':'大森','京都歯科・矯正歯科':'京都'};
+    for (const [key, val] of Object.entries(map)) { if (f.includes(key) || f.includes(val)) return val; }
+    if (f.includes('BF銀座') || f.includes('銀座')) return 'BF銀座';
+    if (f.includes('ウィズ') || f.includes('WITH') || f.includes('ウイズ')) return 'ウィズ';
+    if (f.includes('エスカ')) return 'エスカ';
+    if (f.includes('アール')) return 'アール';
+    if (f.includes('ルミナス')) return 'ルミナス';
+    if (f.includes('茶屋')) return '茶屋';
+    if (f.includes('小牧')) return '小牧';
+    if (f.includes('知立')) return '知立';
+    if (f.includes('八事')) return '八事';
+    if (f.includes('岩田')) return '岩田';
+    if (f.includes('大森')) return '大森';
+    if (f.includes('京都')) return '京都';
+    return f.length > 8 ? f.slice(0, 8) + '…' : f;
+  };
+  const fmtPhone = (p) => {
+    if (!p || p === '0') return '-';
+    let s = String(p).replace(/[^0-9]/g, '');
+    if (s.length >= 10 && !s.startsWith('0')) s = '0' + s;
+    return s;
+  };
+  // 未対応アラート判定
+  const today = new Date(); today.setHours(0,0,0,0);
+  const isOverdue = (d) => {
+    if (d.status && d.status !== '未対応') return false;
+    if (!d.bookDate) return false;
+    const bd = new Date(d.bookDate.replace(/\//g, '-'));
+    return bd < today;
+  };
 
   const isAdmin = userRole === 'admin';
-  tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => `<tr>
+  tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => {
+    const overdue = isOverdue(d);
+    return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
     <td style="white-space:nowrap;font-size:12px">${d.applyDate ? d.applyDate.slice(0, 10) : '-'}</td>
-    <td style="white-space:nowrap;font-size:12px">${d.bookDate ? d.bookDate.slice(0, 10) : '-'}</td>
+    <td style="white-space:nowrap;font-size:12px">${d.bookDate ? d.bookDate.slice(0, 10) : '-'}${overdue ? ' <span style="color:var(--red);font-weight:700;font-size:10px">要対応</span>' : ''}</td>
     <td>${d.name}</td>
     <td style="font-size:12px">${shortService(d.service)}</td>
     <td style="font-size:12px">${shortFac(d.facility)}</td>
-    <td style="font-size:11px;white-space:nowrap">${isAdmin ? (d.phone || '-') : '***'}</td>
+    <td style="font-size:11px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
     <td style="font-size:11px;color:var(--text-sub);max-width:150px;overflow:hidden;text-overflow:ellipsis">${isAdmin ? (d.email || '-') : '***'}</td>
     <td style="font-size:11px;color:var(--text-sub)">${d.source || '-'}</td>
     <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:11px;padding:4px 8px;min-width:90px">
@@ -1535,7 +1598,7 @@ function renderBookings() {
     <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount||''}" placeholder="0" style="font-size:11px;padding:4px 8px;width:90px">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:11px;padding:4px 8px;width:120px">` : (d.paymentMonth || '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:11px;padding:4px 8px;width:120px">` : (d.incentiveMonth || '-')}</td>
-  </tr>`).join('') || '<tr><td colspan="13" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  </tr>`}).join('') || '<tr><td colspan="13" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > 200) {
     tbody.innerHTML += `<tr><td colspan="13" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
@@ -1589,6 +1652,26 @@ function renderBookings() {
       });
     });
   }
+}
+
+function exportCSV() {
+  const pw = prompt('CSV出力パスワードを入力してください');
+  if (pw !== '5858') { alert('パスワードが正しくありません'); return; }
+  const headers = ['申込日','予約日','名前','施術','医院','電話番号','メール','流入元','ステータス'];
+  const rows = bookingsData.map(d => [
+    d.applyDate, d.bookDate, d.name, d.service, d.facility,
+    d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '',
+    d.email, d.source, d.status || '未対応'
+  ]);
+  const bom = '\uFEFF';
+  const csv = bom + [headers.join(','), ...rows.map(r => r.map(c => '"'+(c||'').replace(/"/g,'""')+'"').join(','))].join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `予約データ_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function renderPromoDash() {
