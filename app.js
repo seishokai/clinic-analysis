@@ -1791,7 +1791,6 @@ function populateBookingFilters() {
   const promoCounts = {};
   bookingsData.forEach(d => { if (d.source) { promoCounts[d.source] = (promoCounts[d.source]||0) + 1; } });
   const top5 = Object.entries(promoCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
-  const quickEl = document.getElementById('bk-quick-promos');
   if (quickEl) {
     quickEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px">Quick:</span>' + top5.map(([name]) =>
       `<button class="btn btn-outline bk-quick-promo" style="font-size:10px;padding:3px 8px;min-height:24px">${name.length > 18 ? name.slice(0,18)+'…' : name}</button>`
