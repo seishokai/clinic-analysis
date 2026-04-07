@@ -166,7 +166,9 @@ function setupEventListeners() {
   // Bookings filters
   // Quick filter buttons
   document.getElementById('bk-overdue-btn').addEventListener('click', () => {
-    document.getElementById('bk-status').value = '要対応';
+    // 予約日が昨日以前の人を表示
+    document.getElementById('bk-status').value = '';
+    window._bkProgressFilter = true;
     renderBookings();
   });
   document.getElementById('bk-reset').addEventListener('click', () => {
@@ -178,6 +180,7 @@ function setupEventListeners() {
     document.getElementById('bk-service').value = '';
     document.getElementById('bk-month').value = '';
     window._bkDateFilter = null;
+    window._bkProgressFilter = false;
     renderBookings();
   });
 
@@ -1817,7 +1820,19 @@ function renderBookings() {
       return bd === monthFilter;
     });
   }
-  // 日付ピンポイントフィルター（昨日/今日ボタン用）
+  // 進捗フィルター（予約日が昨日以前の人）
+  if (window._bkProgressFilter) {
+    const td2 = new Date(); td2.setHours(0,0,0,0);
+    filtered = filtered.filter(d => {
+      if (!d.bookDate) return false;
+      const m = d.bookDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!m) return false;
+      const bd = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+      return bd < td2;
+    });
+    window._bkProgressFilter = false;
+  }
+  // 日付ピンポイントフィルター
   if (window._bkDateFilter) {
     const df = window._bkDateFilter;
     filtered = filtered.filter(d => {
