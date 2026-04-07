@@ -1370,6 +1370,7 @@ async function loadBookings() {
     bookingsData = parseCSV(csv);
     populateBookingFilters();
     renderBookings();
+    renderPromoDash();
   } catch (e) {
     console.error('Bookings load error:', e);
     document.getElementById('bk-tbody').innerHTML = '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データ取得に失敗しました</td></tr>';
@@ -1585,6 +1586,64 @@ function renderBookings() {
       });
     });
   }
+}
+
+function renderPromoDash() {
+  const bkExtra = loadData('bk-extra', {});
+  const promoGroups = {};
+  bookingsData.forEach(d => {
+    const p = d.source || '(なし)';
+    if (!promoGroups[p]) promoGroups[p] = { total: 0, cancelled: 0, visited: 0, contracted: 0, amount: 0 };
+    promoGroups[p].total++;
+    if (d.status === 'キャンセル') promoGroups[p].cancelled++;
+    if (d.status === '来院済' || d.status === '成約') promoGroups[p].visited++;
+    if (d.status === '成約') promoGroups[p].contracted++;
+    const key = d.name + '|' + d.applyDate;
+    if (bkExtra[key] && bkExtra[key].contractAmount) promoGroups[key] && (promoGroups[p].amount += Number(bkExtra[key].contractAmount));
+  });
+  // 金額を正しく集計
+  Object.keys(bkExtra).forEach(key => {
+    if (bkExtra[key].contractAmount) {
+      const [name, apply] = key.split('|');
+      const match = bookingsData.find(d => d.name === name && d.applyDate === apply);
+      if (match) {
+        const p = match.source || '(なし)';
+        if (promoGroups[p]) promoGroups[p].amount += Number(bkExtra[key].contractAmount);
+      }
+    }
+  });
+
+  const sorted = Object.entries(promoGroups).sort((a, b) => b[1].total - a[1].total);
+  const totalAll = sorted.reduce((s, [, v]) => s + v.total, 0);
+  const contractedAll = sorted.reduce((s, [, v]) => s + v.contracted, 0);
+
+  document.getElementById('promo-dash-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">プロモ数</span><span class="stat-num">${sorted.length}</span></div>
+    <div class="stat-card"><span class="stat-label">総予約数</span><span class="stat-num">${totalAll}</span></div>
+    <div class="stat-card"><span class="stat-label">総成約</span><span class="stat-num" style="color:var(--green)">${contractedAll}</span></div>
+  `;
+
+  // バーチャート
+  renderBarChart('promo-dash-bookings', sorted.slice(0, 20).map(([name, v]) => ({
+    name: name.length > 20 ? name.slice(0, 20) + '…' : name,
+    rate: Math.round(v.total / totalAll * 100),
+    decided: v.total,
+    consulted: totalAll
+  })));
+
+  // テーブル
+  document.getElementById('promo-dash-tbody').innerHTML = sorted.map(([name, v]) => {
+    const rate = v.visited > 0 ? pct(v.contracted, v.visited) : 0;
+    return `<tr>
+      <td style="font-size:12px">${name}</td>
+      <td>${v.total}</td>
+      <td style="color:var(--red)">${v.cancelled}</td>
+      <td>${v.visited}</td>
+      <td style="color:var(--green)">${v.contracted}</td>
+      <td><span style="color:${rate>=30?'var(--green)':'var(--red)'};font-weight:600">${rate}%</span></td>
+      <td>${v.amount ? '¥' + fmt(v.amount) : '-'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 }
 
 // === Reviews ===

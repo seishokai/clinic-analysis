@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=25">
+  <link rel="stylesheet" href="styles.css?v=26">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -146,9 +146,14 @@
 
     <!-- ==================== 予約管理 ==================== -->
     <main id="view-bookings" class="view" hidden>
+      <div class="sub-nav">
+        <button class="sub-nav-btn active" data-sub="bk-list">予約一覧</button>
+        <button class="sub-nav-btn" data-sub="bk-promo-dash">プロモ別</button>
+      </div>
+
+      <div id="sub-bk-list">
       <div class="page-header">
         <h2>予約・来院管理</h2>
-        <p class="page-desc">スプレッドシートからリアルタイム取得</p>
       </div>
 
       <div class="stats-row" id="bk-stats"></div>
@@ -211,6 +216,28 @@
             </thead>
             <tbody id="bk-tbody"></tbody>
           </table>
+        </div>
+      </div>
+      </div>
+
+      <!-- プロモ別ダッシュボード -->
+      <div id="sub-bk-promo-dash" hidden>
+        <div class="page-header">
+          <h2>プロモーション別</h2>
+        </div>
+        <div class="stats-row" id="promo-dash-stats"></div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">プロモーション別 予約数</div>
+          <div class="bar-chart" id="promo-dash-bookings"></div>
+        </div>
+        <div class="card" style="margin-bottom:20px">
+          <div class="card-header">プロモーション別 成約・キャンセル</div>
+          <div class="data-table-wrap">
+            <table class="data-table" id="promo-dash-table">
+              <thead><tr><th>プロモーション</th><th>予約数</th><th>キャンセル</th><th>来院</th><th>成約</th><th>成約率</th><th>成約金額</th></tr></thead>
+              <tbody id="promo-dash-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
     </main>
@@ -543,6 +570,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>
