@@ -1462,12 +1462,18 @@ function renderBookings() {
   const visited = filtered.filter(d => d.status === '来院済').length;
   const contracted = filtered.filter(d => d.status === '成約').length;
 
+  // 成約金額集計（localStorageから）
+  const bkExtraStats = loadData('bk-extra', {});
+  let totalAmount = 0;
+  Object.values(bkExtraStats).forEach(v => { if (v.contractAmount) totalAmount += Number(v.contractAmount); });
+
   document.getElementById('bk-stats').innerHTML = `
     <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
     <div class="stat-card"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span></div>
     <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
     <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
     <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+    <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
   `;
 
   document.getElementById('bk-count').textContent = `${filtered.length}件`;
@@ -1503,6 +1509,8 @@ function renderBookings() {
     <td>${d.name}</td>
     <td style="font-size:12px">${shortService(d.service)}</td>
     <td style="font-size:12px">${shortFac(d.facility)}</td>
+    <td style="font-size:11px;white-space:nowrap">${isAdmin ? (d.phone || '-') : '***'}</td>
+    <td style="font-size:11px;color:var(--text-sub);max-width:150px;overflow:hidden;text-overflow:ellipsis">${isAdmin ? (d.email || '-') : '***'}</td>
     <td style="font-size:11px;color:var(--text-sub)">${d.source || '-'}</td>
     <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:11px;padding:4px 8px;min-width:90px">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
@@ -1511,10 +1519,22 @@ function renderBookings() {
       <option ${d.status==='成約'?'selected':''}>成約</option>
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
     </select>` : statusBadge(d.status)}</td>
-  </tr>`).join('') || '<tr><td colspan="7" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+    <td>${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:11px;padding:4px 8px;min-width:80px">
+      <option value="">-</option>
+      <option ${d.contractService==='BF'?'selected':''}>BF</option>
+      <option ${d.contractService==='矯正(表)'?'selected':''}>矯正(表)</option>
+      <option ${d.contractService==='矯正(裏)'?'selected':''}>矯正(裏)</option>
+      <option ${d.contractService==='矯正(ﾋﾟｰｽ)'?'selected':''}>矯正(ﾋﾟｰｽ)</option>
+      <option ${d.contractService==='ﾗﾌﾞﾘｴ'?'selected':''}>ﾗﾌﾞﾘｴ</option>
+      <option ${d.contractService==='ｲﾝﾌﾟﾗﾝﾄ'?'selected':''}>ｲﾝﾌﾟﾗﾝﾄ</option>
+    </select>` : (d.contractService || '-')}</td>
+    <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount||''}" placeholder="0" style="font-size:11px;padding:4px 8px;width:90px">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
+    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:11px;padding:4px 8px;width:120px">` : (d.paymentMonth || '-')}</td>
+    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:11px;padding:4px 8px;width:120px">` : (d.incentiveMonth || '-')}</td>
+  </tr>`).join('') || '<tr><td colspan="13" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > 200) {
-    tbody.innerHTML += `<tr><td colspan="7" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
+    tbody.innerHTML += `<tr><td colspan="13" style="text-align:center;color:var(--text-muted);font-size:12px">最新200件を表示中（全${sorted.length}件）</td></tr>`;
   }
 
   // ステータス変更イベント
@@ -1524,18 +1544,44 @@ function renderBookings() {
         const name = sel.dataset.name;
         const applyDate = sel.dataset.apply;
         const newStatus = sel.value;
-        // 即座にローカル更新
         const match = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
         if (match) match.status = newStatus;
         sel.style.borderColor = 'var(--green)';
         setTimeout(() => { sel.style.borderColor = ''; }, 1000);
-        // バックグラウンドでAPI送信（待たない）
         fetch(GAS_API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
+          method: 'POST', mode: 'no-cors',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ name, applyDate, status: newStatus })
         }).catch(err => console.error('Update error:', err));
+      });
+    });
+
+    // 追加フィールド（成約施術・金額・入金月・インセ月）のイベント
+    const bkExtra = loadData('bk-extra', {});
+    const saveExtra = (name, apply, field, value) => {
+      const key = name + '|' + apply;
+      if (!bkExtra[key]) bkExtra[key] = {};
+      bkExtra[key][field] = value;
+      saveData('bk-extra', bkExtra);
+    };
+    // セレクト
+    tbody.querySelectorAll('.bk-field-select').forEach(sel => {
+      const key = sel.dataset.name + '|' + sel.dataset.apply;
+      if (bkExtra[key] && bkExtra[key][sel.dataset.field]) sel.value = bkExtra[key][sel.dataset.field];
+      sel.addEventListener('change', () => {
+        saveExtra(sel.dataset.name, sel.dataset.apply, sel.dataset.field, sel.value);
+        sel.style.borderColor = 'var(--green)';
+        setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+      });
+    });
+    // インプット
+    tbody.querySelectorAll('.bk-field-input').forEach(inp => {
+      const key = inp.dataset.name + '|' + inp.dataset.apply;
+      if (bkExtra[key] && bkExtra[key][inp.dataset.field]) inp.value = bkExtra[key][inp.dataset.field];
+      inp.addEventListener('change', () => {
+        saveExtra(inp.dataset.name, inp.dataset.apply, inp.dataset.field, inp.value);
+        inp.style.borderColor = 'var(--green)';
+        setTimeout(() => { inp.style.borderColor = ''; }, 1000);
       });
     });
   }
