@@ -188,6 +188,7 @@ body {
 
 /* === Content === */
 .view { padding: 24px; padding-bottom: calc(24px + var(--bottom-h)); max-width: 1200px; margin: 0 auto; }
+.view.view-wide { max-width: 100%; padding: 16px; }
 .view[hidden] { display: none !important; }
 .page-header { margin-bottom: 20px; }
 .page-header h2 { font-size: 18px; font-weight: 700; }
@@ -473,6 +474,7 @@ body {
   .stat-num { font-size: 22px; }
   .form-grid { grid-template-columns: 1fr; }
   .modal-content { width: 100%; max-width: 100%; max-height: 100%; height: 100%; border-radius: 0; padding: 16px; }
+  .view-wide { padding: 8px; }
   .detail-grid { grid-template-columns: 1fr; }
   .detail-grid dt { margin-top: 8px; font-size: 10px; }
   .detail-grid dd { padding: 6px 10px; background: var(--bg); border-radius: 6px; }

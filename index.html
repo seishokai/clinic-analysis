@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=32">
+  <link rel="stylesheet" href="styles.css?v=33">
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
 </head>
@@ -141,7 +141,7 @@
     <!-- 数値タブは廃止、中身はTCタブに統合 -->
 
     <!-- ==================== 予約管理 ==================== -->
-    <main id="view-bookings" class="view" hidden>
+    <main id="view-bookings" class="view view-wide" hidden>
       <div class="sub-nav">
         <button class="sub-nav-btn active" data-sub="bk-list">予約一覧</button>
         <button class="sub-nav-btn" data-sub="bk-promo-dash">プロモ別</button>
@@ -155,45 +155,28 @@
       <div class="stats-row" id="bk-stats"></div>
 
       <!-- フィルター -->
-      <div class="card" style="margin-bottom:20px">
-        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <div class="form-group" style="min-width:140px">
-            <label class="form-label">医院</label>
-            <select class="form-select" id="bk-facility"><option value="">全て</option></select>
-          </div>
-          <div class="form-group" style="min-width:140px">
-            <label class="form-label">プロモーション</label>
-            <select class="form-select" id="bk-promo"><option value="">全て</option></select>
-          </div>
-          <div class="form-group" style="min-width:140px">
-            <label class="form-label">施術</label>
-            <select class="form-select" id="bk-service"><option value="">全て</option></select>
-          </div>
-          <div class="form-group" style="min-width:140px">
-            <label class="form-label">ステータス</label>
-            <select class="form-select" id="bk-status">
-              <option value="">全て</option>
-              <option value="要対応">要対応（期限切れ未対応）</option>
-              <option value="未対応">未対応</option>
-              <option value="確認済">確認済</option>
-              <option value="来院済">来院済</option>
-              <option value="成約">成約</option>
-              <option value="キャンセル">キャンセル</option>
-            </select>
-          </div>
-          <div class="form-group" style="min-width:120px">
-            <label class="form-label">期間</label>
-            <input type="month" class="form-input" id="bk-month" style="font-size:13px">
-          </div>
-          <button class="btn btn-dark" id="bk-refresh" style="margin-top:18px;min-height:36px;padding:8px 16px;font-size:12px">更新</button>
-          <button class="btn btn-outline" id="bk-csv" style="margin-top:18px;min-height:36px;padding:8px 16px;font-size:12px">CSV出力</button>
-          <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:18px;align-items:center" id="bk-quick-promos"></div>
-        </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
+        <select class="form-select" id="bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
+        <select class="form-select" id="bk-promo" style="width:auto;padding:6px 8px;font-size:11px"><option value="">プロモ:全て</option></select>
+        <select class="form-select" id="bk-service" style="width:auto;padding:6px 8px;font-size:11px"><option value="">相談:全て</option></select>
+        <select class="form-select" id="bk-status" style="width:auto;padding:6px 8px;font-size:11px">
+          <option value="">状態:全て</option>
+          <option value="要対応">要対応</option>
+          <option value="未対応">未対応</option>
+          <option value="確認済">確認済</option>
+          <option value="来院済">来院済</option>
+          <option value="成約">成約</option>
+          <option value="キャンセル">キャンセル</option>
+        </select>
+        <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px">
+        <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px">更新</button>
+        <button class="btn btn-outline" id="bk-csv" style="min-height:30px;padding:6px 12px;font-size:11px">CSV</button>
+        <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center" id="bk-quick-promos"></div>
       </div>
 
       <!-- データテーブル -->
-      <div class="card">
-        <div class="card-header">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+      <div class="card" style="padding:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)"></span></div>
         <div class="data-table-wrap">
           <table class="data-table" id="bk-table">
             <thead>
@@ -598,6 +581,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=32"></script>
+  <script src="app.js?v=33"></script>
 </body>
 </html>
