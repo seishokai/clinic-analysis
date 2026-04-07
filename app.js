@@ -69,7 +69,10 @@ function setupEventListeners() {
       sessionStorage.setItem('role', 'admin');
       userRole = 'admin';
       promoFilter = '';
+      loginBtn.textContent = 'ログイン';
+      loginBtn.disabled = false;
       showApp();
+      return;
     } else if (PROMO_PASSWORDS[pw]) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
@@ -77,7 +80,10 @@ function setupEventListeners() {
       sessionStorage.setItem('promoFilter', PROMO_PASSWORDS[pw]);
       userRole = 'promo';
       promoFilter = PROMO_PASSWORDS[pw];
+      loginBtn.textContent = 'ログイン';
+      loginBtn.disabled = false;
       showApp();
+      return;
     } else {
       // 管理タブで発行したアカウントをチェック（DB）
       const { data: dbAccounts } = await sb.from('accounts').select('*').eq('password', pw);
@@ -159,10 +165,6 @@ function setupEventListeners() {
 
   // Bookings filters
   // Quick filter buttons
-  document.getElementById('bk-overdue').addEventListener('click', () => {
-    document.getElementById('bk-status').value = '要対応';
-    renderBookings();
-  });
   document.getElementById('bk-yesterday').addEventListener('click', () => {
     const y = new Date(); y.setDate(y.getDate() - 1);
     document.getElementById('bk-status').value = '';
@@ -173,6 +175,12 @@ function setupEventListeners() {
     const t = new Date();
     document.getElementById('bk-status').value = '';
     window._bkDateFilter = t.toISOString().slice(0,10);
+    renderBookings();
+  });
+  document.getElementById('bk-tomorrow').addEventListener('click', () => {
+    const tm = new Date(); tm.setDate(tm.getDate() + 1);
+    document.getElementById('bk-status').value = '';
+    window._bkDateFilter = tm.toISOString().slice(0,10);
     renderBookings();
   });
   document.getElementById('bk-reset').addEventListener('click', () => {
@@ -1878,12 +1886,30 @@ function renderBookings() {
     return `<span class="badge badge-default">${s}</span>`;
   };
 
-  const fmtDateShort = (d) => {
+  const fmtApplyDate = (d) => {
     if (!d) return '-';
-    // "2026/04/08 00:49" or "2026年4月13日(月)渕嶋予夏" or "4/8 17:00"
-    const m = d.match(/(\d{1,2})[\/月](\d{1,2})/);
-    if (m) return m[1] + '/' + m[2];
+    // "2026/04/08 00:49" → "4/8"
+    const m = d.match(/\d{4}\D+(\d{1,2})\D+(\d{1,2})/);
+    if (m) return parseInt(m[1]) + '/' + parseInt(m[2]);
     return d.slice(0, 5);
+  };
+  const fmtBookDate = (d) => {
+    if (!d) return '-';
+    // "2026/4/17 15:30" → "4/17 15:30"
+    const m1 = d.match(/\d{4}\D+(\d{1,2})\D+(\d{1,2})\s+(\d{1,2}:\d{2})/);
+    if (m1) return parseInt(m1[1]) + '/' + parseInt(m1[2]) + ' ' + m1[3];
+    // "2026/4/17 15:30" without year prefix
+    const m2 = d.match(/(\d{1,2})\D+(\d{1,2})\s+(\d{1,2}:\d{2})/);
+    if (m2) return parseInt(m2[1]) + '/' + parseInt(m2[2]) + ' ' + m2[3];
+    // "2026年4月13日(月)15時00分" → "4/13 15:00"
+    const m3 = d.match(/(\d{1,2})\D*月\D*(\d{1,2})\D*日.*?(\d{1,2})\D*時\D*(\d{2})\D*分/);
+    if (m3) return parseInt(m3[1]) + '/' + parseInt(m3[2]) + ' ' + m3[3] + ':' + m3[4];
+    // "2026年4月13日(月)" without time → "4/13"
+    const m4 = d.match(/(\d{1,2})\D*月\D*(\d{1,2})/);
+    if (m4) return parseInt(m4[1]) + '/' + parseInt(m4[2]);
+    const m5 = d.match(/(\d{1,2})[\/](\d{1,2})/);
+    if (m5) return parseInt(m5[1]) + '/' + parseInt(m5[2]);
+    return d.slice(0, 8);
   };
   const shortService = (s) => {
     if (!s) return '-';
@@ -1932,8 +1958,8 @@ function renderBookings() {
     const overdue = isOverdue(d);
     return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
-    <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtDateShort(d.applyDate)}</td>
-    <td style="white-space:nowrap;font-size:10px">${fmtDateShort(d.bookDate)}${overdue ? '<span style="color:var(--red);font-weight:700">!</span>' : ''}</td>
+    <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
+    <td style="white-space:nowrap;font-size:10px">${fmtBookDate(d.bookDate)}${overdue ? '<span style="color:var(--red);font-weight:700">!</span>' : ''}</td>
     <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">${d.name}</td>
     <td style="font-size:10px;white-space:nowrap">${shortService(d.service)}</td>
     <td style="font-size:10px;white-space:nowrap">${shortFac(d.facility)}</td>
