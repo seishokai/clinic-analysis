@@ -2161,7 +2161,7 @@ function renderBookings() {
         const current = memos[key] || '';
         const ta = document.createElement('textarea');
         ta.value = current;
-        ta.style.cssText = 'font-size:13px;width:280px;height:120px;padding:8px;border:2px solid var(--accent);border-radius:8px;resize:vertical;position:absolute;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.2);background:white;right:0';
+        ta.style.cssText = 'font-size:14px;width:360px;height:180px;padding:10px;border:2px solid var(--accent);border-radius:8px;resize:both;position:absolute;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.25);background:white;right:0;line-height:1.6';
         ta.placeholder = '進捗メモを入力...';
         td.style.position = 'relative';
         td.appendChild(ta);
