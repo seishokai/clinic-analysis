@@ -1896,12 +1896,13 @@ function renderBookings() {
     window._bkDateFilter = null; // 1回限り
   }
 
-  // Stats
-  const total = filtered.length;
-  const cancelled = filtered.filter(d => d.status === 'キャンセル').length;
-  const pending = filtered.filter(d => !d.status || d.status === '未対応').length;
-  const visited = filtered.filter(d => d.status === '来院済').length;
-  const contracted = filtered.filter(d => d.status === '成約').length;
+  // Stats（除外は統計から除く）
+  const active = filtered.filter(d => d.status !== '除外');
+  const total = active.length;
+  const cancelled = active.filter(d => d.status === 'キャンセル').length;
+  const pending = active.filter(d => !d.status || d.status === '未対応').length;
+  const visited = active.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const contracted = active.filter(d => d.status === '成約').length;
 
   // 成約金額集計（localStorageから）
   const bkExtraStats = loadData('bk-extra', {});
@@ -2017,7 +2018,8 @@ function renderBookings() {
   const displayLimit = window._bkDisplayLimit || 200;
   tbody.innerHTML = sorted.slice(0, displayLimit).map((d, idx) => {
     const overdue = isOverdue(d);
-    return `<tr style="${overdue ? 'background:#fef2f2' : ''}">
+    const rowStyle = d.status==='除外' ? 'background:#f5f5f5;opacity:0.5;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#fef2f2' : overdue ? 'background:#fef2f2' : '';
+    return `<tr style="${rowStyle}">
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
     <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
@@ -2028,12 +2030,13 @@ function renderBookings() {
     <td style="font-size:10px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
     <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? (d.email || '-') : '***'}</td>
     <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${d.source || '-'}</td>
-    <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px">
+    <td>${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
       <option ${d.status==='成約'?'selected':''}>成約</option>
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
+      <option ${d.status==='除外'?'selected':''}>除外</option>
     </select>` : statusBadge(d.status)}</td>
     <td style="font-size:10px;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" class="bk-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(d._memo||'').replace(/"/g,'&quot;')}">${isAdmin ? (d._memo ? d._memo.slice(0,6) + (d._memo.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>') : (d._memo || '-')}</td>
     <td>${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px">
