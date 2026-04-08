@@ -1806,7 +1806,17 @@ function populateBookingFilters() {
     ).join('');
     quickEl.querySelectorAll('.bk-quick-promo').forEach((btn, i) => {
       btn.addEventListener('click', () => {
-        promoEl.value = top5[i][0];
+        // 選択状態をトグル
+        const isActive = btn.style.background === 'rgb(219, 234, 254)';
+        quickEl.querySelectorAll('.bk-quick-promo').forEach(b => { b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; });
+        if (isActive) {
+          promoEl.value = '';
+        } else {
+          promoEl.value = top5[i][0];
+          btn.style.background = '#dbeafe';
+          btn.style.color = '#1d4ed8';
+          btn.style.borderColor = '#93c5fd';
+        }
         renderBookings();
       });
     });
