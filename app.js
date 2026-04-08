@@ -1695,7 +1695,7 @@ async function loadBookings() {
     }
   } catch (e) {
     console.error('Bookings load error:', e);
-    document.getElementById('bk-tbody').innerHTML = '<tr><td colspan="14" style="text-align:center;color:var(--red)">データ取得失敗。更新ボタンを押してください。</td></tr>';
+    document.getElementById('bk-tbody').innerHTML = '<tr><td colspan="15" style="text-align:center;color:var(--red)">データ取得失敗。更新ボタンを押してください。</td></tr>';
   }
 }
 
@@ -1927,6 +1927,10 @@ function renderBookings() {
     <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
   `;
 
+  // メモデータを付与
+  const memoData = loadData('bk-memos', {});
+  filtered.forEach(d => { const key = d.name+'|'+d.applyDate; d._memo = memoData[key] || ''; });
+
   document.getElementById('bk-count').textContent = `${filtered.length}件`;
 
   // Table
@@ -2031,6 +2035,7 @@ function renderBookings() {
       <option ${d.status==='成約'?'selected':''}>成約</option>
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
     </select>` : statusBadge(d.status)}</td>
+    <td style="font-size:10px;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" class="bk-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(d._memo||'').replace(/"/g,'&quot;')}">${isAdmin ? (d._memo ? d._memo.slice(0,6) + (d._memo.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>') : (d._memo || '-')}</td>
     <td>${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px">
       <option value="">-</option>
       <option ${d.contractService==='BF'?'selected':''}>BF</option>
@@ -2043,10 +2048,10 @@ function renderBookings() {
     <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:70px">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.paymentMonth || '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
-  </tr>`}).join('') || '<tr><td colspan="14" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  </tr>`}).join('') || '<tr><td colspan="15" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > displayLimit) {
-    tbody.innerHTML += `<tr><td colspan="14" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
+    tbody.innerHTML += `<tr><td colspan="15" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
   }
 
   // ステータス変更イベント
@@ -2096,6 +2101,37 @@ function renderBookings() {
         saveExtra(inp.dataset.name, inp.dataset.apply, inp.dataset.field, inp.value);
         inp.style.borderColor = 'var(--green)';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+      });
+    });
+
+    // メモクリックで編集
+    tbody.querySelectorAll('.bk-memo-cell').forEach(td => {
+      td.addEventListener('click', () => {
+        if (!isAdmin || td.querySelector('textarea')) return;
+        const name = td.dataset.name;
+        const apply = td.dataset.apply;
+        const key = name + '|' + apply;
+        const memos = loadData('bk-memos', {});
+        const current = memos[key] || '';
+        const ta = document.createElement('textarea');
+        ta.value = current;
+        ta.style.cssText = 'font-size:10px;width:150px;height:60px;padding:4px;border:1px solid var(--accent);border-radius:4px;resize:vertical;position:absolute;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+        ta.placeholder = '進捗メモを入力...';
+        td.style.position = 'relative';
+        td.appendChild(ta);
+        ta.focus();
+        const save = () => {
+          const val = ta.value.trim();
+          memos[key] = val;
+          saveData('bk-memos', memos);
+          td.innerHTML = val ? val.slice(0,6) + (val.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>';
+          td.title = val;
+          // DBにも保存
+          sb.from('booking_status').upsert({ name, apply_date: apply, memo: val }, { onConflict: 'name,apply_date' }).then(({error}) => { if (error) console.warn('Memo save error:', error); });
+          showToast('メモを保存しました');
+        };
+        ta.addEventListener('blur', save);
+        ta.addEventListener('keydown', e => { if (e.key === 'Escape') { ta.value = current; ta.blur(); } });
       });
     });
 
