@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=70">
+  <link rel="stylesheet" href="styles.css?v=71">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -146,6 +146,7 @@
     <main id="view-bookings" class="view view-wide">
       <div class="sub-nav">
         <button class="sub-nav-btn active" data-sub="bk-list">予約一覧</button>
+        <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
         <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
       </div>
 
@@ -189,22 +190,22 @@
           <table class="data-table compact" id="bk-table">
             <thead>
               <tr>
-                <th style="width:40px">ツール</th>
-                <th style="width:40px">申込</th>
-                <th style="width:40px">予約</th>
-                <th style="width:65px;text-align:left">名前</th>
-                <th style="width:30px">相談</th>
-                <th style="width:45px">医院</th>
-                <th style="width:75px">電話</th>
-                <th style="width:90px;text-align:left">メール</th>
-                <th style="width:70px">流入元</th>
-                <th style="width:60px">状態</th>
-                <th style="width:50px">メモ</th>
-                <th style="width:55px">成約</th>
-                <th style="width:55px">金額(税抜)</th>
-                <th style="width:65px">入金月</th>
-                <th style="width:65px">インセ月</th>
-                <th style="width:55px">インセ額</th>
+                <th>.</th>
+                <th>申込</th>
+                <th>予約</th>
+                <th style="text-align:left">名前</th>
+                <th>相談</th>
+                <th>医院</th>
+                <th>電話</th>
+                <th style="text-align:left">メール</th>
+                <th>流入元</th>
+                <th>状態</th>
+                <th>メモ</th>
+                <th>成約</th>
+                <th>金額</th>
+                <th>入金月</th>
+                <th>インセ月</th>
+                <th>インセ額</th>
               </tr>
             </thead>
             <tbody id="bk-tbody"></tbody>
@@ -214,6 +215,35 @@
       </div>
 
       <!-- プロモ別ダッシュボード -->
+      <!-- 申込分析 -->
+      <div id="sub-bk-apply" hidden>
+        <div class="page-header"><h2>申込分析</h2></div>
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn btn-dark apply-period-btn" data-period="today" style="font-size:11px;padding:6px 12px;min-height:28px">今日</button>
+          <button class="btn btn-outline apply-period-btn" data-period="yesterday" style="font-size:11px;padding:6px 12px;min-height:28px">昨日</button>
+          <button class="btn btn-outline apply-period-btn" data-period="week" style="font-size:11px;padding:6px 12px;min-height:28px">今週</button>
+          <button class="btn btn-outline apply-period-btn" data-period="month" style="font-size:11px;padding:6px 12px;min-height:28px">今月</button>
+          <button class="btn btn-outline apply-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button>
+        </div>
+        <div class="stats-row" id="apply-stats" style="margin-bottom:16px"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">日別申込数</div>
+          <div class="bar-chart" id="apply-daily-chart"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">プロモ別申込数</div>
+          <div class="bar-chart" id="apply-promo-chart"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">医院別申込数</div>
+          <div class="bar-chart" id="apply-facility-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">相談別申込数</div>
+          <div class="bar-chart" id="apply-service-chart"></div>
+        </div>
+      </div>
+
       <div id="sub-bk-analysis" hidden>
         <div class="page-header"><h2>予約分析</h2></div>
 
@@ -684,6 +714,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=70"></script>
+  <script src="app.js?v=71"></script>
 </body>
 </html>

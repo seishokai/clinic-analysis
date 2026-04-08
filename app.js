@@ -144,8 +144,9 @@ function setupEventListeners() {
       if (el) {
         el.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== `sub-${sub}`);
       }
-      // 分析タブ切替時にデータ更新
+      // タブ切替時にデータ更新
       if (sub === 'bk-analysis' && bookingsData.length > 0) renderAnalysis();
+      if (sub === 'bk-apply' && bookingsData.length > 0) renderApplyAnalysis('today');
     });
   });
 
@@ -178,6 +179,15 @@ function setupEventListeners() {
 
   // Memo modal save
   document.getElementById('memo-modal-save').addEventListener('click', saveMemoModal);
+
+  // Apply analysis period buttons
+  document.querySelectorAll('.apply-period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.apply-period-btn').forEach(b => b.className = 'btn btn-outline apply-period-btn');
+      btn.className = 'btn btn-dark apply-period-btn';
+      renderApplyAnalysis(btn.dataset.period);
+    });
+  });
 
   // Analysis filters & axis
   ['an-facility','an-service','an-promo','an-tool','an-month'].forEach(id => {
@@ -2279,6 +2289,87 @@ function exportCSV() {
   a.download = `予約データ_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// === 申込分析 ===
+function renderApplyAnalysis(period) {
+  period = period || 'today';
+  const sFac = (f) => {
+    if (!f) return '-';
+    if (f.includes('銀座')) return 'BF銀座'; if (f.includes('ウィズ')||f.includes('WITH')) return 'ウィズ';
+    if (f.includes('エスカ')) return 'エスカ'; if (f.includes('アール')) return 'アール';
+    if (f.includes('ルミナス')) return 'ルミナス'; if (f.includes('茶屋')) return '茶屋';
+    if (f.includes('小牧')) return '小牧'; if (f.includes('知立')) return '知立';
+    if (f.includes('八事')) return '八事'; if (f.includes('岩田')) return '岩田';
+    if (f.includes('大森')) return '大森'; if (f.includes('京都')) return '京都';
+    return f.length > 8 ? f.slice(0,8)+'…' : f;
+  };
+  const sSvc = (s) => {
+    if (!s) return '-';
+    if (s.includes('ラミネート')||s.includes('ブラックフィルム')) return 'BF';
+    if (s.includes('矯正')) return '矯正'; if (s.includes('セラミック')) return 'セラミック';
+    if (s.includes('インプラント')) return 'インプラント';
+    return s.replace(/相談|無料|　/g,'').slice(0,6);
+  };
+
+  let data = bookingsData.filter(d => d.status !== '除外');
+
+  // 期間フィルター（申込日ベース）
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+  const yesterday = new Date(now); yesterday.setDate(yesterday.getDate()-1);
+  const yesterdayStr = `${yesterday.getFullYear()}/${String(yesterday.getMonth()+1).padStart(2,'0')}/${String(yesterday.getDate()).padStart(2,'0')}`;
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-7);
+  const monthStart = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/01`;
+
+  const getApplyDateStr = (d) => {
+    if (!d.applyDate) return '';
+    const m = d.applyDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    if (!m) return '';
+    return `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}/${String(parseInt(m[3])).padStart(2,'0')}`;
+  };
+
+  if (period === 'today') {
+    data = data.filter(d => getApplyDateStr(d) === todayStr);
+  } else if (period === 'yesterday') {
+    data = data.filter(d => getApplyDateStr(d) === yesterdayStr);
+  } else if (period === 'week') {
+    data = data.filter(d => { const ds = getApplyDateStr(d); return ds >= `${weekAgo.getFullYear()}/${String(weekAgo.getMonth()+1).padStart(2,'0')}/${String(weekAgo.getDate()).padStart(2,'0')}`; });
+  } else if (period === 'month') {
+    data = data.filter(d => { const ds = getApplyDateStr(d); return ds >= monthStart; });
+  }
+
+  // 統計
+  const total = data.length;
+  const byTool = {}; data.forEach(d => { byTool[d.tool||'不明'] = (byTool[d.tool||'不明']||0)+1; });
+
+  document.getElementById('apply-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">申込数</span><span class="stat-num">${total}</span></div>
+    <div class="stat-card"><span class="stat-label">DXHUB</span><span class="stat-num">${byTool['DXHUB']||0}</span></div>
+    <div class="stat-card"><span class="stat-label">セレクト</span><span class="stat-num">${byTool['セレクト']||0}</span></div>
+  `;
+
+  // 日別チャート
+  const daily = {};
+  data.forEach(d => { const ds = getApplyDateStr(d); if (ds) { const short = ds.slice(5); daily[short] = (daily[short]||0)+1; } });
+  const dailySorted = Object.entries(daily).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 14);
+  const maxDaily = Math.max(...dailySorted.map(([,v]) => v), 1);
+  document.getElementById('apply-daily-chart').innerHTML = dailySorted.map(([day, count]) =>
+    `<div class="bar-row"><div class="bar-label">${day}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/maxDaily*100),5)}%"><span>${count}</span></div></div><div class="bar-value">${count}件</div></div>`
+  ).join('') || '<p style="color:var(--text-muted);font-size:13px">データなし</p>';
+
+  // プロモ別
+  const promoG = {}; data.forEach(d => { const p = d.source||'(なし)'; promoG[p] = (promoG[p]||0)+1; });
+  const promoS = Object.entries(promoG).sort((a,b) => b[1]-a[1]);
+  renderBarChart('apply-promo-chart', promoS.slice(0,15).map(([name,count]) => ({ name: name.length>20?name.slice(0,20)+'…':name, rate: total>0?Math.round(count/total*100):0, decided: count, consulted: total })));
+
+  // 医院別
+  const facG = {}; data.forEach(d => { const f = sFac(d.facility); facG[f] = (facG[f]||0)+1; });
+  renderBarChart('apply-facility-chart', Object.entries(facG).sort((a,b) => b[1]-a[1]).map(([name,count]) => ({ name, rate: total>0?Math.round(count/total*100):0, decided: count, consulted: total })));
+
+  // 相談別
+  const svcG = {}; data.forEach(d => { const s = sSvc(d.service); svcG[s] = (svcG[s]||0)+1; });
+  renderBarChart('apply-service-chart', Object.entries(svcG).sort((a,b) => b[1]-a[1]).map(([name,count]) => ({ name, rate: total>0?Math.round(count/total*100):0, decided: count, consulted: total })));
 }
 
 function renderAnalysis() {
