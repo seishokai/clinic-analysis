@@ -1946,6 +1946,16 @@ function renderBookings() {
   const pending = active.filter(d => !d.status || d.status === '未対応').length;
   const visited = active.filter(d => d.status === '来院済' || d.status === '成約').length;
   const contracted = active.filter(d => d.status === '成約').length;
+  // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
+  const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
+  const pastBookings = active.filter(d => {
+    if (!d.bookDate) return false;
+    const m = d.bookDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+    if (!m) return false;
+    return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3])) < todayForRate;
+  });
+  const pastVisited = pastBookings.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
   // 成約金額集計（localStorageから）
   const bkExtraStats = loadData('bk-extra', {});
@@ -1966,7 +1976,7 @@ function renderBookings() {
     <div class="stat-card"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span></div>
     <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
     <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
-    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${total > 0 ? Math.round((total - cancelled - pending) / total * 100) : 0}%</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${visitRate}%</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px">${pastVisited}/${pastBookings.length}件</span></div>
     <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
     <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
   `;
