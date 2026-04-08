@@ -211,13 +211,21 @@ function setupEventListeners() {
 
   // Bookings filters
   // Quick filter buttons
+  const resetQuickBtns = () => {
+    document.getElementById('bk-overdue-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px';
+    document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px';
+  };
   document.getElementById('bk-overdue-btn').addEventListener('click', () => {
+    resetQuickBtns();
+    document.getElementById('bk-overdue-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#dc2626;color:white;border:2px solid #dc2626;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(220,38,38,0.3)';
     document.getElementById('bk-status').value = '';
     window._bkProgressFilter = true;
     window._bkTodayFilter = false;
     renderBookings();
   });
   document.getElementById('bk-today-btn').addEventListener('click', () => {
+    resetQuickBtns();
+    document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#1d4ed8;color:white;border:2px solid #1d4ed8;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(29,78,216,0.3)';
     document.getElementById('bk-status').value = '';
     window._bkTodayFilter = true;
     window._bkProgressFilter = false;
@@ -235,6 +243,7 @@ function setupEventListeners() {
     window._bkProgressFilter = false;
     window._bkTodayFilter = false;
     window._bkDisplayLimit = 200;
+    resetQuickBtns();
     renderBookings();
   });
 
