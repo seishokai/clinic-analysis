@@ -202,9 +202,15 @@ function setupEventListeners() {
   // Bookings filters
   // Quick filter buttons
   document.getElementById('bk-overdue-btn').addEventListener('click', () => {
-    // 予約日が昨日以前の人を表示
     document.getElementById('bk-status').value = '';
     window._bkProgressFilter = true;
+    window._bkTodayFilter = false;
+    renderBookings();
+  });
+  document.getElementById('bk-today-btn').addEventListener('click', () => {
+    document.getElementById('bk-status').value = '';
+    window._bkTodayFilter = true;
+    window._bkProgressFilter = false;
     renderBookings();
   });
   document.getElementById('bk-reset').addEventListener('click', () => {
@@ -217,6 +223,7 @@ function setupEventListeners() {
     document.getElementById('bk-month').value = '';
     window._bkDateFilter = null;
     window._bkProgressFilter = false;
+    window._bkTodayFilter = false;
     window._bkDisplayLimit = 200;
     renderBookings();
   });
@@ -1916,6 +1923,18 @@ function renderBookings() {
       const bd = d.bookDate.replace(/\//g, '-').slice(0, 7);
       return bd === monthFilter;
     });
+  }
+  // 今日予約フィルター
+  if (window._bkTodayFilter) {
+    const td3 = new Date(); const todayStr = `${td3.getFullYear()}-${String(td3.getMonth()+1).padStart(2,'0')}-${String(td3.getDate()).padStart(2,'0')}`;
+    filtered = filtered.filter(d => {
+      if (!d.bookDate) return false;
+      const m = d.bookDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!m) return false;
+      const bd = `${m[1]}-${String(parseInt(m[2])).padStart(2,'0')}-${String(parseInt(m[3])).padStart(2,'0')}`;
+      return bd === todayStr;
+    });
+    window._bkTodayFilter = false;
   }
   // 進捗フィルター（予約日が昨日以前の人）
   if (window._bkProgressFilter) {
