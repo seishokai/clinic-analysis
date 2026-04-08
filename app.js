@@ -242,9 +242,12 @@ function setupEventListeners() {
 
   // Ad Budget
   document.getElementById('ad-save').addEventListener('click', saveAdBudget);
+  document.getElementById('ad-add-facility').addEventListener('click', () => addAdFacilityRow());
   document.getElementById('ad-filter-agency').addEventListener('change', renderAdBudgets);
   document.getElementById('ad-filter-month').addEventListener('change', renderAdBudgets);
   document.getElementById('ad-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+  // 初期で1店舗行を追加
+  addAdFacilityRow();
 
   // Migrate localStorage data to Supabase (one-time)
   migrateToSupabase();
@@ -2643,89 +2646,165 @@ function showPromoDetail(promoName) {
   document.getElementById('promo-detail').scrollIntoView({behavior:'smooth', block:'start'});
 }
 
-// === Ad Budget (Supabase) ===
+// === Ad Budget (Supabase - 新構造) ===
+const AD_FACILITIES = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','岩田','大森','京都'];
+const AD_MEDIA = ['google','yahoo','meta','tiktok','seo','organic','sns_management','incentive'];
+const AD_MEDIA_LABELS = {google:'Google',yahoo:'Yahoo',meta:'Meta',tiktok:'TikTok',seo:'SEO',organic:'オーガニック',sns_management:'SNS運用',incentive:'インセンティブ'};
+let adFacilityCount = 0;
+
+function addAdFacilityRow(facility, values) {
+  const container = document.getElementById('ad-facilities-container');
+  const idx = adFacilityCount++;
+  const div = document.createElement('div');
+  div.className = 'card';
+  div.style.cssText = 'margin-bottom:10px;padding:12px;background:var(--bg)';
+  div.id = 'ad-fac-' + idx;
+  div.innerHTML = `
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <select class="form-select ad-fac-name" style="width:auto;padding:4px 8px;font-size:12px;font-weight:600">
+        ${AD_FACILITIES.map(f => `<option ${f===(facility||'')?'selected':''}>${f}</option>`).join('')}
+      </select>
+      <button class="resource-delete" onclick="document.getElementById('ad-fac-${idx}').remove()" style="width:24px;height:24px;font-size:11px">×</button>
+    </div>
+    <div class="form-grid" style="grid-template-columns:repeat(4,1fr);gap:8px">
+      ${AD_MEDIA.map(m => `<div class="form-group"><label class="form-label">${AD_MEDIA_LABELS[m]}</label><input type="number" class="form-input ad-media-${m}" placeholder="0" value="${values&&values[m]||''}" style="font-size:12px;padding:4px 8px"></div>`).join('')}
+      <div class="form-group"><label class="form-label">その他名目</label><input type="text" class="form-input ad-media-other-name" placeholder="例: LINE" value="${values&&values.other_name||''}" style="font-size:12px;padding:4px 8px"></div>
+      <div class="form-group"><label class="form-label">その他金額</label><input type="number" class="form-input ad-media-other-amount" placeholder="0" value="${values&&values.other_amount||''}" style="font-size:12px;padding:4px 8px"></div>
+    </div>
+  `;
+  container.appendChild(div);
+}
+
 async function saveAdBudget() {
   const agency = document.getElementById('ad-agency').value.trim();
   const month = document.getElementById('ad-month').value;
-  if (!agency || !month) return;
-  await sb.from('ad_budgets').insert({
-    agency, month, ad_type: document.getElementById('ad-type').value,
+  if (!agency || !month) { showToast('代理店名と年月を入力してください', true); return; }
+
+  // ヘッダー保存
+  const { data: hdr, error: hErr } = await sb.from('ad_budget_headers').insert({
+    agency, month,
     total_budget: Number(document.getElementById('ad-total').value) || 0,
+    common_cost: Number(document.getElementById('ad-common').value) || 0,
     fee: Number(document.getElementById('ad-fee').value) || 0,
-    google: Number(document.getElementById('ad-google').value) || 0,
-    yahoo: Number(document.getElementById('ad-yahoo').value) || 0,
-    meta: Number(document.getElementById('ad-meta').value) || 0,
-    tiktok: Number(document.getElementById('ad-tiktok').value) || 0,
-    seo: Number(document.getElementById('ad-seo').value) || 0,
-    other_name: document.getElementById('ad-other-name').value,
-    other_amount: Number(document.getElementById('ad-other-amount').value) || 0
-  });
-  ['ad-total','ad-fee','ad-google','ad-yahoo','ad-meta','ad-tiktok','ad-seo','ad-other-name','ad-other-amount'].forEach(id => document.getElementById(id).value = '');
+  }).select();
+  if (hErr || !hdr || !hdr[0]) { showToast('保存エラー: ' + (hErr?.message||''), true); return; }
+  const headerId = hdr[0].id;
+
+  // 店舗別詳細保存
+  const facRows = document.querySelectorAll('[id^="ad-fac-"]');
+  for (const row of facRows) {
+    const facility = row.querySelector('.ad-fac-name').value;
+    const detail = { header_id: headerId, facility };
+    AD_MEDIA.forEach(m => { detail[m] = Number(row.querySelector('.ad-media-'+m)?.value) || 0; });
+    detail.other_name = row.querySelector('.ad-media-other-name')?.value || '';
+    detail.other_amount = Number(row.querySelector('.ad-media-other-amount')?.value) || 0;
+    await sb.from('ad_budget_details').insert(detail);
+  }
+
+  // フォームリセット
+  ['ad-total','ad-common','ad-fee'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('ad-facilities-container').innerHTML = '';
+  adFacilityCount = 0;
   showToast('広告予算を登録しました');
   renderAdBudgets();
 }
 
 async function deleteAdBudget(id) {
   if (!confirm('この広告予算を削除しますか？')) return;
-  await sb.from('ad_budgets').delete().eq('id', id);
-  showToast('広告予算を削除しました');
+  await sb.from('ad_budget_headers').delete().eq('id', id);
+  showToast('削除しました');
   renderAdBudgets();
 }
 
 async function renderAdBudgets() {
-  const { data } = await sb.from('ad_budgets').select('*').order('month', { ascending: false });
-  let allData = data || [];
+  const { data: headers } = await sb.from('ad_budget_headers').select('*').order('month', { ascending: false });
+  const { data: details } = await sb.from('ad_budget_details').select('*');
+  let allHeaders = headers || [];
+  const allDetails = details || [];
 
-  // カスタムユーザーの代理店制限
+  // 代理店制限
   if (userRole === 'custom') {
     const myAgency = sessionStorage.getItem('customAgency') || '';
     if (myAgency) {
-      allData = allData.filter(d => d.agency === myAgency);
-      // 代理店名を自動入力
+      allHeaders = allHeaders.filter(h => h.agency === myAgency);
       const agencyInput = document.getElementById('ad-agency');
       if (agencyInput) { agencyInput.value = myAgency; agencyInput.readOnly = true; }
     }
   }
 
   // フィルター
-  const agencyFilter = document.getElementById('ad-filter-agency').value;
-  const monthFilter = document.getElementById('ad-filter-month').value;
-  let filtered = allData;
-  if (agencyFilter) filtered = filtered.filter(d => d.agency === agencyFilter);
-  if (monthFilter) filtered = filtered.filter(d => d.month === monthFilter);
+  const af = document.getElementById('ad-filter-agency').value;
+  const mf = document.getElementById('ad-filter-month').value;
+  let filtered = allHeaders;
+  if (af) filtered = filtered.filter(h => h.agency === af);
+  if (mf) filtered = filtered.filter(h => h.month === mf);
 
-  // フィルター選択肢更新
-  const agencies = [...new Set(allData.map(d => d.agency))].sort();
-  const months = [...new Set(allData.map(d => d.month))].sort().reverse();
-  document.getElementById('ad-filter-agency').innerHTML = '<option value="">代理店:全て</option>' + agencies.map(a => `<option ${a===agencyFilter?'selected':''}>${a}</option>`).join('');
-  document.getElementById('ad-filter-month').innerHTML = '<option value="">月:全て</option>' + months.map(m => `<option ${m===monthFilter?'selected':''}>${m}</option>`).join('');
+  // フィルター選択肢
+  const agencies = [...new Set(allHeaders.map(h => h.agency))].sort();
+  const months = [...new Set(allHeaders.map(h => h.month))].sort().reverse();
+  document.getElementById('ad-filter-agency').innerHTML = '<option value="">代理店:全て</option>' + agencies.map(a => `<option ${a===af?'selected':''}>${a}</option>`).join('');
+  document.getElementById('ad-filter-month').innerHTML = '<option value="">月:全て</option>' + months.map(m => `<option ${m===mf?'selected':''}>${m}</option>`).join('');
 
   // 統計
-  const totalBudget = filtered.reduce((s, d) => s + Number(d.total_budget), 0);
-  const totalFee = filtered.reduce((s, d) => s + Number(d.fee), 0);
-  const totalMedia = filtered.reduce((s, d) => s + Number(d.google) + Number(d.yahoo) + Number(d.meta) + Number(d.tiktok) + Number(d.seo) + Number(d.other_amount), 0);
+  const totalBudget = filtered.reduce((s,h) => s + Number(h.total_budget), 0);
+  const totalCommon = filtered.reduce((s,h) => s + Number(h.common_cost), 0);
+  const totalFee = filtered.reduce((s,h) => s + Number(h.fee), 0);
+  const hdrIds = filtered.map(h => h.id);
+  const filteredDetails = allDetails.filter(d => hdrIds.includes(d.header_id));
+  const totalMedia = filteredDetails.reduce((s,d) => s + AD_MEDIA.reduce((ms,m) => ms + Number(d[m]||0), 0) + Number(d.other_amount||0), 0);
+
   document.getElementById('ad-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-label">総予算</span><span class="stat-num">¥${fmt(totalBudget)}</span></div>
-    <div class="stat-card"><span class="stat-label">手数料合計</span><span class="stat-num">¥${fmt(totalFee)}</span></div>
-    <div class="stat-card"><span class="stat-label">媒体費合計</span><span class="stat-num">¥${fmt(totalMedia)}</span></div>
-    <div class="stat-card"><span class="stat-label">登録件数</span><span class="stat-num">${filtered.length}</span></div>
+    <div class="stat-card"><span class="stat-label">総額</span><span class="stat-num">¥${fmt(totalBudget)}</span></div>
+    <div class="stat-card"><span class="stat-label">共通費</span><span class="stat-num">¥${fmt(totalCommon)}</span></div>
+    <div class="stat-card"><span class="stat-label">手数料</span><span class="stat-num">¥${fmt(totalFee)}</span></div>
+    <div class="stat-card"><span class="stat-label">媒体費</span><span class="stat-num">¥${fmt(totalMedia)}</span></div>
+    <div class="stat-card"><span class="stat-label">件数</span><span class="stat-num">${filtered.length}</span></div>
   `;
 
-  // テーブル
-  document.getElementById('ad-tbody').innerHTML = filtered.map(d => `<tr>
-    <td style="font-size:12px;font-weight:600">${d.agency}</td>
-    <td style="font-size:11px">${d.month}</td>
-    <td style="font-size:11px">${d.ad_type}</td>
-    <td style="font-size:11px;font-weight:600">¥${fmt(d.total_budget)}</td>
-    <td style="font-size:11px">¥${fmt(d.fee)}</td>
-    <td style="font-size:11px">¥${fmt(d.google)}</td>
-    <td style="font-size:11px">¥${fmt(d.yahoo)}</td>
-    <td style="font-size:11px">¥${fmt(d.meta)}</td>
-    <td style="font-size:11px">¥${fmt(d.tiktok)}</td>
-    <td style="font-size:11px">¥${fmt(d.seo)}</td>
-    <td style="font-size:11px">${d.other_name ? d.other_name + ' ¥' + fmt(d.other_amount) : '-'}</td>
-    <td><button class="resource-delete" onclick="deleteAdBudget(${d.id})" style="width:24px;height:24px;font-size:11px">×</button></td>
-  </tr>`).join('') || '<tr><td colspan="12" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  // 一覧
+  const listEl = document.getElementById('ad-list');
+  if (!filtered.length) { listEl.innerHTML = '<p style="color:var(--text-muted);text-align:center;padding:20px">データなし</p>'; return; }
+
+  listEl.innerHTML = filtered.map(h => {
+    const hDetails = allDetails.filter(d => d.header_id === h.id);
+    const facTotal = hDetails.reduce((s,d) => s + AD_MEDIA.reduce((ms,m) => ms + Number(d[m]||0), 0) + Number(d.other_amount||0), 0);
+    return `
+      <div class="card" style="margin-bottom:12px;padding:16px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+          <div>
+            <span style="font-weight:700;font-size:15px">${h.agency}</span>
+            <span style="font-size:12px;color:var(--text-sub);margin-left:8px">${h.month}</span>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">
+            <span style="font-size:16px;font-weight:700">¥${fmt(h.total_budget)}</span>
+            <button class="resource-delete" onclick="deleteAdBudget(${h.id})" style="width:28px;height:28px;font-size:12px">×</button>
+          </div>
+        </div>
+        <div style="display:flex;gap:16px;font-size:12px;color:var(--text-sub);margin-bottom:12px;flex-wrap:wrap">
+          <span>共通費: ¥${fmt(h.common_cost)}</span>
+          <span>手数料: ¥${fmt(h.fee)}</span>
+          <span>店舗広告費: ¥${fmt(facTotal)}</span>
+        </div>
+        ${hDetails.length ? `
+          <div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:6px">店舗別詳細</div>
+          <div class="data-table-wrap">
+            <table class="data-table" style="font-size:11px">
+              <thead><tr><th>店舗</th>${Object.values(AD_MEDIA_LABELS).map(l => `<th>${l}</th>`).join('')}<th>その他</th><th>合計</th></tr></thead>
+              <tbody>${hDetails.map(d => {
+                const rowTotal = AD_MEDIA.reduce((s,m) => s + Number(d[m]||0), 0) + Number(d.other_amount||0);
+                return `<tr>
+                  <td style="font-weight:600">${d.facility}</td>
+                  ${AD_MEDIA.map(m => `<td>¥${fmt(d[m])}</td>`).join('')}
+                  <td>${d.other_name ? d.other_name+' ¥'+fmt(d.other_amount) : '-'}</td>
+                  <td style="font-weight:700">¥${fmt(rowTotal)}</td>
+                </tr>`;
+              }).join('')}</tbody>
+            </table>
+          </div>
+        ` : '<p style="font-size:12px;color:var(--text-muted)">店舗別詳細なし</p>'}
+      </div>
+    `;
+  }).join('');
 }
 
 // === Reviews ===

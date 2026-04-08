@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=69">
+  <link rel="stylesheet" href="styles.css?v=70">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -548,48 +548,45 @@
     <!-- ==================== 広告予算 ==================== -->
     <main id="view-adbudget" class="view" hidden>
       <div class="page-header"><h2>広告予算管理</h2></div>
+
+      <!-- フィルター -->
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <select class="form-select" id="ad-filter-agency" style="width:auto;padding:6px 8px;font-size:12px"><option value="">代理店:全て</option></select>
+        <select class="form-select" id="ad-filter-month" style="width:auto;padding:6px 8px;font-size:12px"><option value="">月:全て</option></select>
+      </div>
+
       <div class="stats-row" id="ad-stats"></div>
 
       <!-- 入力フォーム -->
       <div class="card" style="margin-bottom:20px">
-        <div class="card-header">広告予算入力</div>
-        <div class="form-grid">
+        <div class="card-header">広告予算登録</div>
+
+        <!-- STEP1: 基本情報 -->
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">① 基本情報</div>
+        <div class="form-grid" style="margin-bottom:16px">
           <div class="form-group"><label class="form-label">代理店名</label><input type="text" class="form-input" id="ad-agency" placeholder="例: LIZ"></div>
           <div class="form-group"><label class="form-label">年月</label><input type="month" class="form-input" id="ad-month"></div>
-          <div class="form-group"><label class="form-label">広告種類</label>
-            <select class="form-select" id="ad-type"><option>Ad</option><option>SNS運用</option><option>SEO</option><option>その他</option></select>
-          </div>
-          <div class="form-group"><label class="form-label">広告予算（税抜）</label><input type="number" class="form-input" id="ad-total" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">総額（税抜）</label><input type="number" class="form-input" id="ad-total" placeholder="0"></div>
         </div>
-        <div style="margin-top:12px;font-size:12px;font-weight:600;color:var(--text-sub)">内訳</div>
-        <div class="form-grid" style="margin-top:8px">
-          <div class="form-group"><label class="form-label">手数料</label><input type="number" class="form-input" id="ad-fee" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">Google</label><input type="number" class="form-input" id="ad-google" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">Yahoo</label><input type="number" class="form-input" id="ad-yahoo" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">Meta</label><input type="number" class="form-input" id="ad-meta" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">TikTok</label><input type="number" class="form-input" id="ad-tiktok" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">SEO</label><input type="number" class="form-input" id="ad-seo" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">その他（名目）</label><input type="text" class="form-input" id="ad-other-name" placeholder="例: LINE広告"></div>
-          <div class="form-group"><label class="form-label">その他（金額）</label><input type="number" class="form-input" id="ad-other-amount" placeholder="0"></div>
-        </div>
-        <div class="form-actions"><button class="btn btn-dark" id="ad-save">登録</button></div>
-      </div>
 
-      <!-- フィルター -->
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <select class="form-select" id="ad-filter-agency" style="width:auto;padding:6px 8px;font-size:11px"><option value="">代理店:全て</option></select>
-        <select class="form-select" id="ad-filter-month" style="width:auto;padding:6px 8px;font-size:11px"><option value="">月:全て</option></select>
+        <!-- STEP2: 内訳 -->
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">② 内訳</div>
+        <div class="form-grid" style="margin-bottom:16px">
+          <div class="form-group"><label class="form-label">共通費（制作費等）</label><input type="number" class="form-input" id="ad-common" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">手数料</label><input type="number" class="form-input" id="ad-fee" placeholder="0"></div>
+        </div>
+
+        <!-- STEP3: 店舗別広告費 -->
+        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">③ 店舗別広告費 <button class="btn btn-outline" id="ad-add-facility" style="font-size:10px;padding:2px 8px;min-height:24px;margin-left:8px">+ 店舗追加</button></div>
+        <div id="ad-facilities-container"></div>
+
+        <div class="form-actions" style="margin-top:16px"><button class="btn btn-dark" id="ad-save">登録</button></div>
       </div>
 
       <!-- 一覧 -->
       <div class="card">
-        <div class="card-header">広告予算一覧</div>
-        <div class="data-table-wrap">
-          <table class="data-table">
-            <thead><tr><th>代理店</th><th>年月</th><th>種類</th><th>予算</th><th>手数料</th><th>Google</th><th>Yahoo</th><th>Meta</th><th>TikTok</th><th>SEO</th><th>その他</th><th></th></tr></thead>
-            <tbody id="ad-tbody"></tbody>
-          </table>
-        </div>
+        <div class="card-header">登録済み一覧</div>
+        <div id="ad-list"></div>
       </div>
     </main>
 
@@ -687,6 +684,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=69"></script>
+  <script src="app.js?v=70"></script>
 </body>
 </html>
