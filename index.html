@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=63">
+  <link rel="stylesheet" href="styles.css?v=64">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -146,7 +146,7 @@
     <main id="view-bookings" class="view view-wide">
       <div class="sub-nav">
         <button class="sub-nav-btn active" data-sub="bk-list">予約一覧</button>
-        <button class="sub-nav-btn" data-sub="bk-promo-dash">プロモ別</button>
+        <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
       </div>
 
       <div id="sub-bk-list">
@@ -212,62 +212,59 @@
       </div>
 
       <!-- プロモ別ダッシュボード -->
-      <div id="sub-bk-promo-dash" hidden>
-        <div class="page-header">
-          <h2>プロモーション別</h2>
-        </div>
-        <div class="stats-row" id="promo-dash-stats"></div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">プロモーション別 予約数 <span style="font-weight:400;color:var(--text-muted);font-size:11px">クリックで詳細</span></div>
-          <div class="bar-chart" id="promo-dash-bookings"></div>
-        </div>
+      <div id="sub-bk-analysis" hidden>
+        <div class="page-header"><h2>予約分析</h2></div>
 
-        <!-- プロモ詳細（クリックで表示） -->
-        <div id="promo-detail" hidden>
-          <div class="card" style="margin-bottom:20px;border:2px solid var(--accent)">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-              <div class="card-header" style="margin:0;padding:0;border:0" id="promo-detail-title">詳細</div>
-              <button class="btn btn-outline" onclick="document.getElementById('promo-detail').hidden=true" style="font-size:11px;padding:4px 12px;min-height:28px">閉じる</button>
+        <!-- 分析フィルター -->
+        <div class="card" style="margin-bottom:16px;padding:12px">
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
+            <div class="form-group" style="min-width:120px">
+              <label class="form-label">医院</label>
+              <select class="form-select" id="an-facility" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select>
             </div>
-            <div class="stats-row" id="promo-detail-stats"></div>
-            <div style="margin-top:16px">
-              <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">医院別内訳</div>
-              <div class="bar-chart" id="promo-detail-facility"></div>
+            <div class="form-group" style="min-width:120px">
+              <label class="form-label">相談</label>
+              <select class="form-select" id="an-service" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select>
             </div>
-            <div style="margin-top:16px">
-              <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">相談別内訳</div>
-              <div class="bar-chart" id="promo-detail-service"></div>
+            <div class="form-group" style="min-width:120px">
+              <label class="form-label">プロモ</label>
+              <select class="form-select" id="an-promo" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select>
             </div>
-            <div style="margin-top:16px">
-              <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧</div>
-              <div class="data-table-wrap">
-                <table class="data-table">
-                  <thead><tr><th>予約日</th><th>名前</th><th>相談</th><th>医院</th><th>ステータス</th></tr></thead>
-                  <tbody id="promo-detail-tbody"></tbody>
-                </table>
-              </div>
+            <div class="form-group" style="min-width:120px">
+              <label class="form-label">ツール</label>
+              <select class="form-select" id="an-tool" style="font-size:12px;padding:6px 8px"><option value="">全て</option><option>DXHUB</option><option>セレクト</option></select>
             </div>
+            <div class="form-group" style="min-width:100px">
+              <label class="form-label">期間</label>
+              <input type="month" class="form-input" id="an-month" style="font-size:12px;padding:6px 8px">
+            </div>
+            <button class="btn btn-outline" id="an-reset" style="min-height:32px;padding:6px 10px;font-size:11px">リセット</button>
           </div>
         </div>
 
-        <!-- 医院別集計 -->
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">医院別</div>
-          <div class="bar-chart" id="promo-facility-chart"></div>
+        <!-- 統計 -->
+        <div class="stats-row" id="an-stats" style="gap:6px;margin-bottom:16px"></div>
+
+        <!-- 分析軸切替 -->
+        <div style="display:flex;gap:4px;margin-bottom:16px">
+          <button class="btn btn-dark an-axis-btn" data-axis="promo" style="font-size:11px;padding:6px 12px;min-height:28px">プロモ別</button>
+          <button class="btn btn-outline an-axis-btn" data-axis="facility" style="font-size:11px;padding:6px 12px;min-height:28px">医院別</button>
+          <button class="btn btn-outline an-axis-btn" data-axis="service" style="font-size:11px;padding:6px 12px;min-height:28px">相談別</button>
         </div>
 
-        <!-- 相談別集計 -->
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">相談別</div>
-          <div class="bar-chart" id="promo-service-chart"></div>
+        <!-- チャート -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header" id="an-chart-title">プロモ別</div>
+          <div class="bar-chart" id="an-chart"></div>
         </div>
 
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">プロモーション別 成約・キャンセル</div>
+        <!-- テーブル -->
+        <div class="card">
+          <div class="card-header" id="an-table-title">詳細テーブル</div>
           <div class="data-table-wrap">
-            <table class="data-table" id="promo-dash-table">
-              <thead><tr><th>プロモーション</th><th>予約</th><th>キャンセル</th><th>来院</th><th>来院率</th><th>成約</th><th>成約率</th><th>成約単価</th><th>成約金額</th></tr></thead>
-              <tbody id="promo-dash-tbody"></tbody>
+            <table class="data-table">
+              <thead><tr><th id="an-th-axis">プロモーション</th><th>予約</th><th>キャンセル</th><th>来院</th><th>来院率</th><th>成約</th><th>成約率</th><th>成約単価</th><th>成約金額</th></tr></thead>
+              <tbody id="an-tbody"></tbody>
             </table>
           </div>
         </div>
@@ -672,6 +669,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=63"></script>
+  <script src="app.js?v=64"></script>
 </body>
 </html>

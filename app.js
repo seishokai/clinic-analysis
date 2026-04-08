@@ -144,8 +144,8 @@ function setupEventListeners() {
       if (el) {
         el.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== `sub-${sub}`);
       }
-      // プロモ別タブ切替時にデータ更新
-      if (sub === 'bk-promo-dash' && bookingsData.length > 0) renderPromoDash();
+      // 分析タブ切替時にデータ更新
+      if (sub === 'bk-analysis' && bookingsData.length > 0) renderAnalysis();
     });
   });
 
@@ -175,6 +175,26 @@ function setupEventListeners() {
   document.getElementById('rev-save').addEventListener('click', saveReviewEntry);
   document.getElementById('comment-save').addEventListener('click', saveComment);
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
+
+  // Analysis filters & axis
+  ['an-facility','an-service','an-promo','an-tool','an-month'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', renderAnalysis);
+  });
+  const anResetBtn = document.getElementById('an-reset');
+  if (anResetBtn) anResetBtn.addEventListener('click', () => {
+    ['an-facility','an-service','an-promo','an-tool','an-month'].forEach(id => { const e = document.getElementById(id); if (e) e.value = ''; });
+    renderAnalysis();
+  });
+  document.querySelectorAll('.an-axis-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.an-axis-btn').forEach(b => { b.className = 'btn btn-outline an-axis-btn'; });
+      btn.className = 'btn btn-dark an-axis-btn';
+      window._anAxis = btn.dataset.axis;
+      renderAnalysis();
+    });
+  });
+  window._anAxis = 'promo';
 
   // Bookings filters
   // Quick filter buttons
@@ -1699,7 +1719,7 @@ async function loadBookings() {
 
     populateBookingFilters();
     renderBookings();
-    renderPromoDash();
+    renderAnalysis();
     // 管理タブの選択肢を更新
     const admPromos = document.getElementById('adm-promos');
     const admServices = document.getElementById('adm-services');
@@ -2141,7 +2161,7 @@ function renderBookings() {
         const current = memos[key] || '';
         const ta = document.createElement('textarea');
         ta.value = current;
-        ta.style.cssText = 'font-size:10px;width:150px;height:60px;padding:4px;border:1px solid var(--accent);border-radius:4px;resize:vertical;position:absolute;z-index:100;box-shadow:0 4px 12px rgba(0,0,0,0.15)';
+        ta.style.cssText = 'font-size:13px;width:280px;height:120px;padding:8px;border:2px solid var(--accent);border-radius:8px;resize:vertical;position:absolute;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.2);background:white;right:0';
         ta.placeholder = '進捗メモを入力...';
         td.style.position = 'relative';
         td.appendChild(ta);
@@ -2214,7 +2234,116 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
-function renderPromoDash() {
+function renderAnalysis() {
+  const sFac = (f) => {
+    if (!f) return '-';
+    if (f.includes('銀座')) return 'BF銀座'; if (f.includes('ウィズ')||f.includes('WITH')||f.includes('ワイズ')) return 'ウィズ';
+    if (f.includes('エスカ')) return 'エスカ'; if (f.includes('アール')) return 'アール'; if (f.includes('ルミナス')) return 'ルミナス';
+    if (f.includes('茶屋')) return '茶屋'; if (f.includes('小牧')) return '小牧'; if (f.includes('知立')) return '知立';
+    if (f.includes('八事')) return '八事'; if (f.includes('岩田')) return '岩田'; if (f.includes('大森')) return '大森'; if (f.includes('京都')) return '京都';
+    return f.length > 8 ? f.slice(0,8)+'…' : f;
+  };
+  const sSvc = (s) => {
+    if (!s) return '-';
+    if (s.includes('ラミネート')||s.includes('ブラックフィルム')) return 'BF';
+    if (s.includes('矯正')) return '矯正'; if (s.includes('セラミック')) return 'セラミック';
+    if (s.includes('インプラント')) return 'インプラント';
+    return s.replace(/相談|無料|　/g,'').slice(0,6);
+  };
+
+  let data = bookingsData.filter(d => d.status !== '除外');
+  // 権限制限
+  if (userRole === 'promo' && promoFilter) data = data.filter(d => d.source && d.source === promoFilter);
+  if (userRole === 'custom') {
+    const cp = JSON.parse(sessionStorage.getItem('customPromos')||'[]');
+    if (cp.length) data = data.filter(d => d.source && cp.includes(d.source));
+  }
+  // フィルター
+  const anFac = document.getElementById('an-facility');
+  const anSvc = document.getElementById('an-service');
+  const anPromo = document.getElementById('an-promo');
+  const anTool = document.getElementById('an-tool');
+  const anMonth = document.getElementById('an-month');
+  if (anFac && anFac.value) data = data.filter(d => sFac(d.facility) === anFac.value);
+  if (anSvc && anSvc.value) data = data.filter(d => sSvc(d.service) === anSvc.value);
+  if (anPromo && anPromo.value) data = data.filter(d => d.source === anPromo.value);
+  if (anTool && anTool.value) data = data.filter(d => d.tool === anTool.value);
+  if (anMonth && anMonth.value) data = data.filter(d => d.bookDate && d.bookDate.replace(/\//g,'-').slice(0,7) === anMonth.value);
+
+  // フィルター選択肢を更新
+  if (anFac) { const facs = [...new Set(bookingsData.map(d => sFac(d.facility)).filter(Boolean))].sort(); const cur = anFac.value; anFac.innerHTML = '<option value="">全て</option>'+facs.map(f=>`<option ${f===cur?'selected':''}>${f}</option>`).join(''); }
+  if (anSvc) { const svcs = [...new Set(bookingsData.map(d => sSvc(d.service)).filter(Boolean))].sort(); const cur = anSvc.value; anSvc.innerHTML = '<option value="">全て</option>'+svcs.map(s=>`<option ${s===cur?'selected':''}>${s}</option>`).join(''); }
+  if (anPromo) { const pc = {}; bookingsData.forEach(d => { if (d.source) pc[d.source]=(pc[d.source]||0)+1; }); const ps = Object.entries(pc).sort((a,b)=>b[1]-a[1]); const cur = anPromo.value; anPromo.innerHTML = '<option value="">全て</option>'+ps.map(([p,c])=>`<option value="${p}" ${p===cur?'selected':''}>${p} (${c})</option>`).join(''); }
+
+  // 統計
+  const total = data.length;
+  const cancelled = data.filter(d => d.status==='キャンセル').length;
+  const visited = data.filter(d => d.status==='来院済'||d.status==='成約').length;
+  const contracted = data.filter(d => d.status==='成約').length;
+  const bkExtra = loadData('bk-extra',{});
+  let amt = 0; data.forEach(d => { const k=d.name+'|'+d.applyDate; if (bkExtra[k]&&bkExtra[k].contractAmount) amt+=Number(bkExtra[k].contractAmount); });
+  const vr = total>0?Math.round((total-cancelled)/total*100):0;
+  const cr = visited>0?pct(contracted,visited):0;
+  const unit = contracted>0?Math.round(amt/contracted):0;
+
+  const statsEl = document.getElementById('an-stats');
+  if (statsEl) statsEl.innerHTML = `
+    <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
+    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
+    <div class="stat-card"><span class="stat-label">来院</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${vr}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+    <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num" style="color:${cr>=30?'var(--green)':'var(--red)'}">${cr}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約単価</span><span class="stat-num">¥${fmt(unit)}</span></div>
+    <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(amt)}</span></div>
+  `;
+
+  // 軸でグループ化
+  const axis = window._anAxis || 'promo';
+  const axisLabel = axis==='promo'?'プロモーション':axis==='facility'?'医院':'相談';
+  const getKey = (d) => axis==='promo'?(d.source||'(なし)'):axis==='facility'?sFac(d.facility):sSvc(d.service);
+  const groups = {};
+  data.forEach(d => {
+    const k = getKey(d);
+    if (!groups[k]) groups[k] = {total:0,cancelled:0,visited:0,contracted:0,amount:0};
+    groups[k].total++;
+    if (d.status==='キャンセル') groups[k].cancelled++;
+    if (d.status==='来院済'||d.status==='成約') groups[k].visited++;
+    if (d.status==='成約') groups[k].contracted++;
+    const ek = d.name+'|'+d.applyDate; if (bkExtra[ek]&&bkExtra[ek].contractAmount) groups[k].amount+=Number(bkExtra[ek].contractAmount);
+  });
+  const sorted = Object.entries(groups).sort((a,b)=>b[1].total-a[1].total);
+
+  // チャート
+  const chartEl = document.getElementById('an-chart');
+  const titleEl = document.getElementById('an-chart-title');
+  const thAxis = document.getElementById('an-th-axis');
+  if (titleEl) titleEl.textContent = axisLabel+'別';
+  if (thAxis) thAxis.textContent = axisLabel;
+  if (chartEl) {
+    chartEl.innerHTML = sorted.slice(0,20).map(([name,v]) => {
+      const gvr = v.total>0?Math.round((v.total-v.cancelled)/v.total*100):0;
+      const gcr = v.visited>0?pct(v.contracted,v.visited):0;
+      return `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(v.total/total*100),3)}%"><span>${Math.round(v.total/total*100)}%</span></div></div><div class="bar-value" style="min-width:130px;font-size:10px">${v.total}件 来院${gvr}% 成約${gcr}%</div></div>`;
+    }).join('') || '<p style="color:var(--text-muted)">データなし</p>';
+  }
+
+  // テーブル
+  const tbody = document.getElementById('an-tbody');
+  if (tbody) {
+    tbody.innerHTML = sorted.map(([name,v]) => {
+      const gvr = v.total>0?Math.round((v.total-v.cancelled)/v.total*100):0;
+      const gcr = v.visited>0?pct(v.contracted,v.visited):0;
+      const gu = v.contracted>0?Math.round(v.amount/v.contracted):0;
+      return `<tr><td style="font-size:12px">${name}</td><td>${v.total}</td><td style="color:var(--red)">${v.cancelled}</td><td>${v.visited}</td><td>${gvr}%</td><td style="color:var(--green)">${v.contracted}</td><td><span style="color:${gcr>=30?'var(--green)':'var(--red)'};font-weight:600">${gcr}%</span></td><td>${gu?'¥'+fmt(gu):'-'}</td><td>${v.amount?'¥'+fmt(v.amount):'-'}</td></tr>`;
+    }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  }
+}
+
+function renderPromoDash() { renderAnalysis(); }
+
+// Legacy renderPromoDash - now calls renderAnalysis
+function _oldRenderPromoDash() {
   const bkExtra = loadData('bk-extra', {});
   let dashData = bookingsData;
   // プロモ・カスタムユーザーの制限
