@@ -176,6 +176,9 @@ function setupEventListeners() {
   document.getElementById('comment-save').addEventListener('click', saveComment);
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
+  // Memo modal save
+  document.getElementById('memo-modal-save').addEventListener('click', saveMemoModal);
+
   // Analysis filters & axis
   ['an-facility','an-service','an-promo','an-tool','an-month'].forEach(id => {
     const el = document.getElementById(id);
@@ -2160,34 +2163,11 @@ function renderBookings() {
       });
     });
 
-    // メモクリックで編集
+    // メモクリックでモーダル表示
     tbody.querySelectorAll('.bk-memo-cell').forEach(td => {
       td.addEventListener('click', () => {
-        if (!isAdmin || td.querySelector('textarea')) return;
-        const name = td.dataset.name;
-        const apply = td.dataset.apply;
-        const key = name + '|' + apply;
-        const memos = loadData('bk-memos', {});
-        const current = memos[key] || '';
-        const ta = document.createElement('textarea');
-        ta.value = current;
-        ta.style.cssText = 'font-size:14px;width:360px;height:180px;padding:10px;border:2px solid var(--accent);border-radius:8px;resize:both;position:absolute;z-index:100;box-shadow:0 8px 24px rgba(0,0,0,0.25);background:white;right:0;line-height:1.6';
-        ta.placeholder = '進捗メモを入力...';
-        td.style.position = 'relative';
-        td.appendChild(ta);
-        ta.focus();
-        const save = () => {
-          const val = ta.value.trim();
-          memos[key] = val;
-          saveData('bk-memos', memos);
-          td.innerHTML = val ? val.slice(0,6) + (val.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>';
-          td.title = val;
-          // DBにも保存
-          sb.from('booking_status').upsert({ name, apply_date: apply, memo: val }, { onConflict: 'name,apply_date' }).then(({error}) => { if (error) console.warn('Memo save error:', error); });
-          showToast('メモを保存しました');
-        };
-        ta.addEventListener('blur', save);
-        ta.addEventListener('keydown', e => { if (e.key === 'Escape') { ta.value = current; ta.blur(); } });
+        if (!isAdmin) return;
+        openMemoModal(td.dataset.name, td.dataset.apply, td);
       });
     });
 
@@ -2223,6 +2203,39 @@ function renderBookings() {
       });
     });
   }
+}
+
+// === Memo Modal ===
+let _memoTarget = null;
+function openMemoModal(name, apply, tdEl) {
+  const key = name + '|' + apply;
+  const memos = loadData('bk-memos', {});
+  const current = memos[key] || '';
+  _memoTarget = { name, apply, key, tdEl };
+  document.getElementById('memo-modal-title').textContent = name + ' のメモ';
+  document.getElementById('memo-modal-text').value = current;
+  document.getElementById('memo-modal').hidden = false;
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => document.getElementById('memo-modal-text').focus(), 100);
+}
+function closeMemoModal() {
+  document.getElementById('memo-modal').hidden = true;
+  document.body.style.overflow = '';
+  _memoTarget = null;
+}
+function saveMemoModal() {
+  if (!_memoTarget) return;
+  const val = document.getElementById('memo-modal-text').value.trim();
+  const memos = loadData('bk-memos', {});
+  memos[_memoTarget.key] = val;
+  saveData('bk-memos', memos);
+  if (_memoTarget.tdEl) {
+    _memoTarget.tdEl.innerHTML = val ? val.slice(0,6) + (val.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>';
+    _memoTarget.tdEl.title = val;
+  }
+  sb.from('booking_status').upsert({ name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val }, { onConflict: 'name,apply_date' }).then(() => {});
+  showToast('メモを保存しました');
+  closeMemoModal();
 }
 
 function exportCSV() {
