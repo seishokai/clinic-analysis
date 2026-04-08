@@ -1674,6 +1674,29 @@ async function loadBookings() {
 
     const results = await Promise.all(allFetches);
     bookingsData = results.flat();
+
+    // DBからステータス・メモを読み込んで上書き
+    try {
+      const { data: dbStatuses } = await sb.from('booking_status').select('*');
+      if (dbStatuses && dbStatuses.length) {
+        const statusMap = {};
+        dbStatuses.forEach(s => { statusMap[s.name + '|' + s.apply_date] = s; });
+        bookingsData.forEach(d => {
+          const key = d.name + '|' + d.applyDate;
+          const dbRow = statusMap[key];
+          if (dbRow) {
+            if (dbRow.status) d.status = dbRow.status;
+            if (dbRow.contract_service) d.contractService = dbRow.contract_service;
+            if (dbRow.contract_amount) d.contractAmount = dbRow.contract_amount;
+            if (dbRow.payment_month) d.paymentMonth = dbRow.payment_month;
+            if (dbRow.incentive_month) d.incentiveMonth = dbRow.incentive_month;
+            if (dbRow.memo) d._memo = dbRow.memo;
+            if (dbRow.book_date) d.bookDate = dbRow.book_date;
+          }
+        });
+      }
+    } catch(e) { console.warn('DB status load error:', e); }
+
     populateBookingFilters();
     renderBookings();
     renderPromoDash();
