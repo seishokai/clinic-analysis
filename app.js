@@ -267,6 +267,21 @@ function setupEventListeners() {
     document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') searchPatients(); });
   });
 
+  // BF sub-tabs
+  document.querySelectorAll('.bf-sub-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bf-sub-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      const sub = btn.dataset.bfsub;
+      ['bf-progress','bf-patients','bf-contracts','bf-bookings'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.hidden = el.id !== sub;
+      });
+      if (sub === 'bf-progress') renderBF('all');
+      if ((sub === 'bf-patients' || sub === 'bf-contracts') && bfPatientData.length === 0) loadBFSheetData().then(() => renderBF('all'));
+    });
+  });
+
   // BF tab - password protected
   document.getElementById('bf-tab-btn').addEventListener('click', (e) => {
     if (!bfUnlocked) { e.preventDefault(); e.stopPropagation(); unlockBF(); }

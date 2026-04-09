@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=79">
+  <link rel="stylesheet" href="styles.css?v=80">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -339,6 +339,16 @@
 
       <!-- BF -->
       <div id="sub-bk-bf" hidden>
+        <!-- BFサブナビ -->
+        <div class="sub-nav" style="margin-bottom:12px">
+          <button class="sub-nav-btn active bf-sub-btn" data-bfsub="bf-progress">進捗管理</button>
+          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-patients">患者リスト</button>
+          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-contracts">成約リスト</button>
+          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-bookings">予約ツール</button>
+        </div>
+
+        <!-- BF進捗管理 -->
+        <div id="bf-progress">
         <div class="page-header"><h2>BF 進捗管理</h2></div>
         <div class="stats-row" id="bf-stats" style="margin-bottom:16px"></div>
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
@@ -359,35 +369,47 @@
           <div class="card-header">日別申込推移</div>
           <div class="bar-chart" id="bf-daily-chart"></div>
         </div>
-        <!-- スプレッドシート患者リスト -->
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">BF患者リスト（スプレッドシート同期）<span id="bf-sheet-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-          <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
-            <table class="data-table">
-              <thead><tr><th>予約日</th><th>名前</th><th>経路</th><th>医院</th><th>DR</th><th>性別</th><th>地域</th><th>状況</th><th>本数</th><th>売上</th><th>入金</th><th>完了</th></tr></thead>
-              <tbody id="bf-sheet-tbody"></tbody>
-            </table>
+        </div>
+
+        <!-- BF患者リスト -->
+        <div id="bf-patients" hidden>
+          <div class="page-header"><h2>BF 患者リスト</h2></div>
+          <div class="card">
+            <div class="card-header">患者リスト（スプレッドシート同期）<span id="bf-sheet-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+            <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
+              <table class="data-table">
+                <thead><tr><th>予約日</th><th>名前</th><th>経路</th><th>医院</th><th>DR</th><th>性別</th><th>地域</th><th>状況</th><th>本数</th><th>売上</th><th>入金</th><th>完了</th></tr></thead>
+                <tbody id="bf-sheet-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <!-- 成約リスト -->
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">BF成約リスト <span id="bf-contract-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-          <div class="data-table-wrap" style="max-height:300px;overflow-y:auto">
-            <table class="data-table">
-              <thead><tr><th>日付</th><th>名前</th><th>経路</th><th>医院</th><th>治療予約</th><th>印象予約</th><th>入金</th><th>完了</th><th>売上</th></tr></thead>
-              <tbody id="bf-contract-tbody"></tbody>
-            </table>
+        <!-- BF成約リスト -->
+        <div id="bf-contracts" hidden>
+          <div class="page-header"><h2>BF 成約リスト</h2></div>
+          <div class="card">
+            <div class="card-header">成約リスト <span id="bf-contract-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+            <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
+              <table class="data-table">
+                <thead><tr><th>日付</th><th>名前</th><th>経路</th><th>医院</th><th>治療予約</th><th>印象予約</th><th>入金</th><th>完了</th><th>売上</th></tr></thead>
+                <tbody id="bf-contract-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
 
-        <div class="card">
-          <div class="card-header">BF予約一覧（予約ツール）<span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-          <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
-            <table class="data-table">
-              <thead><tr><th>申込</th><th>予約</th><th>名前</th><th>医院</th><th>プロモ</th><th>状態</th></tr></thead>
-              <tbody id="bf-tbody"></tbody>
-            </table>
+        <!-- BF予約ツール -->
+        <div id="bf-bookings" hidden>
+          <div class="page-header"><h2>BF 予約ツール</h2></div>
+          <div class="card">
+            <div class="card-header">予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+            <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
+              <table class="data-table">
+                <thead><tr><th>申込</th><th>予約</th><th>名前</th><th>医院</th><th>プロモ</th><th>状態</th></tr></thead>
+                <tbody id="bf-tbody"></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </div>
@@ -862,6 +884,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=79"></script>
+  <script src="app.js?v=80"></script>
 </body>
 </html>
