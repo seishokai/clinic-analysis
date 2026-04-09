@@ -278,8 +278,8 @@ function setupEventListeners() {
       renderBF(btn.dataset.period);
     });
   });
-  // 管理者はBFタブを表示
-  if (userRole === 'admin') document.getElementById('bf-tab-btn').style.display = '';
+  // 管理者はBFタブを表示+データ読み込み
+  if (userRole === 'admin') { document.getElementById('bf-tab-btn').style.display = ''; bfUnlocked = true; loadBFSheetData(); }
 
   // Apply analysis period buttons
   document.querySelectorAll('.apply-period-btn').forEach(btn => {
@@ -2554,13 +2554,68 @@ async function registerNewPatient() {
 }
 
 // === BF Tab ===
+const BF_SHEET_ID = '19mSXbPIvDSjck7Pq0MHh9M2YIK5SASbC7mgxl5zKpD8';
 let bfUnlocked = false;
-function unlockBF() {
+let bfPatientData = [];
+let bfContractData = [];
+
+async function loadBFSheetData() {
+  try {
+    const [patRes, conRes] = await Promise.all([
+      fetch(`https://docs.google.com/spreadsheets/d/${BF_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('患者様リスト환자 목록')}`).then(r => r.text()),
+      fetch(`https://docs.google.com/spreadsheets/d/${BF_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent('成約リスト 예약 목록')}`).then(r => r.text())
+    ]);
+    bfPatientData = parseBFCSV(patRes);
+    bfContractData = parseBFContractCSV(conRes);
+  } catch(e) { console.warn('BF sheet load error:', e); }
+}
+
+function parseBFCSV(csv) {
+  const lines = csv.split('\n');
+  if (lines.length < 2) return [];
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (!cols[2]) continue; // 名前なし
+    rows.push({
+      no: cols[0]||'', date: cols[1]||'', name: cols[2]||'', route: cols[3]||'',
+      promo: cols[4]||'', facility: cols[5]||'', dr: cols[6]||'',
+      age: cols[7]||'', gender: cols[8]||'', area: cols[9]||'', job: cols[10]||'',
+      status: cols[11]||'', treatReserve: cols[12]||'', impressReserve: cols[13]||'',
+      setDate: cols[14]||'', teeth: cols[15]||'', sales: cols[16]||'',
+      payment: cols[17]||'', completed: cols[18]||'',
+      refClinic: cols[19]||'', referrer: cols[20]||'', refFee: cols[21]||'', refPaid: cols[22]||''
+    });
+  }
+  return rows;
+}
+
+function parseBFContractCSV(csv) {
+  const lines = csv.split('\n');
+  if (lines.length < 2) return [];
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCSVLine(lines[i]);
+    if (!cols[1]) continue;
+    rows.push({
+      date: cols[0]||'', name: cols[1]||'', route: cols[2]||'',
+      facility: cols[3]||'', age: cols[4]||'', gender: cols[5]||'',
+      area: cols[6]||'', job: cols[7]||'', status: cols[8]||'',
+      treatReserve: cols[9]||'', impressReserve: cols[10]||'',
+      payment: cols[11]||'', completed: cols[12]||'',
+      setFacility: cols[13]||'', refClinic: cols[14]||'',
+      sales: cols[15]||'', referrer: cols[16]||''
+    });
+  }
+  return rows;
+}
+async function unlockBF() {
   if (bfUnlocked) { renderBF('all'); return; }
   const pw = prompt('BFタブのパスワードを入力してください');
   if (pw === 'black') {
     bfUnlocked = true;
     document.getElementById('bf-tab-btn').style.display = '';
+    await loadBFSheetData();
     // サブタブ切替
     document.querySelectorAll('.sub-nav-btn').forEach(s => s.classList.remove('active'));
     document.getElementById('bf-tab-btn').classList.add('active');
@@ -2634,7 +2689,43 @@ function renderBF(period) {
     `<div class="bar-row"><div class="bar-label">${day}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/maxD*100),5)}%"><span>${count}</span></div></div><div class="bar-value">${count}件</div></div>`
   ).join('') || '<p style="color:var(--text-muted)">データなし</p>';
 
-  // テーブル
+  // スプレッドシート患者リスト
+  document.getElementById('bf-sheet-count').textContent = bfPatientData.length + '件';
+  document.getElementById('bf-sheet-tbody').innerHTML = bfPatientData.map(d => {
+    const st = d.completed ? 'background:#f0fdf4' : d.status && d.status.includes('検討') ? 'background:#fffbeb' : '';
+    return `<tr style="${st}">
+      <td style="font-size:10px">${d.date||'-'}</td>
+      <td style="font-size:11px;font-weight:500">${d.name}</td>
+      <td style="font-size:10px">${d.route||'-'}</td>
+      <td style="font-size:10px">${d.facility||'-'}</td>
+      <td style="font-size:10px">${d.dr||'-'}</td>
+      <td style="font-size:10px">${d.gender||'-'}</td>
+      <td style="font-size:10px">${d.area||'-'}</td>
+      <td style="font-size:10px">${d.status||'-'}</td>
+      <td style="font-size:10px;text-align:center">${d.teeth||'-'}</td>
+      <td style="font-size:10px">${d.sales?'¥'+d.sales:'-'}</td>
+      <td style="font-size:10px;text-align:center">${d.payment||'-'}</td>
+      <td style="font-size:10px;text-align:center">${d.completed||'-'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="12" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+
+  // 成約リスト
+  document.getElementById('bf-contract-count').textContent = bfContractData.length + '件';
+  document.getElementById('bf-contract-tbody').innerHTML = bfContractData.map(d => {
+    return `<tr>
+      <td style="font-size:10px">${d.date||'-'}</td>
+      <td style="font-size:11px;font-weight:500">${d.name}</td>
+      <td style="font-size:10px">${d.route||'-'}</td>
+      <td style="font-size:10px">${d.facility||'-'}</td>
+      <td style="font-size:10px">${d.treatReserve||'-'}</td>
+      <td style="font-size:10px">${d.impressReserve||'-'}</td>
+      <td style="font-size:10px">${d.payment||'-'}</td>
+      <td style="font-size:10px">${d.completed||'-'}</td>
+      <td style="font-size:10px">${d.sales?'¥'+d.sales:'-'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+
+  // 予約ツールデータ
   document.getElementById('bf-count').textContent = total + '件';
   const statusBadge = (s) => !s||s==='未対応' ? '<span class="badge badge-default">未対応</span>' : s==='キャンセル' ? '<span class="badge badge-danger">キャンセル</span>' : s==='来院済' ? '<span class="badge badge-warning">来院済</span>' : s==='成約' ? '<span class="badge badge-success">成約</span>' : `<span class="badge badge-default">${s}</span>`;
   const sorted = [...data].sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));

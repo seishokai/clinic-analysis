@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=78">
+  <link rel="stylesheet" href="styles.css?v=79">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -359,8 +359,30 @@
           <div class="card-header">日別申込推移</div>
           <div class="bar-chart" id="bf-daily-chart"></div>
         </div>
+        <!-- スプレッドシート患者リスト -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">BF患者リスト（スプレッドシート同期）<span id="bf-sheet-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+          <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
+            <table class="data-table">
+              <thead><tr><th>予約日</th><th>名前</th><th>経路</th><th>医院</th><th>DR</th><th>性別</th><th>地域</th><th>状況</th><th>本数</th><th>売上</th><th>入金</th><th>完了</th></tr></thead>
+              <tbody id="bf-sheet-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 成約リスト -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">BF成約リスト <span id="bf-contract-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+          <div class="data-table-wrap" style="max-height:300px;overflow-y:auto">
+            <table class="data-table">
+              <thead><tr><th>日付</th><th>名前</th><th>経路</th><th>医院</th><th>治療予約</th><th>印象予約</th><th>入金</th><th>完了</th><th>売上</th></tr></thead>
+              <tbody id="bf-contract-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
         <div class="card">
-          <div class="card-header">BF予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+          <div class="card-header">BF予約一覧（予約ツール）<span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
           <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
             <table class="data-table">
               <thead><tr><th>申込</th><th>予約</th><th>名前</th><th>医院</th><th>プロモ</th><th>状態</th></tr></thead>
@@ -840,6 +862,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=78"></script>
+  <script src="app.js?v=79"></script>
 </body>
 </html>
