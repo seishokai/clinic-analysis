@@ -11,6 +11,32 @@ function showToast(msg, isError) {
   setTimeout(() => t.className = 'toast', 2000);
 }
 
+// === Facility Name Normalizer ===
+function normFac(f) {
+  if (!f) return '-';
+  if (f.includes('銀座')) return 'BF銀座';
+  if (f.includes('ウィズ')||f.includes('WITH')||f.includes('ワイズ')||f.includes('ウイズ')) return 'ウィズ';
+  if (f.includes('エスカ')) return 'エスカ';
+  if (f.includes('アール')||f.includes('名駅アール')) return 'アール';
+  if (f.includes('ルミナス')) return 'ルミナス';
+  if (f.includes('茶屋')) return '茶屋';
+  if (f.includes('小牧')) return '小牧';
+  if (f.includes('知立')) return '知立';
+  if (f.includes('八事')) return '八事';
+  if (f.includes('岩田')) return '岩田';
+  if (f.includes('大森')) return '大森';
+  if (f.includes('京都')) return '京都';
+  return f.length > 8 ? f.slice(0,8)+'…' : f;
+}
+function normSvc(s) {
+  if (!s) return '-';
+  if (s.includes('ラミネート')||s.includes('ブラックフィルム')) return 'BF';
+  if (s.includes('矯正')) return '矯正';
+  if (s.includes('セラミック')) return 'セラミック';
+  if (s.includes('インプラント')) return 'インプラント';
+  return s.replace(/相談|無料|　/g,'').slice(0,6);
+}
+
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
 // プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
@@ -147,6 +173,7 @@ function setupEventListeners() {
       // タブ切替時にデータ更新
       if (sub === 'bk-analysis' && bookingsData.length > 0) renderAnalysis();
       if (sub === 'bk-apply' && bookingsData.length > 0) renderApplyAnalysis('today');
+      if (sub === 'bk-bf') { if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); } }
     });
   });
 
@@ -179,6 +206,20 @@ function setupEventListeners() {
 
   // Memo modal save
   document.getElementById('memo-modal-save').addEventListener('click', saveMemoModal);
+
+  // BF tab - password protected
+  document.getElementById('bf-tab-btn').addEventListener('click', (e) => {
+    if (!bfUnlocked) { e.preventDefault(); e.stopPropagation(); unlockBF(); }
+  });
+  document.querySelectorAll('.bf-period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.bf-period-btn').forEach(b => b.className = 'btn btn-outline bf-period-btn');
+      btn.className = 'btn btn-dark bf-period-btn';
+      renderBF(btn.dataset.period);
+    });
+  });
+  // 管理者はBFタブを表示
+  if (userRole === 'admin') document.getElementById('bf-tab-btn').style.display = '';
 
   // Apply analysis period buttons
   document.querySelectorAll('.apply-period-btn').forEach(btn => {
@@ -2123,8 +2164,8 @@ function renderBookings() {
     <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
       ${fmtBookDate(d.bookDate)}</td>
     <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">${d.name}</td>
-    <td style="font-size:10px;white-space:nowrap">${shortService(d.service)}</td>
-    <td style="font-size:10px;white-space:nowrap">${shortFac(d.facility)}</td>
+    <td style="font-size:10px;white-space:nowrap">${normSvc(d.service)}</td>
+    <td style="font-size:10px;white-space:nowrap">${normFac(d.facility)}</td>
     <td style="font-size:10px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
     <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? (d.email || '-') : '***'}</td>
     <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${d.source || '-'}</td>
@@ -2298,6 +2339,91 @@ function exportCSV() {
   a.download = `予約データ_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// === BF Tab ===
+let bfUnlocked = false;
+function unlockBF() {
+  if (bfUnlocked) { renderBF('all'); return; }
+  const pw = prompt('BFタブのパスワードを入力してください');
+  if (pw === 'black') {
+    bfUnlocked = true;
+    document.getElementById('bf-tab-btn').style.display = '';
+    // サブタブ切替
+    document.querySelectorAll('.sub-nav-btn').forEach(s => s.classList.remove('active'));
+    document.getElementById('bf-tab-btn').classList.add('active');
+    const mainEl = document.getElementById('bf-tab-btn').closest('main');
+    if (mainEl) mainEl.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== 'sub-bk-bf');
+    renderBF('all');
+  } else if (pw !== null) {
+    showToast('パスワードが正しくありません', true);
+  }
+}
+
+function renderBF(period) {
+  period = period || 'all';
+  let data = bookingsData.filter(d => d.status !== '除外' && normSvc(d.service) === 'BF');
+
+  // 期間フィルター
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')}`;
+  const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-7);
+  const monthStart = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/01`;
+  const getDateStr = (d) => { const m = (d.applyDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}/${String(parseInt(m[3])).padStart(2,'0')}` : ''; };
+
+  if (period === 'today') data = data.filter(d => getDateStr(d) === todayStr);
+  else if (period === 'week') data = data.filter(d => getDateStr(d) >= `${weekAgo.getFullYear()}/${String(weekAgo.getMonth()+1).padStart(2,'0')}/${String(weekAgo.getDate()).padStart(2,'0')}`);
+  else if (period === 'month') data = data.filter(d => getDateStr(d) >= monthStart);
+
+  const total = data.length;
+  const cancelled = data.filter(d => d.status === 'キャンセル').length;
+  const visited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const contracted = data.filter(d => d.status === '成約').length;
+  const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
+  const pastBk = data.filter(d => { const m = (d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayForRate; });
+  const pastVisited = pastBk.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const vr = pastBk.length > 0 ? Math.round(pastVisited/pastBk.length*100) : 0;
+  const cr = visited > 0 ? pct(contracted, visited) : 0;
+
+  document.getElementById('bf-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">BF予約数</span><span class="stat-num">${total}</span></div>
+    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
+    <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${vr}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+    <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num">${cr}%</span></div>
+  `;
+
+  // 医院別
+  const facG = {}; data.forEach(d => { const f = normFac(d.facility); if (!facG[f]) facG[f]={t:0,v:0,c:0}; facG[f].t++; if(d.status==='来院済'||d.status==='成約') facG[f].v++; if(d.status==='成約') facG[f].c++; });
+  document.getElementById('bf-facility-chart').innerHTML = Object.entries(facG).sort((a,b)=>b[1].t-a[1].t).map(([name,v]) =>
+    `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(v.t/total*100),3)}%"><span>${Math.round(v.t/total*100)}%</span></div></div><div class="bar-value" style="min-width:100px;font-size:10px">${v.t}件 来院${v.v} 成約${v.c}</div></div>`
+  ).join('') || '<p style="color:var(--text-muted)">データなし</p>';
+
+  // プロモ別
+  const promoG = {}; data.forEach(d => { const p = d.source||'(なし)'; promoG[p] = (promoG[p]||0)+1; });
+  renderBarChart('bf-promo-chart', Object.entries(promoG).sort((a,b)=>b[1]-a[1]).slice(0,10).map(([name,count]) => ({ name: name.length>20?name.slice(0,20)+'…':name, rate: Math.round(count/total*100), decided: count, consulted: total })));
+
+  // 日別
+  const daily = {}; data.forEach(d => { const ds = getDateStr(d); if (ds) { const short = ds.slice(5); daily[short] = (daily[short]||0)+1; } });
+  const dailySorted = Object.entries(daily).sort((a,b)=>b[0].localeCompare(a[0])).slice(0,14);
+  const maxD = Math.max(...dailySorted.map(([,v])=>v),1);
+  document.getElementById('bf-daily-chart').innerHTML = dailySorted.map(([day,count]) =>
+    `<div class="bar-row"><div class="bar-label">${day}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/maxD*100),5)}%"><span>${count}</span></div></div><div class="bar-value">${count}件</div></div>`
+  ).join('') || '<p style="color:var(--text-muted)">データなし</p>';
+
+  // テーブル
+  document.getElementById('bf-count').textContent = total + '件';
+  const statusBadge = (s) => !s||s==='未対応' ? '<span class="badge badge-default">未対応</span>' : s==='キャンセル' ? '<span class="badge badge-danger">キャンセル</span>' : s==='来院済' ? '<span class="badge badge-warning">来院済</span>' : s==='成約' ? '<span class="badge badge-success">成約</span>' : `<span class="badge badge-default">${s}</span>`;
+  const sorted = [...data].sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
+  document.getElementById('bf-tbody').innerHTML = sorted.slice(0,100).map(d => `<tr>
+    <td style="font-size:10px">${(d.applyDate||'').match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : '-'}</td>
+    <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
+    <td style="font-size:11px;font-weight:500">${d.name}</td>
+    <td style="font-size:10px">${normFac(d.facility)}</td>
+    <td style="font-size:9px;color:var(--text-sub)">${(d.source||'-').slice(0,15)}</td>
+    <td>${statusBadge(d.status)}</td>
+  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 }
 
 // === 申込分析 ===

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=72">
+  <link rel="stylesheet" href="styles.css?v=73">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -148,6 +148,7 @@
         <button class="sub-nav-btn active" data-sub="bk-list">予約一覧</button>
         <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
         <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
+        <button class="sub-nav-btn" data-sub="bk-bf" id="bf-tab-btn" style="display:none">BF</button>
       </div>
 
       <div id="sub-bk-list">
@@ -241,6 +242,39 @@
         <div class="card">
           <div class="card-header">相談別申込数</div>
           <div class="bar-chart" id="apply-service-chart"></div>
+        </div>
+      </div>
+
+      <!-- BF -->
+      <div id="sub-bk-bf" hidden>
+        <div class="page-header"><h2>BF 進捗管理</h2></div>
+        <div class="stats-row" id="bf-stats" style="margin-bottom:16px"></div>
+        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+          <button class="btn btn-dark bf-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button>
+          <button class="btn btn-outline bf-period-btn" data-period="month" style="font-size:11px;padding:6px 12px;min-height:28px">今月</button>
+          <button class="btn btn-outline bf-period-btn" data-period="week" style="font-size:11px;padding:6px 12px;min-height:28px">今週</button>
+          <button class="btn btn-outline bf-period-btn" data-period="today" style="font-size:11px;padding:6px 12px;min-height:28px">今日</button>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">医院別</div>
+          <div class="bar-chart" id="bf-facility-chart"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">プロモ別</div>
+          <div class="bar-chart" id="bf-promo-chart"></div>
+        </div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">日別申込推移</div>
+          <div class="bar-chart" id="bf-daily-chart"></div>
+        </div>
+        <div class="card">
+          <div class="card-header">BF予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+          <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
+            <table class="data-table">
+              <thead><tr><th>申込</th><th>予約</th><th>名前</th><th>医院</th><th>プロモ</th><th>状態</th></tr></thead>
+              <tbody id="bf-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -714,6 +748,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=72"></script>
+  <script src="app.js?v=73"></script>
 </body>
 </html>
