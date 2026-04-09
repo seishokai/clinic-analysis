@@ -218,6 +218,13 @@ function setupEventListeners() {
   // Facility tabs
   document.querySelectorAll('.bk-fac-tab').forEach(btn => {
     btn.addEventListener('click', () => {
+      // 手動でサブタブ切替
+      const mainEl = btn.closest('main');
+      if (mainEl) {
+        mainEl.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== 'sub-bk-fac');
+        mainEl.querySelectorAll('.sub-nav-btn').forEach(s => s.classList.remove('active'));
+        btn.classList.add('active');
+      }
       if (bookingsData.length > 0) renderFacTab(btn.dataset.fac);
     });
   });
