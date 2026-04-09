@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=73">
+  <link rel="stylesheet" href="styles.css?v=74">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -146,6 +146,7 @@
     <main id="view-bookings" class="view view-wide">
       <div class="sub-nav">
         <button class="sub-nav-btn active" data-sub="bk-list">予約一覧</button>
+        <button class="sub-nav-btn" data-sub="bk-search">患者検索</button>
         <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
         <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
         <button class="sub-nav-btn" data-sub="bk-bf" id="bf-tab-btn" style="display:none">BF</button>
@@ -216,6 +217,58 @@
       </div>
 
       <!-- プロモ別ダッシュボード -->
+      <!-- 患者検索 -->
+      <div id="sub-bk-search" hidden>
+        <div class="page-header"><h2>患者検索・新規登録</h2></div>
+
+        <!-- 検索 -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">検索</div>
+          <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
+            <div class="form-group"><label class="form-label">名前</label><input type="text" class="form-input" id="ps-name" placeholder="名前で検索"></div>
+            <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="ps-phone" placeholder="電話番号で検索"></div>
+            <div class="form-group"><label class="form-label">メール</label><input type="text" class="form-input" id="ps-email" placeholder="メールで検索"></div>
+            <div class="form-group"><label class="form-label">医院</label>
+              <select class="form-select" id="ps-facility"><option value="">全て</option></select>
+            </div>
+          </div>
+          <div class="form-actions"><button class="btn btn-dark" id="ps-search-btn">検索</button><button class="btn btn-outline" id="ps-clear-btn" style="margin-left:8px">クリア</button></div>
+        </div>
+
+        <!-- 検索結果 -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">検索結果 <span id="ps-result-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+          <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
+            <table class="data-table">
+              <thead><tr><th>申込日</th><th>予約日</th><th>名前</th><th>相談</th><th>医院</th><th>電話</th><th>メール</th><th>プロモ</th><th>状態</th><th>ツール</th></tr></thead>
+              <tbody id="ps-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- 新規登録 -->
+        <div class="card">
+          <div class="card-header">新規患者登録 <span style="font-weight:400;color:var(--text-muted);font-size:11px">スプレッドシート外の手動登録</span></div>
+          <div class="form-grid">
+            <div class="form-group"><label class="form-label">名前 *</label><input type="text" class="form-input" id="np-name" placeholder="患者名"></div>
+            <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="np-phone" placeholder="09012345678"></div>
+            <div class="form-group"><label class="form-label">メール</label><input type="text" class="form-input" id="np-email" placeholder="example@email.com"></div>
+            <div class="form-group"><label class="form-label">医院</label>
+              <select class="form-select" id="np-facility"><option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>岩田</option><option>大森</option><option>京都</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">相談</label>
+              <select class="form-select" id="np-service"><option>BF相談</option><option>矯正相談</option><option>インプラント相談</option><option>セラミック相談</option><option>その他</option></select>
+            </div>
+            <div class="form-group"><label class="form-label">予約日時</label><input type="text" class="form-input" id="np-bookdate" placeholder="例: 2026/4/15 14:00"></div>
+            <div class="form-group"><label class="form-label">プロモ</label><input type="text" class="form-input" id="np-source" placeholder="流入元"></div>
+            <div class="form-group"><label class="form-label">ステータス</label>
+              <select class="form-select" id="np-status"><option>未対応</option><option>確認済</option><option>来院済</option><option>成約</option><option>キャンセル</option></select>
+            </div>
+          </div>
+          <div class="form-actions"><button class="btn btn-dark" id="np-save">登録</button></div>
+        </div>
+      </div>
+
       <!-- 申込分析 -->
       <div id="sub-bk-apply" hidden>
         <div class="page-header"><h2>申込分析</h2></div>
@@ -748,6 +801,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=73"></script>
+  <script src="app.js?v=74"></script>
 </body>
 </html>

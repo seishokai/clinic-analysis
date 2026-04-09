@@ -171,6 +171,13 @@ function setupEventListeners() {
         el.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== `sub-${sub}`);
       }
       // タブ切替時にデータ更新
+      if (sub === 'bk-search' && bookingsData.length > 0) {
+        const psFac = document.getElementById('ps-facility');
+        if (psFac && psFac.options.length <= 1) {
+          const facs = [...new Set(bookingsData.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
+          psFac.innerHTML = '<option value="">全て</option>' + facs.map(f => `<option>${f}</option>`).join('');
+        }
+      }
       if (sub === 'bk-analysis' && bookingsData.length > 0) renderAnalysis();
       if (sub === 'bk-apply' && bookingsData.length > 0) renderApplyAnalysis('today');
       if (sub === 'bk-bf') { if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); } }
@@ -206,6 +213,20 @@ function setupEventListeners() {
 
   // Memo modal save
   document.getElementById('memo-modal-save').addEventListener('click', saveMemoModal);
+
+  // Patient search & register
+  document.getElementById('ps-search-btn').addEventListener('click', searchPatients);
+  document.getElementById('ps-clear-btn').addEventListener('click', () => {
+    ['ps-name','ps-phone','ps-email'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('ps-facility').value = '';
+    document.getElementById('ps-tbody').innerHTML = '';
+    document.getElementById('ps-result-count').textContent = '';
+  });
+  document.getElementById('np-save').addEventListener('click', registerNewPatient);
+  // Enter key for search
+  ['ps-name','ps-phone','ps-email'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') searchPatients(); });
+  });
 
   // BF tab - password protected
   document.getElementById('bf-tab-btn').addEventListener('click', (e) => {
@@ -1768,6 +1789,20 @@ async function loadBookings() {
     const results = await Promise.all(allFetches);
     bookingsData = results.flat();
 
+    // 手動登録データをDBから読み込んで追加
+    try {
+      const { data: manualData } = await sb.from('manual_bookings').select('*').order('created_at', { ascending: false });
+      if (manualData && manualData.length) {
+        manualData.forEach(d => {
+          bookingsData.push({
+            applyDate: d.apply_date, bookDate: d.book_date, name: d.name,
+            service: d.service, facility: d.facility, email: d.email,
+            phone: d.phone, source: d.source, status: d.status, tool: '手動'
+          });
+        });
+      }
+    } catch(e) { console.warn('Manual bookings load error:', e); }
+
     // DBからステータス・メモを読み込んで上書き
     try {
       const { data: dbStatuses } = await sb.from('booking_status').select('*');
@@ -2339,6 +2374,87 @@ function exportCSV() {
   a.download = `予約データ_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// === Patient Search & Register ===
+function searchPatients() {
+  const sName = (document.getElementById('ps-name').value || '').trim().toLowerCase();
+  const sPhone = (document.getElementById('ps-phone').value || '').trim().replace(/[-\s]/g, '');
+  const sEmail = (document.getElementById('ps-email').value || '').trim().toLowerCase();
+  const sFacility = document.getElementById('ps-facility').value;
+
+  if (!sName && !sPhone && !sEmail && !sFacility) {
+    document.getElementById('ps-result-count').textContent = '検索条件を入力してください';
+    document.getElementById('ps-tbody').innerHTML = '';
+    return;
+  }
+
+  let results = bookingsData;
+  if (sName) results = results.filter(d => d.name && d.name.toLowerCase().includes(sName));
+  if (sPhone) results = results.filter(d => d.phone && String(d.phone).replace(/[-\s]/g, '').includes(sPhone));
+  if (sEmail) results = results.filter(d => d.email && d.email.toLowerCase().includes(sEmail));
+  if (sFacility) results = results.filter(d => normFac(d.facility) === sFacility);
+
+  document.getElementById('ps-result-count').textContent = results.length + '件';
+
+  const statusBadge = (s) => !s||s==='未対応' ? '<span class="badge badge-default">未対応</span>' : s==='キャンセル' ? '<span class="badge badge-danger">キャンセル</span>' : s==='来院済' ? '<span class="badge badge-warning">来院済</span>' : s==='成約' ? '<span class="badge badge-success">成約</span>' : s==='除外' ? '<span class="badge badge-default" style="opacity:0.5">除外</span>' : `<span class="badge badge-default">${s}</span>`;
+
+  const sorted = [...results].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
+  document.getElementById('ps-tbody').innerHTML = sorted.slice(0, 100).map(d => `<tr>
+    <td style="font-size:10px">${d.applyDate ? d.applyDate.match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : d.applyDate.slice(5) : '-'}</td>
+    <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
+    <td style="font-size:11px;font-weight:500">${d.name}</td>
+    <td style="font-size:10px">${normSvc(d.service)}</td>
+    <td style="font-size:10px">${normFac(d.facility)}</td>
+    <td style="font-size:10px">${d.phone || '-'}</td>
+    <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${d.email || '-'}</td>
+    <td style="font-size:9px;color:var(--text-sub)">${(d.source||'-').slice(0,15)}</td>
+    <td>${statusBadge(d.status)}</td>
+    <td style="font-size:9px"><span class="badge ${d.tool==='手動'?'badge-warning':'badge-default'}" style="font-size:8px">${d.tool||'DX'}</span></td>
+  </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text-muted)">該当なし</td></tr>';
+}
+
+async function registerNewPatient() {
+  const name = document.getElementById('np-name').value.trim();
+  if (!name) { showToast('名前を入力してください', true); return; }
+
+  const now = new Date();
+  const applyDate = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const entry = {
+    apply_date: applyDate,
+    book_date: document.getElementById('np-bookdate').value || '',
+    name,
+    service: document.getElementById('np-service').value,
+    facility: document.getElementById('np-facility').value,
+    email: document.getElementById('np-email').value.trim(),
+    phone: document.getElementById('np-phone').value.trim(),
+    source: document.getElementById('np-source').value.trim(),
+    status: document.getElementById('np-status').value,
+    tool: '手動'
+  };
+
+  const { error } = await sb.from('manual_bookings').insert(entry);
+  if (error) { showToast('登録エラー: ' + error.message, true); return; }
+
+  // ローカルのbookingsDataにも追加（リロードまで反映）
+  bookingsData.push({
+    applyDate: entry.apply_date,
+    bookDate: entry.book_date,
+    name: entry.name,
+    service: entry.service,
+    facility: entry.facility,
+    email: entry.email,
+    phone: entry.phone,
+    source: entry.source,
+    status: entry.status,
+    tool: '手動'
+  });
+
+  // フォームクリア
+  ['np-name','np-phone','np-email','np-bookdate','np-source'].forEach(id => document.getElementById(id).value = '');
+  showToast(name + ' を登録しました');
+  renderBookings();
 }
 
 // === BF Tab ===
