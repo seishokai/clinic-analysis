@@ -1924,9 +1924,9 @@ function populateBookingFilters() {
   } else if (userRole === 'promo' && promoFilter) {
     filteredForOptions = filteredForOptions.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
   }
-  const facilities = [...new Set(filteredForOptions.map(d => d.facility).filter(Boolean))].sort();
+  const facilities = [...new Set(filteredForOptions.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
   const promos = [...new Set(filteredForOptions.map(d => d.source).filter(Boolean))].sort();
-  const services = [...new Set(filteredForOptions.map(d => d.service).filter(Boolean))].sort();
+  const services = [...new Set(filteredForOptions.map(d => normSvc(d.service)).filter(s => s && s !== '-'))].sort();
 
   const facEl = document.getElementById('bk-facility');
   facEl.innerHTML = '<option value="">医院:全て</option>' + facilities.map(f => `<option>${f}</option>`).join('');
@@ -2006,9 +2006,9 @@ function renderBookings() {
       filtered = filtered.filter(d => d.facility && cFacilities.includes(d.facility));
     }
   }
-  if (facFilterVal) filtered = filtered.filter(d => d.facility === facFilterVal);
+  if (facFilterVal) filtered = filtered.filter(d => normFac(d.facility) === facFilterVal);
   if (promoFilterVal) filtered = filtered.filter(d => d.source === promoFilterVal);
-  if (svcFilter) filtered = filtered.filter(d => d.service === svcFilter);
+  if (svcFilter) filtered = filtered.filter(d => normSvc(d.service) === svcFilter);
   if (statusFilter) {
     if (statusFilter === '要対応') {
       const td = new Date(); td.setHours(0,0,0,0);
@@ -2192,7 +2192,7 @@ function renderBookings() {
   const displayLimit = window._bkDisplayLimit || 200;
   tbody.innerHTML = sorted.slice(0, displayLimit).map((d, idx) => {
     const overdue = isOverdue(d);
-    const rowStyle = d.status==='除外' ? 'background:#f5f5f5;opacity:0.5;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#fef2f2' : overdue ? 'background:#fef2f2' : '';
+    const rowStyle = d.status==='除外' ? 'background:#f5f5f5;opacity:0.4;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#f8f8f8;color:#9ca3af' : (!d.status||d.status==='未対応') ? 'background:#fff5f5' : '';
     return `<tr style="${rowStyle}">
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
