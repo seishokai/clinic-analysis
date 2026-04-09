@@ -37,6 +37,28 @@ function normSvc(s) {
   return s.replace(/相談|無料|　/g,'').slice(0,6);
 }
 
+// === Global Date Formatters ===
+function fmtApplyDate(d) {
+  if (!d) return '-';
+  const m = d.match(/\d{4}\D+(\d{1,2})\D+(\d{1,2})/);
+  if (m) return parseInt(m[1]) + '/' + parseInt(m[2]);
+  return d.slice(0, 5);
+}
+function fmtBookDate(d) {
+  if (!d) return '-';
+  const m1 = d.match(/\d{4}\D+(\d{1,2})\D+(\d{1,2})\s+(\d{1,2}:\d{2})/);
+  if (m1) return parseInt(m1[1]) + '/' + parseInt(m1[2]) + ' ' + m1[3];
+  const m2 = d.match(/(\d{1,2})\D+(\d{1,2})\s+(\d{1,2}:\d{2})/);
+  if (m2) return parseInt(m2[1]) + '/' + parseInt(m2[2]) + ' ' + m2[3];
+  const m3 = d.match(/(\d{1,2})\D*月\D*(\d{1,2})\D*日.*?(\d{1,2})\D*時\D*(\d{2})\D*分/);
+  if (m3) return parseInt(m3[1]) + '/' + parseInt(m3[2]) + ' ' + m3[3] + ':' + m3[4];
+  const m4 = d.match(/(\d{1,2})\D*月\D*(\d{1,2})/);
+  if (m4) return parseInt(m4[1]) + '/' + parseInt(m4[2]);
+  const m5 = d.match(/(\d{1,2})[\/](\d{1,2})/);
+  if (m5) return parseInt(m5[1]) + '/' + parseInt(m5[2]);
+  return d.slice(0, 8);
+}
+
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
 // プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
@@ -2138,31 +2160,7 @@ function renderBookings() {
     return `<span class="badge badge-default">${s}</span>`;
   };
 
-  const fmtApplyDate = (d) => {
-    if (!d) return '-';
-    // "2026/04/08 00:49" → "4/8"
-    const m = d.match(/\d{4}\D+(\d{1,2})\D+(\d{1,2})/);
-    if (m) return parseInt(m[1]) + '/' + parseInt(m[2]);
-    return d.slice(0, 5);
-  };
-  const fmtBookDate = (d) => {
-    if (!d) return '-';
-    // "2026/4/17 15:30" → "4/17 15:30"
-    const m1 = d.match(/\d{4}\D+(\d{1,2})\D+(\d{1,2})\s+(\d{1,2}:\d{2})/);
-    if (m1) return parseInt(m1[1]) + '/' + parseInt(m1[2]) + ' ' + m1[3];
-    // "2026/4/17 15:30" without year prefix
-    const m2 = d.match(/(\d{1,2})\D+(\d{1,2})\s+(\d{1,2}:\d{2})/);
-    if (m2) return parseInt(m2[1]) + '/' + parseInt(m2[2]) + ' ' + m2[3];
-    // "2026年4月13日(月)15時00分" → "4/13 15:00"
-    const m3 = d.match(/(\d{1,2})\D*月\D*(\d{1,2})\D*日.*?(\d{1,2})\D*時\D*(\d{2})\D*分/);
-    if (m3) return parseInt(m3[1]) + '/' + parseInt(m3[2]) + ' ' + m3[3] + ':' + m3[4];
-    // "2026年4月13日(月)" without time → "4/13"
-    const m4 = d.match(/(\d{1,2})\D*月\D*(\d{1,2})/);
-    if (m4) return parseInt(m4[1]) + '/' + parseInt(m4[2]);
-    const m5 = d.match(/(\d{1,2})[\/](\d{1,2})/);
-    if (m5) return parseInt(m5[1]) + '/' + parseInt(m5[2]);
-    return d.slice(0, 8);
-  };
+  // fmtApplyDate, fmtBookDate are now global functions
   const shortService = (s) => {
     if (!s) return '-';
     if (s.includes('ラミネート') || s.includes('ブラックフィルム')) return 'BF';
