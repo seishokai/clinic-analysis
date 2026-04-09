@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=75">
+  <link rel="stylesheet" href="styles.css?v=76">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -150,6 +150,17 @@
         <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
         <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
         <button class="sub-nav-btn" data-sub="bk-bf" id="bf-tab-btn" style="display:none">BF</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="BF銀座">BF銀座</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="エスカ">エスカ</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="アール">アール</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="ウィズ">ウィズ</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="ルミナス">ルミナス</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="茶屋">茶屋</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="知立">知立</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="小牧">小牧</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="八事">八事</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="大森">大森</button>
+        <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="京都">京都</button>
       </div>
 
       <div id="sub-bk-list">
@@ -295,6 +306,34 @@
         <div class="card">
           <div class="card-header">相談別申込数</div>
           <div class="bar-chart" id="apply-service-chart"></div>
+        </div>
+      </div>
+
+      <!-- 医院別 -->
+      <div id="sub-bk-fac" hidden>
+        <div class="page-header"><h2 id="fac-title">医院</h2></div>
+        <div class="stats-row" id="fac-stats" style="margin-bottom:12px"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">予約一覧 <span id="fac-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+          <div class="data-table-wrap" style="max-height:calc(100vh - 350px);overflow-y:auto">
+            <table class="data-table" id="fac-table">
+              <thead><tr><th>申込</th><th>予約</th><th>名前</th><th>相談</th><th>電話</th><th>メール</th><th>プロモ</th><th>状態</th><th>メモ</th><th>成約</th><th>金額</th></tr></thead>
+              <tbody id="fac-tbody"></tbody>
+              <tfoot>
+                <tr style="background:#f0fdf4">
+                  <td colspan="2" style="font-size:10px;color:var(--text-sub)">新規</td>
+                  <td><input type="text" class="form-input" id="fac-new-name" placeholder="名前" style="font-size:11px;padding:3px 6px"></td>
+                  <td><select class="form-select" id="fac-new-svc" style="font-size:10px;padding:2px 4px"><option>BF</option><option>矯正</option><option>インプラント</option><option>セラミック</option></select></td>
+                  <td><input type="text" class="form-input" id="fac-new-phone" placeholder="電話" style="font-size:10px;padding:3px 6px"></td>
+                  <td><input type="text" class="form-input" id="fac-new-email" placeholder="メール" style="font-size:10px;padding:3px 6px"></td>
+                  <td><input type="text" class="form-input" id="fac-new-source" placeholder="プロモ" style="font-size:10px;padding:3px 6px"></td>
+                  <td><select class="form-select" id="fac-new-status" style="font-size:10px;padding:2px 4px"><option>未対応</option><option>確認済</option><option>来院済</option><option>成約</option></select></td>
+                  <td colspan="2"></td>
+                  <td><button class="btn btn-dark" id="fac-new-save" style="font-size:10px;padding:4px 10px;min-height:26px">追加</button></td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
         </div>
       </div>
 
@@ -801,6 +840,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=75"></script>
+  <script src="app.js?v=76"></script>
 </body>
 </html>

@@ -179,6 +179,7 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 .sub-nav-btn:hover { color: var(--text); }
+.sub-nav { flex-wrap: nowrap; }
 .sub-nav-btn.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 
 /* Bottom Nav */

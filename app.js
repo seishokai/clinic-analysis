@@ -181,6 +181,7 @@ function setupEventListeners() {
       if (sub === 'bk-analysis' && bookingsData.length > 0) renderAnalysis();
       if (sub === 'bk-apply' && bookingsData.length > 0) renderApplyAnalysis('today');
       if (sub === 'bk-bf') { if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); } }
+      if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
     });
   });
 
@@ -213,6 +214,15 @@ function setupEventListeners() {
 
   // Memo modal save
   document.getElementById('memo-modal-save').addEventListener('click', saveMemoModal);
+
+  // Facility tabs
+  document.querySelectorAll('.bk-fac-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (bookingsData.length > 0) renderFacTab(btn.dataset.fac);
+    });
+  });
+  document.getElementById('fac-new-save').addEventListener('click', saveFacNewPatient);
+  document.getElementById('fac-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveFacNewPatient(); });
 
   // Patient search & register
   document.getElementById('ps-search-btn').addEventListener('click', searchPatients);
@@ -2376,6 +2386,87 @@ function exportCSV() {
   URL.revokeObjectURL(url);
 }
 
+// === Facility Tab ===
+let currentFacTab = '';
+
+function renderFacTab(facility) {
+  currentFacTab = facility;
+  document.getElementById('fac-title').textContent = facility;
+
+  let data = bookingsData.filter(d => d.status !== '除外' && normFac(d.facility) === facility);
+  const total = data.length;
+  const cancelled = data.filter(d => d.status === 'キャンセル').length;
+  const visited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const contracted = data.filter(d => d.status === '成約').length;
+  const todayR = new Date(); todayR.setHours(0,0,0,0);
+  const past = data.filter(d => { const m = (d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayR; });
+  const pastV = past.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const vr = past.length > 0 ? Math.round(pastV/past.length*100) : 0;
+
+  document.getElementById('fac-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
+    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
+    <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${vr}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+  `;
+  document.getElementById('fac-count').textContent = total + '件';
+
+  const statusBadge = (s) => !s||s==='未対応' ? '<span class="badge badge-default">未対応</span>' : s==='キャンセル' ? '<span class="badge badge-danger">キャンセル</span>' : s==='来院済' ? '<span class="badge badge-warning">来院済</span>' : s==='成約' ? '<span class="badge badge-success">成約</span>' : s==='確認済' ? '<span class="badge badge-default" style="border-color:#7c3aed;color:#7c3aed">確認済</span>' : `<span class="badge badge-default">${s}</span>`;
+
+  const sorted = [...data].sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
+  const memos = loadData('bk-memos', {});
+  const bkExtra = loadData('bk-extra', {});
+
+  document.getElementById('fac-tbody').innerHTML = sorted.slice(0,200).map(d => {
+    const key = d.name+'|'+d.applyDate;
+    const memo = d._memo || memos[key] || '';
+    const extra = bkExtra[key] || {};
+    const rs = d.status==='成約'?'background:#f0fdf4':d.status==='来院済'?'background:#eff6ff':d.status==='キャンセル'?'background:#f8f8f8;color:#9ca3af':(!d.status||d.status==='未対応')?'background:#fff5f5':'';
+    return `<tr style="${rs}">
+      <td style="font-size:10px">${d.applyDate ? d.applyDate.match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : '-' : '-'}</td>
+      <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
+      <td style="font-size:11px;font-weight:500">${d.name}</td>
+      <td style="font-size:10px">${normSvc(d.service)}</td>
+      <td style="font-size:10px">${d.phone||'-'}</td>
+      <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${d.email||'-'}</td>
+      <td style="font-size:9px;color:var(--text-sub)">${(d.source||'-').slice(0,12)}</td>
+      <td style="text-align:center">${statusBadge(d.status)}</td>
+      <td style="font-size:10px;max-width:50px;overflow:hidden;text-overflow:ellipsis;cursor:pointer" class="fac-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(memo||'').replace(/"/g,'&quot;')}">${memo ? memo.slice(0,6)+(memo.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>'}</td>
+      <td style="font-size:10px;text-align:center;${extra.contractService?'background:#dcfce7;color:#15803d;font-weight:600':''}">${extra.contractService||d.contractService||'-'}</td>
+      <td style="font-size:10px;text-align:center">${extra.contractAmount||d.contractAmount?'¥'+fmt(extra.contractAmount||d.contractAmount):'-'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+
+  // メモクリック
+  document.querySelectorAll('#fac-tbody .fac-memo-cell').forEach(td => {
+    td.addEventListener('click', () => openMemoModal(td.dataset.name, td.dataset.apply, td));
+  });
+}
+
+async function saveFacNewPatient() {
+  const name = document.getElementById('fac-new-name').value.trim();
+  if (!name) { showToast('名前を入力してください', true); return; }
+  const now = new Date();
+  const applyDate = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  const entry = {
+    apply_date: applyDate, book_date: '', name,
+    service: document.getElementById('fac-new-svc').value + '相談',
+    facility: currentFacTab,
+    email: document.getElementById('fac-new-email').value.trim(),
+    phone: document.getElementById('fac-new-phone').value.trim(),
+    source: document.getElementById('fac-new-source').value.trim(),
+    status: document.getElementById('fac-new-status').value,
+    tool: '手動'
+  };
+  const { error } = await sb.from('manual_bookings').insert(entry);
+  if (error) { showToast('登録エラー', true); return; }
+  bookingsData.push({ applyDate: entry.apply_date, bookDate: '', name, service: entry.service, facility: currentFacTab, email: entry.email, phone: entry.phone, source: entry.source, status: entry.status, tool: '手動' });
+  ['fac-new-name','fac-new-phone','fac-new-email','fac-new-source'].forEach(id => document.getElementById(id).value = '');
+  showToast(name + ' を追加しました');
+  renderFacTab(currentFacTab);
+}
+
 // === Patient Search & Register ===
 function searchPatients() {
   const sName = (document.getElementById('ps-name').value || '').trim().toLowerCase();
@@ -2478,7 +2569,17 @@ function unlockBF() {
 
 function renderBF(period) {
   period = period || 'all';
-  let data = bookingsData.filter(d => d.status !== '除外' && normSvc(d.service) === 'BF');
+  const bkExtraBF = loadData('bk-extra', {});
+  let data = bookingsData.filter(d => {
+    if (d.status === '除外') return false;
+    if (normSvc(d.service) === 'BF') return true;
+    // 成約施術がBFの人も含める
+    const key = d.name + '|' + d.applyDate;
+    const extra = bkExtraBF[key];
+    if (extra && extra.contractService === 'BF') return true;
+    if (d.contractService === 'BF') return true;
+    return false;
+  });
 
   // 期間フィルター
   const now = new Date();
