@@ -182,7 +182,7 @@ function setupEventListeners() {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
 
   // Sub nav
-  document.querySelectorAll('.sub-nav-btn').forEach(b => {
+  document.querySelectorAll('.sub-nav-btn:not(.bf-sub-btn)').forEach(b => {
     b.addEventListener('click', () => {
       const parent = b.closest('.sub-nav');
       parent.querySelectorAll('.sub-nav-btn').forEach(s => s.classList.remove('active'));
@@ -273,7 +273,9 @@ function setupEventListeners() {
 
   // BF sub-tabs
   document.querySelectorAll('.bf-sub-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      // BFサブタブだけ切替（親のサブナビは触らない）
       document.querySelectorAll('.bf-sub-btn').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       const sub = btn.dataset.bfsub;
@@ -281,8 +283,14 @@ function setupEventListeners() {
         const el = document.getElementById(id);
         if (el) el.hidden = el.id !== sub;
       });
+      // sub-bk-bf自体は表示のまま
+      document.getElementById('sub-bk-bf').hidden = false;
       if (sub === 'bf-progress') renderBF('all');
-      if ((sub === 'bf-patients' || sub === 'bf-contracts') && bfPatientData.length === 0) loadBFSheetData().then(() => renderBF('all'));
+      if (sub === 'bf-patients' || sub === 'bf-contracts') {
+        if (bfPatientData.length === 0) loadBFSheetData().then(() => renderBF('all'));
+        else renderBF('all');
+      }
+      if (sub === 'bf-bookings') renderBF('all');
     });
   });
 
