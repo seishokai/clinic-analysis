@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=83">
+  <link rel="stylesheet" href="styles.css?v=84">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -412,6 +412,8 @@
             <input type="text" class="form-input" id="bf-bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
             <select class="form-select" id="bf-bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
             <select class="form-select" id="bf-bk-status" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="要対応">要対応</option><option value="未対応">未対応</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select>
+            <select class="form-select" id="bf-bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="today">今日</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option></select>
+            <input type="month" class="form-input" id="bf-bk-month" style="width:auto;padding:6px 8px;font-size:11px">
           </div>
           <div class="card" style="padding:8px">
             <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">BF予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
@@ -895,6 +897,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=83"></script>
+  <script src="app.js?v=84"></script>
 </body>
 </html>

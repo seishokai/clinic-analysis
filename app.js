@@ -275,8 +275,8 @@ function setupEventListeners() {
   let _bfAllData = [];
   document.getElementById('bf-bk-progress')?.addEventListener('click', () => { document.getElementById('bf-bk-status').value = '要対応'; renderBFBookings(_bfAllData); });
   document.getElementById('bf-bk-today')?.addEventListener('click', () => { window._bfTodayFilter = true; renderBFBookings(_bfAllData); });
-  document.getElementById('bf-bk-reset')?.addEventListener('click', () => { document.getElementById('bf-bk-status').value = ''; document.getElementById('bf-bk-search').value = ''; document.getElementById('bf-bk-facility').value = ''; window._bfTodayFilter = false; renderBFBookings(_bfAllData); });
-  ['bf-bk-facility','bf-bk-status'].forEach(id => { document.getElementById(id)?.addEventListener('change', () => renderBFBookings(_bfAllData)); });
+  document.getElementById('bf-bk-reset')?.addEventListener('click', () => { ['bf-bk-status','bf-bk-facility','bf-bk-period','bf-bk-month'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; }); document.getElementById('bf-bk-search').value=''; window._bfTodayFilter=false; renderBFBookings(_bfAllData); });
+  ['bf-bk-facility','bf-bk-status','bf-bk-period','bf-bk-month'].forEach(id => { document.getElementById(id)?.addEventListener('change', () => renderBFBookings(_bfAllData)); });
   let bfSearchTimer;
   document.getElementById('bf-bk-search')?.addEventListener('input', () => { clearTimeout(bfSearchTimer); bfSearchTimer = setTimeout(() => renderBFBookings(_bfAllData), 300); });
 
@@ -2807,6 +2807,22 @@ function renderBFBookings(allBFData) {
   const statusF = document.getElementById('bf-bk-status')?.value || '';
   if (search) data = data.filter(d => d.name && d.name.toLowerCase().includes(search));
   if (facF) data = data.filter(d => normFac(d.facility) === facF);
+
+  // 期間フィルター
+  const periodF = document.getElementById('bf-bk-period')?.value || '';
+  const monthF = document.getElementById('bf-bk-month')?.value || '';
+  const getDateStr = (d) => { const m = (d.applyDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${m[1]}-${String(parseInt(m[2])).padStart(2,'0')}-${String(parseInt(m[3])).padStart(2,'0')}` : ''; };
+  if (periodF === 'today') {
+    const t = new Date(); const ts = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}-${String(t.getDate()).padStart(2,'0')}`;
+    data = data.filter(d => getDateStr(d) === ts);
+  } else if (periodF === 'thisMonth') {
+    const t = new Date(); const ms = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
+    data = data.filter(d => getDateStr(d).slice(0,7) === ms);
+  } else if (periodF === 'lastMonth') {
+    const t = new Date(); t.setMonth(t.getMonth()-1); const ms = `${t.getFullYear()}-${String(t.getMonth()+1).padStart(2,'0')}`;
+    data = data.filter(d => getDateStr(d).slice(0,7) === ms);
+  }
+  if (monthF) { data = data.filter(d => getDateStr(d).slice(0,7) === monthF); }
   if (statusF === '要対応') {
     const td = new Date(); td.setHours(0,0,0,0);
     data = data.filter(d => (!d.status||d.status==='未対応') && d.bookDate && (() => { const m=(d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < td; })());
