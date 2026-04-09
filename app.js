@@ -271,6 +271,15 @@ function setupEventListeners() {
     document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') searchPatients(); });
   });
 
+  // BF booking list filters
+  let _bfAllData = [];
+  document.getElementById('bf-bk-progress')?.addEventListener('click', () => { document.getElementById('bf-bk-status').value = '要対応'; renderBFBookings(_bfAllData); });
+  document.getElementById('bf-bk-today')?.addEventListener('click', () => { window._bfTodayFilter = true; renderBFBookings(_bfAllData); });
+  document.getElementById('bf-bk-reset')?.addEventListener('click', () => { document.getElementById('bf-bk-status').value = ''; document.getElementById('bf-bk-search').value = ''; document.getElementById('bf-bk-facility').value = ''; window._bfTodayFilter = false; renderBFBookings(_bfAllData); });
+  ['bf-bk-facility','bf-bk-status'].forEach(id => { document.getElementById(id)?.addEventListener('change', () => renderBFBookings(_bfAllData)); });
+  let bfSearchTimer;
+  document.getElementById('bf-bk-search')?.addEventListener('input', () => { clearTimeout(bfSearchTimer); bfSearchTimer = setTimeout(() => renderBFBookings(_bfAllData), 300); });
+
   // BF sub-tabs
   document.querySelectorAll('.bf-sub-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
@@ -290,7 +299,7 @@ function setupEventListeners() {
         if (bfPatientData.length === 0) loadBFSheetData().then(() => renderBF('all'));
         else renderBF('all');
       }
-      if (sub === 'bf-bookings') renderBF('all');
+      if (sub === 'bf-bookings') { renderBF('all'); }
     });
   });
 
@@ -2783,17 +2792,121 @@ function renderBF(period) {
   }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   // 予約ツールデータ
-  document.getElementById('bf-count').textContent = total + '件';
-  const statusBadge = (s) => !s||s==='未対応' ? '<span class="badge badge-default">未対応</span>' : s==='キャンセル' ? '<span class="badge badge-danger">キャンセル</span>' : s==='来院済' ? '<span class="badge badge-warning">来院済</span>' : s==='成約' ? '<span class="badge badge-success">成約</span>' : `<span class="badge badge-default">${s}</span>`;
+  // BF予約一覧（メイン予約一覧と同じ機能）
+  _bfAllData = data;
+  renderBFBookings(data);
+}
+
+function renderBFBookings(allBFData) {
+  let data = allBFData || [];
+  const isAdmin = userRole === 'admin' || (userRole === 'custom' && sessionStorage.getItem('customEditRole') === 'edit');
+
+  // フィルター
+  const search = (document.getElementById('bf-bk-search')?.value || '').trim().toLowerCase();
+  const facF = document.getElementById('bf-bk-facility')?.value || '';
+  const statusF = document.getElementById('bf-bk-status')?.value || '';
+  if (search) data = data.filter(d => d.name && d.name.toLowerCase().includes(search));
+  if (facF) data = data.filter(d => normFac(d.facility) === facF);
+  if (statusF === '要対応') {
+    const td = new Date(); td.setHours(0,0,0,0);
+    data = data.filter(d => (!d.status||d.status==='未対応') && d.bookDate && (() => { const m=(d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < td; })());
+  } else if (statusF) {
+    if (statusF === '未対応') data = data.filter(d => !d.status || d.status === '未対応');
+    else data = data.filter(d => d.status === statusF);
+  }
+
+  // 統計
+  const active = data.filter(d => d.status !== '除外');
+  const total = active.length;
+  const cancelled = active.filter(d => d.status === 'キャンセル').length;
+  const visited = active.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const contracted = active.filter(d => d.status === '成約').length;
+  const todayR = new Date(); todayR.setHours(0,0,0,0);
+  const past = active.filter(d => { const m=(d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayR; });
+  const pastV = past.filter(d => d.status==='来院済'||d.status==='成約').length;
+  const visitRate = past.length > 0 ? Math.round(pastV/past.length*100) : 0;
+  const overdue = active.filter(d => (!d.status||d.status==='未対応') && d.bookDate && (() => { const m=(d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayR; })()).length;
+
+  document.getElementById('bf-bk-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">BF予約</span><span class="stat-num">${total}</span></div>
+    ${overdue > 0 ? `<div class="stat-card" style="border-color:var(--red)"><span class="stat-label" style="color:var(--red)">要対応</span><span class="stat-num" style="color:var(--red)">${overdue}</span></div>` : ''}
+    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
+    <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
+    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${visitRate}%</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+  `;
+
+  // 医院フィルター選択肢
+  const facs = [...new Set(allBFData.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
+  const facEl = document.getElementById('bf-bk-facility');
+  if (facEl) { const cur = facEl.value; facEl.innerHTML = '<option value="">医院:全て</option>' + facs.map(f => `<option ${f===cur?'selected':''}>${f}</option>`).join(''); }
+
+  document.getElementById('bf-count').textContent = data.length + '件';
+  const memos = loadData('bk-memos', {});
+  const bkExtra = loadData('bk-extra', {});
   const sorted = [...data].sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
-  document.getElementById('bf-tbody').innerHTML = sorted.slice(0,100).map(d => `<tr>
-    <td style="font-size:10px">${(d.applyDate||'').match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : '-'}</td>
+  const tbody = document.getElementById('bf-tbody');
+
+  tbody.innerHTML = sorted.slice(0, 200).map((d, idx) => {
+    const key = d.name+'|'+d.applyDate;
+    const extra = bkExtra[key] || {};
+    const memo = d._memo || memos[key] || '';
+    const rowStyle = d.status==='除外'?'background:#f5f5f5;opacity:0.5;text-decoration:line-through':d.status==='成約'?'background:#f0fdf4':d.status==='来院済'?'background:#eff6ff':d.status==='キャンセル'?'background:#fef2f2':'';
+    return `<tr style="${rowStyle}">
+    <td style="font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
+    <td style="font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
     <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
-    <td style="font-size:11px;font-weight:500">${d.name}</td>
+    <td style="font-size:11px;font-weight:500;text-align:left">${d.name}</td>
     <td style="font-size:10px">${normFac(d.facility)}</td>
-    <td style="font-size:9px;color:var(--text-sub)">${(d.source||'-').slice(0,15)}</td>
-    <td>${statusBadge(d.status)}</td>
-  </tr>`).join('') || '<tr><td colspan="6" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+    <td style="font-size:10px">${d.phone||'-'}</td>
+    <td style="font-size:10px;text-align:left;max-width:90px;overflow:hidden;text-overflow:ellipsis">${d.email||'-'}</td>
+    <td style="font-size:9px;color:var(--text-muted);max-width:70px;overflow:hidden;text-overflow:ellipsis">${d.source||'-'}</td>
+    <td style="text-align:center">${isAdmin ? `<select class="form-select bf-bk-status-sel" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}"><option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option><option ${d.status==='確認済'?'selected':''}>確認済</option><option ${d.status==='来院済'?'selected':''}>来院済</option><option ${d.status==='成約'?'selected':''}>成約</option><option ${d.status==='キャンセル'?'selected':''}>キャンセル</option><option ${d.status==='除外'?'selected':''}>除外</option></select>` : (d.status||'未対応')}</td>
+    <td style="font-size:10px;max-width:50px;overflow:hidden;text-overflow:ellipsis;cursor:pointer" class="bf-bk-memo" data-name="${d.name}" data-apply="${d.applyDate}" title="${(memo||'').replace(/"/g,'&quot;')}">${memo ? memo.slice(0,6)+(memo.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>'}</td>
+    <td style="text-align:center;${extra.contractService?'background:#dcfce7;color:#15803d;font-weight:600':''}">${isAdmin ? `<select class="form-select bf-bk-field" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px"><option value="">-</option><option ${(extra.contractService||d.contractService)==='BF'?'selected':''}>BF</option><option ${(extra.contractService||d.contractService)==='矯正(表)'?'selected':''}>矯正(表)</option><option ${(extra.contractService||d.contractService)==='矯正(裏)'?'selected':''}>矯正(裏)</option><option ${(extra.contractService||d.contractService)==='ﾗﾌﾞﾘｴ'?'selected':''}>ﾗﾌﾞﾘｴ</option><option ${(extra.contractService||d.contractService)==='ｲﾝﾌﾟﾗﾝﾄ'?'selected':''}>ｲﾝﾌﾟﾗﾝﾄ</option></select>` : (extra.contractService||d.contractService||'-')}</td>
+    <td>${isAdmin ? `<input type="number" class="form-input bf-bk-field" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${extra.contractAmount||d.contractAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:60px;text-align:center">` : '-'}</td>
+    <td>${isAdmin ? `<input type="month" class="form-input bf-bk-field" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${extra.paymentMonth||d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : '-'}</td>
+    <td>${isAdmin ? `<input type="month" class="form-input bf-bk-field" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${extra.incentiveMonth||d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : '-'}</td>
+    <td>${isAdmin ? `<input type="number" class="form-input bf-bk-field" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${extra.incentiveAmount||d.incentiveAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:60px;text-align:center">` : '-'}</td>
+  </tr>`}).join('') || '<tr><td colspan="15" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+
+  // イベント: ステータス変更
+  if (isAdmin) {
+    tbody.querySelectorAll('.bf-bk-status-sel').forEach(sel => {
+      sel.addEventListener('change', () => {
+        const name = sel.dataset.name, apply = sel.dataset.apply, newStatus = sel.value;
+        if ((newStatus==='キャンセル'||newStatus==='除外') && !confirm(name+' を「'+newStatus+'」にしますか？')) { const m = bookingsData.find(d=>d.name===name&&d.applyDate===apply); sel.value = m?m.status||'未対応':'未対応'; return; }
+        const match = bookingsData.find(d => d.name===name && d.applyDate===apply);
+        if (match) match.status = newStatus;
+        sel.style.borderColor = 'var(--green)';
+        setTimeout(() => sel.style.borderColor = '', 1000);
+        sb.from('booking_status').upsert({ name, apply_date: apply, status: newStatus }, { onConflict: 'name,apply_date' }).then(() => {});
+      });
+    });
+    // メモ
+    tbody.querySelectorAll('.bf-bk-memo').forEach(td => {
+      td.addEventListener('click', () => openMemoModal(td.dataset.name, td.dataset.apply, td));
+    });
+    // 追加フィールド
+    const bkExtraLocal = loadData('bk-extra', {});
+    const saveExtraBF = (name, apply, field, value) => {
+      const key = name+'|'+apply;
+      if (!bkExtraLocal[key]) bkExtraLocal[key] = {};
+      bkExtraLocal[key][field] = value;
+      saveData('bk-extra', bkExtraLocal);
+      const dbField = field==='contractService'?'contract_service':field==='contractAmount'?'contract_amount':field==='paymentMonth'?'payment_month':field==='incentiveAmount'?'incentive_amount':'incentive_month';
+      const update = { name, apply_date: apply };
+      update[dbField] = field==='contractAmount'||field==='incentiveAmount' ? Number(value)||0 : value;
+      sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' }).then(() => {});
+    };
+    tbody.querySelectorAll('.bf-bk-field').forEach(el => {
+      el.addEventListener('change', () => {
+        saveExtraBF(el.dataset.name, el.dataset.apply, el.dataset.field, el.value);
+        el.style.borderColor = 'var(--green)';
+        setTimeout(() => el.style.borderColor = '', 1000);
+      });
+    });
+  }
 }
 
 // === 申込分析 ===

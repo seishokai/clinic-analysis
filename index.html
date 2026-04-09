@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=82">
+  <link rel="stylesheet" href="styles.css?v=83">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -346,7 +346,7 @@
           <button class="sub-nav-btn active bf-sub-btn" data-bfsub="bf-progress">進捗管理</button>
           <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-patients">患者リスト</button>
           <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-contracts">成約リスト</button>
-          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-bookings">予約ツール</button>
+          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-bookings">予約一覧</button>
         </div>
 
         <!-- BF進捗管理 -->
@@ -401,14 +401,23 @@
           </div>
         </div>
 
-        <!-- BF予約ツール -->
+        <!-- BF予約一覧 -->
         <div id="bf-bookings" hidden>
-          <div class="page-header"><h2>BF 予約ツール</h2></div>
-          <div class="card">
-            <div class="card-header">予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-            <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
-              <table class="data-table">
-                <thead><tr><th>申込</th><th>予約</th><th>名前</th><th>医院</th><th>プロモ</th><th>状態</th></tr></thead>
+          <div class="page-header"><h2>BF 予約一覧</h2></div>
+          <div class="stats-row" id="bf-bk-stats" style="gap:6px;margin-bottom:8px"></div>
+          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+            <button class="btn" id="bf-bk-progress" style="min-height:30px;padding:6px 12px;font-size:11px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px">進捗</button>
+            <button class="btn" id="bf-bk-today" style="min-height:30px;padding:6px 12px;font-size:11px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px">今日予約</button>
+            <button class="btn btn-outline" id="bf-bk-reset" style="min-height:30px;padding:6px 10px;font-size:11px;border-radius:20px">全表示</button>
+            <input type="text" class="form-input" id="bf-bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
+            <select class="form-select" id="bf-bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
+            <select class="form-select" id="bf-bk-status" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="要対応">要対応</option><option value="未対応">未対応</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select>
+          </div>
+          <div class="card" style="padding:8px">
+            <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">BF予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+            <div class="data-table-wrap" style="max-height:calc(100vh - 350px);overflow-y:auto">
+              <table class="data-table compact">
+                <thead><tr><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>プロモ</th><th>状態</th><th>メモ</th><th>成約</th><th>金額</th><th>入金月</th><th>インセ月</th><th>インセ額</th></tr></thead>
                 <tbody id="bf-tbody"></tbody>
               </table>
             </div>
@@ -886,6 +895,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=82"></script>
+  <script src="app.js?v=83"></script>
 </body>
 </html>
