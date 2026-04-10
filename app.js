@@ -3082,6 +3082,66 @@ function renderAnalysis() {
     <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(amt)}</span></div>
   `;
 
+  // ファネル分析
+  const funnelEl = document.getElementById('an-funnel');
+  if (funnelEl) {
+    const fTotal = data.length;
+    const fCancelled = data.filter(d => d.status === 'キャンセル').length;
+    const fActive = fTotal - fCancelled;
+    const fConfirmed = data.filter(d => ['確認済','来院済','成約'].includes(d.status)).length;
+    const fVisited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+    const fContracted = data.filter(d => d.status === '成約').length;
+
+    const steps = [
+      { label: '申込', count: fTotal, color: '#6366f1', width: 100 },
+      { label: '有効（キャンセル除）', count: fActive, color: '#8b5cf6', width: fTotal > 0 ? Math.round(fActive/fTotal*100) : 0 },
+      { label: '確認済', count: fConfirmed, color: '#0ea5e9', width: fTotal > 0 ? Math.round(fConfirmed/fTotal*100) : 0 },
+      { label: '来院', count: fVisited, color: '#22c55e', width: fTotal > 0 ? Math.round(fVisited/fTotal*100) : 0 },
+      { label: '成約', count: fContracted, color: '#f59e0b', width: fTotal > 0 ? Math.round(fContracted/fTotal*100) : 0 },
+    ];
+
+    funnelEl.innerHTML = `
+      <div class="funnel">
+        ${steps.map((s, i) => {
+          const prevCount = i > 0 ? steps[i-1].count : fTotal;
+          const convRate = prevCount > 0 ? Math.round(s.count / prevCount * 100) : 0;
+          const dropRate = prevCount > 0 ? Math.round((prevCount - s.count) / prevCount * 100) : 0;
+          return (i > 0 ? '<div class="funnel-arrow">→</div>' : '') +
+            `<div class="funnel-step">
+              <div class="funnel-bar" style="background:${s.color};width:${Math.max(s.width, 20)}%;min-width:60px">
+                <span style="font-size:18px">${s.count}</span>
+                <span style="font-size:10px;opacity:0.8">${s.width}%</span>
+              </div>
+              <div class="funnel-label">${s.label}</div>
+              ${i > 0 ? `<div class="funnel-rate">${convRate}% 転換 / ${dropRate}% 離脱</div>` : '<div class="funnel-rate">100%</div>'}
+            </div>`;
+        }).join('')}
+      </div>
+      <div style="margin-top:12px;display:grid;grid-template-columns:repeat(4,1fr);gap:8px;font-size:11px">
+        <div style="background:#f8f9fa;padding:8px;border-radius:6px;text-align:center">
+          <div style="font-weight:600;color:var(--text)">キャンセル率</div>
+          <div style="font-size:18px;font-weight:700;color:var(--red)">${fTotal > 0 ? Math.round(fCancelled/fTotal*100) : 0}%</div>
+          <div style="color:var(--text-sub)">${fCancelled}/${fTotal}件</div>
+        </div>
+        <div style="background:#f8f9fa;padding:8px;border-radius:6px;text-align:center">
+          <div style="font-weight:600;color:var(--text)">確認→来院率</div>
+          <div style="font-size:18px;font-weight:700;color:#0ea5e9">${fConfirmed > 0 ? Math.round(fVisited/fConfirmed*100) : 0}%</div>
+          <div style="color:var(--text-sub)">${fVisited}/${fConfirmed}件</div>
+        </div>
+        <div style="background:#f8f9fa;padding:8px;border-radius:6px;text-align:center">
+          <div style="font-weight:600;color:var(--text)">来院→成約率</div>
+          <div style="font-size:18px;font-weight:700;color:var(--green)">${fVisited > 0 ? Math.round(fContracted/fVisited*100) : 0}%</div>
+          <div style="color:var(--text-sub)">${fContracted}/${fVisited}件</div>
+        </div>
+        <div style="background:#f8f9fa;padding:8px;border-radius:6px;text-align:center">
+          <div style="font-weight:600;color:var(--text)">全体成約率</div>
+          <div style="font-size:18px;font-weight:700;color:#f59e0b">${fTotal > 0 ? Math.round(fContracted/fTotal*100) : 0}%</div>
+          <div style="color:var(--text-sub)">${fContracted}/${fTotal}件</div>
+        </div>
+      </div>
+    `;
+  }
+
   // 軸でグループ化
   const axis = window._anAxis || 'promo';
   const axisLabel = axis==='promo'?'プロモーション':axis==='facility'?'医院':'相談';

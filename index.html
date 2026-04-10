@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=85">
+  <link rel="stylesheet" href="styles.css?v=86">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -460,6 +460,12 @@
         <!-- 統計 -->
         <div class="stats-row" id="an-stats" style="gap:6px;margin-bottom:16px"></div>
 
+        <!-- ファネル分析 -->
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header">ファネル分析</div>
+          <div id="an-funnel"></div>
+        </div>
+
         <!-- 分析軸切替 -->
         <div style="display:flex;gap:4px;margin-bottom:16px">
           <button class="btn btn-dark an-axis-btn" data-axis="promo" style="font-size:11px;padding:6px 12px;min-height:28px">プロモ別</button>
@@ -897,6 +903,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=85"></script>
+  <script src="app.js?v=86"></script>
 </body>
 </html>

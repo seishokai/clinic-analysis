@@ -101,6 +101,14 @@ body {
 .header.role-custom .logo-text { color: #1d4ed8; }
 .header-user { font-size: 11px; color: var(--text-sub); background: var(--bg); padding: 4px 10px; border-radius: 12px; white-space: nowrap; }
 
+/* Funnel */
+.funnel { display: flex; align-items: center; gap: 0; padding: 20px 0; }
+.funnel-step { flex: 1; text-align: center; position: relative; }
+.funnel-bar { height: 60px; margin: 0 auto; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-direction: column; color: white; font-weight: 700; transition: width 0.3s; }
+.funnel-label { font-size: 11px; color: var(--text-sub); margin-top: 8px; }
+.funnel-rate { font-size: 10px; color: var(--text-muted); margin-top: 2px; }
+.funnel-arrow { font-size: 20px; color: var(--border); flex-shrink: 0; margin: 0 -4px; }
+
 /* Toast notification */
 .toast {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
