@@ -2186,10 +2186,15 @@ function renderBookings() {
   const pastVisited = pastBookings.filter(d => d.status === '来院済' || d.status === '成約').length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
-  // 成約金額集計（localStorageから）
+  // 成約金額集計（フィルター済みデータから）
   const bkExtraStats = loadData('bk-extra', {});
   let totalAmount = 0;
-  Object.values(bkExtraStats).forEach(v => { if (v.contractAmount) totalAmount += Number(v.contractAmount); });
+  active.forEach(d => {
+    const key = d.name + '|' + d.applyDate;
+    const extra = bkExtraStats[key] || {};
+    const amt = Number(extra.contractAmount) || Number(d.contractAmount) || 0;
+    if (amt) totalAmount += amt;
+  });
 
   // 未対応アラート数
   const todayCheck = new Date(); todayCheck.setHours(0,0,0,0);
