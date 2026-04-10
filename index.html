@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=86">
+  <link rel="stylesheet" href="styles.css?v=87">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -343,14 +343,14 @@
       <div id="sub-bk-bf" hidden>
         <!-- BFサブナビ -->
         <div class="sub-nav" style="margin-bottom:12px">
-          <button class="sub-nav-btn active bf-sub-btn" data-bfsub="bf-progress">進捗管理</button>
+          <button class="sub-nav-btn active bf-sub-btn" data-bfsub="bf-bookings">予約一覧</button>
+          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-progress">進捗管理</button>
           <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-patients">患者リスト</button>
           <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-contracts">成約リスト</button>
-          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-bookings">予約一覧</button>
         </div>
 
         <!-- BF進捗管理 -->
-        <div id="bf-progress">
+        <div id="bf-progress" hidden>
         <div class="page-header"><h2>BF 進捗管理</h2></div>
         <div class="stats-row" id="bf-stats" style="margin-bottom:16px"></div>
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
@@ -402,7 +402,7 @@
         </div>
 
         <!-- BF予約一覧 -->
-        <div id="bf-bookings" hidden>
+        <div id="bf-bookings">
           <div class="page-header"><h2>BF 予約一覧</h2></div>
           <div class="stats-row" id="bf-bk-stats" style="gap:6px;margin-bottom:8px"></div>
           <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
@@ -903,6 +903,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=86"></script>
+  <script src="app.js?v=87"></script>
 </body>
 </html>

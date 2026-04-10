@@ -273,12 +273,26 @@ function setupEventListeners() {
 
   // BF booking list filters
   let _bfAllData = [];
-  document.getElementById('bf-bk-progress')?.addEventListener('click', () => { document.getElementById('bf-bk-status').value = '要対応'; renderBFBookings(_bfAllData); });
-  document.getElementById('bf-bk-today')?.addEventListener('click', () => { window._bfTodayFilter = true; renderBFBookings(_bfAllData); });
-  document.getElementById('bf-bk-reset')?.addEventListener('click', () => { ['bf-bk-status','bf-bk-facility','bf-bk-period','bf-bk-month'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; }); document.getElementById('bf-bk-search').value=''; window._bfTodayFilter=false; renderBFBookings(_bfAllData); });
-  ['bf-bk-facility','bf-bk-status','bf-bk-period','bf-bk-month'].forEach(id => { document.getElementById(id)?.addEventListener('change', () => renderBFBookings(_bfAllData)); });
+  function ensureBFData() {
+    if (_bfAllData.length === 0 && bookingsData.length > 0) {
+      const bkExtraBF = loadData('bk-extra', {});
+      _bfAllData = bookingsData.filter(d => {
+        if (d.status === '除外') return false;
+        if (normSvc(d.service) === 'BF') return true;
+        const key = d.name + '|' + d.applyDate;
+        const extra = bkExtraBF[key];
+        if (extra && extra.contractService === 'BF') return true;
+        if (d.contractService === 'BF') return true;
+        return false;
+      });
+    }
+  }
+  document.getElementById('bf-bk-progress')?.addEventListener('click', () => { document.getElementById('bf-bk-status').value = '要対応'; ensureBFData(); renderBFBookings(_bfAllData); });
+  document.getElementById('bf-bk-today')?.addEventListener('click', () => { window._bfTodayFilter = true; ensureBFData(); renderBFBookings(_bfAllData); });
+  document.getElementById('bf-bk-reset')?.addEventListener('click', () => { ['bf-bk-status','bf-bk-facility','bf-bk-period','bf-bk-month'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; }); document.getElementById('bf-bk-search').value=''; window._bfTodayFilter=false; ensureBFData(); renderBFBookings(_bfAllData); });
+  ['bf-bk-facility','bf-bk-status','bf-bk-period','bf-bk-month'].forEach(id => { document.getElementById(id)?.addEventListener('change', () => { ensureBFData(); renderBFBookings(_bfAllData); }); });
   let bfSearchTimer;
-  document.getElementById('bf-bk-search')?.addEventListener('input', () => { clearTimeout(bfSearchTimer); bfSearchTimer = setTimeout(() => renderBFBookings(_bfAllData), 300); });
+  document.getElementById('bf-bk-search')?.addEventListener('input', () => { clearTimeout(bfSearchTimer); bfSearchTimer = setTimeout(() => { ensureBFData(); renderBFBookings(_bfAllData); }, 300); });
 
   // BF sub-tabs
   document.querySelectorAll('.bf-sub-btn').forEach(btn => {
