@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=89">
+  <link rel="stylesheet" href="styles.css?v=90">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -150,6 +150,7 @@
         <button class="sub-nav-btn" data-sub="bk-search">患者検索</button>
         <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
         <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
+        <div class="sub-divider"></div>
         <button class="sub-nav-btn" data-sub="bk-bf" id="bf-tab-btn" style="display:none">BF</button>
         <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="BF銀座">BF銀座</button>
         <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="エスカ">エスカ</button>
@@ -341,12 +342,12 @@
 
       <!-- BF -->
       <div id="sub-bk-bf" hidden>
-        <!-- BFサブナビ -->
-        <div class="sub-nav" style="margin-bottom:12px">
-          <button class="sub-nav-btn active bf-sub-btn" data-bfsub="bf-bookings">予約一覧</button>
-          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-progress">進捗管理</button>
-          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-patients">患者リスト</button>
-          <button class="sub-nav-btn bf-sub-btn" data-bfsub="bf-contracts">成約リスト</button>
+        <!-- BFサブナビ（メインサブナビと同じバーに表示） -->
+        <div style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--bg);padding:0 12px;margin-bottom:8px;scrollbar-width:none">
+          <button class="bf-sub-btn" data-bfsub="bf-bookings" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text);cursor:pointer;white-space:nowrap;border-bottom:2px solid var(--accent);font-weight:600">一覧</button>
+          <button class="bf-sub-btn" data-bfsub="bf-progress" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">進捗</button>
+          <button class="bf-sub-btn" data-bfsub="bf-patients" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">患者</button>
+          <button class="bf-sub-btn" data-bfsub="bf-contracts" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">成約</button>
         </div>
 
         <!-- BF進捗管理 -->
@@ -915,6 +916,7 @@
         <div class="form-group"><label class="form-label">プロモ</label><input type="text" class="form-input" id="re-source"></div>
         <div style="display:flex;gap:8px">
           <button class="btn btn-dark" id="re-save" style="flex:1">保存</button>
+          <button class="btn" id="re-hide" style="background:#f5f5f5;color:#9ca3af;border:1px solid var(--border)">非表示</button>
           <button class="btn btn-outline" onclick="closeRowEditModal()">キャンセル</button>
         </div>
       </div>
@@ -938,6 +940,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=89"></script>
+  <script src="app.js?v=90"></script>
 </body>
 </html>

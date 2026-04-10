@@ -238,8 +238,14 @@ function setupEventListeners() {
   document.getElementById('comment-save').addEventListener('click', saveComment);
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
-  // Row edit modal save
+  // Row edit modal save & hide
   document.getElementById('re-save').addEventListener('click', saveRowEdit);
+  document.getElementById('re-hide').addEventListener('click', () => {
+    if (!_rowEditTarget) return;
+    if (!confirm(_rowEditTarget.name + ' を非表示にしますか？\n（統計からも除外されます。データは残ります）')) return;
+    document.getElementById('re-status').value = '除外';
+    saveRowEdit();
+  });
 
   // Memo modal save
   document.getElementById('memo-modal-save').addEventListener('click', saveMemoModal);
@@ -302,8 +308,10 @@ function setupEventListeners() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       // BFサブタブだけ切替（親のサブナビは触らない）
-      document.querySelectorAll('.bf-sub-btn').forEach(b => b.classList.remove('active'));
-      btn.classList.add('active');
+      document.querySelectorAll('.bf-sub-btn').forEach(b => { b.style.borderBottomColor = 'transparent'; b.style.color = 'var(--text-sub)'; b.style.fontWeight = '400'; });
+      btn.style.borderBottomColor = 'var(--accent)';
+      btn.style.color = 'var(--text)';
+      btn.style.fontWeight = '600';
       const sub = btn.dataset.bfsub;
       ['bf-progress','bf-patients','bf-contracts','bf-bookings'].forEach(id => {
         const el = document.getElementById(id);
