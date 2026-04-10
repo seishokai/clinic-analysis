@@ -238,6 +238,9 @@ function setupEventListeners() {
   document.getElementById('comment-save').addEventListener('click', saveComment);
   document.getElementById('rev-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
 
+  // Row edit modal save
+  document.getElementById('re-save').addEventListener('click', saveRowEdit);
+
   // Memo modal save
   document.getElementById('memo-modal-save').addEventListener('click', saveMemoModal);
 
@@ -2272,7 +2275,8 @@ function renderBookings() {
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
     <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
       ${fmtBookDate(d.bookDate)}</td>
-    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">${d.name}</td>
+    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-row-edit" data-name="${d.name}" data-apply="${d.applyDate}" title="クリックで編集"`:''}>
+      ${d.name}</td>
     <td style="font-size:10px;white-space:nowrap">${normSvc(d.service)}</td>
     <td style="font-size:10px;white-space:nowrap">${normFac(d.facility)}</td>
     <td style="font-size:10px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
@@ -2369,6 +2373,11 @@ function renderBookings() {
       });
     });
 
+    // 名前クリックで行編集モーダル
+    tbody.querySelectorAll('.bk-row-edit').forEach(td => {
+      td.addEventListener('click', () => openRowEditModal(td.dataset.name, td.dataset.apply));
+    });
+
     // 予約日クリックで変更（インライン入力）
     tbody.querySelectorAll('.bk-edit-date').forEach(td => {
       td.addEventListener('click', () => {
@@ -2401,6 +2410,75 @@ function renderBookings() {
       });
     });
   }
+}
+
+// === Row Edit Modal ===
+let _rowEditTarget = null;
+function openRowEditModal(name, applyDate) {
+  const d = bookingsData.find(b => b.name === name && b.applyDate === applyDate);
+  if (!d) return;
+  _rowEditTarget = d;
+  document.getElementById('row-edit-title').textContent = d.name + ' を編集';
+  document.getElementById('re-name').value = d.name || '';
+  document.getElementById('re-bookdate').value = d.bookDate || '';
+  document.getElementById('re-service').value = d.service || '';
+  document.getElementById('re-phone').value = d.phone || '';
+  document.getElementById('re-email').value = d.email || '';
+  document.getElementById('re-source').value = d.source || '';
+  // 医院
+  const facSel = document.getElementById('re-facility');
+  const facNorm = normFac(d.facility);
+  for (let i = 0; i < facSel.options.length; i++) { if (facSel.options[i].value === facNorm) { facSel.selectedIndex = i; break; } }
+  // ステータス
+  const stSel = document.getElementById('re-status');
+  const st = d.status || '未対応';
+  for (let i = 0; i < stSel.options.length; i++) { if (stSel.options[i].value === st) { stSel.selectedIndex = i; break; } }
+  document.getElementById('row-edit-modal').hidden = false;
+  document.body.style.overflow = 'hidden';
+}
+function closeRowEditModal() {
+  document.getElementById('row-edit-modal').hidden = true;
+  document.body.style.overflow = '';
+  _rowEditTarget = null;
+}
+async function saveRowEdit() {
+  if (!_rowEditTarget) return;
+  const d = _rowEditTarget;
+  const oldName = d.name;
+  const oldApply = d.applyDate;
+
+  // ローカルデータ更新
+  d.name = document.getElementById('re-name').value.trim() || d.name;
+  d.bookDate = document.getElementById('re-bookdate').value || d.bookDate;
+  d.service = document.getElementById('re-service').value || d.service;
+  d.facility = document.getElementById('re-facility').value;
+  d.status = document.getElementById('re-status').value;
+  d.phone = document.getElementById('re-phone').value;
+  d.email = document.getElementById('re-email').value;
+  d.source = document.getElementById('re-source').value;
+
+  // DB保存（ステータス・予約日変更）
+  await sb.from('booking_status').upsert({
+    name: oldName, apply_date: oldApply,
+    status: d.status,
+    book_date: d.bookDate
+  }, { onConflict: 'name,apply_date' }).catch(() => {});
+
+  // 手動登録の場合はmanual_bookingsも更新
+  if (d.tool === '手動') {
+    await sb.from('manual_bookings').update({
+      name: d.name, book_date: d.bookDate, service: d.service,
+      facility: d.facility, phone: d.phone, email: d.email,
+      source: d.source, status: d.status
+    }).eq('name', oldName).eq('apply_date', oldApply).catch(() => {});
+  }
+
+  // GAS APIにもステータス送信
+  fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: oldName, applyDate: oldApply, status: d.status }) }).catch(() => {});
+
+  showToast(d.name + ' を更新しました');
+  closeRowEditModal();
+  renderBookings();
 }
 
 // === Memo Modal ===

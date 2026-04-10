@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=87">
+  <link rel="stylesheet" href="styles.css?v=88">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -886,6 +886,41 @@
     </div>
   </div>
 
+  <!-- 行編集モーダル -->
+  <div id="row-edit-modal" class="modal" hidden>
+    <div class="modal-overlay" onclick="closeRowEditModal()"></div>
+    <div class="modal-content" style="max-width:500px;padding:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+        <h3 style="font-size:16px;font-weight:700" id="row-edit-title">予約情報を編集</h3>
+        <button class="modal-close" onclick="closeRowEditModal()" style="position:static;float:none">&times;</button>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:12px">
+        <div class="form-group"><label class="form-label">名前</label><input type="text" class="form-input" id="re-name"></div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-group"><label class="form-label">予約日時</label><input type="text" class="form-input" id="re-bookdate" placeholder="例: 2026/4/15 14:00"></div>
+          <div class="form-group"><label class="form-label">相談</label><input type="text" class="form-input" id="re-service"></div>
+        </div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-group"><label class="form-label">医院</label>
+            <select class="form-select" id="re-facility"><option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>岩田</option><option>大森</option><option>京都</option></select>
+          </div>
+          <div class="form-group"><label class="form-label">ステータス</label>
+            <select class="form-select" id="re-status"><option>未対応</option><option>確認済</option><option>来院済</option><option>成約</option><option>キャンセル</option><option>除外</option></select>
+          </div>
+        </div>
+        <div class="form-grid" style="grid-template-columns:1fr 1fr">
+          <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="re-phone"></div>
+          <div class="form-group"><label class="form-label">メール</label><input type="text" class="form-input" id="re-email"></div>
+        </div>
+        <div class="form-group"><label class="form-label">プロモ</label><input type="text" class="form-input" id="re-source"></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-dark" id="re-save" style="flex:1">保存</button>
+          <button class="btn btn-outline" onclick="closeRowEditModal()">キャンセル</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- メモモーダル -->
   <div id="memo-modal" class="modal" hidden>
     <div class="modal-overlay" onclick="closeMemoModal()"></div>
@@ -903,6 +938,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=87"></script>
+  <script src="app.js?v=88"></script>
 </body>
 </html>
