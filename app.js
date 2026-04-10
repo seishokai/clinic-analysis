@@ -2441,7 +2441,7 @@ function closeRowEditModal() {
   document.body.style.overflow = '';
   _rowEditTarget = null;
 }
-async function saveRowEdit() {
+function saveRowEdit() {
   if (!_rowEditTarget) return;
   const d = _rowEditTarget;
   const oldName = d.name;
@@ -2457,23 +2457,19 @@ async function saveRowEdit() {
   d.email = document.getElementById('re-email').value;
   d.source = document.getElementById('re-source').value;
 
-  // DB保存（ステータス・予約日変更）
-  await sb.from('booking_status').upsert({
-    name: oldName, apply_date: oldApply,
-    status: d.status,
-    book_date: d.bookDate
-  }, { onConflict: 'name,apply_date' }).catch(() => {});
+  // bk-extraにも保存
+  const bkEx = loadData('bk-extra', {});
+  const key = oldName + '|' + oldApply;
+  if (!bkEx[key]) bkEx[key] = {};
+  bkEx[key].editedName = d.name;
+  bkEx[key].editedBookDate = d.bookDate;
+  saveData('bk-extra', bkEx);
 
-  // 手動登録の場合はmanual_bookingsも更新
+  // DB保存（バックグラウンド）
+  sb.from('booking_status').upsert({ name: oldName, apply_date: oldApply, status: d.status, book_date: d.bookDate }, { onConflict: 'name,apply_date' }).then(() => {});
   if (d.tool === '手動') {
-    await sb.from('manual_bookings').update({
-      name: d.name, book_date: d.bookDate, service: d.service,
-      facility: d.facility, phone: d.phone, email: d.email,
-      source: d.source, status: d.status
-    }).eq('name', oldName).eq('apply_date', oldApply).catch(() => {});
+    sb.from('manual_bookings').update({ name: d.name, book_date: d.bookDate, service: d.service, facility: d.facility, phone: d.phone, email: d.email, source: d.source, status: d.status }).eq('name', oldName).eq('apply_date', oldApply).then(() => {});
   }
-
-  // GAS APIにもステータス送信
   fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: oldName, applyDate: oldApply, status: d.status }) }).catch(() => {});
 
   showToast(d.name + ' を更新しました');
