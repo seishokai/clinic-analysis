@@ -2209,9 +2209,8 @@ function renderBookings() {
     ${overdueCount > 0 ? `<div class="stat-card" style="border-color:var(--red)"><span class="stat-label" style="color:var(--red)">要対応</span><span class="stat-num" style="color:var(--red)">${overdueCount}</span></div>` : ''}
     <div class="stat-card"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span></div>
     <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
-    <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span></div>
-    <div class="stat-card"><span class="stat-label">来院率</span><span class="stat-num">${visitRate}%</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px">${pastVisited}/${pastBookings.length}件</span></div>
-    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span></div>
+    <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
     <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
   `;
   // インセ金額は別途集計不要（各行で入力）
