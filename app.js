@@ -2099,8 +2099,11 @@ function renderBookings() {
   }
   if (monthFilter) {
     filtered = filtered.filter(d => {
-      const bd = d.bookDate.replace(/\//g, '-').slice(0, 7);
-      return bd === monthFilter;
+      const src = d.bookDate || d.applyDate;
+      if (!src) return false;
+      const m = src.match(/(\d{4})\D+(\d{1,2})/);
+      if (!m) return false;
+      return m[1] + '-' + String(parseInt(m[2])).padStart(2,'0') === monthFilter;
     });
   }
   // 今日予約フィルター
@@ -3040,7 +3043,16 @@ function renderAnalysis() {
   if (anSvc && anSvc.value) data = data.filter(d => sSvc(d.service) === anSvc.value);
   if (anPromo && anPromo.value) data = data.filter(d => d.source === anPromo.value);
   if (anTool && anTool.value) data = data.filter(d => d.tool === anTool.value);
-  if (anMonth && anMonth.value) data = data.filter(d => d.bookDate && d.bookDate.replace(/\//g,'-').slice(0,7) === anMonth.value);
+  if (anMonth && anMonth.value) {
+    data = data.filter(d => {
+      if (!d.bookDate && !d.applyDate) return false;
+      const src = d.bookDate || d.applyDate;
+      const m = src.match(/(\d{4})\D+(\d{1,2})/);
+      if (!m) return false;
+      const ym = m[1] + '-' + String(parseInt(m[2])).padStart(2,'0');
+      return ym === anMonth.value;
+    });
+  }
 
   // フィルター選択肢を更新
   if (anFac) { const facs = [...new Set(bookingsData.map(d => sFac(d.facility)).filter(Boolean))].sort(); const cur = anFac.value; anFac.innerHTML = '<option value="">全て</option>'+facs.map(f=>`<option ${f===cur?'selected':''}>${f}</option>`).join(''); }
