@@ -2596,7 +2596,7 @@ function renderFacTab(facility) {
     return `<tr style="${rs}">
       <td style="font-size:10px">${d.applyDate ? d.applyDate.match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : '-' : '-'}</td>
       <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
-      <td style="font-size:11px;font-weight:500">${d.name}</td>
+      <td style="font-size:11px;font-weight:500;cursor:pointer;text-decoration:underline dotted" class="fac-row-edit" data-name="${d.name}" data-apply="${d.applyDate}" title="クリックで編集">${d.name}</td>
       <td style="font-size:10px">${normSvc(d.service)}</td>
       <td style="font-size:10px">${d.phone||'-'}</td>
       <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${d.email||'-'}</td>
@@ -2607,6 +2607,18 @@ function renderFacTab(facility) {
       <td style="font-size:10px;text-align:center">${extra.contractAmount||d.contractAmount?'¥'+fmt(extra.contractAmount||d.contractAmount):'-'}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+
+  // 名前クリックで行編集
+  document.querySelectorAll('#fac-tbody .fac-row-edit').forEach(td => {
+    td.addEventListener('click', () => {
+      openRowEditModal(td.dataset.name, td.dataset.apply);
+      // 保存後にこの医院タブを再描画
+      const origSave = document.getElementById('re-save').onclick;
+      document.getElementById('re-save').onclick = null;
+      const handler = () => { saveRowEdit(); renderFacTab(currentFacTab); document.getElementById('re-save').removeEventListener('click', handler); };
+      document.getElementById('re-save').addEventListener('click', handler, { once: true });
+    });
+  });
 
   // メモクリック
   document.querySelectorAll('#fac-tbody .fac-memo-cell').forEach(td => {
@@ -2971,7 +2983,8 @@ function renderBFBookings(allBFData) {
     <td style="font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
     <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
-    <td style="font-size:11px;font-weight:500;text-align:left">${d.name}</td>
+    <td style="font-size:11px;font-weight:500;text-align:left;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bf-bk-row-edit" data-name="${d.name}" data-apply="${d.applyDate}" title="クリックで編集"`:''}>
+      ${d.name}</td>
     <td style="font-size:10px">${normFac(d.facility)}</td>
     <td style="font-size:10px">${d.phone||'-'}</td>
     <td style="font-size:10px;text-align:left;max-width:90px;overflow:hidden;text-overflow:ellipsis">${d.email||'-'}</td>
@@ -2984,6 +2997,16 @@ function renderBFBookings(allBFData) {
     <td>${isAdmin ? `<input type="month" class="form-input bf-bk-field" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${extra.incentiveMonth||d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : '-'}</td>
     <td>${isAdmin ? `<input type="number" class="form-input bf-bk-field" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${extra.incentiveAmount||d.incentiveAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:60px;text-align:center">` : '-'}</td>
   </tr>`}).join('') || '<tr><td colspan="15" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+
+  // 名前クリックで行編集
+  if (isAdmin) {
+    tbody.querySelectorAll('.bf-bk-row-edit').forEach(td => {
+      td.addEventListener('click', () => {
+        openRowEditModal(td.dataset.name, td.dataset.apply);
+        document.getElementById('re-save').addEventListener('click', () => { ensureBFData(); renderBFBookings(_bfAllData); }, { once: true });
+      });
+    });
+  }
 
   // イベント: ステータス変更
   if (isAdmin) {
