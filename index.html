@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=103">
+  <link rel="stylesheet" href="styles.css?v=104">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -20,7 +20,11 @@
       <!-- ポータルメニュー -->
       <div id="portal-menu" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
         <button onclick="document.getElementById('portal-menu').hidden=true;document.getElementById('login-section').hidden=false" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">売上管理</button>
-        <a href="https://studio.because-and.co.jp/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト</a>
+        <button onclick="document.getElementById('training-sub').hidden=!document.getElementById('training-sub').hidden" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト</button>
+        <div id="training-sub" hidden style="display:flex;flex-direction:column;gap:6px;padding-left:16px">
+          <a href="https://studio.because-and.co.jp/" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">動画研修</a>
+          <a href="https://studio.because-and.co.jp/" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">Q&A研修</a>
+        </div>
         <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">労務管理（ピノキオ）</a>
       </div>
 
@@ -970,6 +974,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=103"></script>
+  <script src="app.js?v=104"></script>
 </body>
 </html>
