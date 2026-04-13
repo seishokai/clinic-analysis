@@ -2723,15 +2723,39 @@ async function parseMailAndRegister() {
   const dateTime = extract([/日時[:：]\s*(.+)/i, /予約日時[:：]\s*(.+)/i, /予約日[:：]\s*(.+)/i]);
   const promo = extract([/プロモーションコード[:：]\s*(.+)/i, /プロモ[:：]\s*(.+)/i, /流入元[:：]\s*(.+)/i]);
 
+  // 登録日（メールの日付ヘッダーから）
+  let mailDate = '';
+  const mdPatterns = [
+    /(\d{1,2})月(\d{1,2})日.*?(\d{1,2}):(\d{2})/,  // 4月10日(金) 15:03
+    /(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/,  // 2026/4/10 15:03
+  ];
+  for (const p of mdPatterns) {
+    const m = text.match(p);
+    if (m) {
+      if (m.length === 5) { // 月日時分
+        const now2 = new Date();
+        mailDate = `${now2.getFullYear()}/${String(parseInt(m[1])).padStart(2,'0')}/${String(parseInt(m[2])).padStart(2,'0')} ${m[3]}:${m[4]}`;
+      } else if (m.length === 6) { // 年月日時分
+        mailDate = `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}/${String(parseInt(m[3])).padStart(2,'0')} ${m[4]}:${m[5]}`;
+      }
+      break;
+    }
+  }
+
   if (!name) { resultEl.textContent = '名前が読み取れませんでした'; showToast('名前が見つかりません', true); return; }
 
   // 確認表示
-  const parsed = `名前: ${name}\n医院: ${normFac(facility) || facility}\n施術: ${service}\n予約: ${dateTime}\n電話: ${phone}\nメール: ${email}\nプロモ: ${promo}`;
+  const parsed = `登録日: ${mailDate || '今日'}\n名前: ${name}\n医院: ${normFac(facility) || facility}\n施術: ${service}\n予約: ${dateTime}\n電話: ${phone}\nメール: ${email}\nプロモ: ${promo}`;
   if (!confirm('以下の内容で登録しますか？\n\n' + parsed)) { resultEl.textContent = 'キャンセルしました'; return; }
 
-  // 登録
-  const now = new Date();
-  const applyDate = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  // 登録日
+  let applyDate;
+  if (mailDate) {
+    applyDate = mailDate;
+  } else {
+    const now = new Date();
+    applyDate = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+  }
 
   const entry = {
     apply_date: applyDate,
