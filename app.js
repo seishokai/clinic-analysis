@@ -15,17 +15,21 @@ function showToast(msg, isError) {
 function normFac(f) {
   if (!f) return '-';
   if (f.includes('銀座')) return 'BF銀座';
-  if (f.includes('ウィズ')||f.includes('WITH')||f.includes('ワイズ')||f.includes('ウイズ')) return 'ウィズ';
+  // 小牧を先にチェック（ワイズ歯科矯正歯科＋KIDS イオン小牧店）
+  if (f.includes('小牧') || f.includes('KIDS') || f.includes('イオン')) return '小牧';
+  // ウィズ（名古屋ウィズ歯科・矯正歯科 / WITH DENTAL CLINIC）
+  if (f.includes('ウィズ') || f.includes('WITH') || f.includes('ウイズ')) return 'ウィズ';
+  // ワイズ = 小牧（ワイズ歯科矯正歯科）
+  if (f.includes('ワイズ')) return '小牧';
   if (f.includes('エスカ')) return 'エスカ';
-  if (f.includes('アール')||f.includes('名駅アール')) return 'アール';
+  if (f.includes('アール') || f.includes('名駅アール')) return 'アール';
   if (f.includes('ルミナス')) return 'ルミナス';
   if (f.includes('茶屋')) return '茶屋';
-  if (f.includes('小牧')) return '小牧';
-  if (f.includes('知立')) return '知立';
-  if (f.includes('八事')) return '八事';
+  if (f.includes('知立') || f.includes('アピタ')) return '知立';
+  if (f.includes('八事') || f.includes('やごと')) return '八事';
   if (f.includes('岩田')) return '岩田';
   if (f.includes('大森')) return '大森';
-  if (f.includes('京都')) return '京都';
+  if (f.includes('京都') || f.includes('河原町')) return '京都';
   return f.length > 8 ? f.slice(0,8)+'…' : f;
 }
 function normSvc(s) {
