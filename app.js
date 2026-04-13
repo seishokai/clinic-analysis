@@ -63,6 +63,30 @@ function fmtBookDate(d) {
   return d.slice(0, 8);
 }
 
+// === Unified Date Parser ===
+function parseDate(dateStr) {
+  if (!dateStr) return null;
+  const m = dateStr.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if (!m) return null;
+  return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+}
+function getYM(d) {
+  const src = d.bookDate || d.applyDate;
+  if (!src) return '';
+  const m = src.match(/(\d{4})\D+(\d{1,2})/);
+  return m ? m[1] + '-' + String(parseInt(m[2])).padStart(2,'0') : '';
+}
+function getApplyYM(d) {
+  if (!d.applyDate) return '';
+  const m = d.applyDate.match(/(\d{4})\D+(\d{1,2})/);
+  return m ? m[1] + '-' + String(parseInt(m[2])).padStart(2,'0') : '';
+}
+function getApplyDateStr(d) {
+  if (!d.applyDate) return '';
+  const m = d.applyDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  return m ? `${m[1]}-${String(parseInt(m[2])).padStart(2,'0')}-${String(parseInt(m[3])).padStart(2,'0')}` : '';
+}
+
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
 // プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
@@ -2104,7 +2128,7 @@ function renderBookings() {
   if (toolFilter) filtered = filtered.filter(d => d.tool === toolFilter);
   // プロモユーザーの場合、自分のプロモのみ表示
   if (userRole === 'promo' && promoFilter) {
-    filtered = filtered.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
+    filtered = filtered.filter(d => d.source && d.source.trim() === promoFilter.trim());
     document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
   }
   // カスタムユーザーの制限（完全一致）
@@ -2128,7 +2152,7 @@ function renderBookings() {
   if (statusFilter) {
     if (statusFilter === '要対応') {
       const td = new Date(); td.setHours(0,0,0,0);
-      filtered = filtered.filter(d => (!d.status || d.status === '未対応') && d.bookDate && new Date(d.bookDate.replace(/\//g,'-')) < td);
+      filtered = filtered.filter(d => (!d.status || d.status === '未対応') && (() => { const bd = parseDate(d.bookDate); return bd && bd < td; })());
     } else if (statusFilter === '未対応') filtered = filtered.filter(d => !d.status || d.status === '未対応');
     else filtered = filtered.filter(d => d.status === statusFilter);
   }
@@ -2141,13 +2165,7 @@ function renderBookings() {
     else if (periodFilter === 'fiscal') { const now = new Date(); const fy = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear()-1; filtered = filtered.filter(d => getYM(d) >= fy+'-07'); }
   }
   if (monthFilter) {
-    filtered = filtered.filter(d => {
-      const src = d.bookDate || d.applyDate;
-      if (!src) return false;
-      const m = src.match(/(\d{4})\D+(\d{1,2})/);
-      if (!m) return false;
-      return m[1] + '-' + String(parseInt(m[2])).padStart(2,'0') === monthFilter;
-    });
+    filtered = filtered.filter(d => getYM(d) === monthFilter);
   }
   // 今日予約フィルター
   if (window._bkTodayFilter) {
@@ -2165,11 +2183,8 @@ function renderBookings() {
   if (window._bkProgressFilter) {
     const td2 = new Date(); td2.setHours(0,0,0,0);
     filtered = filtered.filter(d => {
-      if (!d.bookDate) return false;
-      const m = d.bookDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
-      if (!m) return false;
-      const bd = new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
-      return bd < td2;
+      const bd = parseDate(d.bookDate);
+      return bd && bd < td2;
     });
     window._bkProgressFilter = false;
   }
@@ -2195,12 +2210,7 @@ function renderBookings() {
   const contracted = active.filter(d => d.status === '成約').length;
   // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
   const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
-  const pastBookings = active.filter(d => {
-    if (!d.bookDate) return false;
-    const m = d.bookDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
-    if (!m) return false;
-    return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3])) < todayForRate;
-  });
+  const pastBookings = active.filter(d => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; });
   const pastVisited = pastBookings.filter(d => d.status === '来院済' || d.status === '成約').length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
@@ -2218,8 +2228,8 @@ function renderBookings() {
   const todayCheck = new Date(); todayCheck.setHours(0,0,0,0);
   const overdueCount = filtered.filter(d => {
     if (d.status && d.status !== '未対応') return false;
-    if (!d.bookDate) return false;
-    return new Date(d.bookDate.replace(/\//g, '-')) < todayCheck;
+    const bd = parseDate(d.bookDate);
+    return bd && bd < todayCheck;
   }).length;
 
   document.getElementById('bk-stats').innerHTML = `
