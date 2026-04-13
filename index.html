@@ -6,7 +6,219 @@
   <title>清翔会</title>
   <link rel="stylesheet" href="styles.css?v=105">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>.modal[hidden]{display:none!important}</style>
+  <style>
+    .modal[hidden]{display:none!important}
+
+    /* ══ Q&A研修 スタイル ══ */
+    #view-qa {
+      display: none;
+      height: calc(100vh - 52px);
+      overflow: hidden;
+    }
+    #view-qa.active { display: flex; }
+    #qa-sidebar {
+      width: 220px;
+      flex-shrink: 0;
+      background: #fff;
+      border-right: 1.5px solid #e8e8e8;
+      height: 100%;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    #qa-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+    }
+    #qa-subheader {
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      padding: 11px 18px;
+      flex-shrink: 0;
+    }
+    #qa-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 18px 60px;
+    }
+    .qa-dept-btn {
+      width: 100%;
+      text-align: left;
+      border: none;
+      border-radius: 7px;
+      padding: 9px 10px;
+      font-size: 12.5px;
+      font-weight: 600;
+      background: transparent;
+      color: #444;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 2px;
+      cursor: pointer;
+      transition: background .15s;
+      font-family: inherit;
+    }
+    .qa-dept-btn:hover { background: #f0f0f0; }
+    .qa-dept-btn.active { background: #111 !important; color: #fff !important; }
+    .qa-cat-header {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 11px 2px;
+      border-bottom: 1px solid #111;
+      cursor: pointer;
+      user-select: none;
+    }
+    .qa-cat-header:first-of-type { border-top: 1px solid #111; }
+    .qa-item-row {
+      border-bottom: 1px solid #eee;
+      padding: 12px 2px;
+      transition: background .1s;
+    }
+    .qa-item-row:hover { background: #f8f8f8; }
+    .qa-badge-q {
+      font-weight: 900;
+      font-size: 10px;
+      color: #fff;
+      background: #111;
+      border-radius: 3px;
+      padding: 2px 5px;
+      flex-shrink: 0;
+      margin-top: 3px;
+      letter-spacing: 0.5px;
+    }
+    .qa-badge-a {
+      font-weight: 900;
+      font-size: 10px;
+      color: #111;
+      background: #ebebeb;
+      border-radius: 3px;
+      padding: 2px 5px;
+      flex-shrink: 0;
+      margin-top: 3px;
+    }
+    .qa-ibtn {
+      background: none;
+      border: 1px solid #e8e8e8;
+      border-radius: 4px;
+      padding: 3px 6px;
+      font-size: 12px;
+      color: #ccc;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color .1s, color .1s;
+    }
+    .qa-ibtn:hover { border-color: #999; color: #555; }
+    .qa-add-btn {
+      background: none;
+      border: 1.5px dashed #ddd;
+      border-radius: 5px;
+      padding: 7px 0;
+      font-size: 12px;
+      color: #bbb;
+      width: 100%;
+      cursor: pointer;
+      font-family: inherit;
+      transition: border-color .15s, color .15s;
+    }
+    .qa-add-btn:hover { border-color: #999; color: #666; }
+    .qa-primary-btn {
+      border: 1.5px solid #111;
+      border-radius: 5px;
+      padding: 7px 15px;
+      font-size: 13px;
+      font-weight: 700;
+      background: #111;
+      color: #fff;
+      white-space: nowrap;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .qa-outline-btn {
+      border: 1.5px solid #111;
+      border-radius: 5px;
+      padding: 5px 11px;
+      font-size: 11px;
+      font-weight: 700;
+      background: #fff;
+      color: #111;
+      white-space: nowrap;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .qa-input {
+      width: 100%;
+      border: 1.5px solid #e0e0e0;
+      border-radius: 5px;
+      padding: 7px 10px;
+      font-size: 13px;
+      font-family: inherit;
+      display: block;
+      background: #fafafa;
+      box-sizing: border-box;
+    }
+    .qa-input:focus { outline: 2px solid #111 !important; }
+    .qa-label {
+      display: block;
+      font-size: 9px;
+      font-weight: 700;
+      color: #bbb;
+      margin-bottom: 4px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+    }
+    .qa-modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      padding: 20px;
+    }
+    .qa-modal-box {
+      background: #fff;
+      border-radius: 8px;
+      padding: 22px 22px 18px;
+      width: 100%;
+      max-width: 420px;
+      border: 2px solid #111;
+      box-shadow: 0 8px 40px rgba(0,0,0,.15);
+    }
+    .qa-toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: #111;
+      color: #fff;
+      border-radius: 6px;
+      padding: 10px 20px;
+      font-size: 12px;
+      font-weight: 700;
+      z-index: 9999;
+      white-space: nowrap;
+      animation: qaFadeUp .18s ease;
+    }
+    @keyframes qaFadeUp {
+      from { opacity:0; transform:translateX(-50%) translateY(8px); }
+      to   { opacity:1; transform:translateX(-50%) translateY(0); }
+    }
+    @keyframes qaSpin { to { transform: rotate(360deg); } }
+    @keyframes qaSlideUp {
+      from { opacity:0; transform:translateY(20px); }
+      to   { opacity:1; transform:translateY(0); }
+    }
+    ::-webkit-scrollbar { width: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #ddd; border-radius: 4px; }
+  </style>
   <meta name="theme-color" content="#333333">
 </head>
 <body>
@@ -23,7 +235,8 @@
         <button onclick="document.getElementById('training-sub').hidden=!document.getElementById('training-sub').hidden" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト</button>
         <div id="training-sub" hidden style="display:flex;flex-direction:column;gap:6px;padding-left:16px">
           <a href="https://owojchhi.gensparkspace.com/index.html" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">動画研修</a>
-          <a href="https://owojchhi.gensparkspace.com/index.html" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">Q&A研修</a>
+          <!-- Q&A研修：ログインしてポータル内で開く -->
+          <button onclick="openQaFromLogin()" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-align:center;cursor:pointer;transition:all 0.2s;font-family:inherit;width:100%" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">Q&A研修</button>
         </div>
         <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">労務管理（ピノキオ）</a>
       </div>
@@ -57,6 +270,7 @@
         <button class="nav-btn" data-view="tc">TC</button>
         <button class="nav-btn" data-view="sales">売上</button>
         <button class="nav-btn" data-view="adbudget">広告</button>
+        <button class="nav-btn" data-view="qa">📚 研修</button>
         <button class="nav-btn" data-view="admin">管理</button>
       </nav>
       <div class="nav-spacer"></div>
@@ -77,6 +291,10 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
         <span>予約</span>
       </button>
+      <button class="bottom-nav-btn" data-view="qa">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 015.83 1c0 2-3 3-3 3M12 17h.01"/></svg>
+        <span>研修</span>
+      </button>
       <button class="bottom-nav-btn" data-view="adbudget">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
         <span>広告</span>
@@ -87,12 +305,57 @@
       </button>
     </nav>
 
+    <!-- ==================== Q&A研修 ==================== -->
+    <main id="view-qa" style="display:none;height:calc(100vh - 52px);overflow:hidden;flex-direction:row;">
+
+      <!-- サイドバー -->
+      <aside id="qa-sidebar">
+        <div style="padding:14px 10px 8px;flex:1">
+          <div style="font-size:8px;letter-spacing:3px;color:#ccc;text-transform:uppercase;margin-bottom:8px;padding-left:4px">診療カテゴリー</div>
+          <div id="qa-dept-list"></div>
+        </div>
+        <!-- AI生成ボタン -->
+        <div style="padding:10px 10px 16px;border-top:1px solid #f0f0f0">
+          <button id="qa-ai-btn" style="width:100%;border:none;border-radius:8px;padding:11px 10px;font-size:12px;font-weight:700;background:linear-gradient(135deg,#111 0%,#333 100%);color:#fff;display:flex;align-items:center;gap:8px;justify-content:center;cursor:pointer;font-family:inherit;box-shadow:0 2px 8px rgba(0,0,0,.15)">
+            <span style="font-size:16px">✦</span>
+            <span>AI でQ&A を自動生成</span>
+          </button>
+          <div style="font-size:9px;color:#ccc;text-align:center;margin-top:5px;letter-spacing:0.3px">URLを入力するだけで自動作成</div>
+        </div>
+      </aside>
+
+      <!-- メインエリア -->
+      <div id="qa-main">
+        <!-- サブヘッダー -->
+        <div id="qa-subheader">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <div>
+              <h2 style="font-size:15px;font-weight:900;margin:0" id="qa-dept-title">🦷 削らないラミネートベニア</h2>
+              <div style="font-size:11px;color:#999;margin-top:2px" id="qa-dept-count">カウンセリング担当者向けQ&Aマニュアル</div>
+            </div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="qa-outline-btn" id="qa-expand-all">全展開</button>
+              <button class="qa-outline-btn" id="qa-collapse-all">全閉じ</button>
+              <button class="qa-primary-btn" id="qa-add-cat-btn">＋ カテゴリー</button>
+            </div>
+          </div>
+          <div style="position:relative">
+            <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#ccc;font-size:13px;pointer-events:none">🔍</span>
+            <input id="qa-search" type="text" placeholder="キーワードで検索…" style="width:100%;border:1.5px solid #e0e0e0;border-radius:6px;padding:8px 28px 8px 28px;font-size:13px;background:#fafafa;font-family:inherit;box-sizing:border-box;outline:none">
+            <button id="qa-search-clear" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%);background:none;border:none;color:#ccc;font-size:16px;line-height:1;cursor:pointer">×</button>
+          </div>
+        </div>
+
+        <!-- コンテンツ -->
+        <div id="qa-content">
+          <div id="qa-list"></div>
+        </div>
+      </div>
+    </main>
+
     <!-- ==================== 売上 ==================== -->
     <main id="view-sales" class="view" hidden>
-      <div class="page-header">
-        <h2>売上管理</h2>
-      </div>
-
+      <div class="page-header"><h2>売上管理</h2></div>
       <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center">
         <label class="form-label" style="margin:0">年度</label>
         <select class="form-select" id="sales-year" style="width:auto">
@@ -100,64 +363,35 @@
           <option value="2024">24期 (2024.7-2025.6)</option>
         </select>
       </div>
-
       <div class="facility-tabs" id="sales-facility-tabs"></div>
-
       <div class="stats-row" id="sales-stats"></div>
-
-      <!-- 月別一覧テーブル -->
       <div class="card" style="margin-bottom:20px">
         <div class="card-header">月別売上一覧</div>
         <div class="data-table-wrap" id="sales-monthly-wrap">
           <table class="data-table" id="sales-monthly-table"></table>
         </div>
       </div>
-
-      <!-- 入力フォーム -->
       <div class="card" style="margin-bottom:20px">
         <div class="card-header">売上入力</div>
         <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">月</label>
-            <input type="month" class="form-input" id="sales-month">
-          </div>
-          <div class="form-group">
-            <label class="form-label">自費売上</label>
-            <input type="number" class="form-input" id="sales-self" placeholder="0">
-          </div>
-          <div class="form-group">
-            <label class="form-label">保険売上</label>
-            <input type="number" class="form-input" id="sales-insurance" placeholder="0">
-          </div>
-          <div class="form-group">
-            <label class="form-label">物販</label>
-            <input type="number" class="form-input" id="sales-product" placeholder="0">
-          </div>
-          <div class="form-group">
-            <label class="form-label">広告費</label>
-            <input type="number" class="form-input" id="sales-ad" placeholder="0">
-          </div>
+          <div class="form-group"><label class="form-label">月</label><input type="month" class="form-input" id="sales-month"></div>
+          <div class="form-group"><label class="form-label">自費売上</label><input type="number" class="form-input" id="sales-self" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">保険売上</label><input type="number" class="form-input" id="sales-insurance" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">物販</label><input type="number" class="form-input" id="sales-product" placeholder="0"></div>
+          <div class="form-group"><label class="form-label">広告費</label><input type="number" class="form-input" id="sales-ad" placeholder="0"></div>
         </div>
-        <div class="form-actions">
-          <button class="btn btn-dark" id="sales-save">保存</button>
-        </div>
+        <div class="form-actions"><button class="btn btn-dark" id="sales-save">保存</button></div>
       </div>
-
-      <!-- 一覧 -->
       <div class="card">
         <div class="card-header">売上一覧</div>
         <div class="data-table-wrap">
           <table class="data-table" id="sales-table">
-            <thead>
-              <tr><th>月</th><th>自費</th><th>保険</th><th>物販</th><th>広告費</th><th>合計</th></tr>
-            </thead>
+            <thead><tr><th>月</th><th>自費</th><th>保険</th><th>物販</th><th>広告費</th><th>合計</th></tr></thead>
             <tbody id="sales-tbody"></tbody>
           </table>
         </div>
       </div>
     </main>
-
-    <!-- 数値タブは廃止、中身はTCタブに統合 -->
 
     <!-- ==================== 予約管理 ==================== -->
     <main id="view-bookings" class="view view-wide">
@@ -180,136 +414,78 @@
         <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="大森">大森</button>
         <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="京都">京都</button>
       </div>
-
       <div id="sub-bk-list">
-      <div class="page-header">
-        <h2>予約・来院管理</h2>
-      </div>
-
-      <div class="stats-row" id="bk-stats" style="gap:6px;margin-bottom:8px"><div class="stat-card"><span class="stat-label">読み込み中...</span></div></div>
-
-      <!-- フィルター -->
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
-        <button class="btn" id="bk-overdue-btn" style="min-height:34px;padding:6px 16px;font-size:12px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px;transition:all 0.2s">進捗</button>
-        <button class="btn" id="bk-today-btn" style="min-height:34px;padding:6px 16px;font-size:12px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px;transition:all 0.2s">今日予約</button>
-        <button class="btn btn-outline" id="bk-reset" style="min-height:34px;padding:6px 14px;font-size:11px;border-radius:20px">全表示</button>
-        <input type="text" class="form-input" id="bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
-        <select class="form-select" id="bk-tool" style="width:auto;padding:6px 8px;font-size:11px"><option value="">ツール:全て</option><option value="DXHUB">DXHUB</option><option value="セレクト">セレクト</option></select>
-        <select class="form-select" id="bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
-        <select class="form-select" id="bk-promo" style="width:auto;padding:6px 8px;font-size:11px"><option value="">プロモ:全て</option></select>
-        <select class="form-select" id="bk-service" style="width:auto;padding:6px 8px;font-size:11px"><option value="">相談:全て</option></select>
-        <select class="form-select" id="bk-status" style="width:auto;padding:6px 8px;font-size:11px">
-          <option value="">状態:全て</option>
-          <option value="要対応">要対応</option>
-          <option value="未対応">未対応</option>
-          <option value="確認済">確認済</option>
-          <option value="来院済">来院済</option>
-          <option value="成約">成約</option>
-          <option value="キャンセル">キャンセル</option>
-          <option value="除外">除外</option>
-        </select>
-        <select class="form-select" id="bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option><option value="fiscal">今期</option></select>
-        <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px">
-        <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px">更新</button>
-        <button class="btn btn-outline" id="bk-csv" style="min-height:30px;padding:6px 12px;font-size:11px">CSV</button>
-        <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center" id="bk-quick-promos"></div>
-      </div>
-
-      <!-- データテーブル -->
-      <div class="card" style="padding:12px">
-        <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)">読み込み中...</span></div>
-        <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
-          <table class="data-table compact" id="bk-table">
-            <thead>
-              <tr>
-                <th>.</th>
-                <th>申込</th>
-                <th>予約</th>
-                <th style="text-align:left">名前</th>
-                <th>相談</th>
-                <th>医院</th>
-                <th>電話</th>
-                <th style="text-align:left">メール</th>
-                <th>流入元</th>
-                <th>状態</th>
-                <th>メモ</th>
-                <th>成約</th>
-                <th>金額</th>
-                <th>入金月</th>
-                <th>インセ月</th>
-                <th>インセ額</th>
-              </tr>
-            </thead>
-            <tbody id="bk-tbody"></tbody>
-          </table>
+        <div class="page-header"><h2>予約・来院管理</h2></div>
+        <div class="stats-row" id="bk-stats" style="gap:6px;margin-bottom:8px"><div class="stat-card"><span class="stat-label">読み込み中...</span></div></div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
+          <button class="btn" id="bk-overdue-btn" style="min-height:34px;padding:6px 16px;font-size:12px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px;transition:all 0.2s">進捗</button>
+          <button class="btn" id="bk-today-btn" style="min-height:34px;padding:6px 16px;font-size:12px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px;transition:all 0.2s">今日予約</button>
+          <button class="btn btn-outline" id="bk-reset" style="min-height:34px;padding:6px 14px;font-size:11px;border-radius:20px">全表示</button>
+          <input type="text" class="form-input" id="bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
+          <select class="form-select" id="bk-tool" style="width:auto;padding:6px 8px;font-size:11px"><option value="">ツール:全て</option><option value="DXHUB">DXHUB</option><option value="セレクト">セレクト</option></select>
+          <select class="form-select" id="bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
+          <select class="form-select" id="bk-promo" style="width:auto;padding:6px 8px;font-size:11px"><option value="">プロモ:全て</option></select>
+          <select class="form-select" id="bk-service" style="width:auto;padding:6px 8px;font-size:11px"><option value="">相談:全て</option></select>
+          <select class="form-select" id="bk-status" style="width:auto;padding:6px 8px;font-size:11px">
+            <option value="">状態:全て</option><option value="要対応">要対応</option><option value="未対応">未対応</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option><option value="除外">除外</option>
+          </select>
+          <select class="form-select" id="bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option><option value="fiscal">今期</option></select>
+          <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px">
+          <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px">更新</button>
+          <button class="btn btn-outline" id="bk-csv" style="min-height:30px;padding:6px 12px;font-size:11px">CSV</button>
+          <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center" id="bk-quick-promos"></div>
+        </div>
+        <div class="card" style="padding:12px">
+          <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)">読み込み中...</span></div>
+          <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
+            <table class="data-table compact" id="bk-table">
+              <thead><tr><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>相談</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>流入元</th><th>状態</th><th>メモ</th><th>成約</th><th>金額</th><th>入金月</th><th>インセ月</th><th>インセ額</th></tr></thead>
+              <tbody id="bk-tbody"></tbody>
+            </table>
+          </div>
         </div>
       </div>
-      </div>
-
-      <!-- プロモ別ダッシュボード -->
-      <!-- 患者検索 -->
       <div id="sub-bk-search" hidden>
         <div class="page-header"><h2>患者検索・新規登録</h2></div>
-
-        <!-- 検索 -->
         <div class="card" style="margin-bottom:16px">
           <div class="card-header">検索</div>
           <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
             <div class="form-group"><label class="form-label">名前</label><input type="text" class="form-input" id="ps-name" placeholder="名前で検索"></div>
             <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="ps-phone" placeholder="電話番号で検索"></div>
             <div class="form-group"><label class="form-label">メール</label><input type="text" class="form-input" id="ps-email" placeholder="メールで検索"></div>
-            <div class="form-group"><label class="form-label">医院</label>
-              <select class="form-select" id="ps-facility"><option value="">全て</option></select>
-            </div>
+            <div class="form-group"><label class="form-label">医院</label><select class="form-select" id="ps-facility"><option value="">全て</option></select></div>
           </div>
           <div class="form-actions"><button class="btn btn-dark" id="ps-search-btn">検索</button><button class="btn btn-outline" id="ps-clear-btn" style="margin-left:8px">クリア</button></div>
         </div>
-
-        <!-- 検索結果 -->
         <div class="card" style="margin-bottom:16px">
           <div class="card-header">検索結果 <span id="ps-result-count" style="font-weight:400;color:var(--text-muted)"></span></div>
           <div class="data-table-wrap" style="max-height:400px;overflow-y:auto">
-            <table class="data-table">
-              <thead><tr><th>申込日</th><th>予約日</th><th>名前</th><th>相談</th><th>医院</th><th>電話</th><th>メール</th><th>プロモ</th><th>状態</th><th>ツール</th></tr></thead>
-              <tbody id="ps-tbody"></tbody>
-            </table>
+            <table class="data-table"><thead><tr><th>申込日</th><th>予約日</th><th>名前</th><th>相談</th><th>医院</th><th>電話</th><th>メール</th><th>プロモ</th><th>状態</th><th>ツール</th></tr></thead><tbody id="ps-tbody"></tbody></table>
           </div>
         </div>
-
-        <!-- メール貼り付け登録 -->
         <div class="card" style="margin-bottom:16px">
           <div class="card-header">メール貼り付け登録 <span style="font-weight:400;color:var(--text-muted);font-size:11px">予約メールをコピペで自動登録</span></div>
-          <textarea class="notes-area" id="mail-paste" rows="6" placeholder="予約通知メールの内容をここに貼り付けてください&#10;&#10;プロモーションコード、施術、クリニック、日時、お名前、メール、電話番号を自動で読み取ります" style="font-size:13px;min-height:100px"></textarea>
+          <textarea class="notes-area" id="mail-paste" rows="6" placeholder="予約通知メールの内容をここに貼り付けてください" style="font-size:13px;min-height:100px"></textarea>
           <div style="display:flex;gap:8px;margin-top:8px;align-items:center">
             <button class="btn btn-dark" id="mail-parse-btn">読み取り＆登録</button>
             <span id="mail-parse-result" style="font-size:12px;color:var(--text-sub)"></span>
           </div>
         </div>
-
-        <!-- 新規登録 -->
         <div class="card">
           <div class="card-header">新規患者登録 <span style="font-weight:400;color:var(--text-muted);font-size:11px">手動入力</span></div>
           <div class="form-grid">
             <div class="form-group"><label class="form-label">名前 *</label><input type="text" class="form-input" id="np-name" placeholder="患者名"></div>
             <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="np-phone" placeholder="09012345678"></div>
             <div class="form-group"><label class="form-label">メール</label><input type="text" class="form-input" id="np-email" placeholder="example@email.com"></div>
-            <div class="form-group"><label class="form-label">医院</label>
-              <select class="form-select" id="np-facility"><option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>岩田</option><option>大森</option><option>京都</option></select>
-            </div>
-            <div class="form-group"><label class="form-label">相談</label>
-              <select class="form-select" id="np-service"><option>BF相談</option><option>矯正相談</option><option>インプラント相談</option><option>セラミック相談</option><option>その他</option></select>
-            </div>
+            <div class="form-group"><label class="form-label">医院</label><select class="form-select" id="np-facility"><option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>岩田</option><option>大森</option><option>京都</option></select></div>
+            <div class="form-group"><label class="form-label">相談</label><select class="form-select" id="np-service"><option>BF相談</option><option>矯正相談</option><option>インプラント相談</option><option>セラミック相談</option><option>その他</option></select></div>
             <div class="form-group"><label class="form-label">予約日時</label><input type="text" class="form-input" id="np-bookdate" placeholder="例: 2026/4/15 14:00"></div>
             <div class="form-group"><label class="form-label">プロモ</label><input type="text" class="form-input" id="np-source" placeholder="流入元"></div>
-            <div class="form-group"><label class="form-label">ステータス</label>
-              <select class="form-select" id="np-status"><option>未対応</option><option>確認済</option><option>来院済</option><option>成約</option><option>キャンセル</option></select>
-            </div>
+            <div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="np-status"><option>未対応</option><option>確認済</option><option>来院済</option><option>成約</option><option>キャンセル</option></select></div>
           </div>
           <div class="form-actions"><button class="btn btn-dark" id="np-save">登録</button></div>
         </div>
       </div>
-
-      <!-- 申込分析 -->
       <div id="sub-bk-apply" hidden>
         <div class="page-header"><h2>申込分析</h2></div>
         <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
@@ -320,25 +496,11 @@
           <button class="btn btn-outline apply-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button>
         </div>
         <div class="stats-row" id="apply-stats" style="margin-bottom:16px"></div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">日別申込数</div>
-          <div class="bar-chart" id="apply-daily-chart"></div>
-        </div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">プロモ別申込数</div>
-          <div class="bar-chart" id="apply-promo-chart"></div>
-        </div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">医院別申込数</div>
-          <div class="bar-chart" id="apply-facility-chart"></div>
-        </div>
-        <div class="card">
-          <div class="card-header">相談別申込数</div>
-          <div class="bar-chart" id="apply-service-chart"></div>
-        </div>
+        <div class="card" style="margin-bottom:16px"><div class="card-header">日別申込数</div><div class="bar-chart" id="apply-daily-chart"></div></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-header">プロモ別申込数</div><div class="bar-chart" id="apply-promo-chart"></div></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-header">医院別申込数</div><div class="bar-chart" id="apply-facility-chart"></div></div>
+        <div class="card"><div class="card-header">相談別申込数</div><div class="bar-chart" id="apply-service-chart"></div></div>
       </div>
-
-      <!-- 医院別 -->
       <div id="sub-bk-fac" hidden>
         <div class="page-header"><h2 id="fac-title">医院</h2></div>
         <div class="stats-row" id="fac-stats" style="margin-bottom:12px"></div>
@@ -373,157 +535,35 @@
           </div>
         </div>
       </div>
-
-      <!-- BF -->
       <div id="sub-bk-bf" hidden>
-        <!-- BFサブナビ（メインサブナビと同じバーに表示） -->
         <div style="display:flex;gap:0;overflow-x:auto;border-bottom:1px solid var(--border);background:var(--bg);padding:0 12px;margin-bottom:8px;scrollbar-width:none">
           <button class="bf-sub-btn" data-bfsub="bf-bookings" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text);cursor:pointer;white-space:nowrap;border-bottom:2px solid var(--accent);font-weight:600">一覧</button>
           <button class="bf-sub-btn" data-bfsub="bf-progress" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">進捗</button>
           <button class="bf-sub-btn" data-bfsub="bf-patients" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">患者</button>
           <button class="bf-sub-btn" data-bfsub="bf-contracts" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">成約</button>
         </div>
-
-        <!-- BF進捗管理 -->
-        <div id="bf-progress" hidden>
-        <div class="page-header"><h2>BF 進捗管理</h2></div>
-        <div class="stats-row" id="bf-stats" style="margin-bottom:16px"></div>
-        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
-          <button class="btn btn-dark bf-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button>
-          <button class="btn btn-outline bf-period-btn" data-period="month" style="font-size:11px;padding:6px 12px;min-height:28px">今月</button>
-          <button class="btn btn-outline bf-period-btn" data-period="week" style="font-size:11px;padding:6px 12px;min-height:28px">今週</button>
-          <button class="btn btn-outline bf-period-btn" data-period="today" style="font-size:11px;padding:6px 12px;min-height:28px">今日</button>
-        </div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">医院別</div>
-          <div class="bar-chart" id="bf-facility-chart"></div>
-        </div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">プロモ別</div>
-          <div class="bar-chart" id="bf-promo-chart"></div>
-        </div>
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">日別申込推移</div>
-          <div class="bar-chart" id="bf-daily-chart"></div>
-        </div>
-        </div>
-
-        <!-- BF患者リスト -->
-        <div id="bf-patients" hidden>
-          <div class="page-header"><h2>BF 患者リスト</h2></div>
-          <div class="card">
-            <div class="card-header">患者リスト（スプレッドシート同期）<span id="bf-sheet-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-            <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
-              <table class="data-table">
-                <thead><tr><th>予約日</th><th>名前</th><th>経路</th><th>医院</th><th>DR</th><th>性別</th><th>地域</th><th>状況</th><th>本数</th><th>売上</th><th>入金</th><th>完了</th></tr></thead>
-                <tbody id="bf-sheet-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- BF成約リスト -->
-        <div id="bf-contracts" hidden>
-          <div class="page-header"><h2>BF 成約リスト</h2></div>
-          <div class="card">
-            <div class="card-header">成約リスト <span id="bf-contract-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-            <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
-              <table class="data-table">
-                <thead><tr><th>日付</th><th>名前</th><th>経路</th><th>医院</th><th>治療予約</th><th>印象予約</th><th>入金</th><th>完了</th><th>売上</th></tr></thead>
-                <tbody id="bf-contract-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-
-        <!-- BF予約一覧 -->
-        <div id="bf-bookings">
-          <div class="page-header"><h2>BF 予約一覧</h2></div>
-          <div class="stats-row" id="bf-bk-stats" style="gap:6px;margin-bottom:8px"></div>
-          <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
-            <button class="btn" id="bf-bk-progress" style="min-height:30px;padding:6px 12px;font-size:11px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px">進捗</button>
-            <button class="btn" id="bf-bk-today" style="min-height:30px;padding:6px 12px;font-size:11px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px">今日予約</button>
-            <button class="btn btn-outline" id="bf-bk-reset" style="min-height:30px;padding:6px 10px;font-size:11px;border-radius:20px">全表示</button>
-            <input type="text" class="form-input" id="bf-bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
-            <select class="form-select" id="bf-bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
-            <select class="form-select" id="bf-bk-status" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="要対応">要対応</option><option value="未対応">未対応</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select>
-            <select class="form-select" id="bf-bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="today">今日</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option></select>
-            <input type="month" class="form-input" id="bf-bk-month" style="width:auto;padding:6px 8px;font-size:11px">
-          </div>
-          <div class="card" style="padding:8px">
-            <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">BF予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div>
-            <div class="data-table-wrap" style="max-height:calc(100vh - 350px);overflow-y:auto">
-              <table class="data-table compact">
-                <thead><tr><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>プロモ</th><th>状態</th><th>メモ</th><th>成約</th><th>金額</th><th>入金月</th><th>インセ月</th><th>インセ額</th></tr></thead>
-                <tbody id="bf-tbody"></tbody>
-              </table>
-            </div>
-          </div>
-        </div>
+        <div id="bf-progress" hidden><div class="page-header"><h2>BF 進捗管理</h2></div><div class="stats-row" id="bf-stats" style="margin-bottom:16px"></div><div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"><button class="btn btn-dark bf-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button><button class="btn btn-outline bf-period-btn" data-period="month" style="font-size:11px;padding:6px 12px;min-height:28px">今月</button><button class="btn btn-outline bf-period-btn" data-period="week" style="font-size:11px;padding:6px 12px;min-height:28px">今週</button><button class="btn btn-outline bf-period-btn" data-period="today" style="font-size:11px;padding:6px 12px;min-height:28px">今日</button></div><div class="card" style="margin-bottom:16px"><div class="card-header">医院別</div><div class="bar-chart" id="bf-facility-chart"></div></div><div class="card" style="margin-bottom:16px"><div class="card-header">プロモ別</div><div class="bar-chart" id="bf-promo-chart"></div></div><div class="card" style="margin-bottom:16px"><div class="card-header">日別申込推移</div><div class="bar-chart" id="bf-daily-chart"></div></div></div>
+        <div id="bf-patients" hidden><div class="page-header"><h2>BF 患者リスト</h2></div><div class="card"><div class="card-header">患者リスト（スプレッドシート同期）<span id="bf-sheet-count" style="font-weight:400;color:var(--text-muted)"></span></div><div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto"><table class="data-table"><thead><tr><th>予約日</th><th>名前</th><th>経路</th><th>医院</th><th>DR</th><th>性別</th><th>地域</th><th>状況</th><th>本数</th><th>売上</th><th>入金</th><th>完了</th></tr></thead><tbody id="bf-sheet-tbody"></tbody></table></div></div></div>
+        <div id="bf-contracts" hidden><div class="page-header"><h2>BF 成約リスト</h2></div><div class="card"><div class="card-header">成約リスト <span id="bf-contract-count" style="font-weight:400;color:var(--text-muted)"></span></div><div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto"><table class="data-table"><thead><tr><th>日付</th><th>名前</th><th>経路</th><th>医院</th><th>治療予約</th><th>印象予約</th><th>入金</th><th>完了</th><th>売上</th></tr></thead><tbody id="bf-contract-tbody"></tbody></table></div></div></div>
+        <div id="bf-bookings"><div class="page-header"><h2>BF 予約一覧</h2></div><div class="stats-row" id="bf-bk-stats" style="gap:6px;margin-bottom:8px"></div><div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><button class="btn" id="bf-bk-progress" style="min-height:30px;padding:6px 12px;font-size:11px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px">進捗</button><button class="btn" id="bf-bk-today" style="min-height:30px;padding:6px 12px;font-size:11px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px">今日予約</button><button class="btn btn-outline" id="bf-bk-reset" style="min-height:30px;padding:6px 10px;font-size:11px;border-radius:20px">全表示</button><input type="text" class="form-input" id="bf-bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px"><select class="form-select" id="bf-bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select><select class="form-select" id="bf-bk-status" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="要対応">要対応</option><option value="未対応">未対応</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select><select class="form-select" id="bf-bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="today">今日</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option></select><input type="month" class="form-input" id="bf-bk-month" style="width:auto;padding:6px 8px;font-size:11px"></div><div class="card" style="padding:8px"><div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">BF予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div><div class="data-table-wrap" style="max-height:calc(100vh - 350px);overflow-y:auto"><table class="data-table compact"><thead><tr><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>プロモ</th><th>状態</th><th>メモ</th><th>成約</th><th>金額</th><th>入金月</th><th>インセ月</th><th>インセ額</th></tr></thead><tbody id="bf-tbody"></tbody></table></div></div></div>
       </div>
-
       <div id="sub-bk-analysis" hidden>
         <div class="page-header"><h2>予約分析</h2></div>
-
-        <!-- 分析フィルター -->
         <div class="card" style="margin-bottom:16px;padding:12px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
-            <div class="form-group" style="min-width:120px">
-              <label class="form-label">医院</label>
-              <select class="form-select" id="an-facility" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select>
-            </div>
-            <div class="form-group" style="min-width:120px">
-              <label class="form-label">相談</label>
-              <select class="form-select" id="an-service" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select>
-            </div>
-            <div class="form-group" style="min-width:120px">
-              <label class="form-label">プロモ</label>
-              <select class="form-select" id="an-promo" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select>
-            </div>
-            <div class="form-group" style="min-width:120px">
-              <label class="form-label">ツール</label>
-              <select class="form-select" id="an-tool" style="font-size:12px;padding:6px 8px"><option value="">全て</option><option>DXHUB</option><option>セレクト</option></select>
-            </div>
-            <div class="form-group" style="min-width:100px">
-              <label class="form-label">期間</label>
-              <input type="month" class="form-input" id="an-month" style="font-size:12px;padding:6px 8px">
-            </div>
+            <div class="form-group" style="min-width:120px"><label class="form-label">医院</label><select class="form-select" id="an-facility" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select></div>
+            <div class="form-group" style="min-width:120px"><label class="form-label">相談</label><select class="form-select" id="an-service" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select></div>
+            <div class="form-group" style="min-width:120px"><label class="form-label">プロモ</label><select class="form-select" id="an-promo" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select></div>
+            <div class="form-group" style="min-width:120px"><label class="form-label">ツール</label><select class="form-select" id="an-tool" style="font-size:12px;padding:6px 8px"><option value="">全て</option><option>DXHUB</option><option>セレクト</option></select></div>
+            <div class="form-group" style="min-width:100px"><label class="form-label">期間</label><input type="month" class="form-input" id="an-month" style="font-size:12px;padding:6px 8px"></div>
             <button class="btn btn-outline" id="an-reset" style="min-height:32px;padding:6px 10px;font-size:11px">リセット</button>
           </div>
         </div>
-
-        <!-- 統計 -->
         <div class="stats-row" id="an-stats" style="gap:6px;margin-bottom:16px"></div>
-
-        <!-- ファネル分析 -->
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header">ファネル分析</div>
-          <div id="an-funnel"></div>
-        </div>
-
-        <!-- 分析軸切替 -->
-        <div style="display:flex;gap:4px;margin-bottom:16px">
-          <button class="btn btn-dark an-axis-btn" data-axis="promo" style="font-size:11px;padding:6px 12px;min-height:28px">プロモ別</button>
-          <button class="btn btn-outline an-axis-btn" data-axis="facility" style="font-size:11px;padding:6px 12px;min-height:28px">医院別</button>
-          <button class="btn btn-outline an-axis-btn" data-axis="service" style="font-size:11px;padding:6px 12px;min-height:28px">相談別</button>
-        </div>
-
-        <!-- チャート -->
-        <div class="card" style="margin-bottom:16px">
-          <div class="card-header" id="an-chart-title">プロモ別</div>
-          <div class="bar-chart" id="an-chart"></div>
-        </div>
-
-        <!-- テーブル -->
-        <div class="card">
-          <div class="card-header" id="an-table-title">詳細テーブル</div>
-          <div class="data-table-wrap">
-            <table class="data-table">
-              <thead><tr><th id="an-th-axis">プロモーション</th><th>予約</th><th>キャンセル</th><th>来院</th><th>来院率</th><th>成約</th><th>成約率</th><th>成約単価</th><th>成約金額</th></tr></thead>
-              <tbody id="an-tbody"></tbody>
-            </table>
-          </div>
-        </div>
+        <div class="card" style="margin-bottom:16px"><div class="card-header">ファネル分析</div><div id="an-funnel"></div></div>
+        <div style="display:flex;gap:4px;margin-bottom:16px"><button class="btn btn-dark an-axis-btn" data-axis="promo" style="font-size:11px;padding:6px 12px;min-height:28px">プロモ別</button><button class="btn btn-outline an-axis-btn" data-axis="facility" style="font-size:11px;padding:6px 12px;min-height:28px">医院別</button><button class="btn btn-outline an-axis-btn" data-axis="service" style="font-size:11px;padding:6px 12px;min-height:28px">相談別</button></div>
+        <div class="card" style="margin-bottom:16px"><div class="card-header" id="an-chart-title">プロモ別</div><div class="bar-chart" id="an-chart"></div></div>
+        <div class="card"><div class="card-header" id="an-table-title">詳細テーブル</div><div class="data-table-wrap"><table class="data-table"><thead><tr><th id="an-th-axis">プロモーション</th><th>予約</th><th>キャンセル</th><th>来院</th><th>来院率</th><th>成約</th><th>成約率</th><th>成約単価</th><th>成約金額</th></tr></thead><tbody id="an-tbody"></tbody></table></div></div>
       </div>
     </main>
 
@@ -536,444 +576,532 @@
         <button class="sub-nav-btn" data-sub="reviews">口コミ</button>
         <button class="sub-nav-btn" data-sub="strategy">戦略ノート</button>
       </div>
-
-      <!-- グローバルフィルター -->
       <div style="display:flex;gap:12px;padding:12px 24px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;position:sticky;top:56px;z-index:50" id="tc-filters">
-        <div style="display:flex;gap:6px;align-items:center">
-          <label class="form-label" style="margin:0;min-width:auto">年度</label>
-          <select class="form-select" id="tc-year" style="width:auto;padding:8px 12px;font-size:13px">
-            <option value="all" selected>全期間</option>
-            <option value="2025">25期</option>
-            <option value="2024">24期</option>
-            <option value="2023">23期</option>
-            <option value="2022">22期</option>
-            <option value="2021">21期</option>
-            <option value="2020">20期</option>
-          </select>
-        </div>
-        <div style="display:flex;gap:6px;align-items:center">
-          <label class="form-label" style="margin:0;min-width:auto">医院</label>
-          <select class="form-select" id="tc-facility" style="width:auto;padding:8px 12px;font-size:13px">
-            <option value="全体">全体</option>
-          </select>
-        </div>
+        <div style="display:flex;gap:6px;align-items:center"><label class="form-label" style="margin:0;min-width:auto">年度</label><select class="form-select" id="tc-year" style="width:auto;padding:8px 12px;font-size:13px"><option value="all" selected>全期間</option><option value="2025">25期</option><option value="2024">24期</option><option value="2023">23期</option><option value="2022">22期</option><option value="2021">21期</option><option value="2020">20期</option></select></div>
+        <div style="display:flex;gap:6px;align-items:center"><label class="form-label" style="margin:0;min-width:auto">医院</label><select class="form-select" id="tc-facility" style="width:auto;padding:8px 12px;font-size:13px"><option value="全体">全体</option></select></div>
       </div>
-
-      <!-- 決定率 -->
-      <div id="sub-rates">
-        <div class="page-header"><h2>決定</h2></div>
-        <div class="stats-row" id="rates-stats"></div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">月別推移</div>
-          <div class="data-table-wrap"><table class="data-table" id="rates-monthly-table"></table></div>
-        </div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">医院別</div>
-          <div class="bar-chart" id="rates-facility"></div>
-        </div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">種類別（キレイライン / ウィスマイル / ビンクス）</div>
-          <div class="bar-chart" id="rates-counselor"></div>
-        </div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">ドクター別 月別推移</div>
-          <div class="data-table-wrap">
-            <table class="data-table" id="doctor-monthly-table"></table>
-          </div>
-        </div>
-        <div class="card">
-          <div class="card-header">ドクター別 決定率</div>
-          <div class="bar-chart" id="rates-doctor"></div>
-        </div>
-      </div>
-
-      <!-- 初診管理 -->
-      <div id="sub-patients" hidden>
-        <div class="page-header"><h2>初診管理</h2></div>
-        <div class="stats-row" id="patients-stats"></div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">新規登録</div>
-          <div class="form-grid">
-            <div class="form-group"><label class="form-label">来院日</label><input type="date" class="form-input" id="pt-date"></div>
-            <div class="form-group"><label class="form-label">名前</label><input type="text" class="form-input" id="pt-name" placeholder="患者名"></div>
-            <div class="form-group"><label class="form-label">目的</label>
-              <select class="form-select" id="pt-purpose"><option>矯正相談</option><option>インプラント相談</option><option>BF相談</option><option>ラブリエ相談</option><option>保険初診</option><option>転院</option><option>その他</option></select>
-            </div>
-            <div class="form-group"><label class="form-label">初診由来</label>
-              <select class="form-select" id="pt-source"><option>Google検索</option><option>インスタ</option><option>紹介</option><option>広告</option><option>その他</option></select>
-            </div>
-            <div class="form-group"><label class="form-label">カウンセラー</label><input type="text" class="form-input" id="pt-counselor" placeholder="スタッフ名"></div>
-            <div class="form-group"><label class="form-label">ドクター</label><input type="text" class="form-input" id="pt-doctor" placeholder="Dr名"></div>
-            <div class="form-group"><label class="form-label">ステータス</label>
-              <select class="form-select" id="pt-status"><option>予約</option><option>来院</option><option>相談済</option><option>検査予約</option><option>診断済</option><option>成約</option><option>キャンセル</option></select>
-            </div>
-            <div class="form-group"><label class="form-label">金額</label><input type="number" class="form-input" id="pt-amount" placeholder="0"></div>
-          </div>
-          <div class="form-actions"><button class="btn btn-dark" id="pt-save">登録</button></div>
-        </div>
-        <div class="card">
-          <div class="card-header">患者一覧</div>
-          <div class="data-table-wrap">
-            <table class="data-table" id="patients-table">
-              <thead><tr><th>日付</th><th>名前</th><th>目的</th><th>由来</th><th>カウンセラー</th><th>Dr</th><th>ステータス</th><th>金額</th></tr></thead>
-              <tbody id="patients-tbody"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- 競合調査 -->
-      <div id="sub-competitors" hidden>
-        <div class="page-header">
-          <h2>競合調査</h2>
-        </div>
-        <div class="stats-row">
-          <div class="stat-card"><span class="stat-num" id="tc-total">0</span><span class="stat-label">調査医院数</span></div>
-          <div class="stat-card"><span class="stat-num" id="tc-avg">0</span><span class="stat-label">平均スコア</span></div>
-          <div class="stat-card"><span class="stat-num" id="tc-docs">0</span><span class="stat-label">資料数</span></div>
-        </div>
-
-        <!-- 医院追加ボタン -->
-        <div style="margin-bottom:20px">
-          <button class="btn btn-dark" id="add-clinic-btn">+ 医院を追加</button>
-        </div>
-
-        <div class="clinic-grid" id="clinic-grid"></div>
-
-        <!-- 医院追加モーダル -->
-        <div id="clinic-add-modal" class="modal" hidden>
-          <div class="modal-overlay" onclick="document.getElementById('clinic-add-modal').hidden=true"></div>
-          <div class="modal-content" style="max-width:600px;padding:24px;max-height:90vh;overflow-y:auto">
-            <button class="modal-close" onclick="document.getElementById('clinic-add-modal').hidden=true">&times;</button>
-            <h3 style="font-size:16px;margin-bottom:16px">新しい医院を追加</h3>
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <div class="form-grid">
-                <div class="form-group"><label class="form-label">医院名</label><input type="text" class="form-input" id="nc-name" placeholder="例: ○○歯科・矯正歯科"></div>
-                <div class="form-group"><label class="form-label">訪問日</label><input type="date" class="form-input" id="nc-date"></div>
-                <div class="form-group"><label class="form-label">訪問時間</label><input type="text" class="form-input" id="nc-time" placeholder="例: 10:00〜11:00"></div>
-                <div class="form-group"><label class="form-label">住所</label><input type="text" class="form-input" id="nc-address" placeholder="例: 名古屋市中村区..."></div>
-                <div class="form-group"><label class="form-label">DA担当</label><input type="text" class="form-input" id="nc-da" placeholder="例: 佐々木さん"></div>
-                <div class="form-group"><label class="form-label">Dr担当</label><input type="text" class="form-input" id="nc-dr" placeholder="例: 伊藤先生"></div>
-              </div>
-              <div style="font-size:13px;font-weight:600;color:var(--text-sub);margin-top:8px">評価（5段階）</div>
-              <div class="form-grid" style="grid-template-columns:repeat(4,1fr)">
-                <div class="form-group"><label class="form-label">受付</label><select class="form-select" id="nc-s1"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
-                <div class="form-group"><label class="form-label">カウンセリング</label><select class="form-select" id="nc-s2"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
-                <div class="form-group"><label class="form-label">接遇</label><select class="form-select" id="nc-s3"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
-                <div class="form-group"><label class="form-label">院内環境</label><select class="form-select" id="nc-s4"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div>
-              </div>
-              <div class="form-group"><label class="form-label">料金情報</label><input type="text" class="form-input" id="nc-pricing" placeholder="例: 見積もり配布、パンフレット説明"></div>
-              <div class="form-group"><label class="form-label">強み</label><textarea class="form-input" id="nc-strengths" rows="2" placeholder="1行1つ。例:&#10;Dr.のカウンセリングが良い&#10;清潔感がある" style="resize:vertical"></textarea></div>
-              <div class="form-group"><label class="form-label">改善点</label><textarea class="form-input" id="nc-improvements" rows="2" placeholder="カウンセリングの改善点" style="resize:vertical"></textarea></div>
-              <div class="form-group"><label class="form-label">総合評価</label><textarea class="form-input" id="nc-summary" rows="2" placeholder="総合的なコメント" style="resize:vertical"></textarea></div>
-              <button class="btn btn-dark" id="nc-save" style="width:100%">登録</button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 資料登録モーダル -->
-        <div id="doc-modal" class="modal" hidden>
-          <div class="modal-overlay" onclick="document.getElementById('doc-modal').hidden=true"></div>
-          <div class="modal-content" style="max-width:500px;padding:24px">
-            <button class="modal-close" onclick="document.getElementById('doc-modal').hidden=true">&times;</button>
-            <h3 style="font-size:16px;margin-bottom:16px" id="doc-modal-title">資料を追加</h3>
-            <input type="hidden" id="doc-clinic">
-            <div style="display:flex;flex-direction:column;gap:12px">
-              <div class="form-group">
-                <label class="form-label">資料名</label>
-                <input type="text" class="form-input" id="doc-name" placeholder="例: 見積書">
-              </div>
-              <div class="form-group">
-                <label class="form-label">種類</label>
-                <select class="form-select" id="doc-type">
-                  <option>見積書</option>
-                  <option>パンフレット</option>
-                  <option>録音</option>
-                  <option>データ</option>
-                  <option>写真</option>
-                  <option>カウンセリング資料</option>
-                  <option>その他</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Google Drive URL</label>
-                <input type="url" class="form-input" id="doc-url" placeholder="https://drive.google.com/...">
-              </div>
-              <button class="btn btn-dark" id="doc-save" style="width:100%">登録</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 戦略ノート -->
-      <!-- 口コミ（TCタブ内） -->
-      <div id="sub-reviews" hidden>
-        <div class="page-header"><h2>口コミ管理</h2></div>
-        <div class="facility-tabs" id="reviews-facility-tabs"></div>
-        <div class="stats-row" id="reviews-stats"></div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">月次データ入力</div>
-          <div class="form-grid">
-            <div class="form-group"><label class="form-label">月</label><input type="month" class="form-input" id="rev-month"></div>
-            <div class="form-group"><label class="form-label">口コミ数（累計）</label><input type="number" class="form-input" id="rev-count" placeholder="0"></div>
-            <div class="form-group"><label class="form-label">評価点</label><input type="number" class="form-input" id="rev-rating" placeholder="4.5" step="0.1" min="1" max="5"></div>
-          </div>
-          <div class="form-actions"><button class="btn btn-dark" id="rev-save">保存</button></div>
-        </div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">評価推移</div>
-          <div id="reviews-chart" style="min-height:200px"></div>
-        </div>
-        <div class="card" style="margin-bottom:20px">
-          <div class="card-header">口コミコメント</div>
-          <div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px">
-            <div style="flex:1;display:flex;flex-direction:column;gap:8px">
-              <select class="form-select" id="comment-rating"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select>
-              <textarea class="form-input" id="comment-text" rows="2" placeholder="口コミ内容を貼り付け..." style="resize:vertical"></textarea>
-            </div>
-            <button class="btn btn-dark" id="comment-save">追加</button>
-          </div>
-          <div id="comments-list"></div>
-        </div>
-        <div class="card">
-          <div class="card-header">月次データ</div>
-          <div class="data-table-wrap">
-            <table class="data-table"><thead><tr><th>月</th><th>口コミ数</th><th>増減</th><th>評価</th></tr></thead><tbody id="reviews-tbody"></tbody></table>
-          </div>
-        </div>
-      </div>
-
-      <div id="sub-strategy" hidden>
-        <div class="page-header">
-          <h2>戦略ノート</h2>
-          <p class="page-desc">カウンセリング改善戦略</p>
-        </div>
-        <div class="strategy-grid">
-          <div class="strategy-section">
-            <div class="card">
-              <div class="card-header">目的</div>
-              <p style="font-size:14px">清翔会の成約率をあげて、広告の効果を最大限にする。</p>
-              <div class="kpi-box" style="margin-top:14px">
-                <div class="kpi"><span class="kpi-label">現在の成約率</span><span class="kpi-value red">30%</span></div>
-                <div class="kpi"><span class="kpi-label">目標成約率</span><span class="kpi-value green">???</span></div>
-              </div>
-            </div>
-          </div>
-          <div class="strategy-section">
-            <div class="card">
-              <div class="card-header">課題要因</div>
-              <ul class="issue-list">
-                <li><span class="tag tag-red">価格</span>他医院との比較・値段で選ばれない</li>
-                <li><span class="tag tag-orange">説明</span>説明不足、接遇面の問題</li>
-                <li><span class="tag tag-blue">技術</span>ドクター技術料、広告関連</li>
-              </ul>
-            </div>
-          </div>
-          <div class="strategy-section">
-            <div class="card">
-              <div class="card-header">競合から学んだ施策</div>
-              <div id="suggestions-summary"></div>
-            </div>
-          </div>
-          <div class="strategy-section">
-            <div class="card">
-              <div class="card-header">アクションプラン</div>
-              <div class="action-columns">
-                <div class="action-col"><h4>即実行</h4><ul class="action-list" id="immediate-actions"></ul></div>
-                <div class="action-col"><h4>短期</h4><ul class="action-list" id="short-actions"></ul></div>
-                <div class="action-col"><h4>中長期</h4><ul class="action-list" id="long-actions"></ul></div>
-              </div>
-            </div>
-          </div>
-          <div class="strategy-section">
-            <div class="card">
-              <div class="card-header">メモ</div>
-              <textarea id="strategy-notes" class="notes-area" placeholder="メモを記入..."></textarea>
-              <button class="btn btn-dark btn-save" id="save-notes">保存</button>
-              <span id="save-status" class="save-status"></span>
-            </div>
-          </div>
-        </div>
-      </div>
+      <div id="sub-rates"><div class="page-header"><h2>決定</h2></div><div class="stats-row" id="rates-stats"></div><div class="card" style="margin-bottom:20px"><div class="card-header">月別推移</div><div class="data-table-wrap"><table class="data-table" id="rates-monthly-table"></table></div></div><div class="card" style="margin-bottom:20px"><div class="card-header">医院別</div><div class="bar-chart" id="rates-facility"></div></div><div class="card" style="margin-bottom:20px"><div class="card-header">種類別（キレイライン / ウィスマイル / ビンクス）</div><div class="bar-chart" id="rates-counselor"></div></div><div class="card" style="margin-bottom:20px"><div class="card-header">ドクター別 月別推移</div><div class="data-table-wrap"><table class="data-table" id="doctor-monthly-table"></table></div></div><div class="card"><div class="card-header">ドクター別 決定率</div><div class="bar-chart" id="rates-doctor"></div></div></div>
+      <div id="sub-patients" hidden><div class="page-header"><h2>初診管理</h2></div><div class="stats-row" id="patients-stats"></div><div class="card" style="margin-bottom:20px"><div class="card-header">新規登録</div><div class="form-grid"><div class="form-group"><label class="form-label">来院日</label><input type="date" class="form-input" id="pt-date"></div><div class="form-group"><label class="form-label">名前</label><input type="text" class="form-input" id="pt-name" placeholder="患者名"></div><div class="form-group"><label class="form-label">目的</label><select class="form-select" id="pt-purpose"><option>矯正相談</option><option>インプラント相談</option><option>BF相談</option><option>ラブリエ相談</option><option>保険初診</option><option>転院</option><option>その他</option></select></div><div class="form-group"><label class="form-label">初診由来</label><select class="form-select" id="pt-source"><option>Google検索</option><option>インスタ</option><option>紹介</option><option>広告</option><option>その他</option></select></div><div class="form-group"><label class="form-label">カウンセラー</label><input type="text" class="form-input" id="pt-counselor" placeholder="スタッフ名"></div><div class="form-group"><label class="form-label">ドクター</label><input type="text" class="form-input" id="pt-doctor" placeholder="Dr名"></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="pt-status"><option>予約</option><option>来院</option><option>相談済</option><option>検査予約</option><option>診断済</option><option>成約</option><option>キャンセル</option></select></div><div class="form-group"><label class="form-label">金額</label><input type="number" class="form-input" id="pt-amount" placeholder="0"></div></div><div class="form-actions"><button class="btn btn-dark" id="pt-save">登録</button></div></div><div class="card"><div class="card-header">患者一覧</div><div class="data-table-wrap"><table class="data-table" id="patients-table"><thead><tr><th>日付</th><th>名前</th><th>目的</th><th>由来</th><th>カウンセラー</th><th>Dr</th><th>ステータス</th><th>金額</th></tr></thead><tbody id="patients-tbody"></tbody></table></div></div></div>
+      <div id="sub-competitors" hidden><div class="page-header"><h2>競合調査</h2></div><div class="stats-row"><div class="stat-card"><span class="stat-num" id="tc-total">0</span><span class="stat-label">調査医院数</span></div><div class="stat-card"><span class="stat-num" id="tc-avg">0</span><span class="stat-label">平均スコア</span></div><div class="stat-card"><span class="stat-num" id="tc-docs">0</span><span class="stat-label">資料数</span></div></div><div style="margin-bottom:20px"><button class="btn btn-dark" id="add-clinic-btn">+ 医院を追加</button></div><div class="clinic-grid" id="clinic-grid"></div><div id="clinic-add-modal" class="modal" hidden><div class="modal-overlay" onclick="document.getElementById('clinic-add-modal').hidden=true"></div><div class="modal-content" style="max-width:600px;padding:24px;max-height:90vh;overflow-y:auto"><button class="modal-close" onclick="document.getElementById('clinic-add-modal').hidden=true">&times;</button><h3 style="font-size:16px;margin-bottom:16px">新しい医院を追加</h3><div style="display:flex;flex-direction:column;gap:12px"><div class="form-grid"><div class="form-group"><label class="form-label">医院名</label><input type="text" class="form-input" id="nc-name" placeholder="例: ○○歯科・矯正歯科"></div><div class="form-group"><label class="form-label">訪問日</label><input type="date" class="form-input" id="nc-date"></div><div class="form-group"><label class="form-label">訪問時間</label><input type="text" class="form-input" id="nc-time" placeholder="例: 10:00〜11:00"></div><div class="form-group"><label class="form-label">住所</label><input type="text" class="form-input" id="nc-address" placeholder="例: 名古屋市中村区..."></div><div class="form-group"><label class="form-label">DA担当</label><input type="text" class="form-input" id="nc-da" placeholder="例: 佐々木さん"></div><div class="form-group"><label class="form-label">Dr担当</label><input type="text" class="form-input" id="nc-dr" placeholder="例: 伊藤先生"></div></div><div style="font-size:13px;font-weight:600;color:var(--text-sub);margin-top:8px">評価（5段階）</div><div class="form-grid" style="grid-template-columns:repeat(4,1fr)"><div class="form-group"><label class="form-label">受付</label><select class="form-select" id="nc-s1"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div><div class="form-group"><label class="form-label">カウンセリング</label><select class="form-select" id="nc-s2"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div><div class="form-group"><label class="form-label">接遇</label><select class="form-select" id="nc-s3"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div><div class="form-group"><label class="form-label">院内環境</label><select class="form-select" id="nc-s4"><option>5</option><option>4</option><option>3</option><option>2</option><option>1</option></select></div></div><div class="form-group"><label class="form-label">料金情報</label><input type="text" class="form-input" id="nc-pricing" placeholder="例: 見積もり配布、パンフレット説明"></div><div class="form-group"><label class="form-label">強み</label><textarea class="form-input" id="nc-strengths" rows="2" style="resize:vertical"></textarea></div><div class="form-group"><label class="form-label">改善点</label><textarea class="form-input" id="nc-improvements" rows="2" style="resize:vertical"></textarea></div><div class="form-group"><label class="form-label">総合評価</label><textarea class="form-input" id="nc-summary" rows="2" style="resize:vertical"></textarea></div><button class="btn btn-dark" id="nc-save" style="width:100%">登録</button></div></div></div><div id="doc-modal" class="modal" hidden><div class="modal-overlay" onclick="document.getElementById('doc-modal').hidden=true"></div><div class="modal-content" style="max-width:500px;padding:24px"><button class="modal-close" onclick="document.getElementById('doc-modal').hidden=true">&times;</button><h3 style="font-size:16px;margin-bottom:16px" id="doc-modal-title">資料を追加</h3><input type="hidden" id="doc-clinic"><div style="display:flex;flex-direction:column;gap:12px"><div class="form-group"><label class="form-label">資料名</label><input type="text" class="form-input" id="doc-name" placeholder="例: 見積書"></div><div class="form-group"><label class="form-label">種類</label><select class="form-select" id="doc-type"><option>見積書</option><option>パンフレット</option><option>録音</option><option>データ</option><option>写真</option><option>カウンセリング資料</option><option>その他</option></select></div><div class="form-group"><label class="form-label">Google Drive URL</label><input type="url" class="form-input" id="doc-url" placeholder="https://drive.google.com/..."></div><button class="btn btn-dark" id="doc-save" style="width:100%">登録</button></div></div></div></div>
+      <div id="sub-reviews" hidden><div class="page-header"><h2>口コミ管理</h2></div><div class="facility-tabs" id="reviews-facility-tabs"></div><div class="stats-row" id="reviews-stats"></div><div class="card" style="margin-bottom:20px"><div class="card-header">月次データ入力</div><div class="form-grid"><div class="form-group"><label class="form-label">月</label><input type="month" class="form-input" id="rev-month"></div><div class="form-group"><label class="form-label">口コミ数（累計）</label><input type="number" class="form-input" id="rev-count" placeholder="0"></div><div class="form-group"><label class="form-label">評価点</label><input type="number" class="form-input" id="rev-rating" placeholder="4.5" step="0.1" min="1" max="5"></div></div><div class="form-actions"><button class="btn btn-dark" id="rev-save">保存</button></div></div><div class="card" style="margin-bottom:20px"><div class="card-header">評価推移</div><div id="reviews-chart" style="min-height:200px"></div></div><div class="card" style="margin-bottom:20px"><div class="card-header">口コミコメント</div><div style="display:flex;gap:8px;align-items:flex-start;margin-bottom:12px"><div style="flex:1;display:flex;flex-direction:column;gap:8px"><select class="form-select" id="comment-rating"><option value="5">★★★★★</option><option value="4">★★★★☆</option><option value="3">★★★☆☆</option><option value="2">★★☆☆☆</option><option value="1">★☆☆☆☆</option></select><textarea class="form-input" id="comment-text" rows="2" placeholder="口コミ内容を貼り付け..." style="resize:vertical"></textarea></div><button class="btn btn-dark" id="comment-save">追加</button></div><div id="comments-list"></div></div><div class="card"><div class="card-header">月次データ</div><div class="data-table-wrap"><table class="data-table"><thead><tr><th>月</th><th>口コミ数</th><th>増減</th><th>評価</th></tr></thead><tbody id="reviews-tbody"></tbody></table></div></div></div>
+      <div id="sub-strategy" hidden><div class="page-header"><h2>戦略ノート</h2><p class="page-desc">カウンセリング改善戦略</p></div><div class="strategy-grid"><div class="strategy-section"><div class="card"><div class="card-header">目的</div><p style="font-size:14px">清翔会の成約率をあげて、広告の効果を最大限にする。</p><div class="kpi-box" style="margin-top:14px"><div class="kpi"><span class="kpi-label">現在の成約率</span><span class="kpi-value red">30%</span></div><div class="kpi"><span class="kpi-label">目標成約率</span><span class="kpi-value green">???</span></div></div></div></div><div class="strategy-section"><div class="card"><div class="card-header">課題要因</div><ul class="issue-list"><li><span class="tag tag-red">価格</span>他医院との比較・値段で選ばれない</li><li><span class="tag tag-orange">説明</span>説明不足、接遇面の問題</li><li><span class="tag tag-blue">技術</span>ドクター技術料、広告関連</li></ul></div></div><div class="strategy-section"><div class="card"><div class="card-header">競合から学んだ施策</div><div id="suggestions-summary"></div></div></div><div class="strategy-section"><div class="card"><div class="card-header">アクションプラン</div><div class="action-columns"><div class="action-col"><h4>即実行</h4><ul class="action-list" id="immediate-actions"></ul></div><div class="action-col"><h4>短期</h4><ul class="action-list" id="short-actions"></ul></div><div class="action-col"><h4>中長期</h4><ul class="action-list" id="long-actions"></ul></div></div></div></div><div class="strategy-section"><div class="card"><div class="card-header">メモ</div><textarea id="strategy-notes" class="notes-area" placeholder="メモを記入..."></textarea><button class="btn btn-dark btn-save" id="save-notes">保存</button><span id="save-status" class="save-status"></span></div></div></div></div>
     </main>
 
-    <!-- ==================== 設定 ==================== -->
-    <!-- ==================== 管理 ==================== -->
     <!-- ==================== 広告予算 ==================== -->
     <main id="view-adbudget" class="view" hidden>
       <div class="page-header"><h2>広告予算管理</h2></div>
-
-      <!-- フィルター -->
-      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
-        <select class="form-select" id="ad-filter-agency" style="width:auto;padding:6px 8px;font-size:12px"><option value="">代理店:全て</option></select>
-        <select class="form-select" id="ad-filter-month" style="width:auto;padding:6px 8px;font-size:12px"><option value="">月:全て</option></select>
-      </div>
-
+      <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;align-items:center"><select class="form-select" id="ad-filter-agency" style="width:auto;padding:6px 8px;font-size:12px"><option value="">代理店:全て</option></select><select class="form-select" id="ad-filter-month" style="width:auto;padding:6px 8px;font-size:12px"><option value="">月:全て</option></select></div>
       <div class="stats-row" id="ad-stats"></div>
-
-      <!-- 入力フォーム -->
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header">広告予算登録</div>
-
-        <!-- STEP1: 基本情報 -->
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">① 基本情報</div>
-        <div class="form-grid" style="margin-bottom:16px">
-          <div class="form-group"><label class="form-label">代理店名</label><input type="text" class="form-input" id="ad-agency" placeholder="例: LIZ"></div>
-          <div class="form-group"><label class="form-label">年月</label><input type="month" class="form-input" id="ad-month"></div>
-          <div class="form-group"><label class="form-label">総額（税抜）</label><input type="number" class="form-input" id="ad-total" placeholder="0"></div>
-        </div>
-
-        <!-- STEP2: 内訳 -->
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">② 内訳</div>
-        <div class="form-grid" style="margin-bottom:16px">
-          <div class="form-group"><label class="form-label">共通費（制作費等）</label><input type="number" class="form-input" id="ad-common" placeholder="0"></div>
-          <div class="form-group"><label class="form-label">手数料</label><input type="number" class="form-input" id="ad-fee" placeholder="0"></div>
-        </div>
-
-        <!-- STEP3: 店舗別広告費 -->
-        <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">③ 店舗別広告費 <button class="btn btn-outline" id="ad-add-facility" style="font-size:10px;padding:2px 8px;min-height:24px;margin-left:8px">+ 店舗追加</button></div>
-        <div id="ad-facilities-container"></div>
-
-        <div class="form-actions" style="margin-top:16px"><button class="btn btn-dark" id="ad-save">登録</button></div>
-      </div>
-
-      <!-- 一覧 -->
-      <div class="card">
-        <div class="card-header">登録済み一覧</div>
-        <div id="ad-list"></div>
-      </div>
+      <div class="card" style="margin-bottom:20px"><div class="card-header">広告予算登録</div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">① 基本情報</div><div class="form-grid" style="margin-bottom:16px"><div class="form-group"><label class="form-label">代理店名</label><input type="text" class="form-input" id="ad-agency" placeholder="例: LIZ"></div><div class="form-group"><label class="form-label">年月</label><input type="month" class="form-input" id="ad-month"></div><div class="form-group"><label class="form-label">総額（税抜）</label><input type="number" class="form-input" id="ad-total" placeholder="0"></div></div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">② 内訳</div><div class="form-grid" style="margin-bottom:16px"><div class="form-group"><label class="form-label">共通費（制作費等）</label><input type="number" class="form-input" id="ad-common" placeholder="0"></div><div class="form-group"><label class="form-label">手数料</label><input type="number" class="form-input" id="ad-fee" placeholder="0"></div></div><div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:8px">③ 店舗別広告費 <button class="btn btn-outline" id="ad-add-facility" style="font-size:10px;padding:2px 8px;min-height:24px;margin-left:8px">+ 店舗追加</button></div><div id="ad-facilities-container"></div><div class="form-actions" style="margin-top:16px"><button class="btn btn-dark" id="ad-save">登録</button></div></div>
+      <div class="card"><div class="card-header">登録済み一覧</div><div id="ad-list"></div></div>
     </main>
 
     <!-- ==================== 管理 ==================== -->
     <main id="view-admin" class="view" hidden>
       <div class="page-header"><h2>権限管理</h2><p class="page-desc">閲覧用アカウントの発行・管理</p></div>
-
-      <!-- 新規発行 -->
-      <div class="card" style="margin-bottom:20px">
-        <div class="card-header">新規アカウント発行</div>
-        <div class="form-grid">
-          <div class="form-group">
-            <label class="form-label">アカウント名</label>
-            <input type="text" class="form-input" id="adm-name" placeholder="例: ヒカルさん用">
-          </div>
-          <div class="form-group">
-            <label class="form-label">代理店名（広告用）</label>
-            <input type="text" class="form-input" id="adm-agency" placeholder="例: LIZ（空欄=全て閲覧可）">
-          </div>
-          <div class="form-group">
-            <label class="form-label">権限</label>
-            <select class="form-select" id="adm-role">
-              <option value="view">閲覧のみ</option>
-              <option value="edit">編集・閲覧</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">閲覧タブ</label>
-            <div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">
-              <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-tc" value="tc"> TC</label>
-              <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-sales" value="sales"> 売上</label>
-              <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-bookings" value="bookings" checked> 予約</label>
-              <label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-adbudget" value="adbudget"> 広告</label>
-            </div>
-          </div>
-          <div class="form-group">
-            <label class="form-label">プロモ制限 <button type="button" class="adm-toggle-all" data-target="adm-promos" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label>
-            <select class="form-select" id="adm-promos" multiple style="min-height:100px"></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">施術制限 <button type="button" class="adm-toggle-all" data-target="adm-services" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label>
-            <select class="form-select" id="adm-services" multiple style="min-height:80px"></select>
-          </div>
-          <div class="form-group">
-            <label class="form-label">店舗制限 <button type="button" class="adm-toggle-all" data-target="adm-facilities" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label>
-            <select class="form-select" id="adm-facilities" multiple style="min-height:80px"></select>
-          </div>
-        </div>
-        <div class="form-actions">
-          <button class="btn btn-dark" id="adm-create">発行</button>
-        </div>
-      </div>
-
-      <!-- 発行済みリスト -->
-      <div class="card">
-        <div class="card-header">発行済みアカウント</div>
-        <div id="adm-accounts-list"></div>
-      </div>
+      <div class="card" style="margin-bottom:20px"><div class="card-header">新規アカウント発行</div><div class="form-grid"><div class="form-group"><label class="form-label">アカウント名</label><input type="text" class="form-input" id="adm-name" placeholder="例: ヒカルさん用"></div><div class="form-group"><label class="form-label">代理店名（広告用）</label><input type="text" class="form-input" id="adm-agency" placeholder="例: LIZ（空欄=全て閲覧可）"></div><div class="form-group"><label class="form-label">権限</label><select class="form-select" id="adm-role"><option value="view">閲覧のみ</option><option value="edit">編集・閲覧</option></select></div><div class="form-group"><label class="form-label">閲覧タブ</label><div style="display:flex;flex-direction:column;gap:6px;margin-top:4px"><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-tc" value="tc"> TC</label><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-sales" value="sales"> 売上</label><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-bookings" value="bookings" checked> 予約</label><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-adbudget" value="adbudget"> 広告</label></div></div><div class="form-group"><label class="form-label">プロモ制限 <button type="button" class="adm-toggle-all" data-target="adm-promos" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label><select class="form-select" id="adm-promos" multiple style="min-height:100px"></select></div><div class="form-group"><label class="form-label">施術制限 <button type="button" class="adm-toggle-all" data-target="adm-services" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label><select class="form-select" id="adm-services" multiple style="min-height:80px"></select></div><div class="form-group"><label class="form-label">店舗制限 <button type="button" class="adm-toggle-all" data-target="adm-facilities" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label><select class="form-select" id="adm-facilities" multiple style="min-height:80px"></select></div></div><div class="form-actions"><button class="btn btn-dark" id="adm-create">発行</button></div></div>
+      <div class="card"><div class="card-header">発行済みアカウント</div><div id="adm-accounts-list"></div></div>
     </main>
 
     <main id="view-settings" class="view" hidden>
       <div class="page-header"><h2>設定</h2></div>
-      <div class="settings-list">
-        <button class="settings-item" id="logout-btn-mobile">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg>
-          <span>ログアウト</span>
-        </button>
-      </div>
+      <div class="settings-list"><button class="settings-item" id="logout-btn-mobile"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4M16 17l5-5-5-5M21 12H9"/></svg><span>ログアウト</span></button></div>
     </main>
 
-    <!-- Modal -->
-    <div id="clinic-modal" class="modal" hidden>
-      <div class="modal-overlay"></div>
-      <div class="modal-content">
-        <button class="modal-close" id="modal-close">&times;</button>
-        <div id="modal-body"></div>
+    <!-- モーダル群 -->
+    <div id="clinic-modal" class="modal" hidden><div class="modal-overlay"></div><div class="modal-content"><button class="modal-close" id="modal-close">&times;</button><div id="modal-body"></div></div></div>
+    <div id="row-edit-modal" class="modal" hidden><div class="modal-overlay" onclick="closeRowEditModal()"></div><div class="modal-content" style="max-width:500px;padding:24px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:16px;font-weight:700" id="row-edit-title">予約情報を編集</h3><button class="modal-close" onclick="closeRowEditModal()" style="position:static;float:none">&times;</button></div><div style="display:flex;flex-direction:column;gap:12px"><div class="form-group"><label class="form-label">名前</label><input type="text" class="form-input" id="re-name"></div><div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="form-group"><label class="form-label">予約日時</label><input type="text" class="form-input" id="re-bookdate" placeholder="例: 2026/4/15 14:00"></div><div class="form-group"><label class="form-label">相談</label><input type="text" class="form-input" id="re-service"></div></div><div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="form-group"><label class="form-label">医院</label><select class="form-select" id="re-facility"><option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>岩田</option><option>大森</option><option>京都</option></select></div><div class="form-group"><label class="form-label">ステータス</label><select class="form-select" id="re-status"><option>未対応</option><option>確認済</option><option>来院済</option><option>成約</option><option>キャンセル</option><option>除外</option></select></div></div><div class="form-grid" style="grid-template-columns:1fr 1fr"><div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="re-phone"></div><div class="form-group"><label class="form-label">メール</label><input type="text" class="form-input" id="re-email"></div></div><div class="form-group"><label class="form-label">プロモ</label><input type="text" class="form-input" id="re-source"></div><div style="display:flex;gap:8px"><button class="btn btn-dark" id="re-save" style="flex:1">保存</button><button class="btn" id="re-hide" style="background:#f5f5f5;color:#9ca3af;border:1px solid var(--border)">非表示</button><button class="btn btn-outline" onclick="closeRowEditModal()">キャンセル</button></div></div></div></div>
+    <div id="memo-modal" class="modal" hidden><div class="modal-overlay" onclick="closeMemoModal()"></div><div class="modal-content" style="max-width:480px;padding:24px;max-height:70vh"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px"><h3 style="font-size:16px;font-weight:700" id="memo-modal-title">進捗メモ</h3><button class="modal-close" onclick="closeMemoModal()" style="position:static;float:none">&times;</button></div><textarea id="memo-modal-text" style="width:100%;height:200px;font-size:15px;padding:12px;border:2px solid var(--border);border-radius:8px;line-height:1.8;resize:vertical;outline:none" placeholder="進捗メモを入力..."></textarea><div style="display:flex;gap:8px;margin-top:12px"><button class="btn btn-dark" id="memo-modal-save" style="flex:1">保存</button><button class="btn btn-outline" onclick="closeMemoModal()">閉じる</button></div></div></div>
+  </div>
+
+  <!-- Q&A モーダル群（app外） -->
+  <div id="qa-cat-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:1000;padding:20px">
+    <div onclick="event.stopPropagation()" style="background:#fff;border-radius:8px;padding:22px;width:100%;max-width:400px;border:2px solid #111;box-shadow:0 8px 40px rgba(0,0,0,.15)">
+      <div id="qa-cat-modal-title" style="font-size:13px;font-weight:900;margin-bottom:14px"></div>
+      <div style="font-size:9px;font-weight:700;color:#bbb;margin-bottom:4px;letter-spacing:1.5px;text-transform:uppercase">アイコン</div>
+      <input id="qa-cat-icon-input" type="text" maxlength="2" style="width:52px;border:1.5px solid #e0e0e0;border-radius:5px;padding:7px 10px;font-size:20px;text-align:center;font-family:inherit;display:block;background:#fafafa;margin-bottom:10px;box-sizing:border-box">
+      <div style="font-size:9px;font-weight:700;color:#bbb;margin-bottom:4px;letter-spacing:1.5px;text-transform:uppercase">カテゴリー名</div>
+      <input id="qa-cat-name-input" type="text" placeholder="例：よくあるご質問" style="width:100%;border:1.5px solid #e0e0e0;border-radius:5px;padding:7px 10px;font-size:13px;font-family:inherit;display:block;background:#fafafa;margin-bottom:16px;box-sizing:border-box">
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button onclick="document.getElementById('qa-cat-modal').style.display='none'" style="border:1.5px solid #111;border-radius:5px;padding:7px 15px;font-size:13px;font-weight:700;background:#fff;color:#111;cursor:pointer;font-family:inherit">キャンセル</button>
+        <button id="qa-cat-save-btn" style="border:1.5px solid #111;border-radius:5px;padding:7px 15px;font-size:13px;font-weight:700;background:#111;color:#fff;cursor:pointer;font-family:inherit">保存する</button>
       </div>
     </div>
   </div>
 
-  <!-- 行編集モーダル -->
-  <div id="row-edit-modal" class="modal" hidden>
-    <div class="modal-overlay" onclick="closeRowEditModal()"></div>
-    <div class="modal-content" style="max-width:500px;padding:24px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3 style="font-size:16px;font-weight:700" id="row-edit-title">予約情報を編集</h3>
-        <button class="modal-close" onclick="closeRowEditModal()" style="position:static;float:none">&times;</button>
-      </div>
-      <div style="display:flex;flex-direction:column;gap:12px">
-        <div class="form-group"><label class="form-label">名前</label><input type="text" class="form-input" id="re-name"></div>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr">
-          <div class="form-group"><label class="form-label">予約日時</label><input type="text" class="form-input" id="re-bookdate" placeholder="例: 2026/4/15 14:00"></div>
-          <div class="form-group"><label class="form-label">相談</label><input type="text" class="form-input" id="re-service"></div>
-        </div>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr">
-          <div class="form-group"><label class="form-label">医院</label>
-            <select class="form-select" id="re-facility"><option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>岩田</option><option>大森</option><option>京都</option></select>
-          </div>
-          <div class="form-group"><label class="form-label">ステータス</label>
-            <select class="form-select" id="re-status"><option>未対応</option><option>確認済</option><option>来院済</option><option>成約</option><option>キャンセル</option><option>除外</option></select>
-          </div>
-        </div>
-        <div class="form-grid" style="grid-template-columns:1fr 1fr">
-          <div class="form-group"><label class="form-label">電話番号</label><input type="text" class="form-input" id="re-phone"></div>
-          <div class="form-group"><label class="form-label">メール</label><input type="text" class="form-input" id="re-email"></div>
-        </div>
-        <div class="form-group"><label class="form-label">プロモ</label><input type="text" class="form-input" id="re-source"></div>
-        <div style="display:flex;gap:8px">
-          <button class="btn btn-dark" id="re-save" style="flex:1">保存</button>
-          <button class="btn" id="re-hide" style="background:#f5f5f5;color:#9ca3af;border:1px solid var(--border)">非表示</button>
-          <button class="btn btn-outline" onclick="closeRowEditModal()">キャンセル</button>
-        </div>
+  <div id="qa-item-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);align-items:center;justify-content:center;z-index:1000;padding:20px">
+    <div onclick="event.stopPropagation()" style="background:#fff;border-radius:8px;padding:22px;width:100%;max-width:480px;border:2px solid #111;box-shadow:0 8px 40px rgba(0,0,0,.15)">
+      <div id="qa-item-modal-title" style="font-size:11px;font-weight:700;color:#aaa;margin-bottom:10px;letter-spacing:1.5px;text-transform:uppercase"></div>
+      <div style="font-size:9px;font-weight:700;color:#bbb;margin-bottom:4px;letter-spacing:1.5px;text-transform:uppercase">質問（Q）</div>
+      <input id="qa-item-q" type="text" placeholder="質問を入力…" style="width:100%;border:1.5px solid #e0e0e0;border-radius:5px;padding:7px 10px;font-size:13px;font-family:inherit;display:block;background:#fafafa;margin-bottom:9px;box-sizing:border-box">
+      <div style="font-size:9px;font-weight:700;color:#bbb;margin-bottom:4px;letter-spacing:1.5px;text-transform:uppercase">回答（A）</div>
+      <textarea id="qa-item-a" rows="4" placeholder="回答を入力…" style="width:100%;border:1.5px solid #e0e0e0;border-radius:5px;padding:7px 10px;font-size:13px;font-family:inherit;display:block;background:#fafafa;resize:vertical;line-height:1.7;box-sizing:border-box"></textarea>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+        <button onclick="document.getElementById('qa-item-modal').style.display='none'" style="border:1.5px solid #111;border-radius:5px;padding:7px 15px;font-size:13px;font-weight:700;background:#fff;color:#111;cursor:pointer;font-family:inherit">キャンセル</button>
+        <button id="qa-item-save-btn" style="border:1.5px solid #111;border-radius:5px;padding:7px 15px;font-size:13px;font-weight:700;background:#111;color:#fff;cursor:pointer;font-family:inherit">保存する</button>
       </div>
     </div>
   </div>
 
-  <!-- メモモーダル -->
-  <div id="memo-modal" class="modal" hidden>
-    <div class="modal-overlay" onclick="closeMemoModal()"></div>
-    <div class="modal-content" style="max-width:480px;padding:24px;max-height:70vh">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
-        <h3 style="font-size:16px;font-weight:700" id="memo-modal-title">進捗メモ</h3>
-        <button class="modal-close" onclick="closeMemoModal()" style="position:static;float:none">&times;</button>
+  <!-- AI生成モーダル -->
+  <div id="qa-ai-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);align-items:center;justify-content:center;z-index:1000;padding:16px">
+    <div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;border:2px solid #111;box-shadow:0 16px 60px rgba(0,0,0,.2)">
+      <div style="padding:20px 24px 16px;border-bottom:1.5px solid #f0f0f0">
+        <div style="display:flex;align-items:center;gap:10px">
+          <span style="font-size:20px">✦</span>
+          <div style="flex:1"><div style="font-size:15px;font-weight:900">AI でQ&Aを自動生成</div><div style="font-size:11px;color:#999;margin-top:1px">URLを入力するだけでカウンセリング用Q&Aを自動作成します</div></div>
+          <button onclick="document.getElementById('qa-ai-modal').style.display='none'" style="background:none;border:none;font-size:18px;color:#ccc;cursor:pointer;line-height:1">×</button>
+        </div>
       </div>
-      <textarea id="memo-modal-text" style="width:100%;height:200px;font-size:15px;padding:12px;border:2px solid var(--border);border-radius:8px;line-height:1.8;resize:vertical;outline:none" placeholder="進捗メモを入力..."></textarea>
-      <div style="display:flex;gap:8px;margin-top:12px">
-        <button class="btn btn-dark" id="memo-modal-save" style="flex:1">保存</button>
-        <button class="btn btn-outline" onclick="closeMemoModal()">閉じる</button>
+      <div style="padding:20px 24px" id="qa-ai-modal-body">
+        <div style="margin-bottom:16px">
+          <div style="font-size:9px;font-weight:700;color:#bbb;margin-bottom:6px;letter-spacing:1.5px;text-transform:uppercase">診療カテゴリー</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="qa-ai-dept-grid"></div>
+        </div>
+        <div style="margin-bottom:14px">
+          <div style="font-size:9px;font-weight:700;color:#bbb;margin-bottom:4px;letter-spacing:1.5px;text-transform:uppercase">参考URL</div>
+          <input id="qa-ai-url" type="text" placeholder="https://example.com/treatment-page" style="width:100%;border:1.5px solid #e0e0e0;border-radius:5px;padding:7px 10px;font-size:12px;font-family:inherit;display:block;background:#fafafa;box-sizing:border-box">
+          <div style="font-size:10px;color:#bbb;margin-top:4px">クリニックの公式サイト・治療ページなどのURLを入力してください</div>
+        </div>
+        <div style="margin-bottom:20px">
+          <div style="font-size:9px;font-weight:700;color:#bbb;margin-bottom:6px;letter-spacing:1.5px;text-transform:uppercase">生成するQ&A数（目安）</div>
+          <div style="display:flex;gap:6px" id="qa-ai-count-btns">
+            <button data-n="5" style="border:1.5px solid #e0e0e0;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#fff;color:#444;cursor:pointer;font-family:inherit">5問</button>
+            <button data-n="10" style="border:1.5px solid #111;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#111;color:#fff;cursor:pointer;font-family:inherit">10問</button>
+            <button data-n="15" style="border:1.5px solid #e0e0e0;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#fff;color:#444;cursor:pointer;font-family:inherit">15問</button>
+            <button data-n="20" style="border:1.5px solid #e0e0e0;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#fff;color:#444;cursor:pointer;font-family:inherit">20問</button>
+          </div>
+        </div>
+        <button id="qa-ai-generate-btn" style="width:100%;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:900;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px;cursor:pointer;font-family:inherit">✦ Q&Aを生成する</button>
+        <div id="qa-ai-result" style="margin-top:16px"></div>
       </div>
     </div>
   </div>
 
   <div class="toast" id="toast"></div>
   <script src="app.js?v=105"></script>
+
+  <!-- ══ Q&A研修スクリプト ══ -->
+  <script>
+  // ─── Q&A データ ─────────────────────────────────────────
+  const QA_KEY = 'seishokai_qa_v1';
+  const QA_DEPTS = [
+    { id:'veneer',    label:'削らないラミネートベニア', icon:'🦷' },
+    { id:'ortho',     label:'矯正治療',                 icon:'🔵' },
+    { id:'implant',   label:'インプラント',             icon:'⚙️' },
+    { id:'insurance', label:'保険診療',                 icon:'📋' },
+    { id:'whitening', label:'ホワイトニング',           icon:'✨' },
+    { id:'hygienist', label:'衛生士業務',               icon:'💉' },
+  ];
+
+  const QA_DEFAULT = {
+    veneer: [
+      { id:1, title:'ブラックフィルムとは', icon:'🦷', items:[
+        { id:101, q:'ブラックフィルムとはどんな施術ですか？', a:'韓国の2Dデンタル社が開発した審美歯科治療です。0.1mmの極薄セラミックフィルムを歯の表面に貼り付け、歯の色・形・明るさをコントロールします。韓国では2016年から80,000件以上の臨床実績を持つ削らないラミネートベニアの先駆者です。' },
+        { id:102, q:'「削らない」とはどういう意味ですか？', a:'通常のラミネートベニアは0.3〜0.8mm削りますが、ブラックフィルムは0.1mm以下の極薄設計により、エナメル質をほぼ削ることなく理想の口元を実現します。' },
+        { id:103, q:'出っ歯にならないですか？', a:'0.1mm以下の極薄設計のため、削らずに貼っても不自然な厚みが出ません。光を透過するほど薄く、先端が少し透ける自然な美しい質感を実現します。' },
+        { id:104, q:'ブラックフィルムの保証は？', a:'10年間の無料保証があります。歯科医師・技工士の署名入り保証書付きで、条件は1年に1度の噛み合わせチェックです。装着後半年以内のやり替えも無料です。' },
+        { id:105, q:'費用はいくらですか？', a:'定価は1本275,000円（税込）です。顔全体モニター価格（税込）例：6本1,204,500円 / 10本1,925,000円 / 16本2,904,000円。詳細はカウンセリング時にご案内します。' },
+      ]},
+      { id:2, title:'ラブリエとは', icon:'💎', items:[
+        { id:201, q:'ラブリエとはどんな施術ですか？', a:'La Briller（ラブリエ）は人工ダイヤモンド（ジルコニア）を使用した削らないラミネートベニアです。最薄0.04mmという薄さと高強度を両立し、劣化しない白さを実現します。アジア施術数No.1の実績を持ちます。' },
+        { id:202, q:'ブラックフィルムとの違いは？', a:'【薄さ】ラブリエ0.04mm、BF0.1mm。【白さ】ラブリエは自身の歯の色が透けないため希望色を自由に選べる（◎）、BFは自然な透明感（〇）。【保証】ラブリエ3年、BF10年。【価格】ラブリエ132,000円/本、BF275,000円/本（税込）。' },
+        { id:203, q:'ラブリエの保証は？', a:'基本保証3年。条件は保証書への署名と半年に1度の定期検診。1歯22,000円で10年保証オプションも選べます。' },
+      ]},
+      { id:3, title:'適応・対象', icon:'✅', items:[
+        { id:301, q:'どんな悩みに対応できますか？', a:'①すきっ歯・歯の隙間、②矮小歯・ギザギザ、③ホワイトニングで落ちない変色（テトラサイクリン歯など）、④ブラックトライアングル、⑤軽度のガタツキ、⑥スマイルラインの改善、⑦ホワイトスポット。複合的なお悩みに対応可能です。' },
+        { id:302, q:'カウンセリングは無料ですか？', a:'はい、初回カウンセリングは完全無料です。その場での契約は一切強制しておりません。疑問や不安はどんなことでもお気軽にご相談ください。' },
+      ]},
+    ],
+    ortho:[], implant:[], insurance:[], whitening:[], hygienist:[],
+  };
+
+  let qaData = {};
+  let qaCurrentDept = 'veneer';
+  let qaOpenCats = {};
+  let qaSearch = '';
+  let qaNid = 9000;
+  let qaEditingCat = null; // {deptId, catId} or {deptId, catId:'new'}
+  let qaEditingItem = null; // {deptId, catId, itemId} or {deptId, catId, itemId:'new'}
+  let qaAiDept = 'veneer';
+  let qaAiCount = 10;
+
+  function qaUid(){ return qaNid++; }
+
+  function qaLoad(){
+    try{ const r=localStorage.getItem(QA_KEY); if(r) return JSON.parse(r); }catch(e){}
+    return JSON.parse(JSON.stringify(QA_DEFAULT));
+  }
+  function qaSave(){ try{ localStorage.setItem(QA_KEY, JSON.stringify(qaData)); }catch(e){} }
+
+  function qaToast(msg){
+    const d = document.createElement('div');
+    d.className = 'qa-toast';
+    d.textContent = msg;
+    document.body.appendChild(d);
+    setTimeout(()=>d.remove(), 2000);
+  }
+
+  // ─── ログイン画面からQ&A研修を開く ─────────────────────
+  function openQaFromLogin(){
+    // ログイン画面を隠してappを表示（Q&Aは認証不要でアクセス可能）
+    document.getElementById('login-screen').hidden = true;
+    document.getElementById('app').hidden = false;
+    qaShowView('qa');
+  }
+
+  // ─── ビュー切替（既存のswitchViewを拡張） ───────────────
+  function qaShowView(viewId){
+    // 全view非表示
+    document.querySelectorAll('.view, #view-qa').forEach(v => {
+      v.style.display = 'none';
+      v.classList.remove('active');
+    });
+    // 対象を表示
+    const target = document.getElementById('view-' + viewId);
+    if(target){
+      target.style.display = viewId === 'qa' ? 'flex' : '';
+      target.classList.add('active');
+    }
+    // ナビ更新
+    document.querySelectorAll('.nav-btn, .bottom-nav-btn').forEach(b => {
+      b.classList.toggle('active', b.dataset.view === viewId);
+    });
+    if(viewId === 'qa') qaRender();
+  }
+
+  // ─── レンダリング ────────────────────────────────────────
+  function qaRender(){
+    const dept = qaCurrentDept;
+    const deptInfo = QA_DEPTS.find(d=>d.id===dept);
+    const cats = qaData[dept] || [];
+    const totalQ = cats.reduce((s,c)=>s+c.items.length, 0);
+
+    // タイトル更新
+    document.getElementById('qa-dept-title').textContent = deptInfo.icon + ' ' + deptInfo.label;
+    document.getElementById('qa-dept-count').textContent =
+      'カウンセリング担当者向けQ&Aマニュアル — ' + totalQ + '問 / ' + cats.length + 'カテゴリー';
+
+    // サイドバー
+    const deptList = document.getElementById('qa-dept-list');
+    deptList.innerHTML = '';
+    QA_DEPTS.forEach(d => {
+      const cnt = (qaData[d.id]||[]).reduce((s,c)=>s+c.items.length,0);
+      const btn = document.createElement('button');
+      btn.className = 'qa-dept-btn' + (d.id===dept?' active':'');
+      btn.innerHTML = `<span style="font-size:15px">${d.icon}</span><span style="flex:1;line-height:1.2">${d.label}</span>${cnt>0?`<span style="font-size:9px;font-weight:400;opacity:.6">${cnt}</span>`:''}`;
+      btn.onclick = () => { qaCurrentDept = d.id; qaOpenCats = {}; qaRender(); };
+      deptList.appendChild(btn);
+    });
+
+    // フィルタ
+    const filtered = qaSearch.trim()
+      ? cats.map(c=>({...c,items:c.items.filter(i=>i.q.includes(qaSearch)||i.a.includes(qaSearch))})).filter(c=>c.items.length>0)
+      : cats;
+
+    // コンテンツ
+    const list = document.getElementById('qa-list');
+    list.innerHTML = '';
+
+    if(cats.length === 0){
+      list.innerHTML = `<div style="text-align:center;padding:60px 0;color:#ccc">
+        <div style="font-size:36px;margin-bottom:8px">${deptInfo.icon}</div>
+        <div style="font-size:14px;font-weight:700;color:#bbb;margin-bottom:6px">${deptInfo.label}のQ&Aはまだありません</div>
+        <div style="font-size:12px;margin-bottom:12px">カテゴリーを追加してQ&Aを作成できます</div>
+        <button onclick="qaOpenAddCat()" style="border:none;border-radius:6px;padding:9px 20px;font-size:13px;font-weight:700;background:#111;color:#fff;cursor:pointer;font-family:inherit">＋ カテゴリーを追加</button>
+      </div>`;
+      return;
+    }
+
+    if(filtered.length===0 && qaSearch){
+      list.innerHTML = `<div style="text-align:center;padding:60px 0;color:#ccc"><div style="font-size:28px;margin-bottom:6px">🔍</div><div style="font-size:13px">「${qaSearch}」に一致するQ&Aが見つかりませんでした</div></div>`;
+      return;
+    }
+
+    filtered.forEach((cat, ci) => {
+      const isOpen = qaOpenCats[cat.id] || !!qaSearch.trim();
+      const wrap = document.createElement('div');
+      wrap.style.borderTop = ci===0 ? '1px solid #111' : 'none';
+
+      const hdr = document.createElement('div');
+      hdr.className = 'qa-cat-header';
+      hdr.innerHTML = `
+        <span style="font-size:15px">${cat.icon}</span>
+        <span style="font-weight:800;font-size:13.5px;flex:1">${cat.title}</span>
+        <span style="font-size:10px;color:#bbb;margin-right:6px">${cat.items.length}問</span>
+        <button class="qa-ibtn" onclick="event.stopPropagation();qaOpenEditCat('${dept}',${cat.id})">✏️</button>
+        <button class="qa-ibtn" style="margin-left:3px" onclick="event.stopPropagation();qaDeleteCat('${dept}',${cat.id})">🗑</button>
+        <span style="font-size:10px;color:#bbb;margin-left:4px">${isOpen?'▲':'▼'}</span>`;
+      hdr.onclick = () => { qaOpenCats[cat.id]=!qaOpenCats[cat.id]; qaRender(); };
+      wrap.appendChild(hdr);
+
+      if(isOpen){
+        const body = document.createElement('div');
+        cat.items.forEach((item, idx) => {
+          const row = document.createElement('div');
+          row.className = 'qa-item-row';
+          row.innerHTML = `
+            <div style="display:flex;gap:8px;align-items:flex-start">
+              <span class="qa-badge-q">Q</span>
+              <p style="margin:0;font-weight:700;font-size:13.5px;line-height:1.65;flex:1">${item.q}</p>
+              <div style="display:flex;gap:3px;flex-shrink:0">
+                <button class="qa-ibtn" onclick="qaOpenEditItem('${dept}',${cat.id},${item.id})">✏️</button>
+                <button class="qa-ibtn" onclick="qaDeleteItem('${dept}',${cat.id},${item.id})">🗑</button>
+              </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px">
+              <span class="qa-badge-a">A</span>
+              <p style="margin:0;font-size:13px;line-height:1.9;color:#444;flex:1">${item.a}</p>
+            </div>`;
+          body.appendChild(row);
+        });
+
+        // 追加ボタン
+        const addRow = document.createElement('div');
+        addRow.style.padding = '7px 0';
+        const addBtn = document.createElement('button');
+        addBtn.className = 'qa-add-btn';
+        addBtn.textContent = '＋ Q&Aを追加';
+        addBtn.onclick = () => qaOpenAddItem(dept, cat.id);
+        addRow.appendChild(addBtn);
+        body.appendChild(addRow);
+        wrap.appendChild(body);
+      }
+      list.appendChild(wrap);
+    });
+  }
+
+  // ─── カテゴリー CRUD ─────────────────────────────────────
+  function qaOpenAddCat(){
+    qaEditingCat = { deptId: qaCurrentDept, catId: 'new' };
+    document.getElementById('qa-cat-modal-title').textContent = 'カテゴリーを追加';
+    document.getElementById('qa-cat-icon-input').value = '📌';
+    document.getElementById('qa-cat-name-input').value = '';
+    document.getElementById('qa-cat-modal').style.display = 'flex';
+    setTimeout(()=>document.getElementById('qa-cat-name-input').focus(),50);
+  }
+  function qaOpenEditCat(deptId, catId){
+    const cat = (qaData[deptId]||[]).find(c=>c.id===catId);
+    if(!cat) return;
+    qaEditingCat = { deptId, catId };
+    document.getElementById('qa-cat-modal-title').textContent = 'カテゴリーを編集';
+    document.getElementById('qa-cat-icon-input').value = cat.icon;
+    document.getElementById('qa-cat-name-input').value = cat.title;
+    document.getElementById('qa-cat-modal').style.display = 'flex';
+  }
+  function qaSaveCat(){
+    const icon = document.getElementById('qa-cat-icon-input').value.trim() || '📌';
+    const title = document.getElementById('qa-cat-name-input').value.trim();
+    if(!title) return;
+    const { deptId, catId } = qaEditingCat;
+    if(catId === 'new'){
+      const nid = qaUid();
+      qaData[deptId] = [...(qaData[deptId]||[]), { id:nid, title, icon, items:[] }];
+      qaOpenCats[nid] = true;
+    } else {
+      qaData[deptId] = (qaData[deptId]||[]).map(c=>c.id===catId?{...c,title,icon}:c);
+    }
+    qaSave();
+    document.getElementById('qa-cat-modal').style.display = 'none';
+    qaRender();
+    qaToast('保存しました');
+  }
+  function qaDeleteCat(deptId, catId){
+    if(!confirm('このカテゴリーを削除しますか？')) return;
+    qaData[deptId] = (qaData[deptId]||[]).filter(c=>c.id!==catId);
+    qaSave(); qaRender(); qaToast('削除しました');
+  }
+
+  // ─── アイテム CRUD ───────────────────────────────────────
+  function qaOpenAddItem(deptId, catId){
+    qaEditingItem = { deptId, catId, itemId:'new' };
+    document.getElementById('qa-item-modal-title').textContent = '新規追加';
+    document.getElementById('qa-item-q').value = '';
+    document.getElementById('qa-item-a').value = '';
+    document.getElementById('qa-item-modal').style.display = 'flex';
+    setTimeout(()=>document.getElementById('qa-item-q').focus(),50);
+  }
+  function qaOpenEditItem(deptId, catId, itemId){
+    const cat = (qaData[deptId]||[]).find(c=>c.id===catId);
+    const item = cat?.items.find(i=>i.id===itemId);
+    if(!item) return;
+    qaEditingItem = { deptId, catId, itemId };
+    document.getElementById('qa-item-modal-title').textContent = 'Q&Aを編集中';
+    document.getElementById('qa-item-q').value = item.q;
+    document.getElementById('qa-item-a').value = item.a;
+    document.getElementById('qa-item-modal').style.display = 'flex';
+  }
+  function qaSaveItem(){
+    const q = document.getElementById('qa-item-q').value.trim();
+    const a = document.getElementById('qa-item-a').value.trim();
+    if(!q||!a) return;
+    const { deptId, catId, itemId } = qaEditingItem;
+    qaData[deptId] = (qaData[deptId]||[]).map(cat=>{
+      if(cat.id!==catId) return cat;
+      if(itemId==='new') return {...cat, items:[...cat.items,{id:qaUid(),q,a}]};
+      return {...cat, items:cat.items.map(i=>i.id===itemId?{...i,q,a}:i)};
+    });
+    qaSave();
+    document.getElementById('qa-item-modal').style.display = 'none';
+    qaRender();
+    qaToast(itemId==='new'?'追加しました':'保存しました');
+  }
+  function qaDeleteItem(deptId, catId, itemId){
+    if(!confirm('削除しますか？')) return;
+    qaData[deptId] = (qaData[deptId]||[]).map(cat=>
+      cat.id!==catId?cat:{...cat,items:cat.items.filter(i=>i.id!==itemId)}
+    );
+    qaSave(); qaRender(); qaToast('削除しました');
+  }
+
+  // ─── AI生成 ──────────────────────────────────────────────
+  function qaOpenAiModal(){
+    // カテゴリー選択グリッドを構築
+    const grid = document.getElementById('qa-ai-dept-grid');
+    grid.innerHTML = '';
+    QA_DEPTS.forEach(d=>{
+      const btn = document.createElement('button');
+      btn.style.cssText = `border:1.5px solid ${d.id===qaAiDept?'#111':'#e0e0e0'};border-radius:7px;padding:9px 12px;font-size:12px;font-weight:600;background:${d.id===qaAiDept?'#111':'#fff'};color:${d.id===qaAiDept?'#fff':'#444'};text-align:left;display:flex;align-items:center;gap:7px;cursor:pointer;font-family:inherit;transition:all .15s`;
+      btn.innerHTML = `<span style="font-size:16px">${d.icon}</span><span style="line-height:1.2">${d.label}</span>${d.id===qaAiDept?'<span style="margin-left:auto">✓</span>':''}`;
+      btn.onclick = ()=>{ qaAiDept=d.id; qaOpenAiModal(); };
+      grid.appendChild(btn);
+    });
+    // 問数ボタン
+    document.querySelectorAll('#qa-ai-count-btns button').forEach(b=>{
+      const n = parseInt(b.dataset.n);
+      b.style.border = n===qaAiCount?'1.5px solid #111':'1.5px solid #e0e0e0';
+      b.style.background = n===qaAiCount?'#111':'#fff';
+      b.style.color = n===qaAiCount?'#fff':'#444';
+    });
+    document.getElementById('qa-ai-result').innerHTML = '';
+    document.getElementById('qa-ai-modal').style.display = 'flex';
+  }
+
+  async function qaGenerate(){
+    const url = document.getElementById('qa-ai-url').value.trim();
+    if(!url){ alert('URLを入力してください'); return; }
+
+    const btn = document.getElementById('qa-ai-generate-btn');
+    const result = document.getElementById('qa-ai-result');
+    btn.disabled = true;
+    btn.innerHTML = '<span style="width:16px;height:16px;border:2px solid #888;border-top-color:transparent;border-radius:50%;display:inline-block;animation:qaSpin .7s linear infinite"></span> URLを読み込み中…';
+    result.innerHTML = '';
+
+    try{
+      // allorigins経由でページを取得
+      const res = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+      if(!res.ok) throw new Error('URLの取得に失敗しました');
+      const data = await res.json();
+      const tmp = document.createElement('div');
+      tmp.innerHTML = data.contents || '';
+      tmp.querySelectorAll('script,style,nav,footer,header').forEach(el=>el.remove());
+      const text = (tmp.innerText||tmp.textContent||'').replace(/\s+/g,' ').trim().slice(0,6000);
+      if(text.length<100) throw new Error('ページのテキストを十分に取得できませんでした');
+
+      btn.innerHTML = '<span style="width:16px;height:16px;border:2px solid #888;border-top-color:transparent;border-radius:50%;display:inline-block;animation:qaSpin .7s linear infinite"></span> AIがQ&Aを生成中…';
+
+      const deptLabel = QA_DEPTS.find(d=>d.id===qaAiDept)?.label||qaAiDept;
+      const prompt = `以下はWebページのテキストコンテンツです。これを歯科医院（医療法人SEISHOKAI）のスタッフ研修用Q&Aに変換してください。\n\n【診療カテゴリー】${deptLabel}\n【生成するQ&A数】${qaAiCount}問程度\n【ページ内容】\n${text}\n\n以下のJSON形式のみで返してください（説明文・マークダウン不要）:\n{"categories":[{"title":"カテゴリー名","icon":"絵文字1文字","items":[{"q":"質問文","a":"回答文（詳しく丁寧に）"}]}]}`;
+
+      const apiRes = await fetch('https://api.anthropic.com/v1/messages',{
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})
+      });
+      if(!apiRes.ok) throw new Error('AI APIの呼び出しに失敗しました');
+      const apiData = await apiRes.json();
+      const rawText = (apiData.content||[]).map(b=>b.text||'').join('');
+      const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+      if(!jsonMatch) throw new Error('AIの応答を解析できませんでした');
+      const parsed = JSON.parse(jsonMatch[0]);
+      if(!parsed.categories?.length) throw new Error('Q&Aが生成されませんでした');
+
+      const totalGenerated = parsed.categories.reduce((s,c)=>s+c.items.length,0);
+      let previewHtml = `<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="font-size:13px;font-weight:900">✦ ${totalGenerated}問のQ&Aを生成しました</div><div style="font-size:11px;color:#999">${parsed.categories.length}カテゴリー</div></div>`;
+      previewHtml += `<div style="background:#fafafa;border-radius:8px;border:1.5px solid #e8e8e8;max-height:240px;overflow-y:auto;padding:10px 14px;margin-bottom:14px">`;
+      parsed.categories.forEach(cat=>{
+        previewHtml += `<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:800;margin-bottom:4px">${cat.icon} ${cat.title} <span style="font-size:10px;color:#bbb;font-weight:400">${cat.items.length}問</span></div>`;
+        cat.items.forEach(item=>{
+          previewHtml += `<div style="margin-bottom:6px;padding-left:8px;border-left:2px solid #e8e8e8"><div style="font-size:11px;font-weight:700;margin-bottom:1px">Q. ${item.q}</div><div style="font-size:11px;color:#555">${item.a.slice(0,80)}${item.a.length>80?'…':''}</div></div>`;
+        });
+        previewHtml += `</div>`;
+      });
+      previewHtml += `</div>`;
+      previewHtml += `<div style="display:flex;gap:8px"><button onclick="document.getElementById('qa-ai-modal').style.display='none'" style="flex:1;border:1.5px solid #ddd;border-radius:7px;padding:11px;font-size:13px;font-weight:600;background:#fff;color:#666;cursor:pointer;font-family:inherit">キャンセル</button><button id="qa-ai-apply-btn" style="flex:2;border:none;border-radius:7px;padding:11px;font-size:13px;font-weight:900;background:#111;color:#fff;cursor:pointer;font-family:inherit">✦ このQ&Aを追加する</button></div>`;
+
+      result.innerHTML = previewHtml;
+      document.getElementById('qa-ai-apply-btn').onclick = ()=>{
+        const withIds = parsed.categories.map(cat=>({
+          ...cat, id:qaUid(),
+          items:cat.items.map(item=>({...item,id:qaUid()}))
+        }));
+        qaData[qaAiDept] = [...(qaData[qaAiDept]||[]), ...withIds];
+        qaSave();
+        if(qaAiDept !== qaCurrentDept){ qaCurrentDept=qaAiDept; qaOpenCats={}; }
+        document.getElementById('qa-ai-modal').style.display='none';
+        qaRender();
+        qaToast(`✨ ${totalGenerated}問のQ&Aを生成しました`);
+      };
+
+    } catch(e){
+      result.innerHTML = `<div style="padding:12px 14px;background:#fff5f5;border:1.5px solid #ffd0d0;border-radius:7px;font-size:12px;color:#c0392b">⚠️ ${e.message}<div style="margin-top:6px;color:#999;font-size:11px">URLが正しいか確認するか、別のURLをお試しください</div></div>`;
+    } finally {
+      btn.disabled = false;
+      btn.innerHTML = '✦ Q&Aを生成する';
+    }
+  }
+
+  // ─── 初期化 ──────────────────────────────────────────────
+  document.addEventListener('DOMContentLoaded', function(){
+    qaData = qaLoad();
+
+    // Q&Aナビ連携（既存のnavボタンと統合）
+    document.querySelectorAll('.nav-btn[data-view="qa"], .bottom-nav-btn[data-view="qa"]').forEach(btn=>{
+      btn.addEventListener('click', ()=> qaShowView('qa'));
+    });
+
+    // カテゴリー追加
+    document.getElementById('qa-add-cat-btn').addEventListener('click', qaOpenAddCat);
+    document.getElementById('qa-cat-save-btn').addEventListener('click', qaSaveCat);
+    document.getElementById('qa-item-save-btn').addEventListener('click', qaSaveItem);
+
+    // 全展開・全閉じ
+    document.getElementById('qa-expand-all').addEventListener('click', ()=>{
+      (qaData[qaCurrentDept]||[]).forEach(c=>qaOpenCats[c.id]=true); qaRender();
+    });
+    document.getElementById('qa-collapse-all').addEventListener('click', ()=>{
+      qaOpenCats={}; qaRender();
+    });
+
+    // 検索
+    const searchInput = document.getElementById('qa-search');
+    const searchClear = document.getElementById('qa-search-clear');
+    searchInput.addEventListener('input', e=>{
+      qaSearch = e.target.value;
+      searchClear.style.display = qaSearch?'block':'none';
+      qaRender();
+    });
+    searchClear.addEventListener('click', ()=>{ qaSearch=''; searchInput.value=''; searchClear.style.display='none'; qaRender(); });
+
+    // AI生成
+    document.getElementById('qa-ai-btn').addEventListener('click', qaOpenAiModal);
+    document.getElementById('qa-ai-generate-btn').addEventListener('click', qaGenerate);
+    document.querySelectorAll('#qa-ai-count-btns button').forEach(b=>{
+      b.addEventListener('click', ()=>{ qaAiCount=parseInt(b.dataset.n); qaOpenAiModal(); });
+    });
+
+    // ログイン後にQ&Aビューに切替するナビボタンの再設定
+    // （既存のapp.jsのswitchView関数を上書きしないよう、イベント委譲で対応）
+    document.addEventListener('click', function(e){
+      const btn = e.target.closest('[data-view]');
+      if(!btn) return;
+      const view = btn.dataset.view;
+      if(view === 'qa'){
+        e.stopPropagation();
+        qaShowView('qa');
+      }
+    }, true);
+  });
+  </script>
 </body>
 </html>
