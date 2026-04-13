@@ -2723,22 +2723,18 @@ async function parseMailAndRegister() {
   const dateTime = extract([/日時[:：]\s*(.+)/i, /予約日時[:：]\s*(.+)/i, /予約日[:：]\s*(.+)/i]);
   const promo = extract([/プロモーションコード[:：]\s*(.+)/i, /プロモ[:：]\s*(.+)/i, /流入元[:：]\s*(.+)/i]);
 
-  // 登録日（メールの日付ヘッダーから）
+  // 登録日（メール冒頭の日付ヘッダーから取得）
   let mailDate = '';
-  const mdPatterns = [
-    /(\d{1,2})月(\d{1,2})日.*?(\d{1,2}):(\d{2})/,  // 4月10日(金) 15:03
-    /(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/,  // 2026/4/10 15:03
-  ];
-  for (const p of mdPatterns) {
-    const m = text.match(p);
-    if (m) {
-      if (m.length === 5) { // 月日時分
-        const now2 = new Date();
-        mailDate = `${now2.getFullYear()}/${String(parseInt(m[1])).padStart(2,'0')}/${String(parseInt(m[2])).padStart(2,'0')} ${m[3]}:${m[4]}`;
-      } else if (m.length === 6) { // 年月日時分
-        mailDate = `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}/${String(parseInt(m[3])).padStart(2,'0')} ${m[4]}:${m[5]}`;
-      }
-      break;
+  // メール本文を「新規予約」や「■」の前で分割して、ヘッダー部分だけから日付を探す
+  const headerPart = text.split(/新規予約|━━/)[0] || text.slice(0, 200);
+  const mdMatch1 = headerPart.match(/(\d{1,2})月(\d{1,2})日[^\d]*?(\d{1,2}):(\d{2})/);
+  if (mdMatch1) {
+    const now2 = new Date();
+    mailDate = `${now2.getFullYear()}/${String(parseInt(mdMatch1[1])).padStart(2,'0')}/${String(parseInt(mdMatch1[2])).padStart(2,'0')} ${mdMatch1[3]}:${mdMatch1[4]}`;
+  } else {
+    const mdMatch2 = headerPart.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/);
+    if (mdMatch2) {
+      mailDate = `${mdMatch2[1]}/${String(parseInt(mdMatch2[2])).padStart(2,'0')}/${String(parseInt(mdMatch2[3])).padStart(2,'0')} ${mdMatch2[4]}:${mdMatch2[5]}`;
     }
   }
 
