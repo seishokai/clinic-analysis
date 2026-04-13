@@ -265,6 +265,11 @@ function setupEventListeners() {
   });
   document.getElementById('fac-new-save').addEventListener('click', saveFacNewPatient);
   document.getElementById('fac-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveFacNewPatient(); });
+  // 医院タブフィルター
+  ['fac-period','fac-month','fac-status-filter'].forEach(id => { document.getElementById(id)?.addEventListener('change', () => renderFacTab(currentFacTab)); });
+  let facSearchTimer;
+  document.getElementById('fac-search')?.addEventListener('input', () => { clearTimeout(facSearchTimer); facSearchTimer = setTimeout(() => renderFacTab(currentFacTab), 300); });
+  document.getElementById('fac-filter-reset')?.addEventListener('click', () => { ['fac-period','fac-month','fac-status-filter'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; }); document.getElementById('fac-search').value=''; renderFacTab(currentFacTab); });
 
   // Patient search & register
   document.getElementById('ps-search-btn').addEventListener('click', searchPatients);
@@ -400,6 +405,7 @@ function setupEventListeners() {
     document.getElementById('bk-facility').value = '';
     document.getElementById('bk-promo').value = '';
     document.getElementById('bk-service').value = '';
+    document.getElementById('bk-period').value = '';
     document.getElementById('bk-month').value = '';
     window._bkDateFilter = null;
     window._bkProgressFilter = false;
@@ -415,7 +421,7 @@ function setupEventListeners() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(renderBookings, 300);
   });
-  ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-month'].forEach(id => {
+  ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-period','bk-month'].forEach(id => {
     document.getElementById(id).addEventListener('change', renderBookings);
   });
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
@@ -2122,6 +2128,14 @@ function renderBookings() {
     } else if (statusFilter === '未対応') filtered = filtered.filter(d => !d.status || d.status === '未対応');
     else filtered = filtered.filter(d => d.status === statusFilter);
   }
+  // 期間フィルター
+  const periodFilter = document.getElementById('bk-period')?.value || '';
+  if (periodFilter) {
+    const getYM = (d) => { const m = (d.applyDate||'').match(/(\d{4})\D+(\d{1,2})/); return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : ''; };
+    if (periodFilter === 'thisMonth') { const now = new Date(); const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; filtered = filtered.filter(d => getYM(d) === ym); }
+    else if (periodFilter === 'lastMonth') { const now = new Date(); now.setMonth(now.getMonth()-1); const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; filtered = filtered.filter(d => getYM(d) === ym); }
+    else if (periodFilter === 'fiscal') { const now = new Date(); const fy = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear()-1; filtered = filtered.filter(d => getYM(d) >= fy+'-07'); }
+  }
   if (monthFilter) {
     filtered = filtered.filter(d => {
       const src = d.bookDate || d.applyDate;
@@ -2559,6 +2573,20 @@ function renderFacTab(facility) {
   document.getElementById('fac-title').textContent = facility;
 
   let data = bookingsData.filter(d => d.status !== '除外' && normFac(d.facility) === facility);
+
+  // フィルター
+  const facPeriod = document.getElementById('fac-period')?.value || '';
+  const facMonth = document.getElementById('fac-month')?.value || '';
+  const facStatusF = document.getElementById('fac-status-filter')?.value || '';
+  const facSearch = (document.getElementById('fac-search')?.value || '').trim().toLowerCase();
+  const getApplyYM = (d) => { const m = (d.applyDate||'').match(/(\d{4})\D+(\d{1,2})/); return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : ''; };
+  if (facPeriod === 'thisMonth') { const now = new Date(); const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; data = data.filter(d => getApplyYM(d) === ym); }
+  else if (facPeriod === 'lastMonth') { const now = new Date(); now.setMonth(now.getMonth()-1); const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; data = data.filter(d => getApplyYM(d) === ym); }
+  else if (facPeriod === 'fiscal') { const now = new Date(); const fy = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear()-1; data = data.filter(d => { const ym = getApplyYM(d); return ym >= fy+'-07'; }); }
+  if (facMonth) { data = data.filter(d => getApplyYM(d) === facMonth); }
+  if (facStatusF) { if (facStatusF === '未対応') data = data.filter(d => !d.status || d.status === '未対応'); else data = data.filter(d => d.status === facStatusF); }
+  if (facSearch) data = data.filter(d => d.name && d.name.toLowerCase().includes(facSearch));
+
   const total = data.length;
   const cancelled = data.filter(d => d.status === 'キャンセル').length;
   const visited = data.filter(d => d.status === '来院済' || d.status === '成約').length;

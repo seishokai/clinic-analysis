@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=93">
+  <link rel="stylesheet" href="styles.css?v=94">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -192,6 +192,7 @@
           <option value="キャンセル">キャンセル</option>
           <option value="除外">除外</option>
         </select>
+        <select class="form-select" id="bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option><option value="fiscal">今期</option></select>
         <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px">
         <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px">更新</button>
         <button class="btn btn-outline" id="bk-csv" style="min-height:30px;padding:6px 12px;font-size:11px">CSV</button>
@@ -315,6 +316,13 @@
       <div id="sub-bk-fac" hidden>
         <div class="page-header"><h2 id="fac-title">医院</h2></div>
         <div class="stats-row" id="fac-stats" style="margin-bottom:12px"></div>
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
+          <select class="form-select" id="fac-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option><option value="fiscal">今期(7月〜)</option></select>
+          <input type="month" class="form-input" id="fac-month" style="width:auto;padding:6px 8px;font-size:11px">
+          <select class="form-select" id="fac-status-filter" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="未対応">未対応</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select>
+          <input type="text" class="form-input" id="fac-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
+          <button class="btn btn-outline" id="fac-filter-reset" style="min-height:30px;padding:6px 10px;font-size:11px;border-radius:20px">全表示</button>
+        </div>
         <div class="card" style="margin-bottom:16px">
           <div class="card-header">予約一覧 <span id="fac-count" style="font-weight:400;color:var(--text-muted)"></span></div>
           <div class="data-table-wrap" style="max-height:calc(100vh - 350px);overflow-y:auto">
@@ -940,6 +948,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=93"></script>
+  <script src="app.js?v=94"></script>
 </body>
 </html>
