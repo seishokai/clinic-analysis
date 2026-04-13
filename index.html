@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=100">
+  <link rel="stylesheet" href="styles.css?v=101">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>.modal[hidden]{display:none!important}</style>
   <meta name="theme-color" content="#333333">
@@ -15,16 +15,28 @@
     <div class="login-card">
       <div class="login-logo">
         <h1>SEISHOKAI</h1>
-        <p>Management System</p>
+        <p>Portal</p>
       </div>
-      <div id="login-form">
-        <div class="input-group">
-          <label for="password">Password</label>
-          <input type="password" id="password" placeholder="パスワードを入力" autocomplete="new-password">
+      <!-- ポータルメニュー -->
+      <div id="portal-menu" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
+        <button onclick="document.getElementById('portal-menu').hidden=true;document.getElementById('login-section').hidden=false" class="btn-primary" style="width:100%">売上管理</button>
+        <a href="https://studio.because-and.co.jp/" target="_blank" class="btn-primary" style="text-decoration:none;text-align:center;display:block;background:linear-gradient(135deg,#6366f1,#8b5cf6)">研修サイト</a>
+        <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" class="btn-primary" style="text-decoration:none;text-align:center;display:block;background:linear-gradient(135deg,#0ea5e9,#38bdf8)">労務管理（ピノキオ）</a>
+      </div>
+
+      <!-- ログインフォーム -->
+      <div id="login-section" hidden>
+        <div style="font-size:12px;color:var(--text-sub);text-align:center;margin-bottom:12px">売上管理にログイン</div>
+        <div id="login-form">
+          <div class="input-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" placeholder="パスワードを入力" autocomplete="new-password">
+          </div>
+          <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
+          <button type="button" class="btn-primary" id="login-btn">ログイン</button>
+          <p id="login-error" class="error-msg" hidden>パスワードが正しくありません</p>
+          <button type="button" onclick="document.getElementById('login-section').hidden=true;document.getElementById('portal-menu').hidden=false" style="margin-top:10px;background:none;border:none;color:var(--text-sub);font-size:12px;cursor:pointer;width:100%;text-align:center">← メニューに戻る</button>
         </div>
-        <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
-        <button type="button" class="btn-primary" id="login-btn">ログイン</button>
-        <p id="login-error" class="error-msg" hidden>パスワードが正しくありません</p>
       </div>
     </div>
   </div>
@@ -958,6 +970,6 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=100"></script>
+  <script src="app.js?v=101"></script>
 </body>
 </html>
