@@ -299,6 +299,9 @@ function setupEventListeners() {
   document.getElementById('fac-search')?.addEventListener('input', () => { clearTimeout(facSearchTimer); facSearchTimer = setTimeout(() => renderFacTab(currentFacTab), 300); });
   document.getElementById('fac-filter-reset')?.addEventListener('click', () => { ['fac-period','fac-month','fac-status-filter'].forEach(id => { const e=document.getElementById(id); if(e) e.value=''; }); document.getElementById('fac-search').value=''; renderFacTab(currentFacTab); });
 
+  // Mail paste register
+  document.getElementById('mail-parse-btn').addEventListener('click', parseMailAndRegister);
+
   // Patient search & register
   document.getElementById('ps-search-btn').addEventListener('click', searchPatients);
   document.getElementById('ps-clear-btn').addEventListener('click', () => {
@@ -2693,6 +2696,70 @@ async function saveFacNewPatient() {
   ['fac-new-name','fac-new-phone','fac-new-email','fac-new-source','fac-new-bookdate'].forEach(id => document.getElementById(id).value = '');
   showToast(name + ' を追加しました');
   renderFacTab(currentFacTab);
+}
+
+// === Mail Paste Register ===
+async function parseMailAndRegister() {
+  const text = document.getElementById('mail-paste').value.trim();
+  if (!text) { showToast('メール内容を貼り付けてください', true); return; }
+
+  const resultEl = document.getElementById('mail-parse-result');
+  resultEl.textContent = '読み取り中...';
+
+  // パース
+  const extract = (patterns) => {
+    for (const p of patterns) {
+      const m = text.match(p);
+      if (m) return m[1].trim();
+    }
+    return '';
+  };
+
+  const name = extract([/お名前[:：]\s*(.+)/i, /名前[:：]\s*(.+)/i, /氏名[:：]\s*(.+)/i]);
+  const email = extract([/メール[:：]\s*(.+)/i, /メールアドレス[:：]\s*(.+)/i, /email[:：]\s*(.+)/i, /E-mail[:：]\s*(.+)/i]);
+  const phone = extract([/電話番号[:：]\s*(.+)/i, /電話[:：]\s*(.+)/i, /TEL[:：]\s*(.+)/i, /携帯[:：]\s*(.+)/i]);
+  const service = extract([/施術[:：]\s*(.+)/i, /メニュー[:：]\s*(.+)/i, /サービス[:：]\s*(.+)/i]);
+  const facility = extract([/クリニック[:：]\s*(.+)/i, /医院[:：]\s*(.+)/i, /店舗[:：]\s*(.+)/i]);
+  const dateTime = extract([/日時[:：]\s*(.+)/i, /予約日時[:：]\s*(.+)/i, /予約日[:：]\s*(.+)/i]);
+  const promo = extract([/プロモーションコード[:：]\s*(.+)/i, /プロモ[:：]\s*(.+)/i, /流入元[:：]\s*(.+)/i]);
+
+  if (!name) { resultEl.textContent = '名前が読み取れませんでした'; showToast('名前が見つかりません', true); return; }
+
+  // 確認表示
+  const parsed = `名前: ${name}\n医院: ${normFac(facility) || facility}\n施術: ${service}\n予約: ${dateTime}\n電話: ${phone}\nメール: ${email}\nプロモ: ${promo}`;
+  if (!confirm('以下の内容で登録しますか？\n\n' + parsed)) { resultEl.textContent = 'キャンセルしました'; return; }
+
+  // 登録
+  const now = new Date();
+  const applyDate = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
+
+  const entry = {
+    apply_date: applyDate,
+    book_date: dateTime || '',
+    name,
+    service: service || '',
+    facility: normFac(facility) || facility || '',
+    email: email || '',
+    phone: (phone || '').replace(/[-\s]/g, ''),
+    source: promo || '',
+    status: '未対応',
+    tool: '手動'
+  };
+
+  const { error } = await sb.from('manual_bookings').insert(entry);
+  if (error) { resultEl.textContent = '登録エラー'; showToast('登録エラー: ' + error.message, true); return; }
+
+  // ローカルデータにも追加
+  bookingsData.push({
+    applyDate: entry.apply_date, bookDate: entry.book_date, name: entry.name,
+    service: entry.service, facility: entry.facility, email: entry.email,
+    phone: entry.phone, source: entry.source, status: entry.status, tool: '手動'
+  });
+
+  document.getElementById('mail-paste').value = '';
+  resultEl.textContent = '';
+  showToast(name + ' を登録しました');
+  renderBookings();
 }
 
 // === Patient Search & Register ===
