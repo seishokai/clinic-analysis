@@ -2678,6 +2678,9 @@ function renderFacTab(facility) {
 async function saveFacNewPatient() {
   const name = document.getElementById('fac-new-name').value.trim();
   if (!name) { showToast('名前を入力してください', true); return; }
+  // 重複チェック
+  const dup = bookingsData.find(d => d.name === name && normFac(d.facility) === currentFacTab);
+  if (dup && !confirm('⚠️ 「' + name + '」は既に' + currentFacTab + 'に登録されています。それでも登録しますか？')) return;
   const now = new Date();
   const applyDate = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
   const entry = {
@@ -2739,6 +2742,15 @@ async function parseMailAndRegister() {
   }
 
   if (!name) { resultEl.textContent = '名前が読み取れませんでした'; showToast('名前が見つかりません', true); return; }
+
+  // 重複チェック（名前＋予約日）
+  const duplicate = bookingsData.find(d => d.name === name && d.bookDate && dateTime && d.bookDate.includes(dateTime.split(' ')[0]));
+  if (duplicate) {
+    if (!confirm('⚠️ 同じ名前・予約日のデータが既に存在します。\n\n名前: ' + name + '\n予約: ' + dateTime + '\n\nそれでも登録しますか？')) {
+      resultEl.textContent = '重複のためキャンセル';
+      return;
+    }
+  }
 
   // 確認表示
   const parsed = `登録日: ${mailDate || '今日'}\n名前: ${name}\n医院: ${normFac(facility) || facility}\n施術: ${service}\n予約: ${dateTime}\n電話: ${phone}\nメール: ${email}\nプロモ: ${promo}`;
@@ -2823,6 +2835,9 @@ function searchPatients() {
 async function registerNewPatient() {
   const name = document.getElementById('np-name').value.trim();
   if (!name) { showToast('名前を入力してください', true); return; }
+  // 重複チェック
+  const dup = bookingsData.find(d => d.name === name);
+  if (dup && !confirm('⚠️ 「' + name + '」は既に登録されています。それでも登録しますか？')) return;
 
   const now = new Date();
   const applyDate = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} ${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')}`;
