@@ -402,7 +402,7 @@ async function generateQA(){
   btn.innerHTML='<span style="width:16px;height:16px;border:2px solid #888;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite"></span> 読み込み中…';
   result.innerHTML='';
   try{
-    const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(url));
+    const res=await fetch('https://seishokai-ai-proxy.tkm-koike.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scrapeUrl:url})});
     if(!res.ok)throw new Error('URLの取得に失敗しました');
     const d=await res.json();
     const tmp=document.createElement('div');
