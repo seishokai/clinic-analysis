@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SEISHOKAI Q&A研修</title>
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;background:#f5f5f5;color:#111}
+    @keyframes fu{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+    ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:#ddd;border-radius:4px}
+    input:focus,textarea:focus{outline:2px solid #111!important}
+    .qa-row:hover{background:#f8f8f8}
+    button{cursor:pointer;font-family:inherit}
+
+    #topbar{background:#fff;border-bottom:2px solid #111;padding:11px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200}
+    #back-btn{border:1.5px solid #ddd;border-radius:6px;padding:5px 12px;font-size:12px;background:#fff;color:#666;font-weight:600}
+    #back-btn:hover{background:#f5f5f5}
+    .logo{font-size:17px;font-weight:900;letter-spacing:-0.5px}
+    .sub{font-size:11px;color:#aaa;margin-top:1px}
+
+    #wrapper{display:flex;height:calc(100vh - 52px);overflow:hidden}
+
+    #sidebar{width:220px;flex-shrink:0;background:#fff;border-right:1.5px solid #e8e8e8;height:100%;overflow-y:auto;display:flex;flex-direction:column}
+    .dept-btn{width:100%;text-align:left;border:none;border-radius:7px;padding:9px 10px;font-size:12.5px;font-weight:600;background:transparent;color:#444;display:flex;align-items:center;gap:8px;margin-bottom:2px;transition:background .15s}
+    .dept-btn:hover{background:#f0f0f0}
+    .dept-btn.active{background:#111!important;color:#fff!important}
+
+    #ai-btn-wrap{padding:10px 10px 16px;border-top:1px solid #f0f0f0}
+    #ai-btn{width:100%;border:none;border-radius:8px;padding:11px 10px;font-size:12px;font-weight:700;background:linear-gradient(135deg,#111,#333);color:#fff;display:flex;align-items:center;gap:8px;justify-content:center;box-shadow:0 2px 8px rgba(0,0,0,.15)}
+
+    #main{flex:1;min-width:0;display:flex;flex-direction:column;height:100%;overflow:hidden}
+    #subheader{background:#fff;border-bottom:1px solid #e8e8e8;padding:11px 18px;flex-shrink:0}
+    #qa-content{flex:1;overflow-y:auto;padding:12px 18px 60px}
+
+    .cat-header{display:flex;align-items:center;gap:9px;padding:11px 2px;border-bottom:1px solid #111;cursor:pointer;user-select:none}
+    .cat-wrap:first-child .cat-header{border-top:1px solid #111}
+    .qa-badge-q{font-weight:900;font-size:10px;color:#fff;background:#111;border-radius:3px;padding:2px 5px;flex-shrink:0;margin-top:3px}
+    .qa-badge-a{font-weight:900;font-size:10px;color:#111;background:#ebebeb;border-radius:3px;padding:2px 5px;flex-shrink:0;margin-top:3px}
+    .ibtn{background:none;border:1px solid #e8e8e8;border-radius:4px;padding:3px 6px;font-size:12px;color:#ccc;transition:border-color .1s,color .1s}
+    .ibtn:hover{border-color:#999;color:#555}
+    .add-row-btn{background:none;border:1.5px dashed #ddd;border-radius:5px;padding:7px 0;font-size:12px;color:#bbb;width:100%;transition:border-color .15s,color .15s}
+    .add-row-btn:hover{border-color:#999;color:#666}
+    .primary-btn{border:1.5px solid #111;border-radius:5px;padding:7px 15px;font-size:13px;font-weight:700;background:#111;color:#fff;white-space:nowrap}
+    .outline-btn{border:1.5px solid #111;border-radius:5px;padding:5px 11px;font-size:11px;font-weight:700;background:#fff;color:#111;white-space:nowrap}
+    .qa-input{width:100%;border:1.5px solid #e0e0e0;border-radius:5px;padding:7px 10px;font-size:13px;font-family:inherit;display:block;background:#fafafa;box-sizing:border-box}
+    .qa-label{display:block;font-size:9px;font-weight:700;color:#bbb;margin-bottom:4px;letter-spacing:1.5px;text-transform:uppercase}
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;padding:20px}
+    .modal-box{background:#fff;border-radius:8px;padding:22px;width:100%;max-width:420px;border:2px solid #111;box-shadow:0 8px 40px rgba(0,0,0,.15)}
+    .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#111;color:#fff;border-radius:6px;padding:10px 20px;font-size:12px;font-weight:700;z-index:9999;white-space:nowrap;animation:fu .18s ease}
+  </style>
+</head>
+<body>
+
+<div id="topbar">
+  <button id="back-btn" onclick="history.back()">← ポータルに戻る</button>
+  <div>
+    <div class="logo">SEISHOKAI 研修</div>
+    <div class="sub" id="dept-label">削らないラミネートベニア</div>
+  </div>
+</div>
+
+<div id="wrapper">
+  <!-- サイドバー -->
+  <aside id="sidebar">
+    <div style="padding:14px 10px 8px;flex:1">
+      <div style="font-size:8px;letter-spacing:3px;color:#ccc;text-transform:uppercase;margin-bottom:8px;padding-left:4px">診療カテゴリー</div>
+      <div id="dept-list"></div>
+    </div>
+    <div id="ai-btn-wrap">
+      <button id="ai-btn" onclick="openAiModal()">
+        <span style="font-size:16px">✦</span>
+        <span>AI でQ&A を自動生成</span>
+      </button>
+      <div style="font-size:9px;color:#ccc;text-align:center;margin-top:5px">URLを入力するだけで自動作成</div>
+    </div>
+  </aside>
+
+  <!-- メイン -->
+  <div id="main">
+    <div id="subheader">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+        <div>
+          <h2 style="font-size:15px;font-weight:900" id="dept-title">🦷 削らないラミネートベニア</h2>
+          <div style="font-size:11px;color:#999;margin-top:2px" id="dept-count"></div>
+        </div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <button class="outline-btn" onclick="expandAll()">全展開</button>
+          <button class="outline-btn" onclick="collapseAll()">全閉じ</button>
+          <button class="primary-btn" onclick="openAddCat()">＋ カテゴリー</button>
+        </div>
+      </div>
+      <div style="position:relative">
+        <span style="position:absolute;left:9px;top:50%;transform:translateY(-50%);color:#ccc;font-size:13px;pointer-events:none">🔍</span>
+        <input id="search-input" type="text" placeholder="キーワードで検索…" oninput="onSearch(this.value)" style="width:100%;border:1.5px solid #e0e0e0;border-radius:6px;padding:8px 28px 8px 28px;font-size:13px;background:#fafafa;font-family:inherit;box-sizing:border-box;outline:none">
+      </div>
+    </div>
+    <div id="qa-content">
+      <div id="qa-list"></div>
+    </div>
+  </div>
+</div>
+
+<!-- カテゴリーモーダル -->
+<div id="cat-modal" style="display:none" class="modal-overlay" onclick="this.style.display='none'">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div style="font-size:13px;font-weight:900;margin-bottom:14px" id="cat-modal-title">カテゴリーを追加</div>
+    <div class="qa-label">アイコン</div>
+    <input id="cat-icon" type="text" maxlength="2" class="qa-input" style="width:52px;text-align:center;font-size:20px;margin-bottom:10px">
+    <div class="qa-label">カテゴリー名</div>
+    <input id="cat-name" type="text" placeholder="例：よくあるご質問" class="qa-input" style="margin-bottom:16px">
+    <div style="display:flex;gap:8px;justify-content:flex-end">
+      <button class="outline-btn" onclick="document.getElementById('cat-modal').style.display='none'">キャンセル</button>
+      <button class="primary-btn" onclick="saveCat()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- Q&Aモーダル -->
+<div id="item-modal" style="display:none" class="modal-overlay" onclick="this.style.display='none'">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-width:480px">
+    <div style="font-size:11px;font-weight:700;color:#aaa;margin-bottom:10px;letter-spacing:1.5px;text-transform:uppercase" id="item-modal-title">新規追加</div>
+    <div class="qa-label">質問（Q）</div>
+    <input id="item-q" type="text" placeholder="質問を入力…" class="qa-input" style="margin-bottom:9px">
+    <div class="qa-label">回答（A）</div>
+    <textarea id="item-a" rows="4" placeholder="回答を入力…" class="qa-input" style="resize:vertical;line-height:1.7"></textarea>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:10px">
+      <button class="outline-btn" onclick="document.getElementById('item-modal').style.display='none'">キャンセル</button>
+      <button class="primary-btn" onclick="saveItem()">保存する</button>
+    </div>
+  </div>
+</div>
+
+<!-- AI生成モーダル -->
+<div id="ai-modal" style="display:none" class="modal-overlay" onclick="this.style.display='none'">
+  <div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;width:100%;max-width:560px;max-height:90vh;overflow-y:auto;border:2px solid #111;box-shadow:0 16px 60px rgba(0,0,0,.2);animation:slideUp .2s ease">
+    <div style="padding:20px 24px 16px;border-bottom:1.5px solid #f0f0f0">
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:20px">✦</span>
+        <div style="flex:1"><div style="font-size:15px;font-weight:900">AI でQ&Aを自動生成</div><div style="font-size:11px;color:#999;margin-top:1px">URLを入力するだけでQ&Aを自動作成します</div></div>
+        <button onclick="document.getElementById('ai-modal').style.display='none'" style="background:none;border:none;font-size:18px;color:#ccc;line-height:1">×</button>
+      </div>
+    </div>
+    <div style="padding:20px 24px">
+      <div style="margin-bottom:16px">
+        <div class="qa-label" style="margin-bottom:6px">診療カテゴリー</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px" id="ai-dept-grid"></div>
+      </div>
+      <div style="margin-bottom:14px">
+        <div class="qa-label">参考URL</div>
+        <input id="ai-url" type="text" placeholder="https://example.com/treatment-page" class="qa-input" style="margin-top:4px;font-size:12px">
+        <div style="font-size:10px;color:#bbb;margin-top:4px">クリニックの公式サイト・治療ページなどのURLを入力してください</div>
+      </div>
+      <div style="margin-bottom:20px">
+        <div class="qa-label" style="margin-bottom:6px">生成するQ&A数（目安）</div>
+        <div style="display:flex;gap:6px" id="ai-count-btns">
+          <button data-n="5" onclick="setAiCount(5)" style="border:1.5px solid #e0e0e0;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#fff;color:#444">5問</button>
+          <button data-n="10" onclick="setAiCount(10)" style="border:1.5px solid #111;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#111;color:#fff">10問</button>
+          <button data-n="15" onclick="setAiCount(15)" style="border:1.5px solid #e0e0e0;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#fff;color:#444">15問</button>
+          <button data-n="20" onclick="setAiCount(20)" style="border:1.5px solid #e0e0e0;border-radius:6px;padding:6px 16px;font-size:13px;font-weight:600;background:#fff;color:#444">20問</button>
+        </div>
+      </div>
+      <button id="ai-generate-btn" onclick="generateQA()" style="width:100%;border:none;border-radius:8px;padding:13px;font-size:14px;font-weight:900;background:#111;color:#fff;display:flex;align-items:center;justify-content:center;gap:10px">✦ Q&Aを生成する</button>
+      <div id="ai-result" style="margin-top:16px"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY = 'seishokai_qa_v1';
+const DEPTS = [
+  {id:'veneer',    label:'削らないラミネートベニア', icon:'🦷'},
+  {id:'ortho',     label:'矯正治療',                 icon:'🔵'},
+  {id:'implant',   label:'インプラント',             icon:'⚙️'},
+  {id:'insurance', label:'保険診療',                 icon:'📋'},
+  {id:'whitening', label:'ホワイトニング',           icon:'✨'},
+  {id:'hygienist', label:'衛生士業務',               icon:'💉'},
+];
+
+const DEFAULT_DATA = {
+  veneer:[
+    {id:1,title:'ブラックフィルムとは',icon:'🦷',items:[
+      {id:101,q:'ブラックフィルムとはどんな施術ですか？',a:'韓国の2Dデンタル社が開発した審美歯科治療です。0.1mmの極薄セラミックフィルムを歯の表面に貼り付け、歯の色・形・明るさをコントロールします。韓国では2016年から80,000件以上の臨床実績を持つ削らないラミネートベニアの先駆者です。'},
+      {id:102,q:'「削らない」とはどういう意味ですか？',a:'通常のラミネートベニアは0.3〜0.8mm削りますが、ブラックフィルムは0.1mm以下の極薄設計により、エナメル質をほぼ削ることなく理想の口元を実現します。'},
+      {id:103,q:'ブラックフィルムの保証は？',a:'10年間の無料保証があります。条件は1年に1度の噛み合わせチェックへのご来院です。装着後半年以内のやり替えも無料です。'},
+      {id:104,q:'費用はいくらですか？',a:'定価は1本275,000円（税込）です。顔全体モニター価格（税込）例：6本1,204,500円 / 10本1,925,000円 / 16本2,904,000円。詳細はカウンセリング時にご案内します。'},
+    ]},
+    {id:2,title:'ラブリエとは',icon:'💎',items:[
+      {id:201,q:'ラブリエとはどんな施術ですか？',a:'La Briller（ラブリエ）は人工ダイヤモンド（ジルコニア）を使用した削らないラミネートベニアです。最薄0.04mmという薄さと高強度を両立し、劣化しない白さを実現します。アジア施術数No.1の実績を持ちます。'},
+      {id:202,q:'ブラックフィルムとの違いは？',a:'【薄さ】ラブリエ0.04mm、BF0.1mm。【白さ】ラブリエは自身の歯の色が透けないため希望色を自由に選べる（◎）、BFは自然な透明感（〇）。【保証】ラブリエ3年、BF10年。【価格】ラブリエ132,000円/本、BF275,000円/本（税込）。'},
+    ]},
+    {id:3,title:'適応・対象',icon:'✅',items:[
+      {id:301,q:'どんな悩みに対応できますか？',a:'①すきっ歯・歯の隙間、②矮小歯・ギザギザ、③ホワイトニングで落ちない変色、④ブラックトライアングル、⑤軽度のガタツキ、⑥スマイルラインの改善、⑦ホワイトスポット。複合的なお悩みに対応可能です。'},
+      {id:302,q:'カウンセリングは無料ですか？',a:'はい、初回カウンセリングは完全無料です。その場での契約は一切強制しておりません。'},
+    ]},
+  ],
+  ortho:[],implant:[],insurance:[],whitening:[],hygienist:[],
+};
+
+let data = {};
+let currentDept = 'veneer';
+let openCats = {};
+let searchText = '';
+let editingCat = null;
+let editingItem = null;
+let aiDept = 'veneer';
+let aiCount = 10;
+let nid = 9000;
+const uid = () => nid++;
+
+function load(){
+  try{const r=localStorage.getItem(STORAGE_KEY);if(r)return JSON.parse(r);}catch(e){}
+  return JSON.parse(JSON.stringify(DEFAULT_DATA));
+}
+function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}catch(e){}}
+
+function showToast(msg){
+  const d=document.createElement('div');
+  d.className='toast';d.textContent=msg;
+  document.body.appendChild(d);
+  setTimeout(()=>d.remove(),2000);
+}
+
+function render(){
+  const dept=currentDept;
+  const deptInfo=DEPTS.find(d=>d.id===dept);
+  const cats=data[dept]||[];
+  const totalQ=cats.reduce((s,c)=>s+c.items.length,0);
+
+  document.getElementById('dept-title').textContent=deptInfo.icon+' '+deptInfo.label;
+  document.getElementById('dept-label').textContent=deptInfo.label;
+  document.getElementById('dept-count').textContent='カウンセリング担当者向けQ&Aマニュアル — '+totalQ+'問 / '+cats.length+'カテゴリー';
+
+  // サイドバー
+  const dl=document.getElementById('dept-list');
+  dl.innerHTML='';
+  DEPTS.forEach(d=>{
+    const cnt=(data[d.id]||[]).reduce((s,c)=>s+c.items.length,0);
+    const btn=document.createElement('button');
+    btn.className='dept-btn'+(d.id===dept?' active':'');
+    btn.innerHTML='<span style="font-size:15px">'+d.icon+'</span><span style="flex:1;line-height:1.2">'+d.label+'</span>'+(cnt>0?'<span style="font-size:9px;font-weight:400;opacity:.6">'+cnt+'</span>':'');
+    btn.onclick=()=>{currentDept=d.id;openCats={};render();};
+    dl.appendChild(btn);
+  });
+
+  // Q&Aリスト
+  const filtered=searchText.trim()
+    ?cats.map(c=>({...c,items:c.items.filter(i=>i.q.includes(searchText)||i.a.includes(searchText))})).filter(c=>c.items.length>0)
+    :cats;
+
+  const list=document.getElementById('qa-list');
+  list.innerHTML='';
+
+  if(cats.length===0){
+    list.innerHTML='<div style="text-align:center;padding:60px 0;color:#ccc"><div style="font-size:36px;margin-bottom:8px">'+deptInfo.icon+'</div><div style="font-size:14px;font-weight:700;color:#bbb;margin-bottom:6px">'+deptInfo.label+'のQ&Aはまだありません</div><div style="font-size:12px;margin-bottom:12px">カテゴリーを追加してQ&Aを作成できます</div><button onclick="openAddCat()" style="border:none;border-radius:6px;padding:9px 20px;font-size:13px;font-weight:700;background:#111;color:#fff;cursor:pointer;font-family:inherit">＋ カテゴリーを追加</button></div>';
+    return;
+  }
+  if(filtered.length===0&&searchText){
+    list.innerHTML='<div style="text-align:center;padding:60px 0;color:#ccc"><div style="font-size:28px;margin-bottom:6px">🔍</div><div style="font-size:13px">「'+searchText+'」に一致するQ&Aが見つかりませんでした</div></div>';
+    return;
+  }
+
+  filtered.forEach((cat,ci)=>{
+    const isOpen=openCats[cat.id]||!!searchText.trim();
+    const wrap=document.createElement('div');
+    wrap.className='cat-wrap';
+    wrap.style.borderTop=ci===0?'1px solid #111':'none';
+
+    const hdr=document.createElement('div');
+    hdr.className='cat-header';
+    hdr.innerHTML='<span style="font-size:15px">'+cat.icon+'</span><span style="font-weight:800;font-size:13.5px;flex:1">'+cat.title+'</span><span style="font-size:10px;color:#bbb;margin-right:6px">'+cat.items.length+'問</span><button class="ibtn" onclick="event.stopPropagation();openEditCat(\''+dept+'\','+cat.id+')">✏️</button><button class="ibtn" style="margin-left:3px" onclick="event.stopPropagation();deleteCat(\''+dept+'\','+cat.id+')">🗑</button><span style="font-size:10px;color:#bbb;margin-left:4px">'+(isOpen?'▲':'▼')+'</span>';
+    hdr.onclick=()=>{openCats[cat.id]=!openCats[cat.id];render();};
+    wrap.appendChild(hdr);
+
+    if(isOpen){
+      const body=document.createElement('div');
+      cat.items.forEach((item,idx)=>{
+        const row=document.createElement('div');
+        row.className='qa-row';
+        row.style.cssText='border-bottom:1px solid #eee;padding:12px 2px;transition:background .1s';
+        row.innerHTML='<div style="display:flex;gap:8px;align-items:flex-start"><span class="qa-badge-q">Q</span><p style="margin:0;font-weight:700;font-size:13.5px;line-height:1.65;flex:1">'+escHtml(item.q)+'</p><div style="display:flex;gap:3px;flex-shrink:0"><button class="ibtn" onclick="openEditItem(\''+dept+'\','+cat.id+','+item.id+')">✏️</button><button class="ibtn" onclick="deleteItem(\''+dept+'\','+cat.id+','+item.id+')">🗑</button></div></div><div style="display:flex;gap:8px;align-items:flex-start;margin-top:8px"><span class="qa-badge-a">A</span><p style="margin:0;font-size:13px;line-height:1.9;color:#444;flex:1">'+escHtml(item.a)+'</p></div>';
+        body.appendChild(row);
+      });
+      const addRow=document.createElement('div');
+      addRow.style.padding='7px 0';
+      addRow.innerHTML='<button class="add-row-btn" onclick="openAddItem(\''+dept+'\','+cat.id+')">＋ Q&Aを追加</button>';
+      body.appendChild(addRow);
+      wrap.appendChild(body);
+    }
+    list.appendChild(wrap);
+  });
+}
+
+function escHtml(s){return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+function expandAll(){(data[currentDept]||[]).forEach(c=>openCats[c.id]=true);render();}
+function collapseAll(){openCats={};render();}
+function onSearch(v){searchText=v;render();}
+
+// カテゴリーCRUD
+function openAddCat(){
+  editingCat={deptId:currentDept,catId:'new'};
+  document.getElementById('cat-modal-title').textContent='カテゴリーを追加';
+  document.getElementById('cat-icon').value='📌';
+  document.getElementById('cat-name').value='';
+  document.getElementById('cat-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('cat-name').focus(),50);
+}
+function openEditCat(deptId,catId){
+  const cat=(data[deptId]||[]).find(c=>c.id===catId);if(!cat)return;
+  editingCat={deptId,catId};
+  document.getElementById('cat-modal-title').textContent='カテゴリーを編集';
+  document.getElementById('cat-icon').value=cat.icon;
+  document.getElementById('cat-name').value=cat.title;
+  document.getElementById('cat-modal').style.display='flex';
+}
+function saveCat(){
+  const icon=document.getElementById('cat-icon').value.trim()||'📌';
+  const title=document.getElementById('cat-name').value.trim();
+  if(!title)return;
+  const{deptId,catId}=editingCat;
+  if(catId==='new'){const nid2=uid();data[deptId]=[...(data[deptId]||[]),{id:nid2,title,icon,items:[]}];openCats[nid2]=true;}
+  else data[deptId]=(data[deptId]||[]).map(c=>c.id===catId?{...c,title,icon}:c);
+  save();document.getElementById('cat-modal').style.display='none';render();showToast('保存しました');
+}
+function deleteCat(deptId,catId){
+  if(!confirm('このカテゴリーを削除しますか？'))return;
+  data[deptId]=(data[deptId]||[]).filter(c=>c.id!==catId);
+  save();render();showToast('削除しました');
+}
+
+// Q&A CRUD
+function openAddItem(deptId,catId){
+  editingItem={deptId,catId,itemId:'new'};
+  document.getElementById('item-modal-title').textContent='新規追加';
+  document.getElementById('item-q').value='';
+  document.getElementById('item-a').value='';
+  document.getElementById('item-modal').style.display='flex';
+  setTimeout(()=>document.getElementById('item-q').focus(),50);
+}
+function openEditItem(deptId,catId,itemId){
+  const cat=(data[deptId]||[]).find(c=>c.id===catId);
+  const item=cat?.items.find(i=>i.id===itemId);if(!item)return;
+  editingItem={deptId,catId,itemId};
+  document.getElementById('item-modal-title').textContent='Q&Aを編集中';
+  document.getElementById('item-q').value=item.q;
+  document.getElementById('item-a').value=item.a;
+  document.getElementById('item-modal').style.display='flex';
+}
+function saveItem(){
+  const q=document.getElementById('item-q').value.trim();
+  const a=document.getElementById('item-a').value.trim();
+  if(!q||!a)return;
+  const{deptId,catId,itemId}=editingItem;
+  data[deptId]=(data[deptId]||[]).map(cat=>{
+    if(cat.id!==catId)return cat;
+    if(itemId==='new')return{...cat,items:[...cat.items,{id:uid(),q,a}]};
+    return{...cat,items:cat.items.map(i=>i.id===itemId?{...i,q,a}:i)};
+  });
+  save();document.getElementById('item-modal').style.display='none';render();showToast(itemId==='new'?'追加しました':'保存しました');
+}
+function deleteItem(deptId,catId,itemId){
+  if(!confirm('削除しますか？'))return;
+  data[deptId]=(data[deptId]||[]).map(cat=>cat.id!==catId?cat:{...cat,items:cat.items.filter(i=>i.id!==itemId)});
+  save();render();showToast('削除しました');
+}
+
+// AI生成
+function openAiModal(){
+  const grid=document.getElementById('ai-dept-grid');
+  grid.innerHTML='';
+  DEPTS.forEach(d=>{
+    const btn=document.createElement('button');
+    btn.style.cssText='border:1.5px solid '+(d.id===aiDept?'#111':'#e0e0e0')+';border-radius:7px;padding:9px 12px;font-size:12px;font-weight:600;background:'+(d.id===aiDept?'#111':'#fff')+';color:'+(d.id===aiDept?'#fff':'#444')+';text-align:left;display:flex;align-items:center;gap:7px;cursor:pointer;font-family:inherit';
+    btn.innerHTML='<span style="font-size:16px">'+d.icon+'</span><span style="line-height:1.2">'+d.label+'</span>'+(d.id===aiDept?'<span style="margin-left:auto">✓</span>':'');
+    btn.onclick=()=>{aiDept=d.id;openAiModal();};
+    grid.appendChild(btn);
+  });
+  document.getElementById('ai-result').innerHTML='';
+  document.getElementById('ai-modal').style.display='flex';
+}
+function setAiCount(n){
+  aiCount=n;
+  document.querySelectorAll('#ai-count-btns button').forEach(b=>{
+    const bn=parseInt(b.dataset.n);
+    b.style.border=bn===n?'1.5px solid #111':'1.5px solid #e0e0e0';
+    b.style.background=bn===n?'#111':'#fff';
+    b.style.color=bn===n?'#fff':'#444';
+  });
+}
+async function generateQA(){
+  const url=document.getElementById('ai-url').value.trim();
+  if(!url){alert('URLを入力してください');return;}
+  const btn=document.getElementById('ai-generate-btn');
+  const result=document.getElementById('ai-result');
+  btn.disabled=true;
+  btn.innerHTML='<span style="width:16px;height:16px;border:2px solid #888;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite"></span> 読み込み中…';
+  result.innerHTML='';
+  try{
+    const res=await fetch('https://api.allorigins.win/get?url='+encodeURIComponent(url));
+    if(!res.ok)throw new Error('URLの取得に失敗しました');
+    const d=await res.json();
+    const tmp=document.createElement('div');
+    tmp.innerHTML=d.contents||'';
+    tmp.querySelectorAll('script,style,nav,footer,header').forEach(el=>el.remove());
+    const text=(tmp.innerText||tmp.textContent||'').replace(/\s+/g,' ').trim().slice(0,6000);
+    if(text.length<100)throw new Error('ページのテキストを十分に取得できませんでした');
+    btn.innerHTML='<span style="width:16px;height:16px;border:2px solid #888;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite"></span> AIがQ&Aを生成中…';
+    const deptLabel=DEPTS.find(d=>d.id===aiDept)?.label||aiDept;
+    const prompt='以下はWebページのテキストコンテンツです。これを歯科医院（医療法人SEISHOKAI）のスタッフ研修用Q&Aに変換してください。\n\n【診療カテゴリー】'+deptLabel+'\n【生成するQ&A数】'+aiCount+'問程度\n【ページ内容】\n'+text+'\n\n以下のJSON形式のみで返してください（説明文・マークダウン不要）:\n{"categories":[{"title":"カテゴリー名","icon":"絵文字1文字","items":[{"q":"質問文","a":"回答文（詳しく丁寧に）"}]}]}';
+    const apiRes=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})});
+    if(!apiRes.ok)throw new Error('AI APIの呼び出しに失敗しました');
+    const apiData=await apiRes.json();
+    const rawText=(apiData.content||[]).map(b=>b.text||'').join('');
+    const jsonMatch=rawText.match(/\{[\s\S]*\}/);
+    if(!jsonMatch)throw new Error('AIの応答を解析できませんでした');
+    const parsed=JSON.parse(jsonMatch[0]);
+    if(!parsed.categories?.length)throw new Error('Q&Aが生成されませんでした');
+    const total=parsed.categories.reduce((s,c)=>s+c.items.length,0);
+    let html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="font-size:13px;font-weight:900">✦ '+total+'問のQ&Aを生成しました</div><div style="font-size:11px;color:#999">'+parsed.categories.length+'カテゴリー</div></div>';
+    html+='<div style="background:#fafafa;border-radius:8px;border:1.5px solid #e8e8e8;max-height:240px;overflow-y:auto;padding:10px 14px;margin-bottom:14px">';
+    parsed.categories.forEach(cat=>{
+      html+='<div style="margin-bottom:10px"><div style="font-size:12px;font-weight:800;margin-bottom:4px">'+cat.icon+' '+cat.title+' <span style="font-size:10px;color:#bbb;font-weight:400">'+cat.items.length+'問</span></div>';
+      cat.items.forEach(item=>{html+='<div style="margin-bottom:6px;padding-left:8px;border-left:2px solid #e8e8e8"><div style="font-size:11px;font-weight:700;margin-bottom:1px">Q. '+escHtml(item.q)+'</div><div style="font-size:11px;color:#555">'+escHtml(item.a.slice(0,80))+(item.a.length>80?'…':'')+'</div></div>';});
+      html+='</div>';
+    });
+    html+='</div><div style="display:flex;gap:8px"><button onclick="document.getElementById(\'ai-modal\').style.display=\'none\'" style="flex:1;border:1.5px solid #ddd;border-radius:7px;padding:11px;font-size:13px;font-weight:600;background:#fff;color:#666;cursor:pointer;font-family:inherit">キャンセル</button><button id="ai-apply-btn" style="flex:2;border:none;border-radius:7px;padding:11px;font-size:13px;font-weight:900;background:#111;color:#fff;cursor:pointer;font-family:inherit">✦ このQ&Aを追加する</button></div>';
+    result.innerHTML=html;
+    document.getElementById('ai-apply-btn').onclick=()=>{
+      const withIds=parsed.categories.map(cat=>({...cat,id:uid(),items:cat.items.map(item=>({...item,id:uid()}))}));
+      data[aiDept]=[...(data[aiDept]||[]),...withIds];
+      save();
+      if(aiDept!==currentDept){currentDept=aiDept;openCats={};}
+      document.getElementById('ai-modal').style.display='none';
+      render();
+      showToast('✨ '+total+'問のQ&Aを追加しました');
+    };
+  }catch(e){
+    result.innerHTML='<div style="padding:12px 14px;background:#fff5f5;border:1.5px solid #ffd0d0;border-radius:7px;font-size:12px;color:#c0392b">⚠️ '+e.message+'</div>';
+  }finally{
+    btn.disabled=false;
+    btn.innerHTML='✦ Q&Aを生成する';
+  }
+}
+
+// 初期化
+data=load();
+render();
+</script>
+</body>
+</html>
