@@ -4,9 +4,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>SEISHOKAI Q&A研修</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Hiragino Sans','Noto Sans JP',sans-serif;background:#f5f5f5;color:#111}
+    body{font-family:'Inter','Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;background:#f5f5f5;color:#111;-webkit-font-smoothing:antialiased;font-feature-settings:"palt"}
     @keyframes fu{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
     @keyframes spin{to{transform:rotate(360deg)}}
     @keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
@@ -410,7 +413,7 @@ async function generateQA(){
     btn.innerHTML='<span style="width:16px;height:16px;border:2px solid #888;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite"></span> AIがQ&Aを生成中…';
     const deptLabel=DEPTS.find(d=>d.id===aiDept)?.label||aiDept;
     const prompt='以下はWebページのテキストコンテンツです。これを歯科医院（医療法人SEISHOKAI）のスタッフ研修用Q&Aに変換してください。\n\n【診療カテゴリー】'+deptLabel+'\n【生成するQ&A数】'+aiCount+'問程度\n【ページ内容】\n'+text+'\n\n以下のJSON形式のみで返してください（説明文・マークダウン不要）:\n{"categories":[{"title":"カテゴリー名","icon":"絵文字1文字","items":[{"q":"質問文","a":"回答文（詳しく丁寧に）"}]}]}';
-    const apiRes=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:4000,messages:[{role:'user',content:prompt}]})});
+    const apiRes=await fetch('https://seishokai-ai-proxy.tkm-koike.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:4000,messages:[{role:'user',content:prompt}]})});
     if(!apiRes.ok)throw new Error('AI APIの呼び出しに失敗しました');
     const apiData=await apiRes.json();
     const rawText=(apiData.content||[]).map(b=>b.text||'').join('');
