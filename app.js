@@ -414,19 +414,25 @@ function setupEventListeners() {
     document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px';
   };
   document.getElementById('bk-overdue-btn').addEventListener('click', () => {
+    const wasActive = window._bkProgressFilter;
     resetQuickBtns();
-    document.getElementById('bk-overdue-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#dc2626;color:white;border:2px solid #dc2626;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(220,38,38,0.3)';
-    document.getElementById('bk-status').value = '';
-    window._bkProgressFilter = true;
+    window._bkProgressFilter = !wasActive;
     window._bkTodayFilter = false;
+    if (window._bkProgressFilter) {
+      document.getElementById('bk-overdue-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#dc2626;color:white;border:2px solid #dc2626;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(220,38,38,0.3)';
+      document.getElementById('bk-status').value = '';
+    }
     renderBookings();
   });
   document.getElementById('bk-today-btn').addEventListener('click', () => {
+    const wasActive = window._bkTodayFilter;
     resetQuickBtns();
-    document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#1d4ed8;color:white;border:2px solid #1d4ed8;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(29,78,216,0.3)';
-    document.getElementById('bk-status').value = '';
-    window._bkTodayFilter = true;
+    window._bkTodayFilter = !wasActive;
     window._bkProgressFilter = false;
+    if (window._bkTodayFilter) {
+      document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#1d4ed8;color:white;border:2px solid #1d4ed8;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(29,78,216,0.3)';
+      document.getElementById('bk-status').value = '';
+    }
     renderBookings();
   });
   document.getElementById('bk-reset').addEventListener('click', () => {
@@ -443,6 +449,7 @@ function setupEventListeners() {
     window._bkTodayFilter = false;
     window._bkDisplayLimit = 200;
     resetQuickBtns();
+    if (window._highlightBkFilters) window._highlightBkFilters();
     renderBookings();
   });
 
@@ -452,9 +459,28 @@ function setupEventListeners() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(renderBookings, 300);
   });
+  const highlightActiveFilter = (el) => {
+    if (!el) return;
+    const hasVal = el.value && el.value !== '';
+    if (hasVal) {
+      el.style.background = '#1d4ed8';
+      el.style.color = '#fff';
+      el.style.borderColor = '#1d4ed8';
+      el.style.fontWeight = '700';
+    } else {
+      el.style.background = '';
+      el.style.color = '';
+      el.style.borderColor = '';
+      el.style.fontWeight = '';
+    }
+  };
   ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-period','bk-month'].forEach(id => {
-    document.getElementById(id).addEventListener('change', renderBookings);
+    const el = document.getElementById(id);
+    el.addEventListener('change', () => { highlightActiveFilter(el); renderBookings(); });
   });
+  // 検索欄も色付け
+  document.getElementById('bk-search').addEventListener('input', () => highlightActiveFilter(document.getElementById('bk-search')));
+  window._highlightBkFilters = () => ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-period','bk-month','bk-search'].forEach(id => highlightActiveFilter(document.getElementById(id)));
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
   document.getElementById('bk-csv').addEventListener('click', exportCSV);
 
@@ -2170,7 +2196,7 @@ function renderBookings() {
   if (monthFilter) {
     filtered = filtered.filter(d => getYM(d) === monthFilter);
   }
-  // 今日予約フィルター
+  // 今日予約フィルター（クリアするまで保持）
   if (window._bkTodayFilter) {
     const td3 = new Date(); const todayStr = `${td3.getFullYear()}-${String(td3.getMonth()+1).padStart(2,'0')}-${String(td3.getDate()).padStart(2,'0')}`;
     filtered = filtered.filter(d => {
@@ -2180,16 +2206,14 @@ function renderBookings() {
       const bd = `${m[1]}-${String(parseInt(m[2])).padStart(2,'0')}-${String(parseInt(m[3])).padStart(2,'0')}`;
       return bd === todayStr;
     });
-    window._bkTodayFilter = false;
   }
-  // 進捗フィルター（予約日が昨日以前の人）
+  // 進捗フィルター（予約日が昨日以前の人、クリアするまで保持）
   if (window._bkProgressFilter) {
     const td2 = new Date(); td2.setHours(0,0,0,0);
     filtered = filtered.filter(d => {
       const bd = parseDate(d.bookDate);
       return bd && bd < td2;
     });
-    window._bkProgressFilter = false;
   }
   // 日付ピンポイントフィルター
   if (window._bkDateFilter) {
