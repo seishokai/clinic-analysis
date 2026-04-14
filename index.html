@@ -231,7 +231,7 @@
       </div>
       <!-- ポータルメニュー -->
       <div id="portal-menu" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
-        <button onclick="var s=document.getElementById('login-section');s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">売上管理</button>
+        <button onclick="var s=document.getElementById('login-section');document.getElementById('login-section-booking').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">売上管理</button>
 
         <!-- ログインフォーム（インライン展開） -->
         <div id="login-section" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
@@ -244,6 +244,16 @@
             <button type="button" class="btn-primary" id="login-btn">ログイン</button>
             <p id="login-error" class="error-msg" hidden>パスワードが正しくありません</p>
           </div>
+        </div>
+
+        <button onclick="var s=document.getElementById('login-section-booking');document.getElementById('login-section').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">予約管理</button>
+        <div id="login-section-booking" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
+          <div class="input-group">
+            <label for="password-booking">Password</label>
+            <input type="password" id="password-booking" placeholder="パスワードを入力" autocomplete="new-password">
+          </div>
+          <button type="button" class="btn-primary" id="login-btn-booking">ログイン</button>
+          <p id="login-error-booking" class="error-msg" hidden style="color:#b91c1c;font-size:12px;margin-top:6px">パスワードが正しくありません</p>
         </div>
 
         <button onclick="var s=document.getElementById('training-sub');s.style.display=(s.style.display==='flex'?'none':'flex')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト</button>

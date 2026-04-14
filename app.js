@@ -89,6 +89,7 @@ function getApplyDateStr(d) {
 
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
+const BOOKING_PASSWORD = 'Edoyadepon1@';
 // プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
 const PROMO_PASSWORDS = {
   'hikaru': 'hikaru',
@@ -161,6 +162,16 @@ function setupEventListeners() {
       loginBtn.disabled = false;
       showApp();
       return;
+    } else if (pw === BOOKING_PASSWORD) {
+      document.getElementById('password').value = '';
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'booking');
+      userRole = 'booking';
+      promoFilter = '';
+      loginBtn.textContent = 'ログイン';
+      loginBtn.disabled = false;
+      showApp();
+      return;
     } else if (PROMO_PASSWORDS[pw]) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
@@ -197,6 +208,24 @@ function setupEventListeners() {
     }
   }
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
+  // 予約管理ログイン
+  const bkLoginBtn = document.getElementById('login-btn-booking');
+  if (bkLoginBtn) {
+    bkLoginBtn.addEventListener('click', () => {
+      const pw = document.getElementById('password-booking').value;
+      document.getElementById('password').value = pw;
+      attemptLogin();
+      setTimeout(() => {
+        if (!sessionStorage.getItem('authenticated')) {
+          document.getElementById('login-error-booking').hidden = false;
+          document.getElementById('password-booking').value = '';
+        }
+      }, 500);
+    });
+    document.getElementById('password-booking').addEventListener('keypress', e => {
+      if (e.key === 'Enter') bkLoginBtn.click();
+    });
+  }
   document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
   // #20 パスワード表示トグル
   document.getElementById('pw-toggle').addEventListener('change', e => {
@@ -918,6 +947,17 @@ function showApp() {
   // プロモユーザーの場合、予約タブのみ表示
   userRole = sessionStorage.getItem('role') || 'admin';
   promoFilter = sessionStorage.getItem('promoFilter') || '';
+  if (userRole === 'booking') {
+    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
+      b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
+    });
+    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+      b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
+    });
+    switchView('bookings');
+    loadBookings();
+    return;
+  }
   if (userRole === 'promo') {
     document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
       b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
