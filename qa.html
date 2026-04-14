@@ -412,6 +412,26 @@ function deleteItem(deptId,catId,itemId){
   save();render();showToast('削除しました');
 }
 
+function parseAiJson(raw){
+  if(!raw)return null;
+  let t=raw.trim();
+  // ```json ... ``` を剥がす
+  t=t.replace(/^```(?:json)?\s*/i,'').replace(/```\s*$/,'').trim();
+  // 最初の { から最後の } まで
+  const s=t.indexOf('{'),e=t.lastIndexOf('}');
+  if(s<0||e<0)return null;
+  t=t.slice(s,e+1);
+  // 末尾カンマ削除（], } の前）
+  t=t.replace(/,(\s*[}\]])/g,'$1');
+  try{return JSON.parse(t);}catch(err){
+    console.warn('parseAiJson fail1',err.message);
+    // コントロール文字除去してリトライ
+    try{return JSON.parse(t.replace(/[\x00-\x1F]+/g,' '));}catch(e2){
+      console.warn('parseAiJson fail2',e2.message);
+      return null;
+    }
+  }
+}
 function toggleSidebar(force){
   const sb=document.getElementById('sidebar');
   const ov=document.getElementById('sidebar-overlay');
@@ -462,13 +482,12 @@ async function generateQA(){
     btn.innerHTML='<span style="width:16px;height:16px;border:2px solid #888;border-top-color:transparent;border-radius:50%;display:inline-block;animation:spin .7s linear infinite"></span> AIがQ&Aを生成中…';
     const deptLabel=DEPTS.find(d=>d.id===aiDept)?.label||aiDept;
     const prompt='以下はWebページのテキストコンテンツです。これを歯科医院（医療法人SEISHOKAI）のスタッフ研修用Q&Aに変換してください。\n\n【診療カテゴリー】'+deptLabel+'\n【生成するQ&A数】'+aiCount+'問程度\n【ページ内容】\n'+text+'\n\n以下のJSON形式のみで返してください（説明文・マークダウン不要）:\n{"categories":[{"title":"カテゴリー名","icon":"絵文字1文字","items":[{"q":"質問文","a":"回答文（詳しく丁寧に）"}]}]}';
-    const apiRes=await fetch('https://seishokai-ai-proxy.tkm-koike.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-5',max_tokens:4000,messages:[{role:'user',content:prompt}]})});
+    const apiRes=await fetch('https://seishokai-ai-proxy.tkm-koike.workers.dev/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-haiku-4-5-20251001',max_tokens:8000,messages:[{role:'user',content:prompt}]})});
     if(!apiRes.ok)throw new Error('AI APIの呼び出しに失敗しました');
     const apiData=await apiRes.json();
     const rawText=(apiData.content||[]).map(b=>b.text||'').join('');
-    const jsonMatch=rawText.match(/\{[\s\S]*\}/);
-    if(!jsonMatch)throw new Error('AIの応答を解析できませんでした');
-    const parsed=JSON.parse(jsonMatch[0]);
+    const parsed=parseAiJson(rawText);
+    if(!parsed||!parsed.categories?.length)throw new Error('Q&Aが生成されませんでした');
     if(!parsed.categories?.length)throw new Error('Q&Aが生成されませんでした');
     const total=parsed.categories.reduce((s,c)=>s+c.items.length,0);
     let html='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><div style="font-size:13px;font-weight:900">✦ '+total+'問のQ&Aを生成しました</div><div style="font-size:11px;color:#999">'+parsed.categories.length+'カテゴリー</div></div>';
