@@ -7,6 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     *{box-sizing:border-box;margin:0;padding:0}
     body{font-family:'Inter','Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;background:#f5f5f5;color:#111;-webkit-font-smoothing:antialiased;font-feature-settings:"palt"}
@@ -237,11 +238,28 @@ let aiCount = 10;
 let nid = 9000;
 const uid = () => nid++;
 
-function load(){
+const SUPABASE_URL='https://ndlfqrvoejwgqfdtghmg.supabase.co';
+const SUPABASE_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+
+async function loadRemote(){
+  try{
+    const {data:row,error}=await sb.from('qa_data').select('data').eq('id','main').maybeSingle();
+    if(error)throw error;
+    if(row?.data)return row.data;
+  }catch(e){console.warn('Supabase load failed',e);}
   try{const r=localStorage.getItem(STORAGE_KEY);if(r)return JSON.parse(r);}catch(e){}
   return JSON.parse(JSON.stringify(DEFAULT_DATA));
 }
-function save(){try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}catch(e){}}
+let _saveTimer=null;
+function save(){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(data));}catch(e){}
+  clearTimeout(_saveTimer);
+  _saveTimer=setTimeout(async()=>{
+    try{await sb.from('qa_data').upsert({id:'main',data:data,updated_at:new Date().toISOString()});}
+    catch(e){console.warn('Supabase save failed',e);}
+  },400);
+}
 
 function showToast(msg){
   const d=document.createElement('div');
@@ -480,8 +498,10 @@ async function generateQA(){
 }
 
 // 初期化
-data=load();
-render();
+(async()=>{
+  data=await loadRemote();
+  render();
+})();
 </script>
 </body>
 </html>
