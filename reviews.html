@@ -53,9 +53,21 @@ button{cursor:pointer;font-family:inherit;border:none;background:none;color:inhe
 .row.pinned{opacity:0.4}
 .row.pinned .num{font-size:13px}
 
+.months{grid-column:2 / -1;display:flex;gap:18px;margin-top:10px;flex-wrap:wrap;padding-left:0}
+.mo{display:flex;align-items:baseline;gap:6px;font-size:11px;color:var(--sub);letter-spacing:0.05em}
+.mo .lbl{font-weight:400;min-width:34px}
+.mo .v{font-family:'Cormorant Garamond',serif;font-size:15px;font-weight:500;color:var(--ink);letter-spacing:0.02em}
+.mo .v.none{color:#ccc;font-weight:300}
+
 #status{text-align:center;padding:80px 20px;color:var(--sub);font-size:13px;letter-spacing:0.15em;font-weight:300}
 .error{color:#8b1e1e;background:#fff;border:1px solid #e8d5d5;padding:18px 22px;margin:20px auto;max-width:520px;font-size:13px;line-height:1.8}
 
+.row{grid-template-rows:auto auto}
+@media (max-width:640px){
+  .months{gap:10px;margin-top:8px}
+  .mo{font-size:10px}
+  .mo .v{font-size:13px}
+}
 @media (max-width:640px){
   #topbar{padding:12px 16px}
   .container{padding:32px 16px 60px}
@@ -191,6 +203,25 @@ async function loadData(){
       if(/投稿|件数|口コミ数|レビュー数|count/i.test(colText[c])) countCols.push(c);
     }
 
+    // 月の検出：各列ヘッダーに月情報があるかチェック → ratingCols のみ月情報を付与
+    // 複数ヘッダー行の組合せから "N月" / "YYYY-MM" / "YYYY/MM" を抽出
+    function extractMonth(text){
+      if(!text) return null;
+      let m = text.match(/(\d{4})[\-\/年\.](\d{1,2})/);
+      if(m) return parseInt(m[2]);
+      m = text.match(/(\d{1,2})月/);
+      if(m) return parseInt(m[1]);
+      return null;
+    }
+    const colMonth = {};
+    ratingCols.forEach(c => {
+      const mo = extractMonth(colText[c]);
+      if(mo) colMonth[c] = mo;
+    });
+
+    // 月リスト（昇順）
+    const monthSet = [...new Set(Object.values(colMonth))].sort((a,b)=>a-b);
+
     const data = [];
     for(let r = dataStart; r < rows.length; r++){
       const row = rows[r];
@@ -200,10 +231,25 @@ async function loadData(){
       const avg = ratings.length ? ratings.reduce((s,n)=>s+n,0)/ratings.length : null;
       const counts = countCols.map(c => parseFloat(String(row[c]||'').replace(/[^\d.-]/g,''))).filter(n => !isNaN(n));
       const totalCount = counts.reduce((s,n)=>s+n,0);
-      data.push({ name: shortClinic(facRaw), raw: facRaw, avg, posts: totalCount });
+      // 月別平均
+      const monthlyMap = {};
+      ratingCols.forEach(c => {
+        const mo = colMonth[c];
+        if(!mo) return;
+        const n = parseFloat(String(row[c]||'').replace(/[^\d.-]/g,''));
+        if(!isNaN(n) && n >= 1 && n <= 5){
+          (monthlyMap[mo] = monthlyMap[mo] || []).push(n);
+        }
+      });
+      const monthly = {};
+      Object.entries(monthlyMap).forEach(([mo, arr]) => {
+        monthly[mo] = arr.reduce((s,n)=>s+n,0) / arr.length;
+      });
+      data.push({ name: shortClinic(facRaw), raw: facRaw, avg, posts: totalCount, monthly });
     }
 
     allData = data;
+    window._months = monthSet;
     statusEl.style.display = 'none';
     contentEl.style.display = 'block';
     render();
@@ -233,9 +279,14 @@ function render(){
   document.getElementById('count').textContent = rows.length;
   const rankable = rows.filter(r => !isPinned(r.raw));
 
+  const months = window._months || [];
   document.getElementById('list').innerHTML = rows.map(r => {
     const pinned = isPinned(r.raw);
     const rank = pinned ? '—' : (rankable.indexOf(r) + 1);
+    const monthsHtml = months.length ? `<div class="months">${months.map(m => {
+      const v = r.monthly && r.monthly[m];
+      return `<div class="mo"><span class="lbl">${m}月</span><span class="v ${v==null?'none':''}">${v != null ? v.toFixed(2) : '—'}</span></div>`;
+    }).join('')}</div>` : '';
     return `
       <div class="row ${pinned?'pinned':''}">
         <div class="num">${rank}</div>
@@ -245,6 +296,7 @@ function render(){
           <div class="score">${r.avg != null ? r.avg.toFixed(2) : '—'}</div>
         </div>
         <div class="posts">${r.posts ? `<b>${r.posts}</b>件` : ''}</div>
+        ${monthsHtml}
       </div>
     `;
   }).join('');
