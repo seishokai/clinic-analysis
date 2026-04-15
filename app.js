@@ -2042,6 +2042,25 @@ async function loadBookings() {
       }
     } catch(e) { console.warn('DB status load error:', e); }
 
+    // localStorage bk-extra からユーザー編集を反映
+    try {
+      const bkEx = loadData('bk-extra', {});
+      bookingsData.forEach(d => {
+        const key = d.name + '|' + d.applyDate;
+        const ex = bkEx[key];
+        if (!ex) return;
+        if (ex.editedBookDate) d.bookDate = ex.editedBookDate;
+        if (ex.editedService) d.service = ex.editedService;
+        if (ex.editedFacility) d.facility = ex.editedFacility;
+        if (ex.editedPhone) d.phone = ex.editedPhone;
+        if (ex.editedEmail) d.email = ex.editedEmail;
+        if (ex.editedSource) d.source = ex.editedSource;
+        if (ex.editedStatus) d.status = ex.editedStatus;
+        // 名前はキーになっているので最後に反映
+        if (ex.editedName) d.name = ex.editedName;
+      });
+    } catch(e) { console.warn('bk-extra apply error:', e); }
+
     populateBookingFilters();
     renderBookings();
     renderAnalysis();
@@ -2572,15 +2591,21 @@ function saveRowEdit() {
   d.email = document.getElementById('re-email').value;
   d.source = document.getElementById('re-source').value;
 
-  // bk-extraにも保存
+  // bk-extraにも保存（全編集項目をローカル永続化）
   const bkEx = loadData('bk-extra', {});
   const key = oldName + '|' + oldApply;
   if (!bkEx[key]) bkEx[key] = {};
   bkEx[key].editedName = d.name;
   bkEx[key].editedBookDate = d.bookDate;
+  bkEx[key].editedService = d.service;
+  bkEx[key].editedFacility = d.facility;
+  bkEx[key].editedPhone = d.phone;
+  bkEx[key].editedEmail = d.email;
+  bkEx[key].editedSource = d.source;
+  bkEx[key].editedStatus = d.status;
   saveData('bk-extra', bkEx);
 
-  // DB保存（バックグラウンド）
+  // DB保存（バックグラウンド：ステータス・予約日のみ。他編集項目はlocalStorage）
   sb.from('booking_status').upsert({ name: oldName, apply_date: oldApply, status: d.status, book_date: d.bookDate }, { onConflict: 'name,apply_date' }).then(() => {});
   if (d.tool === '手動') {
     sb.from('manual_bookings').update({ name: d.name, book_date: d.bookDate, service: d.service, facility: d.facility, phone: d.phone, email: d.email, source: d.source, status: d.status }).eq('name', oldName).eq('apply_date', oldApply).then(() => {});
