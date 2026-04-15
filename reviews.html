@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SEISHOKAI 口コミ一覧</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter','Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;background:#f5f5f5;color:#111;-webkit-font-smoothing:antialiased;font-feature-settings:"palt"}
+button{cursor:pointer;font-family:inherit;border:none;background:none}
+
+#topbar{background:#fff;border-bottom:2px solid #111;padding:11px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200}
+#back-btn{border:1.5px solid #ddd;border-radius:6px;padding:5px 12px;font-size:12px;background:#fff;color:#666;font-weight:600}
+#back-btn:hover{background:#f5f5f5}
+.logo{font-size:17px;font-weight:900;letter-spacing:-0.5px}
+.sub{font-size:11px;color:#aaa;margin-top:1px}
+.spacer{flex:1}
+#reload-btn{border:1.5px solid #111;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;background:#111;color:#fff}
+#reload-btn:disabled{opacity:0.5;cursor:wait}
+
+#container{max-width:1200px;margin:0 auto;padding:20px 18px 60px}
+
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.search-box{flex:1;min-width:220px;position:relative}
+.search-box input{width:100%;padding:10px 14px 10px 38px;border:1.5px solid #e5e5e5;border-radius:10px;font-size:14px;background:#fff;font-family:inherit}
+.search-box input:focus{outline:none;border-color:#111}
+.search-box::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:0.5;font-size:14px}
+.filter-chip{padding:8px 14px;border:1.5px solid #e5e5e5;border-radius:20px;background:#fff;font-size:12px;font-weight:600;color:#555;white-space:nowrap}
+.filter-chip.active{background:#111;color:#fff;border-color:#111}
+select.filter-chip{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23666' d='M5 6L0 0h10z'/></svg>");background-repeat:no-repeat;background-position:right 10px center}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
+.stat{background:#fff;border:1px solid #ececec;border-radius:12px;padding:12px 16px}
+.stat-l{font-size:11px;color:#888;font-weight:600;letter-spacing:0.04em;margin-bottom:4px}
+.stat-v{font-size:22px;font-weight:800;letter-spacing:-0.02em}
+.stat-v .unit{font-size:12px;color:#888;margin-left:2px;font-weight:600}
+.stars{color:#f5a623;font-size:16px;letter-spacing:1px;font-weight:700}
+
+#status{text-align:center;padding:60px 20px;color:#999;font-size:14px}
+.error{color:#b91c1c;background:#fff0f0;border:1px solid #fecaca;padding:14px 18px;border-radius:10px;margin-bottom:18px;font-size:13px;line-height:1.6}
+.error b{color:#991b1b}
+.error code{background:#fff;padding:2px 6px;border-radius:4px;font-size:12px;font-family:monospace}
+
+.list{display:flex;flex-direction:column;gap:10px}
+.card{background:#fff;border:1px solid #ececec;border-radius:12px;padding:16px 18px;transition:box-shadow .15s,border-color .15s}
+.card:hover{border-color:#ccc;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
+.card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
+.rating{color:#f5a623;font-size:15px;letter-spacing:1px;font-weight:700}
+.rating .num{color:#111;margin-left:4px;font-size:13px;font-weight:700}
+.author{font-size:13px;font-weight:700;color:#111}
+.date{font-size:11px;color:#999;margin-left:auto}
+.facility-tag{display:inline-block;padding:3px 9px;background:#f3f4f6;border-radius:20px;font-size:11px;font-weight:600;color:#555}
+.body{font-size:14px;line-height:1.75;color:#333;white-space:pre-wrap;word-wrap:break-word}
+.meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;font-size:11px;color:#888}
+.meta b{color:#555;margin-right:4px}
+
+@media (max-width:640px){
+  #container{padding:14px 12px 40px}
+  .toolbar{gap:8px}
+  .search-box{min-width:100%}
+  .stat-v{font-size:18px}
+  .card{padding:13px 14px}
+  .body{font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <button id="back-btn" onclick="location.href='https://seishokai.github.io/clinic-analysis/'">← ポータル</button>
+  <div>
+    <div class="logo">SEISHOKAI</div>
+    <div class="sub">口コミ一覧</div>
+  </div>
+  <div class="spacer"></div>
+  <button id="reload-btn" onclick="loadData()">再読込</button>
+</div>
+
+<div id="container">
+  <div id="status">読み込み中...</div>
+  <div id="content" style="display:none">
+    <div class="stats" id="stats"></div>
+    <div class="toolbar">
+      <div class="search-box"><input type="text" id="search" placeholder="検索（本文・投稿者・医院）"></div>
+      <select class="filter-chip" id="facility-filter"><option value="">医院：全て</option></select>
+      <select class="filter-chip" id="rating-filter">
+        <option value="">評価：全て</option>
+        <option value="5">★5</option>
+        <option value="4">★4</option>
+        <option value="3">★3</option>
+        <option value="2">★2</option>
+        <option value="1">★1</option>
+      </select>
+      <select class="filter-chip" id="sort">
+        <option value="date-desc">新しい順</option>
+        <option value="date-asc">古い順</option>
+        <option value="rating-desc">評価高い順</option>
+        <option value="rating-asc">評価低い順</option>
+      </select>
+    </div>
+    <div class="list" id="list"></div>
+  </div>
+</div>
+
+<script>
+// 公開CSVのURL（ファイル > 共有 > ウェブに公開 で生成）
+const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSJ6gRkfrqoNADOQvmOeum8kOq3QgnOV9MX9MzucD5j8s8FGeKy_uRA1Slv8aIseZ10jdJJtMRtr8y0/pub?output=csv';
+
+let allRows = [];
+let columns = [];
+
+// 列名候補（柔軟マッピング）
+const COL_HINTS = {
+  date: ['日付','投稿日','date','timestamp','タイムスタンプ','投稿時刻','時刻','作成日'],
+  author: ['投稿者','名前','氏名','ユーザー','user','name','author','nickname','ニックネーム'],
+  rating: ['評価','星','レーティング','rating','stars','score','点数','★'],
+  facility: ['医院','院','店舗','facility','clinic','location','場所','拠点','医院名'],
+  body: ['本文','内容','コメント','口コミ','レビュー','body','review','content','comment','text','メッセージ','感想'],
+  reply: ['返信','対応','返答','reply','response'],
+  url: ['url','リンク','link']
+};
+
+function findCol(headers, key){
+  const hints = COL_HINTS[key] || [];
+  for(const h of hints){
+    const i = headers.findIndex(c => c && c.toLowerCase().includes(h.toLowerCase()));
+    if(i >= 0) return i;
+  }
+  return -1;
+}
+
+// CSV parser（カンマ区切り、ダブルクォート対応）
+function parseCSV(text){
+  const rows = [];
+  let row = [], field = '', inQ = false;
+  for(let i=0; i<text.length; i++){
+    const c = text[i];
+    if(inQ){
+      if(c === '"' && text[i+1] === '"'){ field += '"'; i++; }
+      else if(c === '"') inQ = false;
+      else field += c;
+    } else {
+      if(c === '"') inQ = true;
+      else if(c === ','){ row.push(field); field = ''; }
+      else if(c === '\n'){ row.push(field); rows.push(row); row = []; field = ''; }
+      else if(c === '\r'){ /* skip */ }
+      else field += c;
+    }
+  }
+  if(field || row.length){ row.push(field); rows.push(row); }
+  return rows;
+}
+
+function extractStars(v){
+  if(v == null) return null;
+  const s = String(v).trim();
+  const m = s.match(/([1-5])/);
+  if(m) return parseInt(m[1]);
+  const starCount = (s.match(/★/g) || []).length;
+  if(starCount) return starCount;
+  return null;
+}
+
+function formatDate(v){
+  if(!v) return '';
+  const s = String(v).trim();
+  const d = new Date(s);
+  if(!isNaN(d.getTime())){
+    return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+  }
+  return s;
+}
+
+function dateVal(v){
+  if(!v) return 0;
+  const d = new Date(String(v));
+  return isNaN(d.getTime()) ? 0 : d.getTime();
+}
+
+async function loadData(){
+  const statusEl = document.getElementById('status');
+  const contentEl = document.getElementById('content');
+  const reloadBtn = document.getElementById('reload-btn');
+  reloadBtn.disabled = true;
+  statusEl.style.display = 'block';
+  statusEl.innerHTML = '読み込み中...';
+  contentEl.style.display = 'none';
+
+  try {
+    const res = await fetch(CSV_URL);
+    if(!res.ok) throw new Error('HTTP ' + res.status);
+    const text = await res.text();
+    const rows = parseCSV(text).filter(r => r.some(c => c && c.trim()));
+    if(rows.length < 2) throw new Error('データが空です');
+
+    const headers = rows[0].map(h => (h || '').trim());
+    const body = rows.slice(1);
+
+    const idx = {
+      date: findCol(headers, 'date'),
+      author: findCol(headers, 'author'),
+      rating: findCol(headers, 'rating'),
+      facility: findCol(headers, 'facility'),
+      body: findCol(headers, 'body'),
+      reply: findCol(headers, 'reply'),
+      url: findCol(headers, 'url')
+    };
+
+    // bodyが見つからなければ最長列を本文として採用
+    if(idx.body < 0){
+      let maxLen = 0, maxIdx = -1;
+      for(let c=0; c<headers.length; c++){
+        const len = body.reduce((s,r) => s + (r[c]||'').length, 0);
+        if(len > maxLen){ maxLen = len; maxIdx = c; }
+      }
+      idx.body = maxIdx;
+    }
+
+    allRows = body.map(r => ({
+      date: idx.date >= 0 ? r[idx.date] : '',
+      author: idx.author >= 0 ? r[idx.author] : '',
+      rating: idx.rating >= 0 ? extractStars(r[idx.rating]) : null,
+      facility: idx.facility >= 0 ? r[idx.facility] : '',
+      body: idx.body >= 0 ? r[idx.body] : '',
+      reply: idx.reply >= 0 ? r[idx.reply] : '',
+      url: idx.url >= 0 ? r[idx.url] : '',
+      _raw: r,
+      _headers: headers
+    }));
+
+    // 医院フィルターの選択肢を生成
+    const facilities = [...new Set(allRows.map(r => r.facility).filter(Boolean))].sort();
+    const facSel = document.getElementById('facility-filter');
+    facSel.innerHTML = '<option value="">医院：全て</option>' + facilities.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+
+    statusEl.style.display = 'none';
+    contentEl.style.display = 'block';
+    renderStats();
+    render();
+  } catch(e){
+    statusEl.innerHTML = `<div class="error"><b>読み込みに失敗しました</b><br>${escapeHtml(e.message)}<br><br>スプレッドシートの共有設定を <b>「リンクを知っている全員が閲覧可」</b> に変更してください。<br>または <code>ファイル > 共有 > ウェブに公開</code> を実行してください。</div>`;
+  } finally {
+    reloadBtn.disabled = false;
+  }
+}
+
+function escapeHtml(s){
+  return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+function renderStats(){
+  const total = allRows.length;
+  const rated = allRows.filter(r => r.rating);
+  const avg = rated.length ? (rated.reduce((s,r) => s+r.rating, 0) / rated.length) : 0;
+  const five = allRows.filter(r => r.rating === 5).length;
+  const low = allRows.filter(r => r.rating && r.rating <= 2).length;
+
+  const stars = avg ? '★'.repeat(Math.round(avg)) + '☆'.repeat(5-Math.round(avg)) : '';
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="stat-l">総件数</div><div class="stat-v">${total}<span class="unit">件</span></div></div>
+    <div class="stat"><div class="stat-l">平均評価</div><div class="stat-v">${avg ? avg.toFixed(2) : '—'} <span class="stars" style="font-size:13px">${stars}</span></div></div>
+    <div class="stat"><div class="stat-l">★5</div><div class="stat-v">${five}<span class="unit">件</span></div></div>
+    <div class="stat"><div class="stat-l">低評価（★1-2）</div><div class="stat-v" style="color:${low?'#b91c1c':'#111'}">${low}<span class="unit">件</span></div></div>
+  `;
+}
+
+function render(){
+  const q = document.getElementById('search').value.trim().toLowerCase();
+  const fac = document.getElementById('facility-filter').value;
+  const rat = document.getElementById('rating-filter').value;
+  const sort = document.getElementById('sort').value;
+
+  let rows = allRows.filter(r => {
+    if(fac && r.facility !== fac) return false;
+    if(rat && String(r.rating) !== rat) return false;
+    if(q){
+      const hay = (r.body + ' ' + r.author + ' ' + r.facility).toLowerCase();
+      if(!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  rows.sort((a,b) => {
+    if(sort === 'date-desc') return dateVal(b.date) - dateVal(a.date);
+    if(sort === 'date-asc') return dateVal(a.date) - dateVal(b.date);
+    if(sort === 'rating-desc') return (b.rating||0) - (a.rating||0);
+    if(sort === 'rating-asc') return (a.rating||0) - (b.rating||0);
+    return 0;
+  });
+
+  const list = document.getElementById('list');
+  if(!rows.length){
+    list.innerHTML = '<div style="text-align:center;padding:40px;color:#999;font-size:13px">該当する口コミがありません</div>';
+    return;
+  }
+  list.innerHTML = rows.map(r => {
+    const stars = r.rating ? '★'.repeat(r.rating) + '☆'.repeat(5-r.rating) : '';
+    return `
+    <div class="card">
+      <div class="card-head">
+        ${r.rating ? `<div class="rating">${stars}<span class="num">${r.rating}.0</span></div>` : ''}
+        ${r.author ? `<div class="author">${escapeHtml(r.author)}</div>` : ''}
+        ${r.facility ? `<span class="facility-tag">${escapeHtml(r.facility)}</span>` : ''}
+        ${r.date ? `<div class="date">${escapeHtml(formatDate(r.date))}</div>` : ''}
+      </div>
+      ${r.body ? `<div class="body">${escapeHtml(r.body)}</div>` : ''}
+      ${r.reply ? `<div class="meta"><div><b>返信:</b>${escapeHtml(r.reply)}</div></div>` : ''}
+      ${r.url ? `<div class="meta"><a href="${escapeHtml(r.url)}" target="_blank" style="color:#1d4ed8;text-decoration:none">元の投稿を見る →</a></div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+['search','facility-filter','rating-filter','sort'].forEach(id => {
+  document.getElementById(id).addEventListener('input', render);
+  document.getElementById(id).addEventListener('change', render);
+});
+
+loadData();
+</script>
+</body>
+</html>
