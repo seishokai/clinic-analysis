@@ -328,7 +328,7 @@ function render(){
       if(isRatingCol(h)) return `<td class="rating-cell">${formatRating(v)}</td>`;
       if(i === countColIdx) return `<td class="count-cell">${formatCount(v)}</td>`;
       if(isFacilityCol(h)){
-        const short = String(v).replace(/(歯科・矯正歯科|矯正歯科・歯科|歯科医院|歯科・矯正|矯正・歯科|歯科|矯正歯科)$/,'').trim();
+        const short = String(v).replace(/歯科・矯正歯科|矯正歯科・歯科|歯科医院|歯科・矯正|矯正・歯科|矯正歯科|歯科/g,'').trim();
         return `<td class="facility-cell">${linkify(short || v)}</td>`;
       }
       return `<td>${linkify(v)}</td>`;
