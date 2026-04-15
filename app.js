@@ -123,12 +123,45 @@ document.addEventListener('DOMContentLoaded', () => {
   // URL ?view=tc で TC専用ログイン
   const params = new URLSearchParams(location.search);
   if (params.get('view') === 'tc') {
-    sessionStorage.setItem('authenticated', 'true');
-    sessionStorage.setItem('role', 'tc');
-    userRole = 'tc';
-    promoFilter = '';
-    setupEventListeners();
-    showApp();
+    const proceed = () => {
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'tc');
+      userRole = 'tc';
+      promoFilter = '';
+      setupEventListeners();
+      showApp();
+    };
+    if (sessionStorage.getItem('tcPassed') === 'true') { proceed(); return; }
+    // 数字パスワードゲート (5858)
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:inherit';
+    ov.innerHTML = `
+      <div style="font-size:13px;font-weight:700;letter-spacing:2px;color:#111">SEISHOKAI / TC</div>
+      <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase">Enter Passcode</div>
+      <input id="tc-pass-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="off"
+        style="width:160px;text-align:center;font-size:28px;letter-spacing:12px;padding:12px;border:2px solid #111;border-radius:8px;outline:none;font-family:inherit">
+      <div id="tc-pass-err" style="font-size:11px;color:#c00;min-height:14px"></div>
+      <button id="tc-pass-btn" style="border:2px solid #111;background:#111;color:#fff;padding:8px 28px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit">OK</button>
+    `;
+    document.body.appendChild(ov);
+    const input = ov.querySelector('#tc-pass-input');
+    const err = ov.querySelector('#tc-pass-err');
+    const btn = ov.querySelector('#tc-pass-btn');
+    input.focus();
+    input.addEventListener('input', () => { input.value = input.value.replace(/\D/g, ''); err.textContent = ''; });
+    const submit = () => {
+      if (input.value === '5858') {
+        sessionStorage.setItem('tcPassed', 'true');
+        ov.remove();
+        proceed();
+      } else {
+        err.textContent = 'パスコードが違います';
+        input.value = '';
+        input.focus();
+      }
+    };
+    btn.addEventListener('click', submit);
+    input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     return;
   }
   if (sessionStorage.getItem('authenticated') === 'true') {
