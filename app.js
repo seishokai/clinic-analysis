@@ -584,6 +584,26 @@ function setupEventListeners() {
     });
     document.getElementById('rec-start')?.addEventListener('click', startRecording);
     document.getElementById('rec-stop')?.addEventListener('click', stopRecording);
+    document.getElementById('rec-file')?.addEventListener('change', e => {
+      const f = e.target.files[0];
+      const lbl = document.getElementById('rec-file-label');
+      const prev = document.getElementById('rec-file-preview');
+      if (!f) { lbl.textContent = 'クリックして選択 (m4a/mp3/wav/webm)'; prev.style.display = 'none'; return; }
+      const sizeMb = (f.size / 1024 / 1024).toFixed(1);
+      lbl.textContent = `${f.name} (${sizeMb} MB)`;
+      prev.src = URL.createObjectURL(f);
+      prev.style.display = 'block';
+      if (f.size > 50 * 1024 * 1024) {
+        document.getElementById('rec-status').innerHTML = '<span style="color:#c00">⚠ ファイルが50MBを超えています。Supabase Freeプランでは50MBまでです</span>';
+      } else {
+        document.getElementById('rec-status').textContent = '';
+      }
+      // 録音時間をmetadata loadedで自動推測
+      prev.addEventListener('loadedmetadata', () => {
+        const durEl = document.getElementById('rec-duration');
+        if (prev.duration && !durEl.value) durEl.value = Math.max(1, Math.round(prev.duration / 60));
+      }, { once: true });
+    });
   }
   document.getElementById('ad-filter-agency').addEventListener('change', renderAdBudgets);
   document.getElementById('ad-filter-month').addEventListener('change', renderAdBudgets);
@@ -4128,6 +4148,10 @@ async function saveRecording() {
     ['rec-patient','rec-url','rec-duration','rec-amount','rec-notes'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('rec-contracted').value = '0';
     document.getElementById('rec-file').value = '';
+    const fprev = document.getElementById('rec-file-preview');
+    if (fprev) { fprev.style.display = 'none'; fprev.src = ''; }
+    const flbl = document.getElementById('rec-file-label');
+    if (flbl) flbl.textContent = 'クリックして選択 (m4a/mp3/wav/webm)';
     const prev = document.getElementById('rec-preview');
     prev.style.display = 'none'; prev.src = '';
     recordedBlob = null; recordedChunks = [];
