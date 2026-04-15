@@ -4166,7 +4166,8 @@ async function startRecording() {
     const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
       : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
       : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
-    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    const opts = mimeType ? { mimeType, audioBitsPerSecond: 32000 } : { audioBitsPerSecond: 32000 };
+    mediaRecorder = new MediaRecorder(stream, opts);
     recordedChunks = [];
     recordedBlob = null;
     mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
