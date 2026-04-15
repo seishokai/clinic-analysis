@@ -583,11 +583,12 @@
     <!-- ==================== TC ==================== -->
     <main id="view-tc" class="view" hidden>
       <div class="sub-nav">
-        <button class="sub-nav-btn active" data-sub="rates">決定</button>
-        <button class="sub-nav-btn" data-sub="patients">初診管理</button>
-        <button class="sub-nav-btn" data-sub="competitors">競合調査</button>
-        <button class="sub-nav-btn" data-sub="reviews">口コミ</button>
+        <button class="sub-nav-btn active" data-sub="competitors">競合調査</button>
+        <button class="sub-nav-btn" data-sub="recordings">自医院録音</button>
         <button class="sub-nav-btn" data-sub="strategy">戦略ノート</button>
+        <button class="sub-nav-btn" data-sub="rates">決定</button>
+        <button class="sub-nav-btn" data-sub="reviews">口コミ</button>
+        <button class="sub-nav-btn" data-sub="patients" style="display:none">初診管理</button>
       </div>
       <div style="display:flex;gap:12px;padding:12px 24px;background:var(--card);border-bottom:1px solid var(--border);align-items:center;flex-wrap:wrap;position:sticky;top:56px;z-index:50" id="tc-filters">
         <div style="display:flex;gap:6px;align-items:center"><label class="form-label" style="margin:0;min-width:auto">年度</label><select class="form-select" id="tc-year" style="width:auto;padding:8px 12px;font-size:13px"><option value="all" selected>全期間</option><option value="2025">25期</option><option value="2024">24期</option><option value="2023">23期</option><option value="2022">22期</option><option value="2021">21期</option><option value="2020">20期</option></select></div>

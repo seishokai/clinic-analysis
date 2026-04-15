@@ -1594,7 +1594,7 @@ function renderBarChart(id, data) {
 
 // === Clinics (TC) ===
 async function loadClinics() {
-  try { const r = await fetch('data/clinics.json'); clinics = await r.json(); } catch { clinics = []; }
+  try { const r = await fetch('data/clinics.json?v=' + Date.now(), { cache: 'no-store' }); clinics = await r.json(); } catch { clinics = []; }
   // localStorageの追加医院をマージ
   const added = loadData('added-clinics', []);
   clinics = [...clinics, ...added];
