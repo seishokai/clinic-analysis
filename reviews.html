@@ -225,10 +225,29 @@ async function loadData(){
     const rows = parseCSV(text).filter(r => r.some(c => c && String(c).trim()));
     if(rows.length < 1) throw new Error('データが空です');
 
-    headers = rows[0].map(h => (h || '').trim());
-    allRows = rows.slice(1).map(r => {
+    const rawHeaders = rows[0].map(h => (h || '').trim());
+    const rawRows = rows.slice(1);
+
+    // 2026-01 以降のみ表示：日付/月っぽい列ヘッダーを判定し、2026-01より前は除外
+    const MIN_YM = '2026-01';
+    const keepIdx = rawHeaders.map((h, i) => {
+      const ym = extractYM(h);
+      if(ym && ym < MIN_YM) return false;
+      // M/D 形式（年なし）は今年扱い、2026年なら残す、2025年以前なら除外
+      const md = h.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
+      if(md){
+        // ヘッダーに年がない場合、列内の値から推定
+        const sampleVals = rawRows.map(r => r[i]).filter(Boolean);
+        const sampleYM = sampleVals.map(v => extractYM(v)).find(Boolean);
+        if(sampleYM && sampleYM < MIN_YM) return false;
+      }
+      return true;
+    });
+
+    headers = rawHeaders.filter((_, i) => keepIdx[i]);
+    allRows = rawRows.map(r => {
       const obj = {};
-      headers.forEach((h, i) => obj[h] = r[i] || '');
+      rawHeaders.forEach((h, i) => { if(keepIdx[i]) obj[h] = r[i] || ''; });
       return obj;
     });
 
