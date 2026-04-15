@@ -320,6 +320,7 @@ function setupEventListeners() {
       if (sub === 'bk-apply' && bookingsData.length > 0) renderApplyAnalysis('today');
       if (sub === 'bk-bf') { if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); } }
       if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
+      if (sub === 'recordings') renderRecordings();
     });
   });
 
@@ -571,6 +572,17 @@ function setupEventListeners() {
   // Ad Budget
   document.getElementById('ad-save').addEventListener('click', saveAdBudget);
   document.getElementById('ad-add-facility').addEventListener('click', () => addAdFacilityRow());
+
+  // 自医院録音
+  const recSaveBtn = document.getElementById('rec-save');
+  if (recSaveBtn) {
+    recSaveBtn.addEventListener('click', saveRecording);
+    const today = new Date();
+    document.getElementById('rec-date').value = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+    ['rec-filter-counselor','rec-filter-facility','rec-filter-contract'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', renderRecordings);
+    });
+  }
   document.getElementById('ad-filter-agency').addEventListener('change', renderAdBudgets);
   document.getElementById('ad-filter-month').addEventListener('change', renderAdBudgets);
   document.getElementById('ad-month').value = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`;
@@ -4039,6 +4051,137 @@ async function renderAdBudgets() {
       </div>
     `;
   }).join('');
+}
+
+// === 自医院録音 (Phase 1: localStorage) ===
+function getRecordings() { return loadData('self-recordings', []); }
+function setRecordings(arr) { saveData('self-recordings', arr); }
+
+function saveRecording() {
+  const date = document.getElementById('rec-date').value;
+  const counselor = document.getElementById('rec-counselor').value.trim();
+  const facility = document.getElementById('rec-facility').value;
+  const patient = document.getElementById('rec-patient').value.trim();
+  const service = document.getElementById('rec-service').value;
+  const url = document.getElementById('rec-url').value.trim();
+  const duration = Number(document.getElementById('rec-duration').value) || 0;
+  const contracted = document.getElementById('rec-contracted').value === '1';
+  const amount = Number(document.getElementById('rec-amount').value) || 0;
+  const notes = document.getElementById('rec-notes').value.trim();
+  if (!date || !counselor) { showToast('日付とカウンセラーを入力してください', true); return; }
+
+  const recs = getRecordings();
+  recs.push({
+    id: Date.now(),
+    createdAt: new Date().toISOString(),
+    date, counselor, facility, patient, service, url, duration,
+    contracted, amount, notes,
+    aiTranscript: '', aiAdvice: '', aiScore: null
+  });
+  setRecordings(recs);
+  ['rec-patient','rec-url','rec-duration','rec-amount','rec-notes'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('rec-contracted').value = '0';
+  showToast('録音情報を登録しました');
+  renderRecordings();
+}
+
+function deleteRecording(id) {
+  if (!confirm('この録音記録を削除しますか？')) return;
+  setRecordings(getRecordings().filter(r => r.id !== id));
+  showToast('削除しました');
+  renderRecordings();
+}
+
+function openRecordingDetail(id) {
+  const r = getRecordings().find(x => x.id === id);
+  if (!r) return;
+  const body = document.getElementById('rec-detail-body');
+  body.innerHTML = `
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">${r.patient || '（患者名なし）'} 様 / ${r.facility}</h3>
+    <div style="font-size:12px;color:var(--text-sub);margin-bottom:16px">${r.date} ・ ${r.counselor} ・ ${r.service} ・ ${r.duration}分</div>
+    <div style="display:flex;gap:16px;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px">
+      <div><span style="font-size:11px;color:var(--text-sub)">成約</span><div style="font-size:16px;font-weight:700;color:${r.contracted?'#0a0':'#999'}">${r.contracted?'✓ 成約':'未成約'}</div></div>
+      <div><span style="font-size:11px;color:var(--text-sub)">金額</span><div style="font-size:16px;font-weight:700">¥${fmt(r.amount)}</div></div>
+      ${r.aiScore!=null?`<div><span style="font-size:11px;color:var(--text-sub)">AI評価</span><div style="font-size:16px;font-weight:700">${r.aiScore}/100</div></div>`:''}
+    </div>
+    ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><a href="${r.url}" target="_blank" style="font-size:13px;color:#0066cc;word-break:break-all">${r.url}</a></div>` : ''}
+    <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">要点・メモ</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.notes || '(なし)'}</div></div>
+    ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:12px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:6px">AI アドバイス</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.aiAdvice}</div></div>` : '<div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--text-muted)">AI 分析は Phase 3 で対応予定</div>'}
+    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-outline" onclick="deleteRecording(${r.id});document.getElementById('rec-detail-modal').hidden=true" style="color:#c00;border-color:#c00">削除</button><button class="btn btn-outline" onclick="document.getElementById('rec-detail-modal').hidden=true">閉じる</button></div>
+  `;
+  document.getElementById('rec-detail-modal').hidden = false;
+}
+
+function renderRecordings() {
+  const recs = getRecordings();
+
+  // フィルター値
+  const fc = document.getElementById('rec-filter-counselor')?.value || '';
+  const ff = document.getElementById('rec-filter-facility')?.value || '';
+  const fk = document.getElementById('rec-filter-contract')?.value || '';
+  let filtered = recs.slice();
+  if (fc) filtered = filtered.filter(r => r.counselor === fc);
+  if (ff) filtered = filtered.filter(r => r.facility === ff);
+  if (fk !== '') filtered = filtered.filter(r => String(r.contracted ? 1 : 0) === fk);
+
+  // フィルター選択肢
+  const counselors = [...new Set(recs.map(r => r.counselor))].sort();
+  const facilities = [...new Set(recs.map(r => r.facility))].sort();
+  const fcEl = document.getElementById('rec-filter-counselor');
+  const ffEl = document.getElementById('rec-filter-facility');
+  if (fcEl) fcEl.innerHTML = '<option value="">カウンセラー:全て</option>' + counselors.map(c => `<option ${c===fc?'selected':''}>${c}</option>`).join('');
+  if (ffEl) ffEl.innerHTML = '<option value="">医院:全て</option>' + facilities.map(f => `<option ${f===ff?'selected':''}>${f}</option>`).join('');
+
+  // 統計
+  const total = filtered.length;
+  const contracted = filtered.filter(r => r.contracted).length;
+  const rate = total ? (contracted / total * 100).toFixed(1) : '0.0';
+  const totalAmount = filtered.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const avgAmount = contracted ? Math.round(totalAmount / contracted) : 0;
+  document.getElementById('rec-stats').innerHTML = `
+    <div class="stat-card"><span class="stat-label">件数</span><span class="stat-num">${total}</span></div>
+    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num">${contracted}</span></div>
+    <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num">${rate}%</span></div>
+    <div class="stat-card"><span class="stat-label">合計金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
+    <div class="stat-card"><span class="stat-label">平均成約額</span><span class="stat-num">¥${fmt(avgAmount)}</span></div>
+  `;
+
+  // カウンセラー別
+  const byC = {};
+  filtered.forEach(r => {
+    if (!byC[r.counselor]) byC[r.counselor] = { count: 0, contracted: 0, amount: 0 };
+    byC[r.counselor].count++;
+    if (r.contracted) byC[r.counselor].contracted++;
+    byC[r.counselor].amount += Number(r.amount || 0);
+  });
+  const cRows = Object.entries(byC).sort((a, b) => b[1].contracted - a[1].contracted).map(([name, d]) => `
+    <tr>
+      <td style="font-weight:600">${name}</td>
+      <td>${d.count}</td>
+      <td>${d.contracted}</td>
+      <td>${d.count ? (d.contracted / d.count * 100).toFixed(1) : '0.0'}%</td>
+      <td>¥${fmt(d.amount)}</td>
+      <td>¥${fmt(d.contracted ? Math.round(d.amount / d.contracted) : 0)}</td>
+    </tr>`).join('');
+  document.querySelector('#rec-counselor-table tbody').innerHTML = cRows || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:12px">データなし</td></tr>';
+
+  // 一覧
+  const listRows = filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => `
+    <tr style="cursor:pointer" onclick="openRecordingDetail(${r.id})">
+      <td style="white-space:nowrap">${r.date}</td>
+      <td>${r.counselor}</td>
+      <td>${r.facility}</td>
+      <td>${r.patient || '-'}</td>
+      <td>${r.service}</td>
+      <td>${r.duration ? r.duration + '分' : '-'}</td>
+      <td>${r.contracted ? '<span style="color:#0a0;font-weight:700">✓</span>' : '<span style="color:#999">-</span>'}</td>
+      <td>¥${fmt(r.amount)}</td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(r.notes || '').substring(0, 40)}</td>
+      <td>${r.url ? '🎧' : '-'}</td>
+      <td>${r.aiScore != null ? r.aiScore : '-'}</td>
+      <td onclick="event.stopPropagation();deleteRecording(${r.id})" style="cursor:pointer;color:#c00">×</td>
+    </tr>`).join('');
+  document.querySelector('#rec-list-table tbody').innerHTML = listRows || '<tr><td colspan="12" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
 }
 
 // === Reviews ===
