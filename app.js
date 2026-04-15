@@ -90,6 +90,7 @@ function getApplyDateStr(d) {
 // === Config ===
 const CORRECT_PASSWORD = 'Edoyadepon1';
 const BOOKING_PASSWORD = 'Edoyadepon1@';
+const TC_PASSWORD = 'TcEdoyadepon1';
 // プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
 const PROMO_PASSWORDS = {
   'hikaru': 'hikaru',
@@ -119,6 +120,17 @@ function saveData(key, data) { localStorage.setItem(key, JSON.stringify(data)); 
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
+  // URL ?view=tc で TC専用ログイン
+  const params = new URLSearchParams(location.search);
+  if (params.get('view') === 'tc') {
+    sessionStorage.setItem('authenticated', 'true');
+    sessionStorage.setItem('role', 'tc');
+    userRole = 'tc';
+    promoFilter = '';
+    setupEventListeners();
+    showApp();
+    return;
+  }
   if (sessionStorage.getItem('authenticated') === 'true') {
     userRole = sessionStorage.getItem('role') || 'admin';
     promoFilter = sessionStorage.getItem('promoFilter') || '';
@@ -167,6 +179,16 @@ function setupEventListeners() {
       sessionStorage.setItem('authenticated', 'true');
       sessionStorage.setItem('role', 'sales');
       userRole = 'sales';
+      promoFilter = '';
+      loginBtn.textContent = 'ログイン';
+      loginBtn.disabled = false;
+      showApp();
+      return;
+    } else if (pw === TC_PASSWORD) {
+      document.getElementById('password').value = '';
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'tc');
+      userRole = 'tc';
       promoFilter = '';
       loginBtn.textContent = 'ログイン';
       loginBtn.disabled = false;
@@ -955,6 +977,18 @@ function showApp() {
       b.style.display = b.dataset.view === 'sales' ? '' : 'none';
     });
     switchView('sales');
+    return;
+  }
+  if (userRole === 'tc') {
+    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
+      b.style.display = b.dataset.view === 'tc' ? '' : 'none';
+    });
+    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+      b.style.display = b.dataset.view === 'tc' ? '' : 'none';
+    });
+    switchView('tc');
+    seedConsultationData();
+    loadClinics();
     return;
   }
   // 管理者(予約管理): 売上タブを非表示
