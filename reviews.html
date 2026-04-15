@@ -155,6 +155,32 @@ function parseCSV(text){
 function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
+// 医院名の略称マッピング（原文に含まれるキーワード → 表示名）
+const CLINIC_ALIAS = [
+  ['エルエル','エルエル'],['岡崎エルエル','エルエル'],
+  ['茶屋','茶屋'],
+  ['アール','アール'],
+  ['知立','知立'],
+  ['エスカ','エスカ'],
+  ['ウィズ','ウィズ'],['ウイズ','ウィズ'],
+  ['ルミナス','ルミナス'],
+  ['小牧','小牧'],
+  ['みなみ','みなみ'],
+  ['あおい','あおい'],
+  ['さくらい','さくらい'],['安城さくらい','さくらい'],
+  ['大森','大森'],
+  ['京都','京都'],
+  ['銀座','銀座'],['BF銀座','銀座'],
+  ['八事','八事'],
+  ['アサノ','アサノ'],['あさの','アサノ']
+];
+function shortClinic(s){
+  const src = String(s||'');
+  for(const [key, label] of CLINIC_ALIAS){
+    if(src.includes(key)) return label;
+  }
+  return src.replace(/歯科・矯正歯科|矯正歯科・歯科|歯科・矯正|矯正・歯科|歯科医院|矯正歯科|歯科/g,'').replace(/\s+/g,' ').trim();
+}
 function stripDental(s){
   return String(s||'').replace(/歯科・矯正歯科|矯正歯科・歯科|歯科・矯正|矯正・歯科|歯科医院|矯正歯科|歯科/g,'').replace(/\s+/g,' ').trim();
 }
@@ -332,10 +358,10 @@ function render(){
       const v = r[h] || '';
       if(isRatingCol(h)) return `<td class="rating-cell">${formatRating(v)}</td>`;
       if(i === countColIdx) return `<td class="count-cell">${formatCount(v)}</td>`;
-      const vs = stripDental(v);
       if(isFacilityCol(h)){
-        return `<td class="facility-cell">${linkify(vs || v)}</td>`;
+        return `<td class="facility-cell">${linkify(shortClinic(v))}</td>`;
       }
+      const vs = stripDental(v);
       return `<td>${linkify(vs || v)}</td>`;
     }).join('') + '</tr>';
   }).join('');
