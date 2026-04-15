@@ -226,32 +226,83 @@ async function loadData(){
     const rows = parseCSV(text).filter(r => r.some(c => c && String(c).trim()));
     if(rows.length < 1) throw new Error('データが空です');
 
-    const rawHeaders = rows[0].map(h => (h || '').trim());
-    const rawRows = rows.slice(1);
+    // 複数ヘッダ行対応：1〜3行目をスキャンしてキーワードで列種別を決定
+    const headRows = rows.slice(0, Math.min(3, rows.length));
+    const dataStart = headRows.length;
+    const numCols = Math.max(...headRows.map(r => r.length));
 
-    // 2026-01 以降のみ表示：日付/月っぽい列ヘッダーを判定し、2026-01より前は除外
-    const MIN_YM = '2026-01';
-    const keepIdx = rawHeaders.map((h, i) => {
-      const ym = extractYM(h);
-      if(ym && ym < MIN_YM) return false;
-      // M/D 形式（年なし）は今年扱い、2026年なら残す、2025年以前なら除外
-      const md = h.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
-      if(md){
-        // ヘッダーに年がない場合、列内の値から推定
-        const sampleVals = rawRows.map(r => r[i]).filter(Boolean);
-        const sampleYM = sampleVals.map(v => extractYM(v)).find(Boolean);
-        if(sampleYM && sampleYM < MIN_YM) return false;
+    // 各列の全ヘッダーテキストを連結
+    const colText = Array.from({length: numCols}, (_, c) =>
+      headRows.map(r => (r[c]||'').trim()).join(' ').trim()
+    );
+
+    // 医院名の列 = 値に医院名/歯科/矯正が多く含まれる列
+    let facilityIdx = colText.findIndex(t => /医院|医院名|院名|店舗|clinic|facility/i.test(t));
+    if(facilityIdx < 0){
+      // 値ベースで判定
+      for(let c = 0; c < numCols; c++){
+        const vals = rows.slice(dataStart).map(r => r[c]||'');
+        const clinicHits = vals.filter(v => CLINIC_ALIAS.some(([k]) => String(v).includes(k)) || /歯科|矯正/.test(v)).length;
+        if(clinicHits > vals.length * 0.3){ facilityIdx = c; break; }
       }
-      return true;
-    });
+    }
 
-    headers = rawHeaders.filter((_, i) => keepIdx[i]);
-    allRows = rawRows.map(r => {
-      const obj = {};
-      rawHeaders.forEach((h, i) => { if(keepIdx[i]) obj[h] = r[i] || ''; });
-      return obj;
-    });
+    // 平均点列 = ヘッダーに「平均」or 値が 1-5 の小数
+    const ratingCols = [];
+    for(let c = 0; c < numCols; c++){
+      if(c === facilityIdx) continue;
+      if(/平均|評価|rating|スコア|score/i.test(colText[c])){ ratingCols.push(c); continue; }
+      // 値ベース：1〜5の小数が多い
+      const vals = rows.slice(dataStart).map(r => parseFloat(String(r[c]||'').replace(/[^\d.-]/g,''))).filter(n => !isNaN(n));
+      if(vals.length >= 3){
+        const inRange = vals.filter(n => n >= 1 && n <= 5).length;
+        if(inRange / vals.length > 0.8 && vals.some(n => n % 1 !== 0)) ratingCols.push(c);
+      }
+    }
 
+    // 投稿数列 = ヘッダーに「投稿」「件数」
+    const countCols = [];
+    for(let c = 0; c < numCols; c++){
+      if(c === facilityIdx || ratingCols.includes(c)) continue;
+      if(/投稿|件数|口コミ数|レビュー数|count|total/i.test(colText[c])) countCols.push(c);
+    }
+
+    // 各行を集計：医院名 / 平均点(全ratingCols平均) / 投稿数合計
+    const aggregated = [];
+    for(let r = dataStart; r < rows.length; r++){
+      const row = rows[r];
+      const fac = facilityIdx >= 0 ? (row[facilityIdx]||'').trim() : '';
+      if(!fac) continue;
+      const ratings = ratingCols.map(c => parseFloat(String(row[c]||'').replace(/[^\d.-]/g,''))).filter(n => !isNaN(n) && n >= 1 && n <= 5);
+      const avg = ratings.length ? ratings.reduce((s,n)=>s+n,0)/ratings.length : null;
+      const counts = countCols.map(c => parseFloat(String(row[c]||'').replace(/[^\d.-]/g,''))).filter(n => !isNaN(n));
+      const totalCount = counts.reduce((s,n)=>s+n,0);
+      aggregated.push({ 医院名: fac, 平均点: avg, 投稿数: totalCount });
+    }
+
+    headers = ['医院名', '平均点', '投稿数'];
+    allRows = aggregated.map(a => ({
+      '医院名': a.医院名,
+      '平均点': a.平均点 != null ? a.平均点.toFixed(2) : '',
+      '投稿数': a.投稿数 || ''
+    }));
+
+    // 月フィルター非表示（シンプル化後は不要）
+    document.getElementById('month-filter').style.display = 'none';
+    // 以下旧ロジック（日付列フィルター）は使用しない
+    /* noop */
+    return _finish();
+
+    function _finish(){
+      sortCol = headers.indexOf('平均点');
+      sortDir = -1;
+      countColIdx = headers.indexOf('投稿数');
+      maxCount = Math.max(0, ...allRows.map(r => parseFloat(r['投稿数'])||0));
+      document.getElementById('status').style.display = 'none';
+      document.getElementById('content').style.display = 'block';
+      renderHead();
+      render();
+    }
     // 日付列を特定 → 月フィルター
     dateColIdx = headers.findIndex(h => /日付|日時|date|timestamp|タイムスタンプ|投稿日|月/i.test(h));
     if(dateColIdx < 0){
