@@ -605,12 +605,26 @@
             <div class="form-group"><label class="form-label">医院</label><select class="form-select" id="rec-facility"><option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>大森</option><option>京都</option></select></div>
             <div class="form-group"><label class="form-label">患者 (イニシャル可)</label><input type="text" class="form-input" id="rec-patient" placeholder="例: T.K"></div>
             <div class="form-group"><label class="form-label">相談内容</label><select class="form-select" id="rec-service"><option>インビザ</option><option>ワイヤー</option><option>BF</option><option>ラブリエ</option><option>インプラント</option><option>その他</option></select></div>
-            <div class="form-group"><label class="form-label">録音URL (Drive等)</label><input type="url" class="form-input" id="rec-url" placeholder="https://drive.google.com/..."></div>
             <div class="form-group"><label class="form-label">録音時間(分)</label><input type="number" class="form-input" id="rec-duration" placeholder="60"></div>
             <div class="form-group"><label class="form-label">成約</label><select class="form-select" id="rec-contracted"><option value="0">未成約</option><option value="1">成約</option></select></div>
             <div class="form-group"><label class="form-label">金額</label><input type="number" class="form-input" id="rec-amount" placeholder="0"></div>
           </div>
           <div class="form-group" style="margin-top:12px"><label class="form-label">要点・メモ</label><textarea class="form-input" id="rec-notes" rows="3" placeholder="カウンセリングの要点、患者の反応、課題など..." style="resize:vertical"></textarea></div>
+          <div style="margin-top:16px;padding:12px;border:1.5px dashed var(--border);border-radius:8px">
+            <div style="font-size:12px;font-weight:600;margin-bottom:8px">🎙 録音</div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+              <button type="button" class="btn btn-dark" id="rec-start" style="padding:6px 14px;font-size:12px">● 録音開始</button>
+              <button type="button" class="btn btn-outline" id="rec-stop" style="padding:6px 14px;font-size:12px" disabled>■ 停止</button>
+              <span id="rec-timer" style="font-family:'Cormorant Garamond',serif;font-size:18px;font-weight:600">00:00</span>
+              <span id="rec-status" style="font-size:11px;color:var(--text-sub)"></span>
+            </div>
+            <audio id="rec-preview" controls style="width:100%;margin-top:8px;display:none"></audio>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:8px">
+              <label class="form-label" style="margin:0;font-size:11px">または ファイル</label>
+              <input type="file" id="rec-file" accept="audio/*" style="font-size:11px">
+              <input type="url" class="form-input" id="rec-url" placeholder="または URL (Drive等)" style="flex:1;min-width:180px;font-size:12px;padding:4px 8px">
+            </div>
+          </div>
           <div class="form-actions" style="margin-top:12px"><button class="btn btn-dark" id="rec-save">登録</button></div>
         </div>
         <div class="card" style="margin-bottom:20px">

@@ -582,6 +582,8 @@ function setupEventListeners() {
     ['rec-filter-counselor','rec-filter-facility','rec-filter-contract'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', renderRecordings);
     });
+    document.getElementById('rec-start')?.addEventListener('click', startRecording);
+    document.getElementById('rec-stop')?.addEventListener('click', stopRecording);
   }
   document.getElementById('ad-filter-agency').addEventListener('change', renderAdBudgets);
   document.getElementById('ad-filter-month').addEventListener('change', renderAdBudgets);
@@ -4053,47 +4055,158 @@ async function renderAdBudgets() {
   }).join('');
 }
 
-// === 自医院録音 (Phase 1: localStorage) ===
-function getRecordings() { return loadData('self-recordings', []); }
-function setRecordings(arr) { saveData('self-recordings', arr); }
+// === 自医院録音 (Supabase + MediaRecorder) ===
+let recordingsCache = [];
+let mediaRecorder = null;
+let recordedChunks = [];
+let recordedBlob = null;
+let recTimerInterval = null;
+let recStartTime = 0;
 
-function saveRecording() {
+async function fetchRecordings() {
+  try {
+    const { data, error } = await sb.from('self_recordings').select('*').order('session_date', { ascending: false }).order('id', { ascending: false });
+    if (error) throw error;
+    recordingsCache = (data || []).map(r => ({
+      id: r.id, createdAt: r.created_at,
+      date: r.session_date, counselor: r.counselor, facility: r.facility,
+      patient: r.patient, service: r.service, url: r.url, duration: r.duration,
+      contracted: r.contracted, amount: r.amount, notes: r.notes,
+      aiTranscript: r.ai_transcript, aiAdvice: r.ai_advice, aiScore: r.ai_score
+    }));
+  } catch (e) {
+    console.warn('recordings fetch error', e);
+    recordingsCache = loadData('self-recordings', []);
+  }
+  return recordingsCache;
+}
+
+async function uploadRecordingBlob(blob) {
+  const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp4') ? 'm4a' : blob.type.includes('wav') ? 'wav' : 'webm';
+  const fileName = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
+  const { error } = await sb.storage.from('recordings').upload(fileName, blob, { contentType: blob.type, upsert: false });
+  if (error) throw error;
+  const { data: pub } = sb.storage.from('recordings').getPublicUrl(fileName);
+  return pub.publicUrl;
+}
+
+async function saveRecording() {
   const date = document.getElementById('rec-date').value;
   const counselor = document.getElementById('rec-counselor').value.trim();
   const facility = document.getElementById('rec-facility').value;
   const patient = document.getElementById('rec-patient').value.trim();
   const service = document.getElementById('rec-service').value;
-  const url = document.getElementById('rec-url').value.trim();
+  let url = document.getElementById('rec-url').value.trim();
   const duration = Number(document.getElementById('rec-duration').value) || 0;
   const contracted = document.getElementById('rec-contracted').value === '1';
   const amount = Number(document.getElementById('rec-amount').value) || 0;
   const notes = document.getElementById('rec-notes').value.trim();
+  const file = document.getElementById('rec-file').files[0];
   if (!date || !counselor) { showToast('日付とカウンセラーを入力してください', true); return; }
 
-  const recs = getRecordings();
-  recs.push({
-    id: Date.now(),
-    createdAt: new Date().toISOString(),
-    date, counselor, facility, patient, service, url, duration,
-    contracted, amount, notes,
-    aiTranscript: '', aiAdvice: '', aiScore: null
-  });
-  setRecordings(recs);
-  ['rec-patient','rec-url','rec-duration','rec-amount','rec-notes'].forEach(id => document.getElementById(id).value = '');
-  document.getElementById('rec-contracted').value = '0';
-  showToast('録音情報を登録しました');
-  renderRecordings();
+  const saveBtn = document.getElementById('rec-save');
+  saveBtn.disabled = true; saveBtn.textContent = '保存中...';
+  document.getElementById('rec-status').textContent = '';
+
+  try {
+    // 録音blob優先、次にfile、次にurl
+    if (recordedBlob) {
+      document.getElementById('rec-status').textContent = '録音をアップロード中...';
+      url = await uploadRecordingBlob(recordedBlob);
+    } else if (file) {
+      document.getElementById('rec-status').textContent = 'ファイルをアップロード中...';
+      url = await uploadRecordingBlob(file);
+    }
+
+    const { error } = await sb.from('self_recordings').insert({
+      session_date: date, counselor, facility, patient, service, url,
+      duration, contracted, amount, notes
+    });
+    if (error) throw error;
+
+    // リセット
+    ['rec-patient','rec-url','rec-duration','rec-amount','rec-notes'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('rec-contracted').value = '0';
+    document.getElementById('rec-file').value = '';
+    const prev = document.getElementById('rec-preview');
+    prev.style.display = 'none'; prev.src = '';
+    recordedBlob = null; recordedChunks = [];
+    document.getElementById('rec-timer').textContent = '00:00';
+    document.getElementById('rec-status').textContent = '';
+    showToast('録音情報を登録しました');
+    await renderRecordings();
+  } catch (e) {
+    console.error(e);
+    showToast('保存エラー: ' + (e.message || ''), true);
+    document.getElementById('rec-status').textContent = '';
+  } finally {
+    saveBtn.disabled = false; saveBtn.textContent = '登録';
+  }
 }
 
-function deleteRecording(id) {
+async function deleteRecording(id) {
   if (!confirm('この録音記録を削除しますか？')) return;
-  setRecordings(getRecordings().filter(r => r.id !== id));
+  const rec = recordingsCache.find(r => r.id === id);
+  await sb.from('self_recordings').delete().eq('id', id);
+  // Storageからも削除 (URLに /recordings/ が含まれる場合)
+  if (rec && rec.url && rec.url.includes('/recordings/')) {
+    try {
+      const fileName = rec.url.split('/recordings/')[1].split('?')[0];
+      await sb.storage.from('recordings').remove([fileName]);
+    } catch(e) { console.warn('storage delete skipped', e); }
+  }
   showToast('削除しました');
   renderRecordings();
 }
 
+// === ブラウザ録音 ===
+async function startRecording() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mimeType = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+      : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+      : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+    mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+    recordedChunks = [];
+    recordedBlob = null;
+    mediaRecorder.ondataavailable = e => { if (e.data.size > 0) recordedChunks.push(e.data); };
+    mediaRecorder.onstop = () => {
+      recordedBlob = new Blob(recordedChunks, { type: mediaRecorder.mimeType || 'audio/webm' });
+      const prev = document.getElementById('rec-preview');
+      prev.src = URL.createObjectURL(recordedBlob);
+      prev.style.display = 'block';
+      stream.getTracks().forEach(t => t.stop());
+      // duration自動入力 (分)
+      const mins = Math.max(1, Math.round((Date.now() - recStartTime) / 60000));
+      const durEl = document.getElementById('rec-duration');
+      if (!durEl.value) durEl.value = mins;
+      document.getElementById('rec-status').textContent = `録音完了 (${mins}分) — 保存時にアップロード`;
+    };
+    mediaRecorder.start();
+    recStartTime = Date.now();
+    document.getElementById('rec-start').disabled = true;
+    document.getElementById('rec-stop').disabled = false;
+    document.getElementById('rec-status').textContent = '🔴 録音中...';
+    recTimerInterval = setInterval(() => {
+      const s = Math.floor((Date.now() - recStartTime) / 1000);
+      const mm = String(Math.floor(s / 60)).padStart(2, '0');
+      const ss = String(s % 60).padStart(2, '0');
+      document.getElementById('rec-timer').textContent = `${mm}:${ss}`;
+    }, 1000);
+  } catch (e) {
+    showToast('マイクアクセスが拒否されました: ' + e.message, true);
+  }
+}
+
+function stopRecording() {
+  if (mediaRecorder && mediaRecorder.state !== 'inactive') mediaRecorder.stop();
+  clearInterval(recTimerInterval);
+  document.getElementById('rec-start').disabled = false;
+  document.getElementById('rec-stop').disabled = true;
+}
+
 function openRecordingDetail(id) {
-  const r = getRecordings().find(x => x.id === id);
+  const r = recordingsCache.find(x => x.id === id);
   if (!r) return;
   const body = document.getElementById('rec-detail-body');
   body.innerHTML = `
@@ -4104,7 +4217,7 @@ function openRecordingDetail(id) {
       <div><span style="font-size:11px;color:var(--text-sub)">金額</span><div style="font-size:16px;font-weight:700">¥${fmt(r.amount)}</div></div>
       ${r.aiScore!=null?`<div><span style="font-size:11px;color:var(--text-sub)">AI評価</span><div style="font-size:16px;font-weight:700">${r.aiScore}/100</div></div>`:''}
     </div>
-    ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><a href="${r.url}" target="_blank" style="font-size:13px;color:#0066cc;word-break:break-all">${r.url}</a></div>` : ''}
+    ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><audio controls src="${r.url}" style="width:100%;margin-bottom:4px"></audio><a href="${r.url}" target="_blank" style="font-size:11px;color:#0066cc;word-break:break-all">別タブで開く</a></div>` : ''}
     <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">要点・メモ</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.notes || '(なし)'}</div></div>
     ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:12px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:6px">AI アドバイス</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.aiAdvice}</div></div>` : '<div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--text-muted)">AI 分析は Phase 3 で対応予定</div>'}
     <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-outline" onclick="deleteRecording(${r.id});document.getElementById('rec-detail-modal').hidden=true" style="color:#c00;border-color:#c00">削除</button><button class="btn btn-outline" onclick="document.getElementById('rec-detail-modal').hidden=true">閉じる</button></div>
@@ -4112,8 +4225,8 @@ function openRecordingDetail(id) {
   document.getElementById('rec-detail-modal').hidden = false;
 }
 
-function renderRecordings() {
-  const recs = getRecordings();
+async function renderRecordings() {
+  const recs = await fetchRecordings();
 
   // フィルター値
   const fc = document.getElementById('rec-filter-counselor')?.value || '';
