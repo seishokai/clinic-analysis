@@ -21,49 +21,38 @@ button{cursor:pointer;font-family:inherit;border:none;background:none}
 #reload-btn{border:1.5px solid #111;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;background:#111;color:#fff}
 #reload-btn:disabled{opacity:0.5;cursor:wait}
 
-#container{max-width:1200px;margin:0 auto;padding:20px 18px 60px}
+#container{max-width:1400px;margin:0 auto;padding:16px 14px 60px}
 
-.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .search-box{flex:1;min-width:220px;position:relative}
-.search-box input{width:100%;padding:10px 14px 10px 38px;border:1.5px solid #e5e5e5;border-radius:10px;font-size:14px;background:#fff;font-family:inherit}
+.search-box input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;background:#fff;font-family:inherit}
 .search-box input:focus{outline:none;border-color:#111}
-.search-box::before{content:'🔍';position:absolute;left:12px;top:50%;transform:translateY(-50%);opacity:0.5;font-size:14px}
-.filter-chip{padding:8px 14px;border:1.5px solid #e5e5e5;border-radius:20px;background:#fff;font-size:12px;font-weight:600;color:#555;white-space:nowrap}
-.filter-chip.active{background:#111;color:#fff;border-color:#111}
-select.filter-chip{-webkit-appearance:none;appearance:none;padding-right:28px;background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path fill='%23666' d='M5 6L0 0h10z'/></svg>");background-repeat:no-repeat;background-position:right 10px center}
-
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-bottom:18px}
-.stat{background:#fff;border:1px solid #ececec;border-radius:12px;padding:12px 16px}
-.stat-l{font-size:11px;color:#888;font-weight:600;letter-spacing:0.04em;margin-bottom:4px}
-.stat-v{font-size:22px;font-weight:800;letter-spacing:-0.02em}
-.stat-v .unit{font-size:12px;color:#888;margin-left:2px;font-weight:600}
-.stars{color:#f5a623;font-size:16px;letter-spacing:1px;font-weight:700}
+.search-box::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.5;font-size:13px}
+.count-badge{padding:6px 12px;background:#111;color:#fff;border-radius:6px;font-size:12px;font-weight:700}
 
 #status{text-align:center;padding:60px 20px;color:#999;font-size:14px}
 .error{color:#b91c1c;background:#fff0f0;border:1px solid #fecaca;padding:14px 18px;border-radius:10px;margin-bottom:18px;font-size:13px;line-height:1.6}
-.error b{color:#991b1b}
-.error code{background:#fff;padding:2px 6px;border-radius:4px;font-size:12px;font-family:monospace}
 
-.list{display:flex;flex-direction:column;gap:10px}
-.card{background:#fff;border:1px solid #ececec;border-radius:12px;padding:16px 18px;transition:box-shadow .15s,border-color .15s}
-.card:hover{border-color:#ccc;box-shadow:0 2px 10px rgba(0,0,0,0.04)}
-.card-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:8px}
-.rating{color:#f5a623;font-size:15px;letter-spacing:1px;font-weight:700}
-.rating .num{color:#111;margin-left:4px;font-size:13px;font-weight:700}
-.author{font-size:13px;font-weight:700;color:#111}
-.date{font-size:11px;color:#999;margin-left:auto}
-.facility-tag{display:inline-block;padding:3px 9px;background:#f3f4f6;border-radius:20px;font-size:11px;font-weight:600;color:#555}
-.body{font-size:14px;line-height:1.75;color:#333;white-space:pre-wrap;word-wrap:break-word}
-.meta{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;padding-top:10px;border-top:1px solid #f0f0f0;font-size:11px;color:#888}
-.meta b{color:#555;margin-right:4px}
+.table-wrap{background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:auto;max-height:calc(100vh - 180px)}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+thead th{background:#f9f9f9;position:sticky;top:0;z-index:5;border-bottom:2px solid #111;padding:10px 12px;font-weight:700;text-align:left;white-space:nowrap;cursor:pointer;user-select:none;color:#111}
+thead th:hover{background:#f0f0f0}
+thead th .arrow{opacity:0.3;margin-left:4px;font-size:10px}
+thead th.sorted .arrow{opacity:1;color:#111}
+tbody td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;line-height:1.55;color:#333;max-width:420px;word-break:break-word;white-space:pre-wrap}
+tbody tr:hover{background:#fafafa}
+tbody td.rating-cell{color:#f5a623;font-weight:700;white-space:nowrap}
+tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
+tbody td a{color:#1d4ed8;text-decoration:none}
+tbody td a:hover{text-decoration:underline}
 
 @media (max-width:640px){
-  #container{padding:14px 12px 40px}
-  .toolbar{gap:8px}
+  #container{padding:10px 8px 40px}
+  .toolbar{gap:6px}
   .search-box{min-width:100%}
-  .stat-v{font-size:18px}
-  .card{padding:13px 14px}
-  .body{font-size:13px}
+  table{font-size:11.5px}
+  thead th,tbody td{padding:7px 8px}
+  tbody td{max-width:260px}
 }
 </style>
 </head>
@@ -82,57 +71,27 @@ select.filter-chip{-webkit-appearance:none;appearance:none;padding-right:28px;ba
 <div id="container">
   <div id="status">読み込み中...</div>
   <div id="content" style="display:none">
-    <div class="stats" id="stats"></div>
     <div class="toolbar">
-      <div class="search-box"><input type="text" id="search" placeholder="検索（本文・投稿者・医院）"></div>
-      <select class="filter-chip" id="facility-filter"><option value="">医院：全て</option></select>
-      <select class="filter-chip" id="rating-filter">
-        <option value="">評価：全て</option>
-        <option value="5">★5</option>
-        <option value="4">★4</option>
-        <option value="3">★3</option>
-        <option value="2">★2</option>
-        <option value="1">★1</option>
-      </select>
-      <select class="filter-chip" id="sort">
-        <option value="date-desc">新しい順</option>
-        <option value="date-asc">古い順</option>
-        <option value="rating-desc">評価高い順</option>
-        <option value="rating-asc">評価低い順</option>
-      </select>
+      <div class="search-box"><input type="text" id="search" placeholder="全列を検索"></div>
+      <span class="count-badge" id="count">0件</span>
     </div>
-    <div class="list" id="list"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr id="thead"></tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
   </div>
 </div>
 
 <script>
-// 公開CSVのURL（ファイル > 共有 > ウェブに公開 で生成）
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSJ6gRkfrqoNADOQvmOeum8kOq3QgnOV9MX9MzucD5j8s8FGeKy_uRA1Slv8aIseZ10jdJJtMRtr8y0/pub?output=csv';
 
+let headers = [];
 let allRows = [];
-let columns = [];
+let sortCol = -1;
+let sortDir = 1;
 
-// 列名候補（柔軟マッピング）
-const COL_HINTS = {
-  date: ['日付','投稿日','date','timestamp','タイムスタンプ','投稿時刻','時刻','作成日'],
-  author: ['投稿者','名前','氏名','ユーザー','user','name','author','nickname','ニックネーム'],
-  rating: ['評価','星','レーティング','rating','stars','score','点数','★'],
-  facility: ['医院','院','店舗','facility','clinic','location','場所','拠点','医院名'],
-  body: ['本文','内容','コメント','口コミ','レビュー','body','review','content','comment','text','メッセージ','感想'],
-  reply: ['返信','対応','返答','reply','response'],
-  url: ['url','リンク','link']
-};
-
-function findCol(headers, key){
-  const hints = COL_HINTS[key] || [];
-  for(const h of hints){
-    const i = headers.findIndex(c => c && c.toLowerCase().includes(h.toLowerCase()));
-    if(i >= 0) return i;
-  }
-  return -1;
-}
-
-// CSV parser（カンマ区切り、ダブルクォート対応）
 function parseCSV(text){
   const rows = [];
   let row = [], field = '', inQ = false;
@@ -154,30 +113,29 @@ function parseCSV(text){
   return rows;
 }
 
-function extractStars(v){
-  if(v == null) return null;
-  const s = String(v).trim();
-  const m = s.match(/([1-5])/);
-  if(m) return parseInt(m[1]);
-  const starCount = (s.match(/★/g) || []).length;
-  if(starCount) return starCount;
-  return null;
+function escapeHtml(s){
+  return String(s==null?'':s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
 
-function formatDate(v){
-  if(!v) return '';
-  const s = String(v).trim();
-  const d = new Date(s);
-  if(!isNaN(d.getTime())){
-    return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
+function linkify(s){
+  return escapeHtml(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
+}
+
+function isRatingCol(name){
+  return /評価|星|rating|★|score|点/i.test(name);
+}
+function isNumCol(name){
+  return /件数|数$|金額|price|count|total|合計/i.test(name);
+}
+function formatRating(v){
+  const s = String(v||'').trim();
+  const m = s.match(/([1-5](?:\.\d)?)/);
+  if(m){
+    const n = parseFloat(m[1]);
+    const full = Math.floor(n);
+    return '★'.repeat(full) + '☆'.repeat(5-full) + ' ' + n.toFixed(1);
   }
   return s;
-}
-
-function dateVal(v){
-  if(!v) return 0;
-  const d = new Date(String(v));
-  return isNaN(d.getTime()) ? 0 : d.getTime();
 }
 
 async function loadData(){
@@ -190,133 +148,84 @@ async function loadData(){
   contentEl.style.display = 'none';
 
   try {
-    const res = await fetch(CSV_URL);
+    const res = await fetch(CSV_URL + '&_t=' + Date.now());
     if(!res.ok) throw new Error('HTTP ' + res.status);
     const text = await res.text();
-    const rows = parseCSV(text).filter(r => r.some(c => c && c.trim()));
-    if(rows.length < 2) throw new Error('データが空です');
+    const rows = parseCSV(text).filter(r => r.some(c => c && String(c).trim()));
+    if(rows.length < 1) throw new Error('データが空です');
 
-    const headers = rows[0].map(h => (h || '').trim());
-    const body = rows.slice(1);
-
-    const idx = {
-      date: findCol(headers, 'date'),
-      author: findCol(headers, 'author'),
-      rating: findCol(headers, 'rating'),
-      facility: findCol(headers, 'facility'),
-      body: findCol(headers, 'body'),
-      reply: findCol(headers, 'reply'),
-      url: findCol(headers, 'url')
-    };
-
-    // bodyが見つからなければ最長列を本文として採用
-    if(idx.body < 0){
-      let maxLen = 0, maxIdx = -1;
-      for(let c=0; c<headers.length; c++){
-        const len = body.reduce((s,r) => s + (r[c]||'').length, 0);
-        if(len > maxLen){ maxLen = len; maxIdx = c; }
-      }
-      idx.body = maxIdx;
-    }
-
-    allRows = body.map(r => ({
-      date: idx.date >= 0 ? r[idx.date] : '',
-      author: idx.author >= 0 ? r[idx.author] : '',
-      rating: idx.rating >= 0 ? extractStars(r[idx.rating]) : null,
-      facility: idx.facility >= 0 ? r[idx.facility] : '',
-      body: idx.body >= 0 ? r[idx.body] : '',
-      reply: idx.reply >= 0 ? r[idx.reply] : '',
-      url: idx.url >= 0 ? r[idx.url] : '',
-      _raw: r,
-      _headers: headers
-    }));
-
-    // 医院フィルターの選択肢を生成
-    const facilities = [...new Set(allRows.map(r => r.facility).filter(Boolean))].sort();
-    const facSel = document.getElementById('facility-filter');
-    facSel.innerHTML = '<option value="">医院：全て</option>' + facilities.map(f => `<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+    headers = rows[0].map(h => (h || '').trim());
+    allRows = rows.slice(1).map(r => {
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = r[i] || '');
+      return obj;
+    });
 
     statusEl.style.display = 'none';
     contentEl.style.display = 'block';
-    renderStats();
+    renderHead();
     render();
   } catch(e){
-    statusEl.innerHTML = `<div class="error"><b>読み込みに失敗しました</b><br>${escapeHtml(e.message)}<br><br>スプレッドシートの共有設定を <b>「リンクを知っている全員が閲覧可」</b> に変更してください。<br>または <code>ファイル > 共有 > ウェブに公開</code> を実行してください。</div>`;
+    statusEl.innerHTML = `<div class="error"><b>読み込みに失敗しました</b><br>${escapeHtml(e.message)}</div>`;
   } finally {
     reloadBtn.disabled = false;
   }
 }
 
-function escapeHtml(s){
-  return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-}
-
-function renderStats(){
-  const total = allRows.length;
-  const rated = allRows.filter(r => r.rating);
-  const avg = rated.length ? (rated.reduce((s,r) => s+r.rating, 0) / rated.length) : 0;
-  const five = allRows.filter(r => r.rating === 5).length;
-  const low = allRows.filter(r => r.rating && r.rating <= 2).length;
-
-  const stars = avg ? '★'.repeat(Math.round(avg)) + '☆'.repeat(5-Math.round(avg)) : '';
-  document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="stat-l">総件数</div><div class="stat-v">${total}<span class="unit">件</span></div></div>
-    <div class="stat"><div class="stat-l">平均評価</div><div class="stat-v">${avg ? avg.toFixed(2) : '—'} <span class="stars" style="font-size:13px">${stars}</span></div></div>
-    <div class="stat"><div class="stat-l">★5</div><div class="stat-v">${five}<span class="unit">件</span></div></div>
-    <div class="stat"><div class="stat-l">低評価（★1-2）</div><div class="stat-v" style="color:${low?'#b91c1c':'#111'}">${low}<span class="unit">件</span></div></div>
-  `;
+function renderHead(){
+  const thead = document.getElementById('thead');
+  thead.innerHTML = headers.map((h, i) => {
+    const isSorted = sortCol === i;
+    const arrow = isSorted ? (sortDir === 1 ? '▲' : '▼') : '↕';
+    return `<th data-col="${i}" class="${isSorted?'sorted':''}">${escapeHtml(h)}<span class="arrow">${arrow}</span></th>`;
+  }).join('');
+  thead.querySelectorAll('th').forEach(th => {
+    th.addEventListener('click', () => {
+      const i = +th.dataset.col;
+      if(sortCol === i) sortDir = -sortDir;
+      else { sortCol = i; sortDir = 1; }
+      renderHead();
+      render();
+    });
+  });
 }
 
 function render(){
   const q = document.getElementById('search').value.trim().toLowerCase();
-  const fac = document.getElementById('facility-filter').value;
-  const rat = document.getElementById('rating-filter').value;
-  const sort = document.getElementById('sort').value;
-
   let rows = allRows.filter(r => {
-    if(fac && r.facility !== fac) return false;
-    if(rat && String(r.rating) !== rat) return false;
-    if(q){
-      const hay = (r.body + ' ' + r.author + ' ' + r.facility).toLowerCase();
-      if(!hay.includes(q)) return false;
-    }
-    return true;
+    if(!q) return true;
+    return headers.some(h => String(r[h]||'').toLowerCase().includes(q));
   });
 
-  rows.sort((a,b) => {
-    if(sort === 'date-desc') return dateVal(b.date) - dateVal(a.date);
-    if(sort === 'date-asc') return dateVal(a.date) - dateVal(b.date);
-    if(sort === 'rating-desc') return (b.rating||0) - (a.rating||0);
-    if(sort === 'rating-asc') return (a.rating||0) - (b.rating||0);
-    return 0;
-  });
+  if(sortCol >= 0){
+    const key = headers[sortCol];
+    rows = [...rows].sort((a,b) => {
+      const va = a[key]||'', vb = b[key]||'';
+      const na = parseFloat(String(va).replace(/[^\d.-]/g,''));
+      const nb = parseFloat(String(vb).replace(/[^\d.-]/g,''));
+      if(!isNaN(na) && !isNaN(nb)) return (na-nb)*sortDir;
+      return String(va).localeCompare(String(vb), 'ja') * sortDir;
+    });
+  }
 
-  const list = document.getElementById('list');
+  document.getElementById('count').textContent = `${rows.length}件`;
+
+  const tbody = document.getElementById('tbody');
   if(!rows.length){
-    list.innerHTML = '<div style="text-align:center;padding:40px;color:#999;font-size:13px">該当する口コミがありません</div>';
+    tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:40px;color:#999">該当データがありません</td></tr>`;
     return;
   }
-  list.innerHTML = rows.map(r => {
-    const stars = r.rating ? '★'.repeat(r.rating) + '☆'.repeat(5-r.rating) : '';
-    return `
-    <div class="card">
-      <div class="card-head">
-        ${r.rating ? `<div class="rating">${stars}<span class="num">${r.rating}.0</span></div>` : ''}
-        ${r.author ? `<div class="author">${escapeHtml(r.author)}</div>` : ''}
-        ${r.facility ? `<span class="facility-tag">${escapeHtml(r.facility)}</span>` : ''}
-        ${r.date ? `<div class="date">${escapeHtml(formatDate(r.date))}</div>` : ''}
-      </div>
-      ${r.body ? `<div class="body">${escapeHtml(r.body)}</div>` : ''}
-      ${r.reply ? `<div class="meta"><div><b>返信:</b>${escapeHtml(r.reply)}</div></div>` : ''}
-      ${r.url ? `<div class="meta"><a href="${escapeHtml(r.url)}" target="_blank" style="color:#1d4ed8;text-decoration:none">元の投稿を見る →</a></div>` : ''}
-    </div>`;
+  tbody.innerHTML = rows.map(r => {
+    return '<tr>' + headers.map(h => {
+      const v = r[h] || '';
+      if(isRatingCol(h)) return `<td class="rating-cell">${escapeHtml(formatRating(v))}</td>`;
+      if(isNumCol(h)) return `<td class="num">${escapeHtml(v)}</td>`;
+      return `<td>${linkify(v)}</td>`;
+    }).join('') + '</tr>';
   }).join('');
 }
 
-['search','facility-filter','rating-filter','sort'].forEach(id => {
-  document.getElementById(id).addEventListener('input', render);
-  document.getElementById(id).addEventListener('change', render);
-});
+document.getElementById('search').addEventListener('input', render);
 
 loadData();
 </script>
