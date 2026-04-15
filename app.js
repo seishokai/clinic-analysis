@@ -4245,7 +4245,9 @@ let rsStart = 0;
 let rsWakeLock = null;
 
 async function initStandaloneRecorder() {
-  document.getElementById('rec-standalone').hidden = false;
+  const rs = document.getElementById('rec-standalone');
+  rs.hidden = false;
+  rs.style.display = 'flex';
   document.getElementById('login-screen').style.display = 'none';
   // 端末スリープ防止 (Wake Lock)
   const setupWakeLock = async () => {
