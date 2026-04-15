@@ -2050,6 +2050,7 @@ async function loadBookings() {
         const ex = bkEx[key];
         if (!ex) return;
         if (ex.editedBookDate) d.bookDate = ex.editedBookDate;
+        if (ex.editedApplyDate) d.applyDate = ex.editedApplyDate;
         if (ex.editedService) d.service = ex.editedService;
         if (ex.editedFacility) d.facility = ex.editedFacility;
         if (ex.editedPhone) d.phone = ex.editedPhone;
@@ -2554,6 +2555,8 @@ function openRowEditModal(name, applyDate) {
   _rowEditTarget = d;
   document.getElementById('row-edit-title').textContent = d.name + ' を編集';
   document.getElementById('re-name').value = d.name || '';
+  const reApply = document.getElementById('re-applydate');
+  if (reApply) reApply.value = d.applyDate || '';
   document.getElementById('re-bookdate').value = d.bookDate || '';
   document.getElementById('re-service').value = d.service || '';
   document.getElementById('re-phone').value = d.phone || '';
@@ -2583,6 +2586,8 @@ function saveRowEdit() {
 
   // ローカルデータ更新
   d.name = document.getElementById('re-name').value.trim() || d.name;
+  const reApplyEl = document.getElementById('re-applydate');
+  if (reApplyEl) d.applyDate = reApplyEl.value.trim() || d.applyDate;
   d.bookDate = document.getElementById('re-bookdate').value || d.bookDate;
   d.service = document.getElementById('re-service').value || d.service;
   d.facility = document.getElementById('re-facility').value;
@@ -2596,6 +2601,7 @@ function saveRowEdit() {
   const key = oldName + '|' + oldApply;
   if (!bkEx[key]) bkEx[key] = {};
   bkEx[key].editedName = d.name;
+  bkEx[key].editedApplyDate = d.applyDate;
   bkEx[key].editedBookDate = d.bookDate;
   bkEx[key].editedService = d.service;
   bkEx[key].editedFacility = d.facility;
