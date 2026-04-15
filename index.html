@@ -230,41 +230,48 @@
         <p>Portal</p>
       </div>
       <!-- ポータルメニュー -->
-      <div id="portal-menu" style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
-        <button onclick="var s=document.getElementById('login-section');document.getElementById('login-section-booking').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">予約管理</button>
+      <div id="portal-menu" class="portal-cols" style="margin-bottom:20px">
+        <!-- 営業系 -->
+        <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
+          <h3>営業系</h3>
+          <button onclick="var s=document.getElementById('training-sub');s.style.display=(s.style.display==='flex'?'none':'flex')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト</button>
+          <div id="training-sub" style="display:none;flex-direction:column;gap:6px;padding-left:16px">
+            <a href="https://owojchhi.gensparkspace.com/index.html" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">動画研修</a>
+            <a href="qa.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">Q&amp;A研修</a>
+            <a href="ortho.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス</a>
+            <a href="ortho2.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス2</a>
+          </div>
+          <a href="https://seishokai.github.io/shift/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">ドクターシフト</a>
+        </div>
 
-        <!-- ログインフォーム（インライン展開） -->
-        <div id="login-section" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
-          <div id="login-form">
-            <div class="input-group">
-              <label for="password">Password</label>
-              <input type="password" id="password" placeholder="パスワードを入力" autocomplete="new-password">
+        <!-- 管理系 -->
+        <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
+          <h3>管理系</h3>
+          <button onclick="var s=document.getElementById('login-section');document.getElementById('login-section-booking').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">予約管理</button>
+          <div id="login-section" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
+            <div id="login-form">
+              <div class="input-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" placeholder="パスワードを入力" autocomplete="new-password">
+              </div>
+              <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
+              <button type="button" class="btn-primary" id="login-btn">ログイン</button>
+              <p id="login-error" class="error-msg" hidden>パスワードが正しくありません</p>
             </div>
-            <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
-            <button type="button" class="btn-primary" id="login-btn">ログイン</button>
-            <p id="login-error" class="error-msg" hidden>パスワードが正しくありません</p>
           </div>
-        </div>
 
-        <button onclick="var s=document.getElementById('login-section-booking');document.getElementById('login-section').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">売上管理</button>
-        <div id="login-section-booking" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
-          <div class="input-group">
-            <label for="password-booking">Password</label>
-            <input type="password" id="password-booking" placeholder="パスワードを入力" autocomplete="new-password">
+          <button onclick="var s=document.getElementById('login-section-booking');document.getElementById('login-section').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">売上管理</button>
+          <div id="login-section-booking" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
+            <div class="input-group">
+              <label for="password-booking">Password</label>
+              <input type="password" id="password-booking" placeholder="パスワードを入力" autocomplete="new-password">
+            </div>
+            <button type="button" class="btn-primary" id="login-btn-booking">ログイン</button>
+            <p id="login-error-booking" class="error-msg" hidden style="color:#b91c1c;font-size:12px;margin-top:6px">パスワードが正しくありません</p>
           </div>
-          <button type="button" class="btn-primary" id="login-btn-booking">ログイン</button>
-          <p id="login-error-booking" class="error-msg" hidden style="color:#b91c1c;font-size:12px;margin-top:6px">パスワードが正しくありません</p>
-        </div>
 
-        <button onclick="var s=document.getElementById('training-sub');s.style.display=(s.style.display==='flex'?'none':'flex')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト</button>
-        <div id="training-sub" style="display:none;flex-direction:column;gap:6px;padding-left:16px">
-          <a href="https://owojchhi.gensparkspace.com/index.html" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">動画研修</a>
-          <a href="qa.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">Q&amp;A研修</a>
-          <a href="ortho.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス</a>
-          <a href="ortho2.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス2</a>
+          <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">労務管理（ピノキオ）</a>
         </div>
-        <a href="https://seishokai.github.io/shift/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">ドクターシフト</a>
-        <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">労務管理（ピノキオ）</a>
       </div>
     </div>
   </div>

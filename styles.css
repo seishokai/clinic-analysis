@@ -46,8 +46,13 @@ body {
   border-radius: 16px;
   padding: 48px 40px;
   width: 100%;
-  max-width: 380px;
+  max-width: 760px;
   text-align: center;
+}
+.portal-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; text-align: left; }
+.portal-col h3 { font-size: 12px; font-weight: 700; letter-spacing: 0.08em; color: var(--text-sub); margin: 0 0 10px; text-transform: uppercase; text-align: center; }
+@media (max-width: 640px) {
+  .portal-cols { grid-template-columns: 1fr; gap: 16px; }
 }
 .login-logo { margin-bottom: 32px; }
 .login-logo h1 { font-size: 22px; font-weight: 700; letter-spacing: 3px; }
