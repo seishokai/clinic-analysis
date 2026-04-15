@@ -155,8 +155,8 @@ function setupEventListeners() {
     if (pw === CORRECT_PASSWORD) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'admin');
-      userRole = 'admin';
+      sessionStorage.setItem('role', 'sales');
+      userRole = 'sales';
       promoFilter = '';
       loginBtn.textContent = 'ログイン';
       loginBtn.disabled = false;
@@ -165,8 +165,8 @@ function setupEventListeners() {
     } else if (pw === BOOKING_PASSWORD) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'booking');
-      userRole = 'booking';
+      sessionStorage.setItem('role', 'admin');
+      userRole = 'admin';
       promoFilter = '';
       loginBtn.textContent = 'ログイン';
       loginBtn.disabled = false;
@@ -947,15 +947,14 @@ function showApp() {
   // プロモユーザーの場合、予約タブのみ表示
   userRole = sessionStorage.getItem('role') || 'admin';
   promoFilter = sessionStorage.getItem('promoFilter') || '';
-  if (userRole === 'booking') {
+  if (userRole === 'sales') {
     document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
-      b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
+      b.style.display = b.dataset.view === 'sales' ? '' : 'none';
     });
     document.querySelectorAll('.bottom-nav-btn').forEach(b => {
-      b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
+      b.style.display = b.dataset.view === 'sales' ? '' : 'none';
     });
-    switchView('bookings');
-    loadBookings();
+    switchView('sales');
     return;
   }
   if (userRole === 'promo') {
