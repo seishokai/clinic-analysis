@@ -957,6 +957,15 @@ function showApp() {
     switchView('sales');
     return;
   }
+  // 管理者(予約管理): 売上タブを非表示
+  if (userRole === 'admin') {
+    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
+      if (b.dataset.view === 'sales') b.style.display = 'none';
+    });
+    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
+      if (b.dataset.view === 'sales') b.style.display = 'none';
+    });
+  }
   if (userRole === 'promo') {
     document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
       b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
