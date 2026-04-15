@@ -95,6 +95,7 @@ tbody td a:hover{text-decoration:underline}
   <div id="content" style="display:none">
     <div class="toolbar">
       <div class="search-box"><input type="text" id="search" placeholder="全列を検索"></div>
+      <select id="month-filter" class="count-badge" style="background:#fff;color:#111;border:1.5px solid #e5e7eb;padding:8px 14px;cursor:pointer;font-weight:700;box-shadow:none"><option value="">月：全て</option></select>
       <span class="count-badge" id="count">0件</span>
     </div>
     <div class="table-wrap">
@@ -114,7 +115,20 @@ let allRows = [];
 let sortCol = -1;
 let sortDir = 1;
 let countColIdx = -1;
+let dateColIdx = -1;
 let maxCount = 0;
+
+function extractYM(v){
+  if(!v) return '';
+  const s = String(v).trim();
+  // 2024-05, 2024/05, 2024年5月, 2024.05
+  let m = s.match(/(\d{4})[\-\/年\.](\d{1,2})/);
+  if(m) return `${m[1]}-${String(parseInt(m[2])).padStart(2,'0')}`;
+  // 日付パース
+  const d = new Date(s);
+  if(!isNaN(d.getTime())) return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+  return '';
+}
 
 function parseCSV(text){
   const rows = [];
@@ -188,6 +202,25 @@ async function loadData(){
       return obj;
     });
 
+    // 日付列を特定 → 月フィルター
+    dateColIdx = headers.findIndex(h => /日付|日時|date|timestamp|タイムスタンプ|投稿日|月/i.test(h));
+    if(dateColIdx < 0){
+      // 値から判別
+      headers.forEach((h, i) => {
+        if(dateColIdx >= 0) return;
+        const hits = allRows.filter(r => extractYM(r[h])).length;
+        if(hits > allRows.length * 0.5) dateColIdx = i;
+      });
+    }
+    const monthSel = document.getElementById('month-filter');
+    if(dateColIdx >= 0){
+      const months = [...new Set(allRows.map(r => extractYM(r[headers[dateColIdx]])).filter(Boolean))].sort().reverse();
+      monthSel.innerHTML = '<option value="">月：全て</option>' + months.map(m => `<option value="${m}">${m.replace('-','年')}月</option>`).join('');
+      monthSel.style.display = '';
+    } else {
+      monthSel.style.display = 'none';
+    }
+
     // 投稿数の列を特定 → デフォルトソート列に
     countColIdx = headers.findIndex(h => isCountCol(h));
     if(countColIdx < 0){
@@ -238,7 +271,11 @@ function renderHead(){
 
 function render(){
   const q = document.getElementById('search').value.trim().toLowerCase();
+  const ym = document.getElementById('month-filter').value;
   let rows = allRows.filter(r => {
+    if(ym && dateColIdx >= 0){
+      if(extractYM(r[headers[dateColIdx]]) !== ym) return false;
+    }
     if(!q) return true;
     return headers.some(h => String(r[h]||'').toLowerCase().includes(q));
   });
@@ -297,6 +334,7 @@ function render(){
 }
 
 document.getElementById('search').addEventListener('input', render);
+document.getElementById('month-filter').addEventListener('change', render);
 
 loadData();
 </script>
