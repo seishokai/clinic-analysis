@@ -54,7 +54,7 @@ tbody tr.top3{background:linear-gradient(90deg,#f0fdf4,#fafffa) !important}
 .rank.r3{background:linear-gradient(135deg,#b45309,#92400e)}
 .rank.r{background:#e5e7eb;color:#6b7280}
 
-tbody td.rating-cell{white-space:nowrap}
+tbody td.rating-cell{white-space:nowrap;min-width:140px}
 .stars{color:#f59e0b;font-weight:700;letter-spacing:1px}
 .rating-num{display:inline-block;margin-left:6px;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:20px;font-size:11px;font-weight:700}
 .rating-num.low{background:#fee2e2;color:#991b1b}
@@ -327,7 +327,10 @@ function render(){
       const v = r[h] || '';
       if(isRatingCol(h)) return `<td class="rating-cell">${formatRating(v)}</td>`;
       if(i === countColIdx) return `<td class="count-cell">${formatCount(v)}</td>`;
-      if(isFacilityCol(h)) return `<td class="facility-cell">${linkify(v)}</td>`;
+      if(isFacilityCol(h)){
+        const short = String(v).replace(/(歯科・矯正歯科|矯正歯科・歯科|歯科医院|歯科・矯正|矯正・歯科|歯科|矯正歯科)$/,'').trim();
+        return `<td class="facility-cell">${linkify(short || v)}</td>`;
+      }
       return `<td>${linkify(v)}</td>`;
     }).join('') + '</tr>';
   }).join('');
