@@ -3,139 +3,95 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SEISHOKAI 口コミランキング</title>
+<title>SEISHOKAI 口コミ</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+JP:wght@300;400;500;600;700;900&family=Cormorant+Garamond:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --bg:#fafaf7;
   --ink:#1a1a1a;
-  --sub:#8a8a8a;
-  --line:#ececec;
-  --accent:#c9a961;
-  --gold:#d4af37;
+  --sub:#888;
+  --line:#e8e5de;
 }
-body{font-family:'Inter','Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;background:var(--bg);min-height:100vh;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"palt";letter-spacing:0.01em}
+body{font-family:'Noto Serif JP','Hiragino Mincho ProN','YuMincho','Yu Mincho',serif;background:var(--bg);min-height:100vh;color:var(--ink);-webkit-font-smoothing:antialiased;font-feature-settings:"palt";letter-spacing:0.02em;font-weight:400}
 button{cursor:pointer;font-family:inherit;border:none;background:none;color:inherit}
 
-/* TOP BAR */
-#topbar{background:rgba(255,255,255,0.85);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line);padding:14px 28px;display:flex;align-items:center;gap:14px;position:sticky;top:0;z-index:200}
-#back-btn{font-size:12px;color:var(--sub);letter-spacing:0.05em;font-weight:500;transition:color .15s}
+#topbar{background:#fff;border-bottom:1px solid var(--line);padding:16px 28px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:200}
+#back-btn{font-size:13px;color:var(--sub);font-weight:400;transition:color .15s}
 #back-btn:hover{color:var(--ink)}
-.brand{display:flex;align-items:baseline;gap:10px}
-.brand .logo{font-family:'Playfair Display',serif;font-size:20px;font-weight:900;letter-spacing:-0.01em}
-.brand .sub{font-size:10px;color:var(--sub);letter-spacing:0.25em;text-transform:uppercase;font-weight:500}
+.logo{font-size:19px;font-weight:700;letter-spacing:0.04em}
 .spacer{flex:1}
-#reload-btn{font-size:11px;font-weight:600;color:var(--sub);letter-spacing:0.1em;padding:8px 14px;border:1px solid var(--line);border-radius:30px;transition:all .2s;text-transform:uppercase}
+#reload-btn{font-size:12px;font-weight:400;color:var(--sub);padding:6px 14px;border:1px solid var(--line);border-radius:2px;transition:all .2s}
 #reload-btn:hover{border-color:var(--ink);color:var(--ink)}
 #reload-btn:disabled{opacity:0.4;cursor:wait}
 
-/* HERO */
-.hero{text-align:center;padding:60px 20px 40px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#fff 0%,var(--bg) 100%)}
-.hero .eyebrow{font-size:11px;letter-spacing:0.4em;color:var(--accent);font-weight:600;text-transform:uppercase;margin-bottom:14px}
-.hero h1{font-family:'Playfair Display',serif;font-size:44px;font-weight:900;letter-spacing:-0.02em;line-height:1.1;margin-bottom:12px}
-.hero p{font-size:13px;color:var(--sub);letter-spacing:0.08em}
-.hero .divider{width:40px;height:2px;background:var(--accent);margin:22px auto 0}
+.container{max-width:780px;margin:0 auto;padding:50px 24px 80px}
+.title{text-align:center;margin-bottom:44px}
+.title h1{font-size:30px;font-weight:600;letter-spacing:0.08em;margin-bottom:8px}
+.title p{font-size:13px;color:var(--sub);letter-spacing:0.15em;font-weight:300}
 
-/* CONTROLS */
-.controls{max-width:1100px;margin:0 auto;padding:30px 24px 10px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
-.search{flex:1;min-width:200px;position:relative}
-.search input{width:100%;padding:12px 16px 12px 42px;border:none;border-bottom:1px solid var(--line);background:transparent;font-size:14px;font-family:inherit;letter-spacing:0.02em;transition:border-color .2s}
-.search input:focus{outline:none;border-bottom-color:var(--ink)}
-.search::before{content:'';position:absolute;left:14px;top:50%;transform:translateY(-50%);width:14px;height:14px;border:1.5px solid var(--sub);border-radius:50%;background:transparent}
-.search::after{content:'';position:absolute;left:24px;top:calc(50% + 5px);width:6px;height:1.5px;background:var(--sub);transform:rotate(45deg);transform-origin:left}
-.meta{font-size:11px;color:var(--sub);letter-spacing:0.2em;text-transform:uppercase;font-weight:500}
-.meta b{color:var(--ink);font-weight:700;font-size:13px;letter-spacing:0}
+.toolbar{display:flex;align-items:center;gap:18px;margin-bottom:22px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.search{flex:1}
+.search input{width:100%;padding:8px 0;border:none;background:transparent;font-size:14px;font-family:inherit;letter-spacing:0.03em;color:var(--ink)}
+.search input::placeholder{color:#bbb;font-weight:300}
+.search input:focus{outline:none}
+.count{font-size:12px;color:var(--sub);font-weight:400;letter-spacing:0.08em;white-space:nowrap}
+.count b{color:var(--ink);font-weight:600;font-family:'Cormorant Garamond',serif;font-size:18px;margin-right:3px}
 
-/* RANKING LIST */
-.list{max-width:1100px;margin:0 auto;padding:10px 24px 80px}
-.podium{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:30px}
-.card{position:relative;padding:26px 22px;background:#fff;border:1px solid var(--line);border-radius:4px;transition:transform .3s cubic-bezier(.2,.8,.2,1),box-shadow .3s;overflow:hidden}
-.card:hover{transform:translateY(-2px);box-shadow:0 20px 40px -20px rgba(0,0,0,0.15)}
-.card.podium-card{padding:32px 24px;text-align:center}
-.card .rank-n{font-family:'Playfair Display',serif;font-size:72px;font-weight:900;line-height:1;color:var(--ink);letter-spacing:-0.04em;opacity:0.12;position:absolute;top:10px;right:16px;pointer-events:none}
-.card.p1 .rank-n{color:var(--gold);opacity:0.35}
-.card.p2 .rank-n{color:#a8a8a8;opacity:0.35}
-.card.p3 .rank-n{color:#b87333;opacity:0.35}
-.card.p1{border-color:var(--gold);background:linear-gradient(180deg,#fffaeb 0%,#fff 50%)}
-.card.p2{border-color:#d8d8d8}
-.card.p3{border-color:#e2c4a4}
-.medal{display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;font-family:'Playfair Display',serif;font-size:14px;font-weight:900;margin-bottom:18px}
-.card.p1 .medal{background:var(--gold);color:#fff}
-.card.p2 .medal{background:#a8a8a8;color:#fff}
-.card.p3 .medal{background:#b87333;color:#fff}
-.card .fac{font-size:22px;font-weight:700;letter-spacing:-0.01em;line-height:1.25;margin-bottom:14px;color:var(--ink)}
-.card.podium-card .fac{font-size:26px;font-weight:800;margin-bottom:18px}
-.card .score-row{display:flex;align-items:baseline;gap:8px;justify-content:center;margin-bottom:6px}
-.card .score{font-family:'Playfair Display',serif;font-size:40px;font-weight:900;letter-spacing:-0.02em;line-height:1}
-.card .score-max{font-size:13px;color:var(--sub);font-weight:500}
-.card .stars{color:var(--gold);font-size:13px;letter-spacing:3px;text-align:center;margin-bottom:12px}
-.card .posts{font-size:10px;color:var(--sub);letter-spacing:0.2em;text-transform:uppercase;font-weight:600;text-align:center}
-.card .posts b{color:var(--ink);font-size:13px;letter-spacing:0;font-weight:700;margin-right:4px}
-
-/* rest rows */
-.rest{display:flex;flex-direction:column;gap:0;border-top:1px solid var(--line)}
-.row{display:grid;grid-template-columns:60px 1fr auto auto;align-items:center;gap:24px;padding:22px 10px;border-bottom:1px solid var(--line);transition:background .15s;position:relative}
+.list{display:flex;flex-direction:column}
+.row{display:grid;grid-template-columns:48px 1fr auto auto;align-items:baseline;gap:20px;padding:20px 4px;border-bottom:1px solid var(--line);transition:background .12s}
 .row:hover{background:#fff}
-.row .num{font-family:'Playfair Display',serif;font-size:22px;font-weight:900;color:var(--sub);text-align:center;letter-spacing:-0.02em}
-.row .fac-name{font-size:18px;font-weight:700;letter-spacing:-0.01em}
-.row .rating-block{display:flex;align-items:baseline;gap:10px;min-width:180px;justify-content:flex-end}
-.row .stars{color:var(--gold);font-size:14px;letter-spacing:2px}
-.row .score{font-family:'Playfair Display',serif;font-size:26px;font-weight:900;letter-spacing:-0.02em;min-width:64px;text-align:right}
-.row .post-block{min-width:80px;text-align:right;font-size:11px;color:var(--sub);letter-spacing:0.08em;text-transform:uppercase;font-weight:500}
-.row .post-block b{font-family:'Inter',sans-serif;color:var(--ink);font-size:15px;font-weight:700;letter-spacing:0;display:block;margin-bottom:2px}
-.row.pinned{opacity:0.45}
-.row.pinned .num{font-size:14px}
+.row .num{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:400;color:var(--sub);text-align:center;font-style:italic}
+.row .fac{font-size:18px;font-weight:500;letter-spacing:0.04em}
+.row .rating{display:flex;align-items:baseline;gap:10px;min-width:160px;justify-content:flex-end}
+.row .stars{color:#c9a961;font-size:13px;letter-spacing:2px;font-family:serif}
+.row .score{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:500;min-width:64px;text-align:right;letter-spacing:0.02em}
+.row .posts{font-size:12px;color:var(--sub);min-width:70px;text-align:right;font-weight:300;letter-spacing:0.06em}
+.row .posts b{color:var(--ink);font-weight:500;font-family:'Cormorant Garamond',serif;font-size:16px;margin-right:3px}
+.row.pinned{opacity:0.4}
+.row.pinned .num{font-size:13px}
 
-#status{text-align:center;padding:80px 20px;color:var(--sub);font-size:13px;letter-spacing:0.1em;font-weight:500}
-.error{color:#b91c1c;background:#fff;border:1px solid #fecaca;padding:18px 22px;border-radius:4px;margin:20px auto;max-width:600px;font-size:13px;line-height:1.7}
+#status{text-align:center;padding:80px 20px;color:var(--sub);font-size:13px;letter-spacing:0.15em;font-weight:300}
+.error{color:#8b1e1e;background:#fff;border:1px solid #e8d5d5;padding:18px 22px;margin:20px auto;max-width:520px;font-size:13px;line-height:1.8}
 
-@media (max-width:820px){
-  .hero{padding:40px 20px 30px}
-  .hero h1{font-size:30px}
-  .podium{grid-template-columns:1fr;gap:12px}
-  .card.podium-card{padding:24px 20px}
-  .card .rank-n{font-size:56px}
-  .row{grid-template-columns:40px 1fr auto;gap:14px;padding:16px 6px}
-  .row .post-block{display:none}
+@media (max-width:640px){
+  #topbar{padding:12px 16px}
+  .container{padding:32px 16px 60px}
+  .title h1{font-size:24px}
+  .row{grid-template-columns:32px 1fr auto;gap:12px;padding:16px 2px}
+  .row .posts{display:none}
+  .row .fac{font-size:16px}
   .row .score{font-size:22px;min-width:52px}
-  .row .fac-name{font-size:16px}
-  .row .rating-block{min-width:140px}
+  .row .rating{min-width:120px}
+  .row .stars{font-size:11px;letter-spacing:1px}
 }
 </style>
 </head>
 <body>
 
 <div id="topbar">
-  <button id="back-btn" onclick="location.href='https://seishokai.github.io/clinic-analysis/'">← Back</button>
-  <div class="brand">
-    <span class="logo">SEISHOKAI</span>
-    <span class="sub">Reviews</span>
-  </div>
+  <button id="back-btn" onclick="location.href='https://seishokai.github.io/clinic-analysis/'">← 戻る</button>
+  <div class="logo">清翔会</div>
   <div class="spacer"></div>
-  <button id="reload-btn" onclick="loadData()">Refresh</button>
+  <button id="reload-btn" onclick="loadData()">再読込</button>
 </div>
 
-<section class="hero">
-  <div class="eyebrow">2026 年 評価ランキング</div>
-  <h1>Google口コミ 平均点</h1>
-  <p>医院別・平均評価ランキング</p>
-  <div class="divider"></div>
-</section>
+<div class="container">
+  <div class="title">
+    <h1>口コミ平均点</h1>
+    <p>医院別 ランキング</p>
+  </div>
 
-<div class="controls">
-  <div class="search"><input type="text" id="search" placeholder="医院名で検索"></div>
-  <div class="meta"><b id="count">0</b> Clinics</div>
-</div>
+  <div id="status">読み込み中</div>
 
-<div id="status">Loading...</div>
-
-<div id="content" style="display:none">
-  <div class="list">
-    <div class="podium" id="podium"></div>
-    <div class="rest" id="rest"></div>
+  <div id="content" style="display:none">
+    <div class="toolbar">
+      <div class="search"><input type="text" id="search" placeholder="医院名で検索"></div>
+      <div class="count"><b id="count">0</b>件</div>
+    </div>
+    <div class="list" id="list"></div>
   </div>
 </div>
 
@@ -143,21 +99,10 @@ button{cursor:pointer;font-family:inherit;border:none;background:none;color:inhe
 const CSV_URL = 'https://docs.google.com/spreadsheets/d/e/2PACX-1vSJ6gRkfrqoNADOQvmOeum8kOq3QgnOV9MX9MzucD5j8s8FGeKy_uRA1Slv8aIseZ10jdJJtMRtr8y0/pub?gid=269604636&single=true&output=csv';
 
 const CLINIC_ALIAS = [
-  ['エルエル','エルエル'],
-  ['茶屋','茶屋'],
-  ['アール','アール'],
-  ['知立','知立'],
-  ['エスカ','エスカ'],
-  ['ウィズ','ウィズ'],['ウイズ','ウィズ'],
-  ['ルミナス','ルミナス'],
-  ['小牧','小牧'],
-  ['みなみ','みなみ'],
-  ['あおい','あおい'],
-  ['さくらい','さくらい'],
-  ['大森','大森'],
-  ['京都','京都'],
-  ['銀座','銀座'],
-  ['八事','八事'],
+  ['エルエル','エルエル'],['茶屋','茶屋'],['アール','アール'],['知立','知立'],
+  ['エスカ','エスカ'],['ウィズ','ウィズ'],['ウイズ','ウィズ'],['ルミナス','ルミナス'],
+  ['小牧','小牧'],['みなみ','みなみ'],['あおい','あおい'],['さくらい','さくらい'],
+  ['大森','大森'],['京都','京都'],['銀座','銀座'],['八事','八事'],
   ['アサノ','アサノ'],['あさの','アサノ']
 ];
 
@@ -195,10 +140,7 @@ function escapeHtml(s){
 }
 
 let allData = [];
-
-function isPinned(name){
-  return /久屋|ルーセント|ﾙｰｾﾝﾄ|lucent/i.test(name);
-}
+const isPinned = name => /久屋|ルーセント|ﾙｰｾﾝﾄ|lucent/i.test(name);
 
 async function loadData(){
   const statusEl = document.getElementById('status');
@@ -206,7 +148,7 @@ async function loadData(){
   const reloadBtn = document.getElementById('reload-btn');
   reloadBtn.disabled = true;
   statusEl.style.display = 'block';
-  statusEl.textContent = 'Loading...';
+  statusEl.textContent = '読み込み中';
   contentEl.style.display = 'none';
 
   try {
@@ -216,7 +158,6 @@ async function loadData(){
     const rows = parseCSV(text).filter(r => r.some(c => c && String(c).trim()));
     if(rows.length < 2) throw new Error('データが空です');
 
-    // ヘッダ行（最大3行）をスキャン
     const headRows = rows.slice(0, Math.min(3, rows.length));
     const dataStart = headRows.length;
     const numCols = Math.max(...rows.map(r => r.length));
@@ -224,7 +165,6 @@ async function loadData(){
       headRows.map(r => (r[c]||'').trim()).join(' ').trim()
     );
 
-    // 医院名列
     let facilityIdx = colText.findIndex(t => /医院|院名|店舗/i.test(t));
     if(facilityIdx < 0){
       for(let c = 0; c < numCols; c++){
@@ -234,7 +174,6 @@ async function loadData(){
       }
     }
 
-    // 平均点列
     const ratingCols = [];
     for(let c = 0; c < numCols; c++){
       if(c === facilityIdx) continue;
@@ -246,14 +185,12 @@ async function loadData(){
       }
     }
 
-    // 投稿数列
     const countCols = [];
     for(let c = 0; c < numCols; c++){
       if(c === facilityIdx || ratingCols.includes(c)) continue;
       if(/投稿|件数|口コミ数|レビュー数|count/i.test(colText[c])) countCols.push(c);
     }
 
-    // 集計
     const data = [];
     for(let r = dataStart; r < rows.length; r++){
       const row = rows[r];
@@ -287,7 +224,6 @@ function render(){
   const q = document.getElementById('search').value.trim().toLowerCase();
   let rows = allData.filter(r => !q || (r.name + ' ' + r.raw).toLowerCase().includes(q));
 
-  // ソート：ピン留めを最後に、それ以外は平均点降順
   rows.sort((a, b) => {
     const pa = isPinned(a.raw), pb = isPinned(b.raw);
     if(pa !== pb) return pa ? 1 : -1;
@@ -295,44 +231,20 @@ function render(){
   });
 
   document.getElementById('count').textContent = rows.length;
-
-  const podium = document.getElementById('podium');
-  const rest = document.getElementById('rest');
-
   const rankable = rows.filter(r => !isPinned(r.raw));
-  const top3 = rankable.slice(0, 3);
-  const restRows = rows.filter(r => !top3.includes(r));
 
-  podium.innerHTML = top3.map((r, i) => {
-    const cls = ['p1','p2','p3'][i];
-    const medal = ['Ⅰ','Ⅱ','Ⅲ'][i];
-    return `
-      <div class="card podium-card ${cls}">
-        <div class="rank-n">${i+1}</div>
-        <div class="medal">${medal}</div>
-        <div class="fac">${escapeHtml(r.name)}</div>
-        <div class="stars">${stars(r.avg)}</div>
-        <div class="score-row">
-          <div class="score">${r.avg != null ? r.avg.toFixed(2) : '—'}</div>
-          <div class="score-max">/ 5.00</div>
-        </div>
-        ${r.posts ? `<div class="posts"><b>${r.posts}</b> Posts</div>` : ''}
-      </div>
-    `;
-  }).join('');
-
-  rest.innerHTML = restRows.map((r, i) => {
+  document.getElementById('list').innerHTML = rows.map(r => {
     const pinned = isPinned(r.raw);
     const rank = pinned ? '—' : (rankable.indexOf(r) + 1);
     return `
       <div class="row ${pinned?'pinned':''}">
         <div class="num">${rank}</div>
-        <div class="fac-name">${escapeHtml(r.name)}</div>
-        <div class="rating-block">
+        <div class="fac">${escapeHtml(r.name)}</div>
+        <div class="rating">
           <div class="stars">${stars(r.avg)}</div>
           <div class="score">${r.avg != null ? r.avg.toFixed(2) : '—'}</div>
         </div>
-        ${r.posts ? `<div class="post-block"><b>${r.posts}</b>Posts</div>` : '<div class="post-block"></div>'}
+        <div class="posts">${r.posts ? `<b>${r.posts}</b>件` : ''}</div>
       </div>
     `;
   }).join('');
