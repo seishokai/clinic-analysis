@@ -155,8 +155,8 @@ function setupEventListeners() {
     if (pw === CORRECT_PASSWORD) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'sales');
-      userRole = 'sales';
+      sessionStorage.setItem('role', 'admin');
+      userRole = 'admin';
       promoFilter = '';
       loginBtn.textContent = 'ログイン';
       loginBtn.disabled = false;
@@ -165,8 +165,8 @@ function setupEventListeners() {
     } else if (pw === BOOKING_PASSWORD) {
       document.getElementById('password').value = '';
       sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'admin');
-      userRole = 'admin';
+      sessionStorage.setItem('role', 'sales');
+      userRole = 'sales';
       promoFilter = '';
       loginBtn.textContent = 'ログイン';
       loginBtn.disabled = false;
