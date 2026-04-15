@@ -9,50 +9,72 @@
 <link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700;900&family=Inter:wght@400;600;700;900&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter','Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;background:#f5f5f5;color:#111;-webkit-font-smoothing:antialiased;font-feature-settings:"palt"}
+body{font-family:'Inter','Zen Kaku Gothic New','Hiragino Sans','Noto Sans JP',sans-serif;background:linear-gradient(180deg,#f8fafc 0%,#eef2ff 100%);min-height:100vh;color:#111;-webkit-font-smoothing:antialiased;font-feature-settings:"palt"}
 button{cursor:pointer;font-family:inherit;border:none;background:none}
 
-#topbar{background:#fff;border-bottom:2px solid #111;padding:11px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200}
+#topbar{background:#fff;border-bottom:2px solid #111;padding:11px 18px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:200;box-shadow:0 2px 6px rgba(0,0,0,0.04)}
 #back-btn{border:1.5px solid #ddd;border-radius:6px;padding:5px 12px;font-size:12px;background:#fff;color:#666;font-weight:600}
 #back-btn:hover{background:#f5f5f5}
-.logo{font-size:17px;font-weight:900;letter-spacing:-0.5px}
+.logo{font-size:17px;font-weight:900;letter-spacing:-0.5px;background:linear-gradient(90deg,#111,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent}
 .sub{font-size:11px;color:#aaa;margin-top:1px}
 .spacer{flex:1}
-#reload-btn{border:1.5px solid #111;border-radius:6px;padding:6px 14px;font-size:12px;font-weight:700;background:#111;color:#fff}
+#reload-btn{border:none;border-radius:6px;padding:7px 16px;font-size:12px;font-weight:700;background:linear-gradient(135deg,#111,#374151);color:#fff;box-shadow:0 2px 6px rgba(0,0,0,0.15)}
 #reload-btn:disabled{opacity:0.5;cursor:wait}
 
 #container{max-width:1400px;margin:0 auto;padding:16px 14px 60px}
 
 .toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
 .search-box{flex:1;min-width:220px;position:relative}
-.search-box input{width:100%;padding:9px 12px 9px 34px;border:1.5px solid #e5e5e5;border-radius:8px;font-size:13px;background:#fff;font-family:inherit}
-.search-box input:focus{outline:none;border-color:#111}
-.search-box::before{content:'🔍';position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:0.5;font-size:13px}
-.count-badge{padding:6px 12px;background:#111;color:#fff;border-radius:6px;font-size:12px;font-weight:700}
+.search-box input{width:100%;padding:10px 14px 10px 36px;border:1.5px solid #e5e7eb;border-radius:10px;font-size:13px;background:#fff;font-family:inherit;box-shadow:0 1px 3px rgba(0,0,0,0.03)}
+.search-box input:focus{outline:none;border-color:#6366f1;box-shadow:0 0 0 3px rgba(99,102,241,0.15)}
+.search-box::before{content:'🔍';position:absolute;left:11px;top:50%;transform:translateY(-50%);opacity:0.5;font-size:13px}
+.count-badge{padding:7px 14px;background:linear-gradient(135deg,#6366f1,#8b5cf6);color:#fff;border-radius:20px;font-size:12px;font-weight:700;box-shadow:0 2px 6px rgba(99,102,241,0.3)}
 
 #status{text-align:center;padding:60px 20px;color:#999;font-size:14px}
 .error{color:#b91c1c;background:#fff0f0;border:1px solid #fecaca;padding:14px 18px;border-radius:10px;margin-bottom:18px;font-size:13px;line-height:1.6}
 
-.table-wrap{background:#fff;border:1px solid #e5e5e5;border-radius:10px;overflow:auto;max-height:calc(100vh - 180px)}
+.table-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:14px;overflow:auto;max-height:calc(100vh - 180px);box-shadow:0 4px 16px rgba(0,0,0,0.05)}
 table{border-collapse:collapse;width:100%;font-size:12.5px}
-thead th{background:#f9f9f9;position:sticky;top:0;z-index:5;border-bottom:2px solid #111;padding:10px 12px;font-weight:700;text-align:left;white-space:nowrap;cursor:pointer;user-select:none;color:#111}
-thead th:hover{background:#f0f0f0}
-thead th .arrow{opacity:0.3;margin-left:4px;font-size:10px}
-thead th.sorted .arrow{opacity:1;color:#111}
-tbody td{padding:9px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;line-height:1.55;color:#333;max-width:420px;word-break:break-word;white-space:pre-wrap}
-tbody tr:hover{background:#fafafa}
-tbody td.rating-cell{color:#f5a623;font-weight:700;white-space:nowrap}
-tbody td.num{text-align:right;font-variant-numeric:tabular-nums}
-tbody td a{color:#1d4ed8;text-decoration:none}
+thead th{background:linear-gradient(180deg,#1f2937,#111827);color:#fff;position:sticky;top:0;z-index:5;padding:12px 14px;font-weight:700;text-align:left;white-space:nowrap;cursor:pointer;user-select:none;border-right:1px solid rgba(255,255,255,0.08)}
+thead th:last-child{border-right:none}
+thead th:hover{background:linear-gradient(180deg,#374151,#1f2937)}
+thead th .arrow{opacity:0.4;margin-left:6px;font-size:10px}
+thead th.sorted{background:linear-gradient(180deg,#6366f1,#4f46e5)}
+thead th.sorted .arrow{opacity:1}
+tbody td{padding:10px 14px;border-bottom:1px solid #f0f0f0;vertical-align:top;line-height:1.55;color:#333;max-width:420px;word-break:break-word;white-space:pre-wrap}
+tbody tr{transition:background .12s}
+tbody tr:nth-child(even){background:#fafbfc}
+tbody tr:hover{background:#eef2ff !important}
+tbody tr.top1{background:linear-gradient(90deg,#fff7ed,#fffbeb) !important}
+tbody tr.top2{background:linear-gradient(90deg,#fefce8,#fffbeb) !important}
+tbody tr.top3{background:linear-gradient(90deg,#f0fdf4,#fafffa) !important}
+.rank{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-weight:800;font-size:11px;color:#fff}
+.rank.r1{background:linear-gradient(135deg,#f59e0b,#d97706)}
+.rank.r2{background:linear-gradient(135deg,#94a3b8,#64748b)}
+.rank.r3{background:linear-gradient(135deg,#b45309,#92400e)}
+.rank.r{background:#e5e7eb;color:#6b7280}
+
+tbody td.rating-cell{white-space:nowrap}
+.stars{color:#f59e0b;font-weight:700;letter-spacing:1px}
+.rating-num{display:inline-block;margin-left:6px;padding:2px 8px;background:#fef3c7;color:#92400e;border-radius:20px;font-size:11px;font-weight:700}
+.rating-num.low{background:#fee2e2;color:#991b1b}
+.rating-num.high{background:#dcfce7;color:#166534}
+tbody td.num{text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#111}
+tbody td.count-cell{text-align:right;font-variant-numeric:tabular-nums}
+.count-bar{display:inline-flex;align-items:center;gap:8px;justify-content:flex-end;width:100%}
+.count-bar .bar{height:6px;background:linear-gradient(90deg,#6366f1,#8b5cf6);border-radius:3px;min-width:2px}
+.count-bar .val{font-weight:800;color:#4f46e5;min-width:32px;text-align:right}
+tbody td a{color:#4f46e5;text-decoration:none;font-weight:500}
 tbody td a:hover{text-decoration:underline}
+.facility-cell{font-weight:700;color:#111}
 
 @media (max-width:640px){
   #container{padding:10px 8px 40px}
   .toolbar{gap:6px}
   .search-box{min-width:100%}
   table{font-size:11.5px}
-  thead th,tbody td{padding:7px 8px}
-  tbody td{max-width:260px}
+  thead th,tbody td{padding:8px 10px}
+  tbody td{max-width:220px}
 }
 </style>
 </head>
@@ -91,6 +113,8 @@ let headers = [];
 let allRows = [];
 let sortCol = -1;
 let sortDir = 1;
+let countColIdx = -1;
+let maxCount = 0;
 
 function parseCSV(text){
   const rows = [];
@@ -116,26 +140,29 @@ function parseCSV(text){
 function escapeHtml(s){
   return String(s==null?'':s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 }
-
 function linkify(s){
   return escapeHtml(s).replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank">$1</a>');
 }
+function isRatingCol(name){ return /評価|平均|星|rating|★|score(?!)/i.test(name) && !/件数|数$/.test(name); }
+function isCountCol(name){ return /件数|投稿数|投稿|レビュー数|口コミ数|count|total|数$/i.test(name); }
+function isFacilityCol(name){ return /医院|院名|店舗|拠点|clinic|facility/i.test(name); }
 
-function isRatingCol(name){
-  return /評価|星|rating|★|score|点/i.test(name);
-}
-function isNumCol(name){
-  return /件数|数$|金額|price|count|total|合計/i.test(name);
-}
 function formatRating(v){
   const s = String(v||'').trim();
-  const m = s.match(/([1-5](?:\.\d)?)/);
-  if(m){
-    const n = parseFloat(m[1]);
-    const full = Math.floor(n);
-    return '★'.repeat(full) + '☆'.repeat(5-full) + ' ' + n.toFixed(1);
-  }
-  return s;
+  const m = s.match(/([0-5](?:\.\d+)?)/);
+  if(!m) return escapeHtml(s);
+  const n = parseFloat(m[1]);
+  const full = Math.floor(n);
+  const stars = '★'.repeat(full) + '☆'.repeat(5-full);
+  const cls = n >= 4 ? 'high' : n <= 2.9 ? 'low' : '';
+  return `<span class="stars">${stars}</span><span class="rating-num ${cls}">${n.toFixed(1)}</span>`;
+}
+
+function formatCount(v){
+  const n = parseFloat(String(v||'').replace(/[^\d.-]/g,''));
+  if(isNaN(n)) return escapeHtml(v);
+  const pct = maxCount ? (n / maxCount) * 100 : 0;
+  return `<div class="count-bar"><div class="bar" style="width:${Math.max(2, pct*0.8)}px"></div><span class="val">${n}</span></div>`;
 }
 
 async function loadData(){
@@ -161,6 +188,25 @@ async function loadData(){
       return obj;
     });
 
+    // 投稿数の列を特定 → デフォルトソート列に
+    countColIdx = headers.findIndex(h => isCountCol(h));
+    if(countColIdx < 0){
+      // 数値が最も多い列を投稿数候補として採用
+      let bestIdx = -1, bestNum = 0;
+      headers.forEach((h, i) => {
+        const nums = allRows.filter(r => !isNaN(parseFloat(String(r[h]).replace(/[^\d.-]/g,'')))).length;
+        if(nums > bestNum && nums > allRows.length * 0.5){ bestNum = nums; bestIdx = i; }
+      });
+      countColIdx = bestIdx;
+    }
+
+    if(countColIdx >= 0){
+      const key = headers[countColIdx];
+      maxCount = Math.max(0, ...allRows.map(r => parseFloat(String(r[key]).replace(/[^\d.-]/g,'')) || 0));
+      sortCol = countColIdx;
+      sortDir = -1; // 多い順
+    }
+
     statusEl.style.display = 'none';
     contentEl.style.display = 'block';
     renderHead();
@@ -174,16 +220,16 @@ async function loadData(){
 
 function renderHead(){
   const thead = document.getElementById('thead');
-  thead.innerHTML = headers.map((h, i) => {
+  thead.innerHTML = '<th style="width:50px;text-align:center">#</th>' + headers.map((h, i) => {
     const isSorted = sortCol === i;
     const arrow = isSorted ? (sortDir === 1 ? '▲' : '▼') : '↕';
     return `<th data-col="${i}" class="${isSorted?'sorted':''}">${escapeHtml(h)}<span class="arrow">${arrow}</span></th>`;
   }).join('');
-  thead.querySelectorAll('th').forEach(th => {
+  thead.querySelectorAll('th[data-col]').forEach(th => {
     th.addEventListener('click', () => {
       const i = +th.dataset.col;
       if(sortCol === i) sortDir = -sortDir;
-      else { sortCol = i; sortDir = 1; }
+      else { sortCol = i; sortDir = (isCountCol(headers[i]) || i === countColIdx) ? -1 : 1; }
       renderHead();
       render();
     });
@@ -197,14 +243,28 @@ function render(){
     return headers.some(h => String(r[h]||'').toLowerCase().includes(q));
   });
 
+  // 久屋・ルーセントは常に最下段に固定
+  const pinBottom = r => {
+    const text = headers.map(h => r[h]||'').join(' ');
+    return /久屋|ルーセント|ﾙｰｾﾝﾄ|lucent/i.test(text);
+  };
+
   if(sortCol >= 0){
     const key = headers[sortCol];
     rows = [...rows].sort((a,b) => {
+      const pa = pinBottom(a), pb = pinBottom(b);
+      if(pa !== pb) return pa ? 1 : -1;
       const va = a[key]||'', vb = b[key]||'';
       const na = parseFloat(String(va).replace(/[^\d.-]/g,''));
       const nb = parseFloat(String(vb).replace(/[^\d.-]/g,''));
       if(!isNaN(na) && !isNaN(nb)) return (na-nb)*sortDir;
       return String(va).localeCompare(String(vb), 'ja') * sortDir;
+    });
+  } else {
+    rows = [...rows].sort((a,b) => {
+      const pa = pinBottom(a), pb = pinBottom(b);
+      if(pa !== pb) return pa ? 1 : -1;
+      return 0;
     });
   }
 
@@ -212,14 +272,25 @@ function render(){
 
   const tbody = document.getElementById('tbody');
   if(!rows.length){
-    tbody.innerHTML = `<tr><td colspan="${headers.length}" style="text-align:center;padding:40px;color:#999">該当データがありません</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="${headers.length+1}" style="text-align:center;padding:40px;color:#999">該当データがありません</td></tr>`;
     return;
   }
-  tbody.innerHTML = rows.map(r => {
-    return '<tr>' + headers.map(h => {
+  // ランキング対象（ピン留め除外）
+  const rankable = rows.filter(r => !pinBottom(r));
+  tbody.innerHTML = rows.map((r, idx) => {
+    const pinned = pinBottom(r);
+    const rank = pinned ? -1 : rankable.indexOf(r);
+    const rankCls = pinned ? '' : (rank === 0 ? 'top1' : rank === 1 ? 'top2' : rank === 2 ? 'top3' : '');
+    const rankBadge = pinned ? '<span class="rank r" style="background:#f3f4f6;color:#9ca3af;font-size:10px">—</span>'
+      : rank === 0 ? '<span class="rank r1">1</span>'
+      : rank === 1 ? '<span class="rank r2">2</span>'
+      : rank === 2 ? '<span class="rank r3">3</span>'
+      : `<span class="rank r">${rank+1}</span>`;
+    return `<tr class="${rankCls}" style="${pinned?'opacity:0.75':''}"><td style="text-align:center">${rankBadge}</td>` + headers.map((h, i) => {
       const v = r[h] || '';
-      if(isRatingCol(h)) return `<td class="rating-cell">${escapeHtml(formatRating(v))}</td>`;
-      if(isNumCol(h)) return `<td class="num">${escapeHtml(v)}</td>`;
+      if(isRatingCol(h)) return `<td class="rating-cell">${formatRating(v)}</td>`;
+      if(i === countColIdx) return `<td class="count-cell">${formatCount(v)}</td>`;
+      if(isFacilityCol(h)) return `<td class="facility-cell">${linkify(v)}</td>`;
       return `<td>${linkify(v)}</td>`;
     }).join('') + '</tr>';
   }).join('');
