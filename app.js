@@ -122,6 +122,11 @@ function saveData(key, data) { localStorage.setItem(key, JSON.stringify(data)); 
 document.addEventListener('DOMContentLoaded', () => {
   // URL ?view=tc で TC専用ログイン
   const params = new URLSearchParams(location.search);
+  // 録音専用画面
+  if (params.get('view') === 'rec') {
+    initStandaloneRecorder();
+    return;
+  }
   if (params.get('view') === 'tc') {
     const proceed = () => {
       sessionStorage.setItem('authenticated', 'true');
@@ -4228,6 +4233,154 @@ function stopRecording() {
   clearInterval(recTimerInterval);
   document.getElementById('rec-start').disabled = false;
   document.getElementById('rec-stop').disabled = true;
+}
+
+// === 録音専用ページ (?view=rec) ===
+let rsRecorder = null;
+let rsChunks = [];
+let rsBlob = null;
+let rsStream = null;
+let rsTimerInt = null;
+let rsStart = 0;
+let rsWakeLock = null;
+
+async function initStandaloneRecorder() {
+  document.getElementById('rec-standalone').hidden = false;
+  document.getElementById('login-screen').style.display = 'none';
+  // 端末スリープ防止 (Wake Lock)
+  const setupWakeLock = async () => {
+    try {
+      if ('wakeLock' in navigator) {
+        rsWakeLock = await navigator.wakeLock.request('screen');
+        document.getElementById('rs-wake').innerHTML = '● 画面ロック防止';
+        document.getElementById('rs-wake').style.opacity = '.8';
+        rsWakeLock.addEventListener('release', () => {
+          document.getElementById('rs-wake').style.opacity = '.4';
+        });
+      }
+    } catch(e) { console.warn('wakeLock denied', e); }
+  };
+
+  document.getElementById('rs-toggle').addEventListener('click', async () => {
+    if (!rsRecorder || rsRecorder.state === 'inactive') {
+      // 開始
+      try {
+        rsStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mt = MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus'
+          : MediaRecorder.isTypeSupported('audio/webm') ? 'audio/webm'
+          : MediaRecorder.isTypeSupported('audio/mp4') ? 'audio/mp4' : '';
+        rsRecorder = new MediaRecorder(rsStream, { ...(mt ? { mimeType: mt } : {}), audioBitsPerSecond: 32000 });
+        rsChunks = []; rsBlob = null;
+        rsRecorder.ondataavailable = e => { if (e.data.size > 0) rsChunks.push(e.data); };
+        rsRecorder.onstop = () => {
+          rsBlob = new Blob(rsChunks, { type: rsRecorder.mimeType || 'audio/webm' });
+          rsStream.getTracks().forEach(t => t.stop());
+          // 保存画面へ遷移
+          document.getElementById('rs-recording-ui').style.display = 'none';
+          document.getElementById('rs-save-ui').hidden = false;
+          document.getElementById('rs-preview').src = URL.createObjectURL(rsBlob);
+          document.getElementById('rs-save-time').textContent = document.getElementById('rs-timer').textContent;
+        };
+        // 5秒ごとにchunkを吐く (万一のクラッシュ対策)
+        rsRecorder.start(5000);
+        rsStart = Date.now();
+        document.getElementById('rs-toggle').style.background = '#333';
+        document.getElementById('rs-toggle').innerHTML = '■ STOP';
+        document.getElementById('rs-toggle').style.boxShadow = '0 0 40px rgba(255,255,255,.1)';
+        document.getElementById('rs-hint').textContent = '録音中 — 停止は再タップ';
+        await setupWakeLock();
+        rsTimerInt = setInterval(() => {
+          const s = Math.floor((Date.now() - rsStart) / 1000);
+          const hh = Math.floor(s / 3600);
+          const mm = String(Math.floor((s % 3600) / 60)).padStart(2, '0');
+          const ss = String(s % 60).padStart(2, '0');
+          document.getElementById('rs-timer').textContent = hh > 0 ? `${hh}:${mm}:${ss}` : `${mm}:${ss}`;
+          // 推定サイズ (32kbps)
+          const estKb = Math.round(s * 32 / 8);
+          const estDisp = estKb < 1024 ? `≈ ${estKb} KB` : `≈ ${(estKb/1024).toFixed(1)} MB`;
+          document.getElementById('rs-size').textContent = estDisp;
+        }, 1000);
+      } catch (e) {
+        alert('マイクが使えません: ' + e.message);
+      }
+    } else {
+      // 停止
+      rsRecorder.stop();
+      clearInterval(rsTimerInt);
+      if (rsWakeLock) { try { await rsWakeLock.release(); } catch(_){} rsWakeLock = null; }
+    }
+  });
+
+  // タブ復帰時に WakeLock 再取得
+  document.addEventListener('visibilitychange', async () => {
+    if (!document.hidden && rsRecorder && rsRecorder.state === 'recording') {
+      await setupWakeLock();
+    }
+  });
+
+  // 撮り直し
+  document.getElementById('rs-redo').addEventListener('click', () => {
+    if (!confirm('録音を破棄してもう一度撮りますか？')) return;
+    rsBlob = null; rsChunks = [];
+    document.getElementById('rs-save-ui').hidden = true;
+    document.getElementById('rs-recording-ui').style.display = 'flex';
+    document.getElementById('rs-timer').textContent = '00:00';
+    document.getElementById('rs-toggle').style.background = '#d93636';
+    document.getElementById('rs-toggle').innerHTML = '● REC';
+    document.getElementById('rs-toggle').style.boxShadow = '0 0 40px rgba(217,54,54,.4)';
+    document.getElementById('rs-hint').textContent = 'タップで録音開始';
+    document.getElementById('rs-size').textContent = '';
+  });
+
+  // 保存
+  document.getElementById('rs-save').addEventListener('click', async () => {
+    const counselor = document.getElementById('rs-counselor').value.trim();
+    if (!counselor) { document.getElementById('rs-save-status').textContent = 'カウンセラー名を入力してください'; return; }
+    const btn = document.getElementById('rs-save');
+    btn.disabled = true; btn.textContent = '保存中...';
+    document.getElementById('rs-save-status').textContent = 'アップロード中...';
+    try {
+      const url = await uploadRecordingBlob(rsBlob);
+      const durSec = Math.floor((Date.now() - rsStart) / 1000);
+      const today = new Date();
+      const date = `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
+      const { error } = await sb.from('self_recordings').insert({
+        session_date: date, counselor,
+        facility: document.getElementById('rs-facility').value,
+        patient: document.getElementById('rs-patient').value.trim(),
+        service: 'インビザ',
+        url, duration: Math.max(1, Math.round(durSec / 60)),
+        contracted: document.getElementById('rs-contracted').value === '1',
+        amount: Number(document.getElementById('rs-amount').value) || 0,
+        notes: document.getElementById('rs-notes').value.trim()
+      });
+      if (error) throw error;
+      document.getElementById('rs-save-status').innerHTML = '<span style="color:#6f6">✓ 保存完了</span>';
+      setTimeout(() => {
+        // リセットして最初の画面に戻る
+        document.getElementById('rs-redo').click();
+        ['rs-counselor','rs-patient','rs-amount','rs-notes'].forEach(id => document.getElementById(id).value = '');
+        document.getElementById('rs-contracted').value = '0';
+        document.getElementById('rs-save-status').textContent = '';
+      }, 1500);
+    } catch(e) {
+      console.error(e);
+      document.getElementById('rs-save-status').innerHTML = '<span style="color:#f66">エラー: ' + (e.message || '') + '</span>';
+    } finally {
+      btn.disabled = false; btn.textContent = '保存';
+    }
+  });
+
+  // 閉じる
+  document.getElementById('rs-close').addEventListener('click', () => {
+    if (rsRecorder && rsRecorder.state === 'recording') {
+      if (!confirm('録音中です。破棄して閉じますか？')) return;
+      rsRecorder.stop();
+      clearInterval(rsTimerInt);
+    }
+    if (rsWakeLock) { try { rsWakeLock.release(); } catch(_){} }
+    location.href = location.pathname;
+  });
 }
 
 function openRecordingDetail(id) {

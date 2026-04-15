@@ -277,6 +277,49 @@
     </div>
   </div>
 
+  <!-- 録音専用画面 (?view=rec) -->
+  <div id="rec-standalone" hidden style="position:fixed;inset:0;background:#0a0a0a;color:#fff;z-index:9998;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:20px;font-family:inherit">
+    <div style="position:absolute;top:20px;left:24px;font-size:11px;letter-spacing:2px;opacity:.5">SEISHOKAI REC</div>
+    <div style="position:absolute;top:20px;right:24px;display:flex;gap:12px;align-items:center">
+      <span id="rs-wake" style="font-size:10px;opacity:.4">○ 画面ロック防止</span>
+      <button id="rs-close" style="background:none;border:1px solid #555;color:#aaa;padding:4px 10px;font-size:11px;border-radius:4px;cursor:pointer;font-family:inherit">✕</button>
+    </div>
+
+    <!-- 録音画面 -->
+    <div id="rs-recording-ui" style="display:flex;flex-direction:column;align-items:center;gap:32px">
+      <div id="rs-timer" style="font-family:'Cormorant Garamond',serif;font-size:72px;font-weight:300;letter-spacing:4px">00:00</div>
+      <button id="rs-toggle" style="width:180px;height:180px;border-radius:50%;border:none;background:#d93636;color:#fff;font-size:15px;font-weight:700;letter-spacing:2px;cursor:pointer;box-shadow:0 0 40px rgba(217,54,54,.4);font-family:inherit;transition:all .2s">● REC</button>
+      <div id="rs-hint" style="font-size:12px;opacity:.5;letter-spacing:1px">タップで録音開始</div>
+      <div id="rs-size" style="font-size:10px;opacity:.4;font-family:'Cormorant Garamond',serif"></div>
+    </div>
+
+    <!-- 保存画面 (録音完了後) -->
+    <div id="rs-save-ui" hidden style="width:100%;max-width:400px;display:flex;flex-direction:column;gap:12px">
+      <div style="text-align:center;margin-bottom:8px">
+        <div style="font-size:11px;opacity:.5;letter-spacing:2px;margin-bottom:4px">RECORDED</div>
+        <div id="rs-save-time" style="font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:300"></div>
+      </div>
+      <audio id="rs-preview" controls style="width:100%;filter:invert(.9)"></audio>
+      <input type="text" id="rs-counselor" placeholder="カウンセラー名" style="width:100%;padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:6px;font-size:14px;font-family:inherit">
+      <select id="rs-facility" style="width:100%;padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:6px;font-size:14px;font-family:inherit">
+        <option>BF銀座</option><option>エスカ</option><option>アール</option><option>ウィズ</option><option>ルミナス</option><option>茶屋</option><option>知立</option><option>小牧</option><option>八事</option><option>大森</option><option>京都</option>
+      </select>
+      <input type="text" id="rs-patient" placeholder="患者 (イニシャル可、任意)" style="width:100%;padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:6px;font-size:14px;font-family:inherit">
+      <div style="display:flex;gap:8px">
+        <select id="rs-contracted" style="flex:1;padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:6px;font-size:14px;font-family:inherit">
+          <option value="0">未成約</option><option value="1">成約</option>
+        </select>
+        <input type="number" id="rs-amount" placeholder="金額" style="flex:1;padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:6px;font-size:14px;font-family:inherit">
+      </div>
+      <textarea id="rs-notes" rows="2" placeholder="要点メモ (任意)" style="width:100%;padding:12px;background:#1a1a1a;border:1px solid #333;color:#fff;border-radius:6px;font-size:14px;font-family:inherit;resize:vertical"></textarea>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <button id="rs-save" style="flex:2;padding:14px;background:#fff;color:#000;border:none;border-radius:6px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">保存</button>
+        <button id="rs-redo" style="flex:1;padding:14px;background:transparent;color:#aaa;border:1px solid #555;border-radius:6px;font-size:13px;cursor:pointer;font-family:inherit">撮り直し</button>
+      </div>
+      <div id="rs-save-status" style="font-size:11px;opacity:.5;text-align:center;min-height:14px"></div>
+    </div>
+  </div>
+
   <!-- App -->
   <div id="app" class="app" hidden>
     <!-- Header -->
