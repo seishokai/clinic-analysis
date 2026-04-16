@@ -1071,6 +1071,9 @@ function showApp() {
       span.textContent = customName + ' でログイン中';
       header.querySelector('.nav-spacer').after(span);
     }
+    // 個別発行アカウントはサブタブを全部非表示
+    const bkSubNav = document.getElementById('bk-sub-nav');
+    if (bkSubNav) bkSubNav.style.display = 'none';
   }
 
   // プロモユーザーの場合、予約タブのみ表示
