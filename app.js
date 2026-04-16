@@ -2176,6 +2176,8 @@ async function loadBookings() {
     populateBookingFilters();
     renderBookings();
     renderAnalysis();
+    // プロモ率のdatalistも更新
+    if (document.getElementById('pr-code-options')) renderPromoRates();
     // 管理タブの選択肢を更新
     const admPromos = document.getElementById('adm-promos');
     const admServices = document.getElementById('adm-services');
@@ -4147,6 +4149,17 @@ async function deletePromoRate(code) {
 async function renderPromoRates() {
   await loadPromoRates();
   const { data } = await sb.from('promo_rates').select('*').order('promo_code');
+
+  // datalist を既存プロモコードで埋める (予約データ + 登録済みレート + PROMO_PASSWORDS の値)
+  const dl = document.getElementById('pr-code-options');
+  if (dl) {
+    const fromBookings = [...new Set((bookingsData || []).map(d => d.source).filter(Boolean))];
+    const fromRates = (data || []).map(r => r.promo_code);
+    const fromPasswords = typeof PROMO_PASSWORDS === 'object' ? Object.values(PROMO_PASSWORDS) : [];
+    const all = [...new Set([...fromBookings, ...fromRates, ...fromPasswords])].sort();
+    dl.innerHTML = all.map(p => `<option value="${p.replace(/"/g,'&quot;')}">`).join('');
+  }
+
   const tbody = document.querySelector('#pr-table tbody');
   if (!tbody) return;
   const rows = (data || []).map(r => `
