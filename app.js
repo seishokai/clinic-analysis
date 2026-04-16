@@ -127,34 +127,9 @@ document.addEventListener('DOMContentLoaded', () => {
     initStandaloneRecorder();
     return;
   }
-  // マジックリンク (?k=<password>) → 自動ログイン
-  const magicKey = params.get('k');
-  if (magicKey) {
-    (async () => {
-      try {
-        const { data } = await sb.from('accounts').select('*').eq('password', magicKey);
-        const matched = data && data[0];
-        if (matched) {
-          sessionStorage.setItem('authenticated', 'true');
-          sessionStorage.setItem('role', 'custom');
-          sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
-          sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
-          sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
-          sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
-          sessionStorage.setItem('customEditRole', matched.role || 'view');
-          sessionStorage.setItem('customAgency', matched.agency || '');
-          sessionStorage.setItem('customName', matched.name || '');
-          userRole = 'custom';
-          setupEventListeners();
-          // URLからkを除去（履歴汚染とシェア時の漏洩防止）
-          history.replaceState(null, '', location.pathname);
-          showApp();
-          return;
-        }
-      } catch(e) { console.warn('magic link error', e); }
-      // 失敗時は通常ログイン
-      setupEventListeners();
-    })();
+  // パートナー専用ログイン画面 (?view=partner)
+  if (params.get('view') === 'partner') {
+    initPartnerLogin();
     return;
   }
   if (params.get('view') === 'tc') {
@@ -1997,7 +1972,6 @@ async function renderAccounts() {
         <th>代理店</th>
         <th>制限</th>
         <th>パスワード</th>
-        <th>専用URL</th>
         <th></th>
       </tr></thead>
       <tbody>
@@ -2014,14 +1988,20 @@ async function renderAccounts() {
             <td style="font-size:11px">${a.agency || '-'}</td>
             <td style="font-size:11px;color:var(--text-sub)" title="${[...(a.promos||[]),...(a.services||[]),...(a.facilities||[])].join(', ')}">${restrictions.join(' ') || '-'}</td>
             <td><code style="font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;user-select:all">${a.password}</code>
-              <button class="copy-btn" onclick="navigator.clipboard.writeText('${a.password}');showToast('コピーしました')" style="font-size:10px;padding:2px 6px;margin-left:4px">📋</button></td>
-            <td><button class="copy-btn" onclick="navigator.clipboard.writeText('${baseUrl}?k=${a.password}');showToast('専用URLをコピーしました')" style="font-size:10px;padding:3px 10px;background:#111;color:#fff;border-radius:4px;border:none">🔗 URL</button></td>
+              <button class="copy-btn" onclick="navigator.clipboard.writeText('${a.password}');showToast('PWをコピーしました')" style="font-size:10px;padding:2px 6px;margin-left:4px">📋</button></td>
             <td><button class="resource-delete" onclick="deleteAccount(${a.id})" style="width:24px;height:24px;font-size:11px">×</button></td>
           </tr>`;
         }).join('')}
       </tbody>
     </table></div>
-    <div style="margin-top:10px;font-size:11px;color:var(--text-sub)">🔗 URL ボタン: このアカウント専用のログインURLをコピー (開くだけで自動ログイン、パスワード入力不要)</div>
+    <div style="margin-top:14px;padding:12px;background:var(--bg);border-radius:6px;border:1px solid var(--border-light)">
+      <div style="font-size:12px;font-weight:700;margin-bottom:6px">🔗 パートナー共通ログインURL</div>
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <code style="font-size:12px;background:#fff;padding:6px 10px;border-radius:4px;border:1px solid var(--border);user-select:all;flex:1">${baseUrl}?view=partner</code>
+        <button class="copy-btn" onclick="navigator.clipboard.writeText('${baseUrl}?view=partner');showToast('URLをコピーしました')" style="font-size:11px;padding:6px 14px;background:#111;color:#fff;border-radius:4px;border:none">URLをコピー</button>
+      </div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:6px">このURL(共通)とパートナーごとのパスワード(上表)を別経路で伝えてください。URL単体では何もできません。</div>
+    </div>
   `;
 }
 
@@ -4375,6 +4355,65 @@ function stopRecording() {
   clearInterval(recTimerInterval);
   document.getElementById('rec-start').disabled = false;
   document.getElementById('rec-stop').disabled = true;
+}
+
+// === パートナー専用ログイン (?view=partner) ===
+function initPartnerLogin() {
+  // 通常のログイン画面を非表示
+  const loginScreen = document.getElementById('login-screen');
+  if (loginScreen) loginScreen.style.display = 'none';
+  // 専用オーバーレイ
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:inherit;padding:20px';
+  ov.innerHTML = `
+    <div style="font-size:13px;font-weight:700;letter-spacing:3px;color:#111;margin-bottom:8px">SEISHOKAI PARTNERS</div>
+    <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase">Enter Password</div>
+    <input id="pt-pass-input" type="password" autocomplete="off"
+      style="width:280px;text-align:center;font-size:16px;letter-spacing:2px;padding:14px;border:2px solid #111;border-radius:8px;outline:none;font-family:inherit">
+    <div id="pt-pass-err" style="font-size:11px;color:#c00;min-height:14px"></div>
+    <button id="pt-pass-btn" style="border:2px solid #111;background:#111;color:#fff;padding:10px 40px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit;letter-spacing:2px">LOGIN</button>
+    <div style="font-size:10px;color:#bbb;margin-top:16px;letter-spacing:1px">発行されたパスワードをお入れください</div>
+  `;
+  document.body.appendChild(ov);
+  const input = ov.querySelector('#pt-pass-input');
+  const err = ov.querySelector('#pt-pass-err');
+  const btn = ov.querySelector('#pt-pass-btn');
+  input.focus();
+  input.addEventListener('input', () => { err.textContent = ''; });
+  const submit = async () => {
+    const pw = input.value.trim();
+    if (!pw) return;
+    btn.disabled = true; btn.textContent = 'ログイン中...';
+    try {
+      const { data } = await sb.from('accounts').select('*').eq('password', pw);
+      const matched = data && data[0];
+      if (!matched) {
+        err.textContent = 'パスワードが違います';
+        input.value = '';
+        input.focus();
+        btn.disabled = false; btn.textContent = 'LOGIN';
+        return;
+      }
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'custom');
+      sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
+      sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
+      sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
+      sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
+      sessionStorage.setItem('customEditRole', matched.role || 'view');
+      sessionStorage.setItem('customAgency', matched.agency || '');
+      sessionStorage.setItem('customName', matched.name || '');
+      userRole = 'custom';
+      ov.remove();
+      setupEventListeners();
+      showApp();
+    } catch(e) {
+      err.textContent = 'エラー: ' + (e.message || '');
+      btn.disabled = false; btn.textContent = 'LOGIN';
+    }
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 }
 
 // === 録音専用ページ (?view=rec) ===
