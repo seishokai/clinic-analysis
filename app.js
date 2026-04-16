@@ -589,6 +589,11 @@ function setupEventListeners() {
     });
     document.getElementById('rec-start')?.addEventListener('click', startRecording);
     document.getElementById('rec-stop')?.addEventListener('click', stopRecording);
+
+    // プロモ率
+    document.getElementById('pr-save')?.addEventListener('click', savePromoRate);
+    loadPromoRates();
+    renderPromoRates();
     document.getElementById('rec-file')?.addEventListener('change', e => {
       const f = e.target.files[0];
       const lbl = document.getElementById('rec-file-label');
@@ -2610,6 +2615,27 @@ function renderBookings() {
         saveExtra(inp.dataset.name, inp.dataset.apply, inp.dataset.field, inp.value);
         inp.style.borderColor = 'var(--green)';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+        // 成約金額変更時にインセを自動計算
+        if (inp.dataset.field === 'contractAmount') {
+          const name = inp.dataset.name;
+          const apply = inp.dataset.apply;
+          const row = bookingsData.find(b => b.name === name && b.applyDate === apply);
+          if (row) {
+            row.contractAmount = Number(inp.value) || 0;
+            const inc = calcIncentive(row.source, row.contractAmount);
+            if (inc) {
+              row.incentiveAmount = inc;
+              // 同じ行のincentiveAmount入力欄も更新
+              const incInp = tbody.querySelector(`input[data-field="incentiveAmount"][data-name="${CSS.escape(name)}"][data-apply="${CSS.escape(apply)}"]`);
+              if (incInp) {
+                incInp.value = inc;
+                incInp.style.background = '#fef3c7';
+                setTimeout(() => { incInp.style.background = ''; }, 1500);
+              }
+              saveExtra(name, apply, 'incentiveAmount', inc);
+            }
+          }
+        }
       });
     });
 
@@ -4085,6 +4111,58 @@ async function renderAdBudgets() {
       </div>
     `;
   }).join('');
+}
+
+// === プロモ別インセ率 ===
+let promoRatesCache = {}; // { promoCode: rate }
+
+async function loadPromoRates() {
+  try {
+    const { data } = await sb.from('promo_rates').select('*');
+    promoRatesCache = {};
+    (data || []).forEach(r => { promoRatesCache[r.promo_code] = Number(r.rate) || 0; });
+  } catch(e) { console.warn('promo rates load', e); }
+  return promoRatesCache;
+}
+
+async function savePromoRate() {
+  const code = document.getElementById('pr-code').value.trim();
+  const rate = Number(document.getElementById('pr-rate').value);
+  if (!code || isNaN(rate)) { showToast('プロモコードと率を入力', true); return; }
+  const { error } = await sb.from('promo_rates').upsert({ promo_code: code, rate, updated_at: new Date().toISOString() });
+  if (error) { showToast('保存失敗: ' + error.message, true); return; }
+  document.getElementById('pr-code').value = '';
+  document.getElementById('pr-rate').value = '';
+  showToast('プロモ率を保存しました');
+  await renderPromoRates();
+}
+
+async function deletePromoRate(code) {
+  if (!confirm(code + ' のインセ率を削除しますか？')) return;
+  await sb.from('promo_rates').delete().eq('promo_code', code);
+  showToast('削除しました');
+  renderPromoRates();
+}
+
+async function renderPromoRates() {
+  await loadPromoRates();
+  const { data } = await sb.from('promo_rates').select('*').order('promo_code');
+  const tbody = document.querySelector('#pr-table tbody');
+  if (!tbody) return;
+  const rows = (data || []).map(r => `
+    <tr>
+      <td style="font-weight:600">${r.promo_code}</td>
+      <td><span style="font-family:'Cormorant Garamond',serif;font-size:16px;font-weight:600">${r.rate}</span>%</td>
+      <td style="font-size:11px;color:var(--text-sub)">${(r.updated_at||'').substring(0,10)}</td>
+      <td><button class="resource-delete" onclick="deletePromoRate('${r.promo_code.replace(/'/g,"\\'")}')" style="width:24px;height:24px;font-size:11px">×</button></td>
+    </tr>`).join('');
+  tbody.innerHTML = rows || '<tr><td colspan="4" style="color:var(--text-muted);text-align:center;padding:12px">未登録</td></tr>';
+}
+
+function calcIncentive(source, amount) {
+  const rate = promoRatesCache[(source || '').trim()];
+  if (!rate || !Number(amount)) return 0;
+  return Math.round(Number(amount) * rate / 100);
 }
 
 // === 自医院録音 (Supabase + MediaRecorder) ===
