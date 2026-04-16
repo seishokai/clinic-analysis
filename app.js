@@ -2197,6 +2197,37 @@ async function loadBookings() {
       });
     } catch(e) { console.warn('bk-extra apply error:', e); }
 
+    // プロモ率を読み込み (毎ロード時に最新化)
+    try {
+      await loadPromoRates();
+      // 成約金額が入力済みでインセが0/未設定の行は自動再計算
+      const bkEx2 = loadData('bk-extra', {});
+      let recalcCount = 0;
+      bookingsData.forEach(d => {
+        const key = d.name + '|' + d.applyDate;
+        const ex = bkEx2[key] || {};
+        const amt = Number(ex.contractAmount || d.contractAmount || 0);
+        const curInc = Number(ex.incentiveAmount || d.incentiveAmount || 0);
+        if (amt > 0 && curInc === 0) {
+          const inc = calcIncentive(d.source, amt);
+          if (inc) {
+            if (!bkEx2[key]) bkEx2[key] = {};
+            bkEx2[key].incentiveAmount = inc;
+            d.incentiveAmount = inc;
+            // DBにも書き戻し
+            sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, incentive_amount: inc }, { onConflict: 'name,apply_date' }).then(()=>{});
+            recalcCount++;
+          }
+        } else if (ex.incentiveAmount) {
+          d.incentiveAmount = Number(ex.incentiveAmount);
+        }
+      });
+      if (recalcCount > 0) {
+        saveData('bk-extra', bkEx2);
+        console.log(`インセを${recalcCount}件自動計算しました`);
+      }
+    } catch(e) { console.warn('promo rate auto-calc skipped', e); }
+
     populateBookingFilters();
     renderBookings();
     renderAnalysis();
@@ -4159,7 +4190,33 @@ async function savePromoRate() {
   if (error) { showToast('保存失敗: ' + error.message, true); return; }
   document.getElementById('pr-code').value = '';
   document.getElementById('pr-rate').value = '';
-  showToast('プロモ率を保存しました');
+  // キャッシュ更新 + 既存予約の再計算をトリガー
+  await loadPromoRates();
+  if (typeof bookingsData !== 'undefined' && bookingsData.length) {
+    const bkEx = loadData('bk-extra', {});
+    let recalc = 0;
+    bookingsData.forEach(d => {
+      if ((d.source||'').trim() !== code) return;
+      const key = d.name + '|' + d.applyDate;
+      const ex = bkEx[key] || {};
+      const amt = Number(ex.contractAmount || d.contractAmount || 0);
+      if (amt > 0) {
+        const inc = calcIncentive(code, amt);
+        if (inc) {
+          if (!bkEx[key]) bkEx[key] = {};
+          bkEx[key].incentiveAmount = inc;
+          d.incentiveAmount = inc;
+          sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, incentive_amount: inc }, { onConflict: 'name,apply_date' }).then(()=>{});
+          recalc++;
+        }
+      }
+    });
+    if (recalc) saveData('bk-extra', bkEx);
+    if (typeof renderBookings === 'function') renderBookings();
+    showToast(`プロモ率を保存しました (${recalc}件のインセを再計算)`);
+  } else {
+    showToast('プロモ率を保存しました');
+  }
   await renderPromoRates();
 }
 
