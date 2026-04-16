@@ -317,6 +317,8 @@ function setupEventListeners() {
       while (el && el.tagName !== 'MAIN') el = el.parentElement;
       if (el) {
         el.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== `sub-${sub}`);
+        // ビュー単位のサブタブ位置を記憶
+        try { sessionStorage.setItem('lastSub:' + el.id, sub); } catch(_){}
       }
       // タブ切替時にデータ更新
       if (sub === 'bk-search' && bookingsData.length > 0) {
@@ -1131,6 +1133,44 @@ function showApp() {
   renderDocuments();
   loadBookings();
   renderAdBudgets();
+  // 前回のビュー位置を復元
+  restoreLastView();
+}
+
+function restoreLastView() {
+  try {
+    const lastView = sessionStorage.getItem('lastView');
+    // ロールごとに許可されたビューしか復元しない
+    const isAllowed = (v) => {
+      if (userRole === 'admin') return ['bookings','tc','adbudget','admin','sales'].includes(v);
+      if (userRole === 'sales') return v === 'sales';
+      if (userRole === 'tc') return v === 'tc';
+      if (userRole === 'promo') return v === 'bookings';
+      if (userRole === 'custom') {
+        const perms = JSON.parse(sessionStorage.getItem('customPerms') || '[]');
+        return perms.includes(v);
+      }
+      return false;
+    };
+    if (lastView && isAllowed(lastView)) {
+      switchView(lastView);
+    }
+    // 各ビューのサブタブ位置を復元
+    document.querySelectorAll('main.view').forEach(main => {
+      const sub = sessionStorage.getItem('lastSub:' + main.id);
+      if (!sub) return;
+      const subBtn = main.querySelector(`.sub-nav-btn[data-sub="${sub}"]`);
+      if (subBtn && subBtn.style.display !== 'none') {
+        // 直接DOMを切替（クリックすると医院タブの個別データロードが走るため）
+        const parent = subBtn.closest('.sub-nav');
+        if (parent) {
+          parent.querySelectorAll('.sub-nav-btn').forEach(s => s.classList.remove('active'));
+          subBtn.classList.add('active');
+        }
+        main.querySelectorAll('[id^="sub-"]').forEach(s => s.hidden = s.id !== `sub-${sub}`);
+      }
+    });
+  } catch(e) { console.warn('restoreLastView', e); }
 }
 
 // === Navigation ===
@@ -1142,6 +1182,8 @@ function switchView(view) {
   window.scrollTo(0, 0);
   const titles = {tc:'TC',sales:'売上',bookings:'予約',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
+  // 現在のビューを記憶（リロード時に復元）
+  try { sessionStorage.setItem('lastView', view); } catch(_){}
 }
 
 // === Facility Tabs ===
