@@ -127,6 +127,36 @@ document.addEventListener('DOMContentLoaded', () => {
     initStandaloneRecorder();
     return;
   }
+  // マジックリンク (?k=<password>) → 自動ログイン
+  const magicKey = params.get('k');
+  if (magicKey) {
+    (async () => {
+      try {
+        const { data } = await sb.from('accounts').select('*').eq('password', magicKey);
+        const matched = data && data[0];
+        if (matched) {
+          sessionStorage.setItem('authenticated', 'true');
+          sessionStorage.setItem('role', 'custom');
+          sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
+          sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
+          sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
+          sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
+          sessionStorage.setItem('customEditRole', matched.role || 'view');
+          sessionStorage.setItem('customAgency', matched.agency || '');
+          sessionStorage.setItem('customName', matched.name || '');
+          userRole = 'custom';
+          setupEventListeners();
+          // URLからkを除去（履歴汚染とシェア時の漏洩防止）
+          history.replaceState(null, '', location.pathname);
+          showApp();
+          return;
+        }
+      } catch(e) { console.warn('magic link error', e); }
+      // 失敗時は通常ログイン
+      setupEventListeners();
+    })();
+    return;
+  }
   if (params.get('view') === 'tc') {
     const proceed = () => {
       sessionStorage.setItem('authenticated', 'true');
@@ -1964,6 +1994,7 @@ async function renderAccounts() {
         <th>代理店</th>
         <th>制限</th>
         <th>パスワード</th>
+        <th>専用URL</th>
         <th></th>
       </tr></thead>
       <tbody>
@@ -1981,12 +2012,13 @@ async function renderAccounts() {
             <td style="font-size:11px;color:var(--text-sub)" title="${[...(a.promos||[]),...(a.services||[]),...(a.facilities||[])].join(', ')}">${restrictions.join(' ') || '-'}</td>
             <td><code style="font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;user-select:all">${a.password}</code>
               <button class="copy-btn" onclick="navigator.clipboard.writeText('${a.password}');showToast('コピーしました')" style="font-size:10px;padding:2px 6px;margin-left:4px">📋</button></td>
+            <td><button class="copy-btn" onclick="navigator.clipboard.writeText('${baseUrl}?k=${a.password}');showToast('専用URLをコピーしました')" style="font-size:10px;padding:3px 10px;background:#111;color:#fff;border-radius:4px;border:none">🔗 URL</button></td>
             <td><button class="resource-delete" onclick="deleteAccount(${a.id})" style="width:24px;height:24px;font-size:11px">×</button></td>
           </tr>`;
         }).join('')}
       </tbody>
     </table></div>
-    <div style="margin-top:10px;font-size:11px;color:var(--text-sub)">URL共通: <code style="background:var(--bg);padding:2px 6px;border-radius:4px;user-select:all">${baseUrl}</code> <button class="copy-btn" onclick="navigator.clipboard.writeText('${baseUrl}');showToast('URLをコピーしました')" style="font-size:10px;padding:2px 6px">📋</button></div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-sub)">🔗 URL ボタン: このアカウント専用のログインURLをコピー (開くだけで自動ログイン、パスワード入力不要)</div>
   `;
 }
 
