@@ -4691,10 +4691,127 @@ function openRecordingDetail(id) {
     </div>
     ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><audio controls src="${r.url}" style="width:100%;margin-bottom:4px"></audio><a href="${r.url}" target="_blank" style="font-size:11px;color:#0066cc;word-break:break-all">別タブで開く</a></div>` : ''}
     <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">要点・メモ</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.notes || '(なし)'}</div></div>
-    ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:12px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:6px">AI アドバイス</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.aiAdvice}</div></div>` : '<div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:4px;font-size:12px;color:var(--text-muted)">AI 分析は Phase 3 で対応予定</div>'}
-    <div style="display:flex;gap:8px;margin-top:16px"><button class="btn btn-outline" onclick="deleteRecording(${r.id});document.getElementById('rec-detail-modal').hidden=true" style="color:#c00;border-color:#c00">削除</button><button class="btn btn-outline" onclick="document.getElementById('rec-detail-modal').hidden=true">閉じる</button></div>
+    ${r.aiTranscript ? `<details style="margin-bottom:12px"><summary style="font-size:11px;font-weight:600;color:var(--text-sub);cursor:pointer">📝 文字起こし (展開)</summary><div style="font-size:12px;line-height:1.7;white-space:pre-wrap;padding:10px;background:var(--bg);border-radius:4px;max-height:300px;overflow-y:auto;margin-top:6px">${r.aiTranscript}</div></details>` : ''}
+    ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:14px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:8px">🤖 AI フィードバック</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.aiAdvice}</div></div>` : ''}
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button class="btn btn-dark" id="rec-ai-analyze-btn" onclick="analyzeRecording(${r.id})" style="background:#7c3aed;border-color:#7c3aed">${r.aiAdvice ? '🤖 AI再分析' : '🤖 AI分析する'}</button>
+      <button class="btn btn-outline" onclick="document.getElementById('rec-detail-modal').hidden=true">閉じる</button>
+      <button class="btn btn-outline" onclick="deleteRecording(${r.id});document.getElementById('rec-detail-modal').hidden=true" style="color:#c00;border-color:#c00;margin-left:auto">削除</button>
+    </div>
+    <div id="rec-ai-status" style="font-size:11px;color:var(--text-sub);margin-top:8px;min-height:14px"></div>
   `;
   document.getElementById('rec-detail-modal').hidden = false;
+}
+
+// === AI分析 (Cloudflare Workers経由でClaude呼び出し) ===
+const AI_PROXY_URL = 'https://seishokai-ai-proxy.tkm-koike.workers.dev/';
+
+async function analyzeRecording(id) {
+  const r = recordingsCache.find(x => x.id === id);
+  if (!r) return;
+  const btn = document.getElementById('rec-ai-analyze-btn');
+  const status = document.getElementById('rec-ai-status');
+  btn.disabled = true;
+  btn.textContent = '分析中...';
+  status.textContent = '';
+
+  try {
+    // 1. 競合データを文脈に
+    let competitorContext = '';
+    try {
+      const cRes = await fetch('data/clinics.json?v=' + Date.now(), { cache: 'no-store' });
+      const cData = await cRes.json();
+      competitorContext = (cData || []).slice(0, 12).map(c => {
+        const sc = c.scores || {};
+        const avg = ((sc.reception + sc.counseling + sc.hospitality + sc.environment) / 4).toFixed(1);
+        const adopt = (c.suggestions?.adopt || []).join(' / ') || 'なし';
+        return `■ ${c.name} (平均${avg}/5)\n  強み: ${(c.strengths||[]).slice(0,3).join(' / ')}\n  改善点: ${c.improvements?.counseling || ''}\n  採用すべき施策: ${adopt}`;
+      }).join('\n\n');
+    } catch(e) { console.warn('competitor context skip', e); }
+
+    // 2. 録音音声があればまずWhisperで文字起こし (proxyが対応していれば)
+    let transcript = r.aiTranscript || '';
+    if (!transcript && r.url) {
+      status.textContent = '音声を文字起こし中...';
+      try {
+        const wRes = await fetch(AI_PROXY_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ transcribeUrl: r.url, language: 'ja' })
+        });
+        if (wRes.ok) {
+          const wData = await wRes.json();
+          transcript = wData.text || wData.transcript || '';
+        }
+      } catch(e) { console.warn('transcribe skip', e); }
+    }
+
+    // 3. Claude にフィードバック依頼
+    status.textContent = 'Claudeで分析中...';
+    const prompt = `あなたは清翔会(歯科医院グループ)のカウンセリング指導コーチです。
+以下は当院カウンセラーのカウンセリング記録です。競合12医院の調査データと比較しながら、改善点と具体アドバイスを返してください。
+
+# 当院カウンセリング情報
+- 日付: ${r.date}
+- カウンセラー: ${r.counselor}
+- 医院: ${r.facility}
+- 患者: ${r.patient || '不明'}
+- 相談内容: ${r.service}
+- 録音時間: ${r.duration}分
+- 成約: ${r.contracted ? 'あり' : 'なし'}
+- 成約金額: ${r.amount ? '¥' + Number(r.amount).toLocaleString() : 'なし'}
+- 要点メモ: ${r.notes || '(なし)'}
+${transcript ? '- 文字起こし:\n' + transcript.slice(0, 8000) : ''}
+
+# 競合医院の調査結果
+${competitorContext || '(データ未取得)'}
+
+# 出力フォーマット (JSONのみ、説明文不要)
+{
+  "score": 1-100の整数,
+  "good": ["良かった点1","良かった点2","良かった点3"],
+  "improve": ["改善点1","改善点2","改善点3"],
+  "advice": "成約率向上のための具体的アドバイス(150-300文字)。競合医院の事例を引用して具体的に。",
+  "next_action": "次回までに実行すべき具体的アクション3つを箇条書きで"
+}`;
+
+    const apiRes = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!apiRes.ok) throw new Error('AI API失敗 ' + apiRes.status);
+    const apiData = await apiRes.json();
+    const rawText = (apiData.content || []).map(b => b.text || '').join('');
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('AIの返答を解析できませんでした');
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    // 4. 整形してDB保存
+    const adviceText = `【総合スコア】${parsed.score}/100点\n\n【良かった点】\n${(parsed.good||[]).map(x=>'・'+x).join('\n')}\n\n【改善点】\n${(parsed.improve||[]).map(x=>'・'+x).join('\n')}\n\n【アドバイス】\n${parsed.advice||''}\n\n【次回までに】\n${parsed.next_action||''}`;
+
+    await sb.from('self_recordings').update({
+      ai_transcript: transcript || null,
+      ai_advice: adviceText,
+      ai_score: Number(parsed.score) || null
+    }).eq('id', id);
+
+    // 5. キャッシュ更新 + モーダル再描画
+    r.aiTranscript = transcript;
+    r.aiAdvice = adviceText;
+    r.aiScore = Number(parsed.score) || null;
+    status.innerHTML = '<span style="color:#0a0">✓ 分析完了</span>';
+    setTimeout(() => { openRecordingDetail(id); renderRecordings(); }, 500);
+  } catch(e) {
+    console.error(e);
+    status.innerHTML = '<span style="color:#c00">エラー: ' + (e.message || '') + '</span>';
+    btn.disabled = false;
+    btn.textContent = '🤖 再試行';
+  }
 }
 
 async function renderRecordings() {
