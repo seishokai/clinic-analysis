@@ -4332,7 +4332,8 @@ async function fetchRecordings() {
       date: r.session_date, counselor: r.counselor, facility: r.facility,
       patient: r.patient, service: r.service, url: r.url, duration: r.duration,
       contracted: r.contracted, amount: r.amount, notes: r.notes,
-      aiTranscript: r.ai_transcript, aiAdvice: r.ai_advice, aiScore: r.ai_score
+      aiTranscript: r.ai_transcript, aiAdvice: r.ai_advice, aiScore: r.ai_score,
+      aiChat: r.ai_chat || loadData('rec-chat-' + r.id, [])
     }));
   } catch (e) {
     console.warn('recordings fetch error', e);
@@ -4695,6 +4696,16 @@ function openRecordingDetail(id) {
     <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">要点・メモ</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.notes || '(なし)'}</div></div>
     ${r.aiTranscript ? `<details style="margin-bottom:12px"><summary style="font-size:11px;font-weight:600;color:var(--text-sub);cursor:pointer">📝 文字起こし (展開)</summary><div style="font-size:12px;line-height:1.7;white-space:pre-wrap;padding:10px;background:var(--bg);border-radius:4px;max-height:300px;overflow-y:auto;margin-top:6px">${r.aiTranscript}</div></details>` : ''}
     ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:14px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:8px">🤖 AI フィードバック</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.aiAdvice}</div></div>` : ''}
+    ${r.aiAdvice ? `
+    <div style="margin-bottom:12px;padding:12px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:4px">
+      <div style="font-size:11px;font-weight:600;color:#0369a1;margin-bottom:8px">💬 AIとディスカッション</div>
+      <div id="rec-chat-history" style="max-height:280px;overflow-y:auto;margin-bottom:10px"></div>
+      <div style="display:flex;gap:6px;align-items:flex-end">
+        <textarea id="rec-chat-input" rows="2" placeholder="質問・深掘りしたいことを入力 (例: もっと具体的な事例で / 価格説明のテンプレを作って)" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;line-height:1.5;resize:vertical;font-family:inherit"></textarea>
+        <button class="btn btn-dark" id="rec-chat-send" onclick="sendChatMessage(${r.id})" style="padding:8px 16px;font-size:12px;background:#0284c7;border-color:#0284c7">送信</button>
+      </div>
+      <div id="rec-chat-status" style="font-size:10px;color:var(--text-sub);margin-top:6px;min-height:12px"></div>
+    </div>` : ''}
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
       <button class="btn btn-dark" id="rec-ai-analyze-btn" onclick="analyzeRecording(${r.id})" style="background:#7c3aed;border-color:#7c3aed">${r.aiAdvice ? '🤖 AI再分析' : '🤖 AI分析する'}</button>
       <button class="btn btn-outline" onclick="document.getElementById('rec-detail-modal').hidden=true">閉じる</button>
@@ -4703,6 +4714,109 @@ function openRecordingDetail(id) {
     <div id="rec-ai-status" style="font-size:11px;color:var(--text-sub);margin-top:8px;min-height:14px"></div>
   `;
   document.getElementById('rec-detail-modal').hidden = false;
+  if (r.aiAdvice) renderChatHistory(r);
+}
+
+function renderChatHistory(r) {
+  const el = document.getElementById('rec-chat-history');
+  if (!el) return;
+  const chat = r.aiChat || [];
+  if (!chat.length) { el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);text-align:center;padding:8px">まだ会話なし。質問してみよう</div>'; return; }
+  el.innerHTML = chat.map(m => {
+    if (m.role === 'user') {
+      return `<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><div style="max-width:80%;padding:8px 12px;background:#0284c7;color:#fff;border-radius:12px 12px 2px 12px;font-size:12px;line-height:1.5;white-space:pre-wrap">${escHtml(m.content)}</div></div>`;
+    } else {
+      return `<div style="display:flex;justify-content:flex-start;margin-bottom:8px"><div style="max-width:85%;padding:8px 12px;background:#fff;border:1px solid var(--border-light);border-radius:12px 12px 12px 2px;font-size:12px;line-height:1.6;white-space:pre-wrap">${escHtml(m.content)}</div></div>`;
+    }
+  }).join('');
+  el.scrollTop = el.scrollHeight;
+}
+
+function escHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function sendChatMessage(id) {
+  const r = recordingsCache.find(x => x.id === id);
+  if (!r) return;
+  const input = document.getElementById('rec-chat-input');
+  const status = document.getElementById('rec-chat-status');
+  const sendBtn = document.getElementById('rec-chat-send');
+  const userMsg = input.value.trim();
+  if (!userMsg) return;
+
+  // ユーザーメッセージ追加
+  if (!r.aiChat) r.aiChat = [];
+  r.aiChat.push({ role: 'user', content: userMsg });
+  renderChatHistory(r);
+  input.value = '';
+  sendBtn.disabled = true;
+  status.textContent = 'AI応答中...';
+
+  try {
+    // 競合データ
+    let competitorContext = '';
+    try {
+      const cRes = await fetch('data/clinics.json?v=' + Date.now(), { cache: 'no-store' });
+      const cData = await cRes.json();
+      competitorContext = (cData || []).slice(0, 12).map(c => {
+        const sc = c.scores || {};
+        const avg = ((sc.reception + sc.counseling + sc.hospitality + sc.environment) / 4).toFixed(1);
+        return `■ ${c.name}(${avg}/5): 強み=${(c.strengths||[]).slice(0,2).join('/')} / 改善=${c.improvements?.counseling || ''}`;
+      }).join('\n');
+    } catch(_){}
+
+    const systemPrompt = `あなたは清翔会(歯科医院グループ)のカウンセリング指導コーチです。
+以下のカウンセリング録音について、ユーザー(医院スタッフ)とディスカッションします。
+具体的かつ実用的なアドバイスを返してください。長文すぎず、要点を絞って。
+
+# 対象カウンセリング
+- 日付: ${r.date} / カウンセラー: ${r.counselor} / 医院: ${r.facility}
+- 相談: ${r.service} / ${r.duration}分 / 成約: ${r.contracted ? 'あり ¥'+Number(r.amount).toLocaleString() : 'なし'}
+- 要点メモ: ${r.notes || '(なし)'}
+${r.aiTranscript ? '- 文字起こし(抜粋): ' + r.aiTranscript.slice(0,3000) : ''}
+
+# 過去のAI分析サマリー
+${(r.aiAdvice||'').slice(0,1500)}
+
+# 競合12医院データ(参考)
+${competitorContext}`;
+
+    // 会話履歴をClaude形式に
+    const messages = r.aiChat.map(m => ({ role: m.role, content: m.content }));
+
+    const apiRes = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1500,
+        system: systemPrompt,
+        messages
+      })
+    });
+    if (!apiRes.ok) throw new Error('AI失敗 ' + apiRes.status);
+    const apiData = await apiRes.json();
+    const reply = (apiData.content || []).map(b => b.text || '').join('');
+
+    r.aiChat.push({ role: 'assistant', content: reply });
+    renderChatHistory(r);
+    status.textContent = '';
+
+    // DB保存 (ai_chat列がない環境ではフォールバック)
+    try {
+      await sb.from('self_recordings').update({ ai_chat: r.aiChat }).eq('id', id);
+    } catch(e) {
+      console.warn('ai_chat 列がない可能性。SQL: ALTER TABLE self_recordings ADD COLUMN ai_chat JSONB;', e);
+      saveData('rec-chat-' + id, r.aiChat);
+    }
+  } catch(e) {
+    console.error(e);
+    status.innerHTML = '<span style="color:#c00">エラー: ' + (e.message || '') + '</span>';
+    r.aiChat.pop(); // ユーザーメッセージを巻き戻し
+    renderChatHistory(r);
+    input.value = userMsg;
+  } finally {
+    sendBtn.disabled = false;
+  }
 }
 
 // === AI分析 (Cloudflare Workers経由でClaude呼び出し) ===
