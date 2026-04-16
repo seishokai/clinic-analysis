@@ -596,6 +596,7 @@ function setupEventListeners() {
     });
     document.getElementById('rec-start')?.addEventListener('click', startRecording);
     document.getElementById('rec-stop')?.addEventListener('click', stopRecording);
+    document.getElementById('comp-ai-run')?.addEventListener('click', runCompetitorAIAnalysis);
 
     // プロモ率
     document.getElementById('pr-save')?.addEventListener('click', savePromoRate);
@@ -2152,6 +2153,7 @@ async function renderClinicDocs() {
           <div class="doc-title" style="font-size:12px">${d.name}</div>
           <div class="doc-sub" style="font-size:10px">${d.type}</div>
         </div>
+        ${d.type === '録音' ? `<button class="btn btn-outline" style="font-size:10px;padding:3px 8px;margin-right:4px;background:#7c3aed;color:#fff;border-color:#7c3aed" onclick="event.preventDefault();event.stopPropagation();openCompetitorAIModal(${d.id},'${(d.clinic||'').replace(/'/g,"&apos;")}','${(d.name||'').replace(/'/g,"&apos;")}')">🤖 AI</button>` : ''}
         <button class="resource-delete" style="width:24px;height:24px;font-size:12px" onclick="event.preventDefault();event.stopPropagation();deleteDocument(${d.id})">×</button>
       </a>
     `).join('');
@@ -4705,6 +4707,115 @@ function openRecordingDetail(id) {
 
 // === AI分析 (Cloudflare Workers経由でClaude呼び出し) ===
 const AI_PROXY_URL = 'https://seishokai-ai-proxy.tkm-koike.workers.dev/';
+
+// 競合録音のAI分析モーダル
+function openCompetitorAIModal(docId, clinicName, docName) {
+  document.getElementById('comp-ai-title').textContent = `競合録音 AI分析: ${clinicName}`;
+  document.getElementById('comp-ai-sub').textContent = `資料: ${docName}`;
+  document.getElementById('comp-ai-text').value = '';
+  document.getElementById('comp-ai-status').textContent = '';
+  document.getElementById('comp-ai-result').innerHTML = '';
+  document.getElementById('comp-ai-modal').hidden = false;
+  document.getElementById('comp-ai-modal').dataset.clinic = clinicName;
+}
+
+async function runCompetitorAIAnalysis() {
+  const clinicName = document.getElementById('comp-ai-modal').dataset.clinic;
+  const text = document.getElementById('comp-ai-text').value.trim();
+  if (!text) { alert('文字起こし/要約を貼り付けてください'); return; }
+  const btn = document.getElementById('comp-ai-run');
+  const status = document.getElementById('comp-ai-status');
+  const result = document.getElementById('comp-ai-result');
+  btn.disabled = true; btn.textContent = '分析中...';
+  status.textContent = 'Claudeで分析中...';
+  result.innerHTML = '';
+
+  try {
+    // 当該医院の調査データを取得
+    const targetClinic = (clinics || []).find(c => c.name === clinicName);
+    const targetInfo = targetClinic ? `
+■ ${targetClinic.name}
+  訪問: ${targetClinic.visitDate} / Dr: ${targetClinic.staff?.dr || '不明'}
+  既存評価: 受付${targetClinic.scores?.reception}/カウンセリング${targetClinic.scores?.counseling}/接遇${targetClinic.scores?.hospitality}/環境${targetClinic.scores?.environment}
+  既存の強み: ${(targetClinic.strengths||[]).join(' / ')}
+  既存の改善点: ${targetClinic.improvements?.counseling || ''}
+` : '';
+
+    const prompt = `あなたは清翔会(歯科医院グループ)のカウンセリング戦略コンサルタントです。
+競合医院 ${clinicName} のカウンセリング録音の文字起こしを分析し、清翔会が学ぶべきポイントと自院に取り入れるべき施策を抽出してください。
+
+# 既存の競合調査データ
+${targetInfo}
+
+# 録音の文字起こし/要約
+${text.slice(0, 10000)}
+
+# 出力フォーマット (JSONのみ、説明文不要)
+{
+  "score": 1-100の整数(競合のカウンセリングの完成度),
+  "strengths": ["この医院の強み1","強み2","強み3"],
+  "weaknesses": ["弱点・改善余地1","2","3"],
+  "adopt": ["清翔会が真似すべき施策1(具体的に)","2","3","4","5"],
+  "differentiate": "清翔会が差別化すべきポイント(150文字)",
+  "key_phrases": ["印象的だった具体フレーズ1","2","3"]
+}`;
+
+    const apiRes = await fetch(AI_PROXY_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 2000,
+        messages: [{ role: 'user', content: prompt }]
+      })
+    });
+    if (!apiRes.ok) throw new Error('AI API失敗 ' + apiRes.status);
+    const apiData = await apiRes.json();
+    const rawText = (apiData.content || []).map(b => b.text || '').join('');
+    const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('AIの返答を解析できませんでした');
+    const parsed = JSON.parse(jsonMatch[0]);
+
+    status.innerHTML = '<span style="color:#0a0">✓ 分析完了</span>';
+
+    result.innerHTML = `
+      <div style="padding:14px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:12px;font-weight:700;color:#b8860b">🤖 AI 分析結果</div>
+          <div style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:600">${parsed.score||'-'}<span style="font-size:11px;color:var(--text-sub)">/100</span></div>
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;font-weight:600;color:#0a0;margin-bottom:4px">💪 ${clinicName} の強み</div>
+          <ul style="font-size:13px;line-height:1.7;margin:0;padding-left:20px">${(parsed.strengths||[]).map(x=>`<li>${x}</li>`).join('')}</ul>
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;font-weight:600;color:#c00;margin-bottom:4px">⚠ ${clinicName} の弱点</div>
+          <ul style="font-size:13px;line-height:1.7;margin:0;padding-left:20px">${(parsed.weaknesses||[]).map(x=>`<li>${x}</li>`).join('')}</ul>
+        </div>
+        <div style="margin-bottom:12px;padding:10px;background:#fff;border-radius:6px">
+          <div style="font-size:11px;font-weight:600;color:#7c3aed;margin-bottom:4px">✨ 清翔会が真似すべき施策</div>
+          <ul style="font-size:13px;line-height:1.7;margin:0;padding-left:20px;font-weight:500">${(parsed.adopt||[]).map(x=>`<li>${x}</li>`).join('')}</ul>
+        </div>
+        <div style="margin-bottom:12px">
+          <div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">🎯 差別化ポイント</div>
+          <div style="font-size:13px;line-height:1.7;padding:8px;background:#fff;border-radius:4px">${parsed.differentiate||''}</div>
+        </div>
+        ${(parsed.key_phrases||[]).length ? `<div>
+          <div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">💬 印象的なフレーズ</div>
+          <ul style="font-size:13px;line-height:1.7;margin:0;padding-left:20px;color:var(--text-sub)">${parsed.key_phrases.map(x=>`<li>"${x}"</li>`).join('')}</ul>
+        </div>` : ''}
+        <div style="display:flex;gap:6px;margin-top:14px">
+          <button class="btn btn-outline" style="font-size:11px;padding:5px 12px" onclick="navigator.clipboard.writeText(document.getElementById('comp-ai-result').innerText);showToast('コピーしました')">📋 結果をコピー</button>
+        </div>
+      </div>
+    `;
+    btn.disabled = false; btn.textContent = '🔄 再分析';
+  } catch(e) {
+    console.error(e);
+    status.innerHTML = '<span style="color:#c00">エラー: ' + (e.message || '') + '</span>';
+    btn.disabled = false; btn.textContent = '🤖 AI分析する';
+  }
+}
 
 async function analyzeRecording(id) {
   const r = recordingsCache.find(x => x.id === id);
