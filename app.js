@@ -2558,17 +2558,24 @@ function renderBookings() {
         const name = sel.dataset.name;
         const applyDate = sel.dataset.apply;
         const newStatus = sel.value;
-        // #3 キャンセル・除外は確認
+        const match = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
+        // キャンセル・除外は確認
         if ((newStatus === 'キャンセル' || newStatus === '除外') && !confirm(name + ' を「' + newStatus + '」に変更しますか？')) {
           sel.value = match ? match.status || '未対応' : '未対応';
           return;
         }
-        const match = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
         if (match) match.status = newStatus;
-        sel.style.borderColor = 'var(--green)';
-        setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+        // bk-extra にも永続化 (DB失敗時の保険)
+        const bkEx = loadData('bk-extra', {});
+        const key = name + '|' + applyDate;
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].editedStatus = newStatus;
+        saveData('bk-extra', bkEx);
+        // DB保存
         sb.from('booking_status').upsert({ name, apply_date: applyDate, status: newStatus }, { onConflict: 'name,apply_date' }).then(({error}) => { if (error) showToast('DB保存失敗: ' + error.message, true); });
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
+        // 再描画で統計カード・行色・成約率を更新
+        renderBookings();
       });
     });
 
