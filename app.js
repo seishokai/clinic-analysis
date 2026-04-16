@@ -5094,21 +5094,56 @@ async function renderRecordings() {
 
   // 一覧
   const listRows = filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(r => `
-    <tr style="cursor:pointer" onclick="openRecordingDetail(${r.id})">
-      <td style="white-space:nowrap">${r.date}</td>
-      <td>${r.counselor}</td>
-      <td>${r.facility}</td>
-      <td>${r.patient || '-'}</td>
-      <td>${r.service}</td>
-      <td>${r.duration ? r.duration + '分' : '-'}</td>
-      <td>${r.contracted ? '<span style="color:#0a0;font-weight:700">✓</span>' : '<span style="color:#999">-</span>'}</td>
-      <td>¥${fmt(r.amount)}</td>
-      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${(r.notes || '').substring(0, 40)}</td>
-      <td>${r.url ? '🎧' : '-'}</td>
-      <td>${r.aiScore != null ? r.aiScore : '-'}</td>
-      <td onclick="event.stopPropagation();deleteRecording(${r.id})" style="cursor:pointer;color:#c00">×</td>
+    <tr>
+      <td style="white-space:nowrap;cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.date}</td>
+      <td style="cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.counselor}</td>
+      <td style="cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.facility}</td>
+      <td style="cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.patient || '-'}</td>
+      <td style="cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.service}</td>
+      <td style="cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.duration ? r.duration + '分' : '-'}</td>
+      <td><select class="rec-inline" data-id="${r.id}" data-field="contracted" style="font-size:11px;padding:2px 4px;border-radius:4px;border:1px solid var(--border);${r.contracted?'background:#dcfce7;color:#15803d;font-weight:700':'background:#fff;color:#999'}">
+        <option value="0" ${!r.contracted?'selected':''}>未</option>
+        <option value="1" ${r.contracted?'selected':''}>成約</option>
+      </select></td>
+      <td><input type="text" inputmode="numeric" class="rec-inline rec-amt-inline" data-id="${r.id}" data-field="amount" value="${r.amount?Number(r.amount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:90px;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" onclick="openRecordingDetail(${r.id})">${(r.notes || '').substring(0, 40)}</td>
+      <td style="cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.url ? '🎧' : '-'}</td>
+      <td style="cursor:pointer" onclick="openRecordingDetail(${r.id})">${r.aiScore != null ? r.aiScore : '-'}</td>
+      <td onclick="deleteRecording(${r.id})" style="cursor:pointer;color:#c00">×</td>
     </tr>`).join('');
-  document.querySelector('#rec-list-table tbody').innerHTML = listRows || '<tr><td colspan="12" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+  const tbody = document.querySelector('#rec-list-table tbody');
+  tbody.innerHTML = listRows || '<tr><td colspan="12" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+
+  // インラインCRUD
+  tbody.querySelectorAll('.rec-inline').forEach(el => {
+    if (el.classList.contains('rec-amt-inline')) {
+      el.addEventListener('focus', () => { el.value = el.value.replace(/,/g,''); });
+      el.addEventListener('blur', () => { const n = Number(el.value.replace(/,/g,'')); el.value = n ? n.toLocaleString() : ''; });
+    }
+    el.addEventListener('change', async () => {
+      const id = Number(el.dataset.id);
+      const field = el.dataset.field;
+      let value = el.value;
+      const dbField = field === 'contracted' ? 'contracted' : 'amount';
+      const dbValue = field === 'contracted' ? value === '1' : (Number(String(value).replace(/,/g,'')) || 0);
+      try {
+        await sb.from('self_recordings').update({ [dbField]: dbValue }).eq('id', id);
+        const cached = recordingsCache.find(x => x.id === id);
+        if (cached) { cached[field] = dbValue; }
+        el.style.borderColor = '#0a0';
+        if (field === 'contracted') {
+          if (dbValue) { el.style.background = '#dcfce7'; el.style.color = '#15803d'; el.style.fontWeight = '700'; }
+          else { el.style.background = '#fff'; el.style.color = '#999'; el.style.fontWeight = ''; }
+        }
+        setTimeout(() => { el.style.borderColor = ''; }, 1000);
+        // カウンセラー別集計と統計を再描画
+        renderRecordings();
+      } catch(e) {
+        showToast('保存失敗: ' + (e.message||''), true);
+      }
+    });
+    el.addEventListener('click', e => e.stopPropagation());
+  });
 }
 
 // === Reviews ===
