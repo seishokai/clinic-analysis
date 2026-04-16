@@ -546,3 +546,9 @@ body {
   .stat-num { font-size: 20px; }
   .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
 }
+
+/* 成約なのに商材/金額が未入力のアラート */
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+  50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
+}
