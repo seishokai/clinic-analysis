@@ -4327,7 +4327,11 @@ async function fetchRecordings() {
   try {
     const { data, error } = await sb.from('self_recordings').select('*').order('session_date', { ascending: false }).order('id', { ascending: false });
     if (error) throw error;
-    recordingsCache = (data || []).map(r => ({
+    if (!data) {
+      console.warn('recordings fetch: no data returned, keeping cache');
+      return recordingsCache;
+    }
+    recordingsCache = data.map(r => ({
       id: r.id, createdAt: r.created_at,
       date: r.session_date, counselor: r.counselor, facility: r.facility,
       patient: r.patient, service: r.service, url: r.url, duration: r.duration,
@@ -4335,9 +4339,14 @@ async function fetchRecordings() {
       aiTranscript: r.ai_transcript, aiAdvice: r.ai_advice, aiScore: r.ai_score,
       aiChat: r.ai_chat || loadData('rec-chat-' + r.id, [])
     }));
+    // ローカル退避（fetch失敗時の表示維持用）
+    try { saveData('self-recordings-backup', recordingsCache); } catch(_){}
   } catch (e) {
-    console.warn('recordings fetch error', e);
-    recordingsCache = loadData('self-recordings', []);
+    console.warn('recordings fetch error - using last backup', e);
+    // 直近キャッシュを保持。空にしない
+    if (!recordingsCache.length) {
+      recordingsCache = loadData('self-recordings-backup', []);
+    }
   }
   return recordingsCache;
 }
@@ -5039,6 +5048,52 @@ ${competitorContext || '(データ未取得)'}
   }
 }
 
+function updateRecordingStatsOnly() {
+  // フィルター適用後のデータで統計＋カウンセラー別だけ再計算（行は触らない）
+  const recs = recordingsCache;
+  const fc = document.getElementById('rec-filter-counselor')?.value || '';
+  const ff = document.getElementById('rec-filter-facility')?.value || '';
+  const fk = document.getElementById('rec-filter-contract')?.value || '';
+  let filtered = recs.slice();
+  if (fc) filtered = filtered.filter(r => r.counselor === fc);
+  if (ff) filtered = filtered.filter(r => r.facility === ff);
+  if (fk !== '') filtered = filtered.filter(r => String(r.contracted ? 1 : 0) === fk);
+  const total = filtered.length;
+  const contracted = filtered.filter(r => r.contracted).length;
+  const rate = total ? (contracted / total * 100).toFixed(1) : '0.0';
+  const totalAmount = filtered.reduce((s, r) => s + Number(r.amount || 0), 0);
+  const avgAmount = contracted ? Math.round(totalAmount / contracted) : 0;
+  const statsEl = document.getElementById('rec-stats');
+  if (statsEl) {
+    statsEl.innerHTML = `
+      <div class="stat-card"><span class="stat-label">件数</span><span class="stat-num">${total}</span></div>
+      <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num">${contracted}</span></div>
+      <div class="stat-card"><span class="stat-label">成約率</span><span class="stat-num">${rate}%</span></div>
+      <div class="stat-card"><span class="stat-label">合計金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
+      <div class="stat-card"><span class="stat-label">平均成約額</span><span class="stat-num">¥${fmt(avgAmount)}</span></div>
+    `;
+  }
+  // カウンセラー別
+  const byC = {};
+  filtered.forEach(r => {
+    if (!byC[r.counselor]) byC[r.counselor] = { count: 0, contracted: 0, amount: 0 };
+    byC[r.counselor].count++;
+    if (r.contracted) byC[r.counselor].contracted++;
+    byC[r.counselor].amount += Number(r.amount || 0);
+  });
+  const cRows = Object.entries(byC).sort((a, b) => b[1].contracted - a[1].contracted).map(([name, d]) => `
+    <tr>
+      <td style="font-weight:600">${name}</td>
+      <td>${d.count}</td>
+      <td>${d.contracted}</td>
+      <td>${d.count ? (d.contracted / d.count * 100).toFixed(1) : '0.0'}%</td>
+      <td>¥${fmt(d.amount)}</td>
+      <td>¥${fmt(d.contracted ? Math.round(d.amount / d.contracted) : 0)}</td>
+    </tr>`).join('');
+  const cTbody = document.querySelector('#rec-counselor-table tbody');
+  if (cTbody) cTbody.innerHTML = cRows || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:12px">データなし</td></tr>';
+}
+
 async function renderRecordings() {
   const recs = await fetchRecordings();
 
@@ -5127,7 +5182,9 @@ async function renderRecordings() {
       const dbField = field === 'contracted' ? 'contracted' : 'amount';
       const dbValue = field === 'contracted' ? value === '1' : (Number(String(value).replace(/,/g,'')) || 0);
       try {
-        await sb.from('self_recordings').update({ [dbField]: dbValue }).eq('id', id);
+        const { error } = await sb.from('self_recordings').update({ [dbField]: dbValue }).eq('id', id);
+        if (error) throw error;
+        // ローカルキャッシュを更新（再fetchしない）
         const cached = recordingsCache.find(x => x.id === id);
         if (cached) { cached[field] = dbValue; }
         el.style.borderColor = '#0a0';
@@ -5136,9 +5193,10 @@ async function renderRecordings() {
           else { el.style.background = '#fff'; el.style.color = '#999'; el.style.fontWeight = ''; }
         }
         setTimeout(() => { el.style.borderColor = ''; }, 1000);
-        // カウンセラー別集計と統計を再描画
-        renderRecordings();
+        // 統計だけ再計算（一覧は再描画しない＝行フォーカスが消えない）
+        updateRecordingStatsOnly();
       } catch(e) {
+        console.error(e);
         showToast('保存失敗: ' + (e.message||''), true);
       }
     });
