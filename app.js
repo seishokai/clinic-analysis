@@ -2603,10 +2603,10 @@ function renderBookings() {
       <option ${d.contractService==='ﾗﾌﾞﾘｴ'?'selected':''}>ﾗﾌﾞﾘｴ</option>
       <option ${d.contractService==='ｲﾝﾌﾟﾗﾝﾄ'?'selected':''}>ｲﾝﾌﾟﾗﾝﾄ</option>
     </select>` : (d.contractService || '-')}</td>
-    <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:70px;${d.status==='成約'&&!Number(d.contractAmount)?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':''}">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
+    <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:90px;text-align:right;font-variant-numeric:tabular-nums;${d.status==='成約'&&!Number(d.contractAmount)?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':''}">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.paymentMonth || '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
-    <td>${isAdmin ? `<input type="number" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${d.incentiveAmount||''}" placeholder="0" style="font-size:10px;padding:2px 4px;width:60px;text-align:center">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
+    <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:80px;text-align:right;font-variant-numeric:tabular-nums">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
   </tr>`}).join('') || '<tr><td colspan="16" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > displayLimit) {
@@ -2651,7 +2651,7 @@ function renderBookings() {
       // DBにも保存
       const dbField = field === 'contractService' ? 'contract_service' : field === 'contractAmount' ? 'contract_amount' : field === 'paymentMonth' ? 'payment_month' : field === 'incentiveAmount' ? 'incentive_amount' : 'incentive_month';
       const update = { name, apply_date: apply };
-      update[dbField] = field === 'contractAmount' ? Number(value) || 0 : value;
+      update[dbField] = (field === 'contractAmount' || field === 'incentiveAmount') ? Number(String(value).replace(/,/g,'')) || 0 : value;
       sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' }).then(() => {});
     };
     // セレクト
@@ -2667,9 +2667,22 @@ function renderBookings() {
     // インプット
     tbody.querySelectorAll('.bk-field-input').forEach(inp => {
       const key = inp.dataset.name + '|' + inp.dataset.apply;
-      if (bkExtra[key] && bkExtra[key][inp.dataset.field]) inp.value = bkExtra[key][inp.dataset.field];
+      if (bkExtra[key] && bkExtra[key][inp.dataset.field]) {
+        const v = bkExtra[key][inp.dataset.field];
+        if (inp.classList.contains('bk-amt-input')) inp.value = v ? Number(String(v).replace(/,/g,'')).toLocaleString() : '';
+        else inp.value = v;
+      }
+      // 金額系: フォーカス時はカンマ除去、blur時に再フォーマット
+      if (inp.classList.contains('bk-amt-input')) {
+        inp.addEventListener('focus', () => { inp.value = inp.value.replace(/,/g,''); });
+        inp.addEventListener('blur', () => {
+          const n = Number(inp.value.replace(/,/g,''));
+          inp.value = n ? n.toLocaleString() : '';
+        });
+      }
       inp.addEventListener('change', () => {
-        saveExtra(inp.dataset.name, inp.dataset.apply, inp.dataset.field, inp.value);
+        const rawVal = inp.classList.contains('bk-amt-input') ? String(inp.value).replace(/,/g,'') : inp.value;
+        saveExtra(inp.dataset.name, inp.dataset.apply, inp.dataset.field, rawVal);
         inp.style.borderColor = 'var(--green)';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
         // 成約金額変更時にインセを自動計算
@@ -2678,14 +2691,13 @@ function renderBookings() {
           const apply = inp.dataset.apply;
           const row = bookingsData.find(b => b.name === name && b.applyDate === apply);
           if (row) {
-            row.contractAmount = Number(inp.value) || 0;
+            row.contractAmount = Number(rawVal) || 0;
             const inc = calcIncentive(row.source, row.contractAmount);
             if (inc) {
               row.incentiveAmount = inc;
-              // 同じ行のincentiveAmount入力欄も更新
               const incInp = tbody.querySelector(`input[data-field="incentiveAmount"][data-name="${CSS.escape(name)}"][data-apply="${CSS.escape(apply)}"]`);
               if (incInp) {
-                incInp.value = inc;
+                incInp.value = Number(inc).toLocaleString();
                 incInp.style.background = '#fef3c7';
                 setTimeout(() => { incInp.style.background = ''; }, 1500);
               }
