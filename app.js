@@ -1954,31 +1954,40 @@ async function renderAccounts() {
   const accounts = await getAccountsFromDB();
   if (!accounts.length) { el.innerHTML = '<p style="color:var(--text-muted);font-size:13px">発行済みアカウントなし</p>'; return; }
   const baseUrl = location.origin + location.pathname;
-  el.innerHTML = accounts.map(a => `
-    <div style="padding:16px;margin-bottom:10px;background:var(--bg);border-radius:var(--radius-sm);border:1px solid var(--border-light)">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-        <strong style="font-size:14px">${a.name}</strong>
-        <button class="resource-delete" onclick="deleteAccount(${a.id})" style="width:28px;height:28px;font-size:13px">×</button>
-      </div>
-      <div style="font-size:12px;color:var(--text-sub);margin-bottom:8px">
-        <span class="badge ${a.role==='edit'?'badge-success':'badge-default'}" style="margin-right:4px">${a.role==='edit'?'編集':'閲覧のみ'}</span>
-        ${a.permissions.map(p => p==='tc'?'TC':p==='sales'?'売上':'予約').join(', ')}
-        ${a.agency ? '<br>代理店: ' + a.agency : ''}
-        ${a.promos && a.promos.length ? '<br>プロモ: ' + a.promos.join(', ') : ''}
-        ${a.services && a.services.length ? '<br>施術: ' + a.services.map(s=>s.length>15?s.slice(0,15)+'…':s).join(', ') : ''}
-        ${a.facilities && a.facilities.length ? '<br>店舗: ' + a.facilities.map(f=>f.length>10?f.slice(0,10)+'…':f).join(', ') : ''}
-      </div>
-      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        <div style="font-size:12px;background:var(--card);padding:6px 12px;border-radius:6px;border:1px solid var(--border)">
-          <span style="color:var(--text-sub)">URL:</span> <span style="user-select:all">${baseUrl}</span><button class="copy-btn" onclick="navigator.clipboard.writeText('${baseUrl}');showToast('URLをコピーしました')">コピー</button>
-        </div>
-        <div style="font-size:12px;background:var(--card);padding:6px 12px;border-radius:6px;border:1px solid var(--border)">
-          <span style="color:var(--text-sub)">PW:</span> <strong style="user-select:all;color:var(--text)">${a.password}</strong><button class="copy-btn" onclick="navigator.clipboard.writeText('${a.password}');showToast('コピーしました')">コピー</button>
-        </div>
-      </div>
-      <div style="font-size:10px;color:var(--text-muted);margin-top:6px">発行日: ${a.created}</div>
-    </div>
-  `).join('');
+  const permLabel = p => ({tc:'TC',sales:'売上',bookings:'予約',adbudget:'広告'})[p] || p;
+  el.innerHTML = `
+    <div class="data-table-wrap"><table class="data-table" style="font-size:13px">
+      <thead><tr>
+        <th style="text-align:left">名前</th>
+        <th>権限</th>
+        <th>タブ</th>
+        <th>代理店</th>
+        <th>制限</th>
+        <th>パスワード</th>
+        <th></th>
+      </tr></thead>
+      <tbody>
+        ${accounts.map(a => {
+          const restrictions = [];
+          if (a.promos && a.promos.length) restrictions.push(`プロモ${a.promos.length}`);
+          if (a.services && a.services.length) restrictions.push(`施術${a.services.length}`);
+          if (a.facilities && a.facilities.length) restrictions.push(`店舗${a.facilities.length}`);
+          return `
+          <tr>
+            <td style="text-align:left;font-weight:600">${a.name}</td>
+            <td><span class="badge ${a.role==='edit'?'badge-success':'badge-default'}" style="font-size:10px">${a.role==='edit'?'編集':'閲覧'}</span></td>
+            <td style="font-size:11px">${(a.permissions||[]).map(permLabel).join(' / ') || '-'}</td>
+            <td style="font-size:11px">${a.agency || '-'}</td>
+            <td style="font-size:11px;color:var(--text-sub)" title="${[...(a.promos||[]),...(a.services||[]),...(a.facilities||[])].join(', ')}">${restrictions.join(' ') || '-'}</td>
+            <td><code style="font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px;user-select:all">${a.password}</code>
+              <button class="copy-btn" onclick="navigator.clipboard.writeText('${a.password}');showToast('コピーしました')" style="font-size:10px;padding:2px 6px;margin-left:4px">📋</button></td>
+            <td><button class="resource-delete" onclick="deleteAccount(${a.id})" style="width:24px;height:24px;font-size:11px">×</button></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table></div>
+    <div style="margin-top:10px;font-size:11px;color:var(--text-sub)">URL共通: <code style="background:var(--bg);padding:2px 6px;border-radius:4px;user-select:all">${baseUrl}</code> <button class="copy-btn" onclick="navigator.clipboard.writeText('${baseUrl}');showToast('URLをコピーしました')" style="font-size:10px;padding:2px 6px">📋</button></div>
+  `;
 }
 
 function closeModal() {
