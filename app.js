@@ -88,19 +88,8 @@ function getApplyDateStr(d) {
 }
 
 // === Config ===
-const CORRECT_PASSWORD = 'Edoyadepon1';
-const BOOKING_PASSWORD = 'Edoyadepon1@';
-const TC_PASSWORD = 'TcEdoyadepon1';
-// プロモ別パスワード: パスワード → フィルターするプロモコードのプレフィックス
-const PROMO_PASSWORDS = {
-  'hikaru': 'hikaru',
-  'third': 'third',
-  'murase': 'murase',
-  'sasaki': 'sasaki',
-  'ceramic': 'ceramic',
-  'implant': 'implant',
-  'blackfilm': 'blackfilm',
-};
+// マスターPW/プロモPWはDB移行済 (accounts.account_type) - ハードコード削除済
+const PROMO_PASSWORDS = {}; // 互換用の空オブジェクト (古いコードが参照しないよう)
 let userRole = 'admin'; // 'admin' or 'promo'
 let promoFilter = ''; // プロモ別ログイン時のフィルター
 const FACILITIES = ['全体','エスカ','アール','ウィズ','ルミナス','茶屋','アサノ','知立','小牧','八事','岩田','大森','京都','銀座','訪問'];
@@ -253,34 +242,7 @@ function setupEventListeners() {
       }
     } catch(e) { console.warn('DB login check failed, falling back to hardcoded', e); }
 
-    // 2) ハードコード PW (後方互換: DB未移行時の保険)
-    if (pw === CORRECT_PASSWORD) {
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'admin');
-      userRole = 'admin'; promoFilter = '';
-      finish(); showApp(); return;
-    }
-    if (pw === BOOKING_PASSWORD) {
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'sales');
-      userRole = 'sales'; promoFilter = '';
-      finish(); showApp(); return;
-    }
-    if (pw === TC_PASSWORD) {
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'tc');
-      userRole = 'tc'; promoFilter = '';
-      finish(); showApp(); return;
-    }
-    if (PROMO_PASSWORDS[pw]) {
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'promo');
-      sessionStorage.setItem('promoFilter', PROMO_PASSWORDS[pw]);
-      userRole = 'promo'; promoFilter = PROMO_PASSWORDS[pw];
-      finish(); showApp(); return;
-    }
-
-    // 失敗
+    // 認証失敗 (ハードコードフォールバックは削除済)
     document.getElementById('login-error').hidden = false;
     finish();
   }
