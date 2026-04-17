@@ -207,70 +207,82 @@ function setupEventListeners() {
     const loginBtn = document.getElementById('login-btn');
     loginBtn.textContent = 'ログイン中...';
     loginBtn.disabled = true;
-    if (pw === CORRECT_PASSWORD) {
+
+    const finish = () => {
       document.getElementById('password').value = '';
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'admin');
-      userRole = 'admin';
-      promoFilter = '';
       loginBtn.textContent = 'ログイン';
       loginBtn.disabled = false;
-      showApp();
-      return;
-    } else if (pw === BOOKING_PASSWORD) {
-      document.getElementById('password').value = '';
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'sales');
-      userRole = 'sales';
-      promoFilter = '';
-      loginBtn.textContent = 'ログイン';
-      loginBtn.disabled = false;
-      showApp();
-      return;
-    } else if (pw === TC_PASSWORD) {
-      document.getElementById('password').value = '';
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'tc');
-      userRole = 'tc';
-      promoFilter = '';
-      loginBtn.textContent = 'ログイン';
-      loginBtn.disabled = false;
-      showApp();
-      return;
-    } else if (PROMO_PASSWORDS[pw]) {
-      document.getElementById('password').value = '';
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'promo');
-      sessionStorage.setItem('promoFilter', PROMO_PASSWORDS[pw]);
-      userRole = 'promo';
-      promoFilter = PROMO_PASSWORDS[pw];
-      loginBtn.textContent = 'ログイン';
-      loginBtn.disabled = false;
-      showApp();
-      return;
-    } else {
-      // 管理タブで発行したアカウントをチェック（DB）
+    };
+
+    // 1) DB の accounts テーブルを優先チェック
+    try {
       const { data: dbAccounts } = await sb.from('accounts').select('*').eq('password', pw);
       const matched = dbAccounts && dbAccounts[0];
       if (matched) {
-        document.getElementById('password').value = '';
         sessionStorage.setItem('authenticated', 'true');
-        sessionStorage.setItem('role', 'custom');
-        sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
-        sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
-        sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
-        sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
-        sessionStorage.setItem('customEditRole', matched.role || 'view');
-        sessionStorage.setItem('customAgency', matched.agency || '');
-        sessionStorage.setItem('customName', matched.name || '');
+        const type = matched.account_type || 'custom';
+        if (type === 'admin') {
+          sessionStorage.setItem('role', 'admin');
+          userRole = 'admin'; promoFilter = '';
+        } else if (type === 'sales') {
+          sessionStorage.setItem('role', 'sales');
+          userRole = 'sales'; promoFilter = '';
+        } else if (type === 'tc') {
+          sessionStorage.setItem('role', 'tc');
+          userRole = 'tc'; promoFilter = '';
+        } else if (type === 'promo') {
+          const pf = (matched.promos && matched.promos[0]) || '';
+          sessionStorage.setItem('role', 'promo');
+          sessionStorage.setItem('promoFilter', pf);
+          userRole = 'promo'; promoFilter = pf;
+        } else {
+          // custom
+          sessionStorage.setItem('role', 'custom');
+          sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions || []));
+          sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
+          sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
+          sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
+          sessionStorage.setItem('customEditRole', matched.role || 'view');
+          sessionStorage.setItem('customAgency', matched.agency || '');
+          sessionStorage.setItem('customName', matched.name || '');
+          userRole = 'custom';
+        }
+        finish();
         showApp();
         return;
       }
-      document.getElementById('login-error').hidden = false;
-      document.getElementById('password').value = '';
-      loginBtn.textContent = 'ログイン';
-      loginBtn.disabled = false;
+    } catch(e) { console.warn('DB login check failed, falling back to hardcoded', e); }
+
+    // 2) ハードコード PW (後方互換: DB未移行時の保険)
+    if (pw === CORRECT_PASSWORD) {
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'admin');
+      userRole = 'admin'; promoFilter = '';
+      finish(); showApp(); return;
     }
+    if (pw === BOOKING_PASSWORD) {
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'sales');
+      userRole = 'sales'; promoFilter = '';
+      finish(); showApp(); return;
+    }
+    if (pw === TC_PASSWORD) {
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'tc');
+      userRole = 'tc'; promoFilter = '';
+      finish(); showApp(); return;
+    }
+    if (PROMO_PASSWORDS[pw]) {
+      sessionStorage.setItem('authenticated', 'true');
+      sessionStorage.setItem('role', 'promo');
+      sessionStorage.setItem('promoFilter', PROMO_PASSWORDS[pw]);
+      userRole = 'promo'; promoFilter = PROMO_PASSWORDS[pw];
+      finish(); showApp(); return;
+    }
+
+    // 失敗
+    document.getElementById('login-error').hidden = false;
+    finish();
   }
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
   // 予約管理ログイン
