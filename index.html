@@ -629,11 +629,15 @@
           <button class="bf-sub-btn" data-bfsub="bf-lifecycle" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">セット進捗</button>
         </div>
         <div id="bf-lifecycle" hidden>
-          <div style="display:flex;align-items:baseline;gap:12px;margin:4px 0 8px">
-            <h2 style="font-size:17px;font-weight:700;margin:0">BF セット進捗管理</h2>
-            <span style="font-size:11px;color:var(--text-sub)">カウンセリング後〜セット完了までの全プロセスを一元管理</span>
+          <div id="bf-lc-header-wrap">
+            <div style="display:flex;align-items:baseline;gap:12px;margin:4px 0 8px">
+              <h2 style="font-size:17px;font-weight:700;margin:0">BF セット進捗管理</h2>
+              <span style="font-size:11px;color:var(--text-sub)">カウンセリング後〜セット完了までの全プロセスを一元管理</span>
+              <button id="bf-lc-collapse" style="margin-left:auto;padding:4px 12px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▲ ヘッダーを隠す</button>
+            </div>
+            <div id="bf-lc-funnel" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;overflow-x:auto"></div>
           </div>
-          <div id="bf-lc-funnel" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;overflow-x:auto"></div>
+          <div id="bf-lc-expand-wrap" style="display:none;margin:4px 0 8px"><button id="bf-lc-expand" style="padding:4px 12px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer">▼ ヘッダーを表示</button></div>
           <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
             <select class="form-select" id="bf-lc-filter-status" style="width:auto;padding:6px 10px;font-size:12px"><option value="">BFステータス:全て</option></select>
             <select class="form-select" id="bf-lc-filter-fac" style="width:auto;padding:6px 10px;font-size:12px"><option value="">CS医院:全て</option></select>
@@ -911,7 +915,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=140"></script>
+  <script src="app.js?v=141"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

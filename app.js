@@ -3567,6 +3567,37 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
 
 async function renderBFLifecycle() {
   await loadBFLifecycleData();
+  // ヘッダー折りたたみトグル (1回だけバインド)
+  const collapseBtn = document.getElementById('bf-lc-collapse');
+  const expandBtn = document.getElementById('bf-lc-expand');
+  const applyCollapse = (collapsed) => {
+    const hdr = document.querySelector('.header'); // 上部ナビ
+    const bfSubNav = document.querySelector('#sub-bk-bf > div'); // BF一覧/進捗/… タブ
+    const bfLcHdr = document.getElementById('bf-lc-header-wrap');
+    const expandWrap = document.getElementById('bf-lc-expand-wrap');
+    const tableWrap = document.querySelector('#bf-lifecycle .data-table-wrap');
+    if (collapsed) {
+      if (hdr) hdr.style.display = 'none';
+      if (bfSubNav) bfSubNav.style.display = 'none';
+      if (bfLcHdr) bfLcHdr.style.display = 'none';
+      if (expandWrap) expandWrap.style.display = 'block';
+      if (tableWrap) tableWrap.style.maxHeight = 'calc(100vh - 80px)';
+    } else {
+      if (hdr) hdr.style.display = '';
+      if (bfSubNav) bfSubNav.style.display = '';
+      if (bfLcHdr) bfLcHdr.style.display = '';
+      if (expandWrap) expandWrap.style.display = 'none';
+      if (tableWrap) tableWrap.style.maxHeight = '';
+    }
+  };
+  if (collapseBtn && !collapseBtn._bound) {
+    collapseBtn._bound = true;
+    collapseBtn.addEventListener('click', () => applyCollapse(true));
+  }
+  if (expandBtn && !expandBtn._bound) {
+    expandBtn._bound = true;
+    expandBtn.addEventListener('click', () => applyCollapse(false));
+  }
   // BF相談のデータを抽出 (予約日が今日以前のみ、未来分は除外)
   const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
   const bfRows = (bookingsData || []).filter(d => {
