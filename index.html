@@ -654,17 +654,34 @@
                 <thead><tr>
                   <th style="width:72px">来院予定日</th>
                   <th style="text-align:left;width:100px">名前</th>
-                  <th style="width:130px">CS医院</th>
-                  <th style="width:90px">CSDR</th>
-                  <th style="width:130px">BFステータス</th>
-                  <th style="width:90px">セット医院</th>
-                  <th>メモ</th>
+                  <th style="width:90px">CS医院</th>
+                  <th style="width:80px">CSDR</th>
+                  <th style="width:120px">BFステータス</th>
+                  <th style="width:80px">セット医院</th>
+                  <th style="width:85px">売上</th>
+                  <th style="width:75px">交通費</th>
+                  <th style="min-width:120px">メモ</th>
                   <th style="width:105px">次回予定日</th>
                   <th style="width:50px">経過</th>
                   <th style="width:55px">履歴</th>
                 </tr></thead>
                 <tbody id="bf-lc-tbody"></tbody>
               </table>
+            </div>
+          </div>
+          <div id="bf-lc-csdr-modal" class="modal" hidden>
+            <div class="modal-overlay" onclick="document.getElementById('bf-lc-csdr-modal').hidden=true"></div>
+            <div class="modal-content" style="max-width:360px;padding:20px;max-height:80vh;overflow-y:auto;background:#fff">
+              <button class="modal-close" onclick="document.getElementById('bf-lc-csdr-modal').hidden=true">&times;</button>
+              <h3 style="font-size:14px;font-weight:700;margin-bottom:10px" id="bf-lc-csdr-title">CSDR を選択</h3>
+              <div id="bf-lc-csdr-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px"></div>
+              <div style="border-top:1px solid var(--border-light);padding-top:12px">
+                <div style="font-size:11px;color:var(--text-sub);margin-bottom:6px">＋ 新規Dr登録</div>
+                <div style="display:flex;gap:6px">
+                  <input type="text" id="bf-lc-csdr-new" placeholder="Dr名 (例: 佐藤)" style="flex:1;padding:8px;border:1.5px solid var(--border);border-radius:4px;font-size:13px;background:#fff;color:#111">
+                  <button class="btn btn-outline" id="bf-lc-csdr-add" style="padding:6px 14px;font-size:12px;border-color:#0a0;color:#0a0">＋ 追加</button>
+                </div>
+              </div>
             </div>
           </div>
           <div id="bf-lc-csfac-modal" class="modal" hidden>
@@ -944,7 +961,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=150"></script>
+  <script src="app.js?v=151"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

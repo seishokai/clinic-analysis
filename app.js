@@ -3528,7 +3528,7 @@ let bfHistoryCache = {}; // key: name|applyDate → [events]
 
 async function loadBFLifecycleData() {
   try {
-    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo');
+    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost');
     bfLifecycleCache = {};
     (data || []).forEach(r => {
       bfLifecycleCache[r.name + '|' + r.apply_date] = r;
@@ -3696,7 +3696,20 @@ async function renderBFLifecycle() {
 }
 
 const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
-const CSDR_LIST = ['小池','鶴田','立松','原','西村','山田']; // 固定Dr、追加はdatalistで
+const CSDR_DEFAULTS = ['小池','鶴田','立松','原','西村','山田'];
+function getCSDRList() {
+  const saved = loadData('csdr-extra-list', []);
+  return [...new Set([...CSDR_DEFAULTS, ...saved])];
+}
+function addCSDR(name) {
+  name = (name||'').trim();
+  if (!name) return;
+  const saved = loadData('csdr-extra-list', []);
+  if (!CSDR_DEFAULTS.includes(name) && !saved.includes(name)) {
+    saved.push(name);
+    saveData('csdr-extra-list', saved);
+  }
+}
 
 // === 全体連動マッピング ===
 // 予約一覧の状態 → BFステータスの初期値 (BF相談のみ適用)
@@ -3807,12 +3820,14 @@ function drawBFLifecycleTable(bfRows) {
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
       <td><button type="button" class="bf-lc-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-value="${esc(info.bf_cs_facility||csFac||'')}" style="font-size:10px;padding:3px 6px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;min-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${parseCsFac(info.bf_cs_facility||csFac||'').join(', ') || '<span style="color:var(--text-muted)">未選択</span>'}</button></td>
-      <td><input type="text" list="bf-lc-dr-options" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr選択/入力" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
+      <td><button type="button" class="bf-lc-csdr-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 6px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;min-height:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(info.bf_cs_doctor) || '<span style="color:var(--text-muted)">Dr選択</span>'}</button></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:11px;padding:3px 8px;border-radius:4px;min-width:120px;${stStyle}">
         <option value="">未設定</option>
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_set_facility" style="font-size:10px;padding:2px 4px;width:100%">${BF_SET_FACS.map(f => `<option ${(info.bf_set_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
+      <td><input type="text" inputmode="numeric" class="bf-lc-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():(info.contract_amount?Number(info.contract_amount).toLocaleString():'')}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
+      <td><input type="text" inputmode="numeric" class="bf-lc-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
       <td class="bf-lc-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;min-height:26px;background:${info.bf_memo?'#fff8e1':'transparent'};border:1px dashed ${info.bf_memo?'#f9a825':'var(--border)'};border-radius:4px;font-size:11px;line-height:1.5;max-width:320px" title="クリックで編集">${info.bf_memo ? (info.bf_memo.length > 60 ? info.bf_memo.substring(0,60)+'…' : info.bf_memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:9px;padding:2px 3px;width:100%;box-sizing:border-box;border-radius:3px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
@@ -3851,6 +3866,75 @@ function drawBFLifecycleTable(bfRows) {
   tbody.querySelectorAll('.bf-lc-csfac-btn').forEach(btn => {
     btn.addEventListener('click', () => openBFCsFacModal(btn.dataset.name, btn.dataset.apply, bfRows));
   });
+  // CSDR 選択
+  tbody.querySelectorAll('.bf-lc-csdr-btn').forEach(btn => {
+    btn.addEventListener('click', () => openBFCsdrModal(btn.dataset.name, btn.dataset.apply, bfRows));
+  });
+  // 売上/交通費の金額系
+  tbody.querySelectorAll('.bf-lc-money').forEach(inp => {
+    inp.addEventListener('focus', () => { inp.value = inp.value.replace(/,/g,''); });
+    inp.addEventListener('blur', () => { const n = Number(inp.value.replace(/,/g,'')); inp.value = n ? n.toLocaleString() : ''; });
+    inp.addEventListener('change', async () => {
+      const n = Number(inp.value.replace(/,/g,'')) || 0;
+      const field = inp.dataset.field;
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, field, n);
+      if (ok) {
+        inp.style.borderColor = '#0a0';
+        setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+        // 売上 → プロモ率でインセ自動計算も
+        if (field === 'contract_amount') {
+          const d = bookingsData.find(x => x.name === inp.dataset.name && x.applyDate === inp.dataset.apply);
+          if (d) {
+            d.contractAmount = n;
+            const inc = calcIncentive(d.source, n);
+            if (inc) {
+              d.incentiveAmount = inc;
+              sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, incentive_amount: inc }, { onConflict: 'name,apply_date' }).then(()=>{});
+            }
+          }
+        }
+      }
+    });
+  });
+}
+
+function openBFCsdrModal(name, applyDate, bfRows) {
+  const key = name + '|' + applyDate;
+  const info = bfLifecycleCache[key] || {};
+  const current = info.bf_cs_doctor || '';
+  document.getElementById('bf-lc-csdr-title').textContent = `CSDR を選択 — ${name}`;
+  const list = getCSDRList();
+  const redraw = () => {
+    document.getElementById('bf-lc-csdr-list').innerHTML = getCSDRList().map(dr => `
+      <button class="bf-lc-csdr-opt" data-val="${dr.replace(/"/g,'&quot;')}" style="padding:8px 12px;text-align:left;background:${current===dr?'#dcfce7':'#fff'};border:1px solid ${current===dr?'#16a34a':'var(--border)'};border-radius:4px;cursor:pointer;font-size:13px;color:#111">${dr}${current===dr?' ✓':''}</button>
+    `).join('') + `<button class="bf-lc-csdr-opt" data-val="" style="padding:8px 12px;text-align:left;background:#fff;border:1px dashed var(--border);border-radius:4px;cursor:pointer;font-size:13px;color:var(--text-muted)">(クリア)</button>`;
+    document.getElementById('bf-lc-csdr-list').querySelectorAll('.bf-lc-csdr-opt').forEach(b => {
+      b.addEventListener('click', async () => {
+        const v = b.dataset.val || null;
+        const ok = await saveBFLifecycleField(name, applyDate, 'bf_cs_doctor', v);
+        if (ok) {
+          document.getElementById('bf-lc-csdr-modal').hidden = true;
+          if (bfRows) drawBFLifecycleTable(bfRows);
+        }
+      });
+    });
+  };
+  redraw();
+  document.getElementById('bf-lc-csdr-new').value = '';
+  document.getElementById('bf-lc-csdr-modal').hidden = false;
+  const addBtn = document.getElementById('bf-lc-csdr-add');
+  const newBtn = addBtn.cloneNode(true);
+  addBtn.parentNode.replaceChild(newBtn, addBtn);
+  newBtn.addEventListener('click', () => {
+    const v = document.getElementById('bf-lc-csdr-new').value.trim();
+    if (!v) return;
+    addCSDR(v);
+    document.getElementById('bf-lc-csdr-new').value = '';
+    showToast(`Dr「${v}」を追加しました`);
+    redraw();
+  });
+  const newInp = document.getElementById('bf-lc-csdr-new');
+  newInp.onkeydown = (e) => { if (e.key === 'Enter') newBtn.click(); };
 }
 
 function openBFCsFacModal(name, applyDate, bfRows) {
