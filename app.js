@@ -4290,8 +4290,24 @@ function normName(n) {
   return (n || '').replace(/[\s\u3000]+/g, '').toLowerCase();
 }
 // BF用: 同一人物を名前正規化でグルーピング (同じ facility かつ同日)
+// 生存ルール: メモ/BF進捗がある方を優先で残す (情報を失わない)
 function dedupBFRows(rows) {
   const seen = new Map();
+  // スコア: メモ > BFステータス設定 > 成約ステータス > 金額 の順で価値判定
+  const scoreRow = (d) => {
+    const info = getBFInfo(d.name, d.applyDate) || {};
+    let s = 0;
+    if (d._memo) s += 100;
+    if (info.bf_memo) s += 100;
+    if (info.bf_status) s += 50;
+    if (info.bf_cs_facility) s += 10;
+    if (info.bf_cs_doctor) s += 10;
+    if (d.status === '成約') s += 30;
+    else if (d.status === '来院済') s += 10;
+    if (d.contractAmount) s += 5;
+    if (d.contractService) s += 5;
+    return s;
+  };
   rows.forEach(d => {
     const nn = normName(d.name);
     const fac = normFac(d.facility);
@@ -4299,18 +4315,25 @@ function dedupBFRows(rows) {
     const key = nn + '|' + fac + '|' + dateKey;
     if (!seen.has(key)) {
       seen.set(key, d);
-    } else {
-      // マージ: ステータス優先度, メモがある方, 金額がある方を採用
-      const existing = seen.get(key);
-      // BFステータスが設定されている方を優先
-      // _memoがある方を優先
-      if (!existing._memo && d._memo) existing._memo = d._memo;
-      if (!existing.contractAmount && d.contractAmount) existing.contractAmount = d.contractAmount;
-      if (!existing.contractService && d.contractService) existing.contractService = d.contractService;
-      if (!existing.status && d.status) existing.status = d.status;
-      if (d.status === '成約') existing.status = '成約';
-      else if (d.status === '来院済' && existing.status !== '成約') existing.status = '来院済';
+      return;
     }
+    const existing = seen.get(key);
+    // スコアが高い方を"生存行"にし、もう片方の情報も吸収
+    const existingScore = scoreRow(existing);
+    const newScore = scoreRow(d);
+    const survivor = newScore > existingScore ? d : existing;
+    const loser = newScore > existingScore ? existing : d;
+    // 片方にしかない情報を生存側に合わせて転送 (破壊的変更をしない前提で補完のみ)
+    if (!survivor._memo && loser._memo) survivor._memo = loser._memo;
+    if (!survivor.contractAmount && loser.contractAmount) survivor.contractAmount = loser.contractAmount;
+    if (!survivor.contractService && loser.contractService) survivor.contractService = loser.contractService;
+    if (!survivor.phone && loser.phone) survivor.phone = loser.phone;
+    if (!survivor.email && loser.email) survivor.email = loser.email;
+    if (!survivor.source && loser.source) survivor.source = loser.source;
+    // 成約の昇格のみ (降格はしない)
+    if (loser.status === '成約' && survivor.status !== '成約') survivor.status = '成約';
+    else if (loser.status === '来院済' && !survivor.status) survivor.status = '来院済';
+    seen.set(key, survivor);
   });
   return [...seen.values()];
 }
