@@ -887,6 +887,8 @@ function setupEventListeners() {
   document.getElementById('bk-search').addEventListener('input', () => highlightActiveFilter(document.getElementById('bk-search')));
   window._highlightBkFilters = () => ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-period','bk-month','bk-search'].forEach(id => highlightActiveFilter(document.getElementById(id)));
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
+  // 除外も表示チェックボックス
+  document.getElementById('bk-show-excluded')?.addEventListener('change', () => renderBookings());
   // 重複フィルターボタン
   document.getElementById('bk-dup-filter')?.addEventListener('click', () => {
     window._bkDupFilter = !window._bkDupFilter;
@@ -2842,6 +2844,11 @@ function renderBookings() {
   }
   if (monthFilter) {
     filtered = filtered.filter(d => getYM(d) === monthFilter);
+  }
+  // 除外非表示 (「除外も表示」チェックがOFFなら除外行を隠す)
+  const showExcluded = document.getElementById('bk-show-excluded')?.checked;
+  if (!showExcluded) {
+    filtered = filtered.filter(d => d.status !== '除外');
   }
   // 重複フィルター (同一正規化名+医院 が2件以上ある行のみ表示)
   if (window._bkDupFilter) {
