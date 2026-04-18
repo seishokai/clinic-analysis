@@ -4079,7 +4079,12 @@ async function renderBFLifecycle() {
   const stSel = document.getElementById('bf-lc-filter-status');
   if (stSel) stSel.innerHTML = '<option value="">BFステータス:全て</option><option value="__none">未設定</option>' + BF_STATUSES.map(s => `<option value="${s.value}">${s.value}</option>`).join('');
   const csFacSel = document.getElementById('bf-lc-filter-fac');
-  const csFacs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_facility).filter(Boolean))].sort();
+  // 配列保存されたCS医院を個別に展開
+  const csFacSet = new Set();
+  Object.values(bfLifecycleCache).forEach(v => {
+    parseCsFac(v.bf_cs_facility).forEach(f => { if (f) csFacSet.add(f); });
+  });
+  const csFacs = [...csFacSet].sort();
   if (csFacSel) csFacSel.innerHTML = '<option value="">CS医院:全て</option>' + csFacs.map(f => `<option>${f}</option>`).join('');
   const drSel = document.getElementById('bf-lc-filter-dr');
   const drsFromDB = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_doctor).filter(Boolean))];
@@ -4203,7 +4208,7 @@ function drawBFLifecycleTable(bfRows) {
     if (fstSel === '__none') filtered = filtered.filter(d => !bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_status);
     else filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_status === fstSel);
   }
-  if (ffac) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_facility === ffac);
+  if (ffac) filtered = filtered.filter(d => parseCsFac(bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_facility).includes(ffac));
   if (fdr) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_doctor === fdr);
   const fsetfac = document.getElementById('bf-lc-filter-setfac')?.value || '';
   if (fsetfac) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_set_facility === fsetfac);
