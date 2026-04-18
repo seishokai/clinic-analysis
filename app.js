@@ -4257,8 +4257,13 @@ function drawBFLifecycleTable(bfRows) {
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
       <td><button type="button" class="bf-lc-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-value="${esc(info.bf_cs_facility||csFac||'')}" style="font-size:10px;padding:3px 6px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;min-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${parseCsFac(info.bf_cs_facility||csFac||'').join(', ') || '<span style="color:var(--text-muted)">未選択</span>'}</button></td>
-      <td><button type="button" class="bf-lc-csdr-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 6px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;min-height:24px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(info.bf_cs_doctor) || '<span style="color:var(--text-muted)">Dr選択</span>'}</button></td>
-      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:11px;padding:3px 8px;border-radius:4px;min-width:120px;${stStyle}">
+      <td><select class="bf-lc-csdr-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;background:#fff;border:1px solid var(--border);border-radius:4px">
+        <option value="">未選択</option>
+        ${getCSDRList().map(dr => `<option ${info.bf_cs_doctor===dr?'selected':''}>${dr}</option>`).join('')}
+        ${info.bf_cs_doctor && !getCSDRList().includes(info.bf_cs_doctor) ? `<option selected>${info.bf_cs_doctor}</option>` : ''}
+        <option value="__ADD__" style="color:#0a0;font-weight:700">＋ 新規Dr追加</option>
+      </select></td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:10px;padding:2px 4px;border-radius:4px;width:100%;${stStyle}">
         <option value="">未設定</option>
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
@@ -4266,7 +4271,7 @@ function drawBFLifecycleTable(bfRows) {
       <td><input type="text" inputmode="numeric" class="bf-lc-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():(info.contract_amount?Number(info.contract_amount).toLocaleString():'')}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
       <td><input type="text" inputmode="numeric" class="bf-lc-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
       <td class="bf-lc-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;min-height:26px;background:${(info.bf_memo||d._memo)?'#fff8e1':'transparent'};border:1px dashed ${(info.bf_memo||d._memo)?'#f9a825':'var(--border)'};border-radius:4px;font-size:11px;line-height:1.5;max-width:320px" title="クリックで編集">${(info.bf_memo||d._memo) ? ((info.bf_memo||d._memo).length > 60 ? (info.bf_memo||d._memo).substring(0,60)+'…' : (info.bf_memo||d._memo)).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
-      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:9px;padding:2px 3px;width:100%;box-sizing:border-box;border-radius:3px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
+      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:9px;padding:1px 2px;width:100%;box-sizing:border-box;border-radius:3px;${info.bf_next_date?'background:#dcfce7;border:1px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1px solid #f59e0b;color:#92400e'}"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
       <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">📜${histCount}</button></td>
     </tr>`;
@@ -4303,9 +4308,30 @@ function drawBFLifecycleTable(bfRows) {
   tbody.querySelectorAll('.bf-lc-csfac-btn').forEach(btn => {
     btn.addEventListener('click', () => openBFCsFacModal(btn.dataset.name, btn.dataset.apply, bfRows));
   });
-  // CSDR 選択
-  tbody.querySelectorAll('.bf-lc-csdr-btn').forEach(btn => {
-    btn.addEventListener('click', () => openBFCsdrModal(btn.dataset.name, btn.dataset.apply, bfRows));
+  // CSDR インラインセレクト
+  tbody.querySelectorAll('.bf-lc-csdr-select').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      if (sel.value === '__ADD__') {
+        const name = prompt('新しいDr名を入力してください:');
+        if (name && name.trim()) {
+          addCSDR(name.trim());
+          showToast(`Dr「${name.trim()}」を追加しました`);
+          // 追加直後にそのDrを自動選択
+          const ok = await saveBFLifecycleField(sel.dataset.name, sel.dataset.apply, 'bf_cs_doctor', name.trim());
+          if (ok) updateBFFunnelAndTable(bfRows);
+        } else {
+          // キャンセル時は元に戻す
+          const cur = bfLifecycleCache[sel.dataset.name + '|' + sel.dataset.apply]?.bf_cs_doctor || '';
+          sel.value = cur;
+        }
+        return;
+      }
+      const ok = await saveBFLifecycleField(sel.dataset.name, sel.dataset.apply, 'bf_cs_doctor', sel.value || null);
+      if (ok) {
+        sel.style.borderColor = '#0a0';
+        setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+      }
+    });
   });
   // 売上/交通費の金額系
   tbody.querySelectorAll('.bf-lc-money').forEach(inp => {
