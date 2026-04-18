@@ -4792,35 +4792,65 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.filter(p => p && p.trim() && p.trim() !== '?').map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
   }
 
-  // トグルボタンのみを page-header に移動してタイトル横に並べる
+  // トグル + フィルター群を page-header に移動してタイトル横に1行で並べる
   let toggleBtn = el.querySelector('.kaiin-header-toggle');
+  let topbar = el.querySelector('.kaiin-topbar');
   try {
     const parentSub = el.closest('[id^="sub-kaiin-"]');
     const pageHeader = parentSub?.querySelector('.page-header');
-    if (pageHeader && toggleBtn) {
+    if (pageHeader) {
       pageHeader.style.display = 'flex';
       pageHeader.style.alignItems = 'center';
-      pageHeader.style.gap = '12px';
+      pageHeader.style.gap = '8px';
       pageHeader.style.flexWrap = 'nowrap';
-      pageHeader.querySelectorAll('.kaiin-header-toggle').forEach(n => { if (n !== toggleBtn) n.remove(); });
+      pageHeader.style.overflowX = 'auto';
+      pageHeader.style.padding = '6px 8px';
+      pageHeader.querySelectorAll('.kaiin-header-toggle, .kaiin-topbar').forEach(n => {
+        if (n !== toggleBtn && n !== topbar) n.remove();
+      });
       const h2 = pageHeader.querySelector('h2');
-      if (h2) { h2.style.margin = '0'; h2.style.flex = '0 0 auto'; h2.style.whiteSpace = 'nowrap'; }
-      pageHeader.appendChild(toggleBtn);
+      if (h2) { h2.style.margin = '0'; h2.style.flex = '0 0 auto'; h2.style.whiteSpace = 'nowrap'; h2.style.fontSize = '16px'; }
+      if (toggleBtn) pageHeader.appendChild(toggleBtn);
+      if (topbar) {
+        topbar.style.margin = '0';
+        topbar.style.padding = '0';
+        topbar.style.background = 'transparent';
+        topbar.style.border = 'none';
+        topbar.style.flexWrap = 'nowrap';
+        topbar.style.flex = '1';
+        topbar.style.minWidth = '0';
+        pageHeader.appendChild(topbar);
+      }
     }
   } catch(_){}
 
-  // ヘッダー (サマリーカウント) の表示トグル
+  // ヘッダー (サマリーカウント) の表示トグル + トップナビ圧縮
+  const topHdr = document.querySelector('.header');
+  const subNav = document.getElementById('kaiin-sub-nav');
+  const applyCompact = (compact) => {
+    if (compact) {
+      if (topHdr) topHdr.style.display = 'none';
+      if (subNav) subNav.style.display = 'none';
+      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 110px)';
+    } else {
+      if (topHdr) topHdr.style.display = '';
+      if (subNav) subNav.style.display = '';
+      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 260px)';
+    }
+  };
+  // 初期はヘッダー非表示(コンパクト)
+  applyCompact(true);
   toggleBtn?.addEventListener('click', () => {
     const w = el.querySelector('.kaiin-header-wrap');
     const shown = w.style.display !== 'none';
     if (shown) {
       w.style.display = 'none';
       toggleBtn.textContent = '▼ ヘッダーを表示';
-      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 180px)';
+      applyCompact(true);
     } else {
       w.style.display = '';
       toggleBtn.textContent = '▲ ヘッダーを隠す';
-      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 320px)';
+      applyCompact(false);
     }
   });
   drawKaiinRows(treatment, rows, el);
