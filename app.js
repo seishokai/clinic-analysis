@@ -3,6 +3,264 @@ const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// =========================================
+// A3: 保存リトライキュー
+// =========================================
+const SAVE_QUEUE_KEY = 'save-queue-v1';
+let saveQueueTimer = null;
+function enqueueSave(op) {
+  const q = JSON.parse(localStorage.getItem(SAVE_QUEUE_KEY) || '[]');
+  q.push({ ...op, id: Date.now() + Math.random(), attempts: 0, lastAttempt: 0 });
+  localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(q));
+  updateQueueBadge();
+}
+function getQueue() { return JSON.parse(localStorage.getItem(SAVE_QUEUE_KEY) || '[]'); }
+function setQueue(q) { localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(q)); updateQueueBadge(); }
+function updateQueueBadge() {
+  const q = getQueue();
+  let el = document.getElementById('rt-queue-badge');
+  if (!q.length) { if (el) el.remove(); return; }
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'rt-queue-badge';
+    el.style.cssText = 'position:fixed;right:16px;bottom:16px;background:#f59e0b;color:#fff;padding:8px 14px;border-radius:20px;font-size:12px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.15);z-index:999;cursor:pointer;font-family:inherit';
+    el.title = 'クリックで今すぐ再送信';
+    el.addEventListener('click', () => processQueue(true));
+    document.body.appendChild(el);
+  }
+  el.textContent = `⏳ 保留中 ${q.length}件`;
+}
+async function processQueue(force) {
+  const q = getQueue();
+  if (!q.length) return;
+  const now = Date.now();
+  const remaining = [];
+  for (const op of q) {
+    const backoff = Math.min(300000, 3000 * Math.pow(2, op.attempts)); // 3s→6→12→...→5分
+    if (!force && now - op.lastAttempt < backoff) { remaining.push(op); continue; }
+    try {
+      let error = null;
+      if (op.type === 'upsert') {
+        const r = await sb.from(op.table).upsert(op.payload, op.options || {});
+        error = r.error;
+      } else if (op.type === 'insert') {
+        const r = await sb.from(op.table).insert(op.payload);
+        error = r.error;
+      } else if (op.type === 'update') {
+        let query = sb.from(op.table).update(op.payload);
+        Object.entries(op.match || {}).forEach(([k,v]) => { query = query.eq(k, v); });
+        const r = await query;
+        error = r.error;
+      } else if (op.type === 'delete') {
+        let query = sb.from(op.table).delete();
+        Object.entries(op.match || {}).forEach(([k,v]) => { query = query.eq(k, v); });
+        const r = await query;
+        error = r.error;
+      }
+      if (error) throw error;
+      // 成功
+    } catch(e) {
+      op.attempts = (op.attempts || 0) + 1;
+      op.lastAttempt = now;
+      op.lastError = e.message || String(e);
+      if (op.attempts < 10) remaining.push(op);
+      else console.error('Save queue: abandoned after 10 attempts', op);
+    }
+  }
+  setQueue(remaining);
+}
+// safeSave: DB保存を試み、失敗したらキューに溜める
+async function safeSave(op) {
+  try {
+    let result;
+    if (op.type === 'upsert') result = await sb.from(op.table).upsert(op.payload, op.options || {});
+    else if (op.type === 'insert') result = await sb.from(op.table).insert(op.payload);
+    else if (op.type === 'update') {
+      let q = sb.from(op.table).update(op.payload);
+      Object.entries(op.match || {}).forEach(([k,v]) => { q = q.eq(k, v); });
+      result = await q;
+    }
+    else if (op.type === 'delete') {
+      let q = sb.from(op.table).delete();
+      Object.entries(op.match || {}).forEach(([k,v]) => { q = q.eq(k, v); });
+      result = await q;
+    }
+    if (result && result.error) throw result.error;
+    return { ok: true, data: result?.data };
+  } catch(e) {
+    console.warn('safeSave failed, queueing', op, e);
+    enqueueSave(op);
+    return { ok: false, error: e };
+  }
+}
+// リトライ定期実行
+setInterval(() => processQueue(false), 10000);
+// オンライン復帰時にもリトライ
+window.addEventListener('online', () => { processQueue(true); });
+window.addEventListener('load', () => { updateQueueBadge(); setTimeout(() => processQueue(false), 2000); });
+
+// =========================================
+// A2: 楽観的ロック (updated_at チェック)
+// =========================================
+// 行の updated_at を保持するキャッシュ
+const optimisticVersions = {}; // key: "table:id" → updated_at 文字列
+function setVersion(table, id, ts) { optimisticVersions[`${table}:${id}`] = ts; }
+function getVersion(table, id) { return optimisticVersions[`${table}:${id}`]; }
+
+// 条件付きUPDATE: updated_atが一致するときだけ更新する
+async function conditionalUpdate(table, matchKey, seenUpdatedAt, changes) {
+  let query = sb.from(table).update(changes);
+  Object.entries(matchKey).forEach(([k,v]) => { query = query.eq(k, v); });
+  if (seenUpdatedAt) query = query.eq('updated_at', seenUpdatedAt);
+  const { data, error } = await query.select();
+  if (error) return { ok: false, error };
+  if (!data || !data.length) return { ok: false, conflict: true };
+  // 新しい updated_at をキャッシュ更新
+  if (data[0].updated_at) {
+    const id = matchKey.id || (matchKey.name + '|' + matchKey.apply_date);
+    setVersion(table, id, data[0].updated_at);
+  }
+  return { ok: true, data: data[0] };
+}
+
+// 競合通知
+let conflictToastShown = false;
+function showConflictDialog(msg, onReload) {
+  if (conflictToastShown) return;
+  conflictToastShown = true;
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9998;display:flex;align-items:center;justify-content:center;font-family:inherit';
+  ov.innerHTML = `
+    <div style="background:#fff;padding:20px 24px;border-radius:8px;max-width:420px;border:2px solid #f59e0b;box-shadow:0 12px 40px rgba(0,0,0,.2)">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;color:#b45309">⚠ 他のユーザーが先に編集しました</div>
+      <div style="font-size:12px;color:#555;margin-bottom:14px;line-height:1.6">${msg}</div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button id="conflict-cancel" style="padding:6px 14px;background:#fff;border:1px solid #ccc;border-radius:4px;cursor:pointer;font-family:inherit">キャンセル</button>
+        <button id="conflict-reload" style="padding:6px 14px;background:#f59e0b;color:#fff;border:none;border-radius:4px;cursor:pointer;font-weight:600;font-family:inherit">最新を読込</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  const close = () => { ov.remove(); conflictToastShown = false; };
+  ov.querySelector('#conflict-cancel').addEventListener('click', close);
+  ov.querySelector('#conflict-reload').addEventListener('click', () => { close(); onReload && onReload(); });
+}
+
+// =========================================
+// A1: リアルタイム同期
+// =========================================
+let realtimeChannels = [];
+function setupRealtime() {
+  // 既存チャンネル解除
+  realtimeChannels.forEach(ch => { try { sb.removeChannel(ch); } catch(_){} });
+  realtimeChannels = [];
+
+  const tables = ['booking_status','manual_bookings','self_recordings','bf_history','accounts','promo_rates'];
+  tables.forEach(tbl => {
+    const ch = sb.channel('rt-' + tbl)
+      .on('postgres_changes', { event: '*', schema: 'public', table: tbl }, (payload) => {
+        handleRealtimeChange(tbl, payload);
+      }).subscribe();
+    realtimeChannels.push(ch);
+  });
+  console.log('[Realtime] Subscribed:', tables);
+}
+
+// 再描画デバウンス
+const rtDebounce = {};
+function debouncedRefresh(key, fn, delay = 800) {
+  if (rtDebounce[key]) clearTimeout(rtDebounce[key]);
+  rtDebounce[key] = setTimeout(() => { rtDebounce[key] = null; try { fn(); } catch(e) { console.warn(e); } }, delay);
+}
+
+function handleRealtimeChange(table, payload) {
+  const row = payload.new || payload.old || {};
+  // updated_at をキャッシュ更新 (A2)
+  if (row.id && row.updated_at) setVersion(table, row.id, row.updated_at);
+  if (row.name && row.apply_date && row.updated_at) setVersion(table, row.name + '|' + row.apply_date, row.updated_at);
+
+  if (table === 'booking_status' || table === 'manual_bookings') {
+    // 予約系: 該当行を bookingsData に反映
+    if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
+      const key = row.name + '|' + row.apply_date;
+      const d = (bookingsData || []).find(b => b.name === row.name && b.applyDate === row.apply_date);
+      if (d) {
+        if (row.status !== undefined) d.status = row.status;
+        if (row.contract_amount !== undefined) d.contractAmount = row.contract_amount;
+        if (row.incentive_amount !== undefined) d.incentiveAmount = row.incentive_amount;
+        if (row.contract_service !== undefined) d.contractService = row.contract_service;
+        if (row.payment_month !== undefined) d.paymentMonth = row.payment_month;
+        if (row.incentive_month !== undefined) d.incentiveMonth = row.incentive_month;
+        if (row.book_date !== undefined && row.book_date) d.bookDate = row.book_date;
+        if (row.memo !== undefined) d._memo = row.memo;
+      }
+      // BFキャッシュも更新
+      if (row.bf_status !== undefined || row.bf_next_date !== undefined || row.bf_cs_facility !== undefined || row.bf_cs_doctor !== undefined || row.bf_memo !== undefined || row.bf_set_facility !== undefined || row.bf_travel_cost !== undefined) {
+        if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: row.name, apply_date: row.apply_date };
+        Object.keys(row).forEach(k => { if (k.startsWith('bf_')) bfLifecycleCache[key][k] = row[k]; });
+      }
+    }
+    // 画面更新 (デバウンス)
+    if (currentView === 'bookings') {
+      debouncedRefresh('bookings', () => {
+        if (typeof renderBookings === 'function') renderBookings();
+        // BF進捗タブが表示中なら
+        const lc = document.getElementById('bf-lifecycle');
+        if (lc && !lc.hidden) renderBFLifecycle();
+      });
+    }
+  } else if (table === 'self_recordings') {
+    debouncedRefresh('recordings', () => {
+      if (typeof renderRecordings === 'function' && currentView === 'tc') renderRecordings();
+    });
+  } else if (table === 'bf_history') {
+    // 履歴キャッシュに追記
+    const key = row.booking_name + '|' + row.booking_apply_date;
+    if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
+    if (payload.eventType === 'INSERT') bfHistoryCache[key].unshift(row);
+    else if (payload.eventType === 'DELETE' && payload.old?.id) {
+      bfHistoryCache[key] = bfHistoryCache[key].filter(h => h.id !== payload.old.id);
+    }
+    debouncedRefresh('bfhistory', () => {
+      const lc = document.getElementById('bf-lifecycle');
+      if (lc && !lc.hidden) drawBFLifecycleTable(getBFRows());
+    });
+  } else if (table === 'accounts') {
+    debouncedRefresh('accounts', () => { if (typeof renderAccounts === 'function') renderAccounts(); });
+  } else if (table === 'promo_rates') {
+    debouncedRefresh('promo', () => { if (typeof renderPromoRates === 'function') renderPromoRates(); });
+  }
+
+  // 他ユーザー編集通知（控えめに）
+  showRealtimeIndicator();
+}
+
+function getBFRows() {
+  const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+  return (bookingsData || []).filter(d => {
+    const svc = (d.service || '').toLowerCase();
+    if (!(svc.includes('bf') || svc.includes('ブラック'))) return false;
+    const bd = parseDate(d.bookDate);
+    if (bd && bd > todayEnd) return false;
+    return true;
+  });
+}
+
+let rtIndicatorTimer = null;
+function showRealtimeIndicator() {
+  let el = document.getElementById('rt-indicator');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'rt-indicator';
+    el.style.cssText = 'position:fixed;right:16px;top:16px;background:#10b981;color:#fff;padding:5px 12px;border-radius:14px;font-size:10px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.15);z-index:999;opacity:0;transition:opacity .3s;font-family:inherit;pointer-events:none';
+    el.textContent = '🔄 同期';
+    document.body.appendChild(el);
+  }
+  el.style.opacity = '1';
+  if (rtIndicatorTimer) clearTimeout(rtIndicatorTimer);
+  rtIndicatorTimer = setTimeout(() => { el.style.opacity = '0'; }, 1500);
+}
+
 // === Toast ===
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
@@ -1017,6 +1275,11 @@ function showApp() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
+
+  // A1: リアルタイム同期を開始
+  try { setupRealtime(); } catch(e) { console.warn('realtime setup failed', e); }
+  // A3: キューに残っている保存を試行
+  try { processQueue(true); } catch(_){}
 
   // ヘッダーのロール表示
   const header = document.querySelector('.header');
@@ -3565,10 +3828,8 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   if (field === 'bf_status' && value && BF_TO_STATUS[value]) {
     const targetStatus = BF_TO_STATUS[value];
     update.status = targetStatus;
-    // bookingsDataのキャッシュも更新
     const bk = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
     if (bk) bk.status = targetStatus;
-    // bk-extra にも保存
     try {
       const bkEx = loadData('bk-extra', {});
       if (!bkEx[key]) bkEx[key] = {};
@@ -3577,8 +3838,9 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     } catch(_){}
   }
 
-  const { error } = await sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' });
-  if (error) { showToast('保存エラー: ' + error.message, true); return false; }
+  // A3: safeSave でリトライキュー経由
+  const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
+  if (!res.ok) { showToast('⚠ 一時保存に失敗。自動再送信します', true); /* キューに積まれる */ }
   // キャッシュ更新
   if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
   bfLifecycleCache[key][field] = value;
