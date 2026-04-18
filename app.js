@@ -4750,13 +4750,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
         <table class="data-table compact">
           <thead><tr>
-            <th style="width:60px">来院</th>
-            <th style="text-align:left;width:120px">名前</th>
-            <th style="width:100px">ツール/プロモ</th>
-            <th style="width:80px">医院</th>
-            <th style="width:90px">相談</th>
-            <th style="width:120px">ステータス</th>
+            <th style="width:55px">来院</th>
+            <th style="text-align:left;width:110px">名前</th>
+            <th style="width:90px">ツール/プロモ</th>
+            <th style="width:70px">医院</th>
+            <th style="width:80px">相談</th>
+            <th style="width:130px">ステータス</th>
             <th>メモ</th>
+            <th style="width:95px">次回予定</th>
           </tr></thead>
           <tbody class="kaiin-tbody"></tbody>
         </table>
@@ -4841,6 +4842,11 @@ function drawKaiinRows(treatment, rows, container) {
     } else {
       promoBadge = '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     }
+    // 次回予定日の色分け (BFと同じ)
+    const nextDate = info.bf_next_date || '';
+    const nextDateStyle = nextDate ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600' : 'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e';
+    // 丸いステータスバッジ
+    const stRound = st ? `border-radius:20px;background:${stColor}22;color:${stColor};border:1.5px solid ${stColor};font-weight:700;padding:4px 10px` : 'border-radius:20px;padding:4px 10px';
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
@@ -4859,13 +4865,26 @@ function drawKaiinRows(treatment, rows, container) {
         if (/ジュエリー/.test(s)) return 'ティースジュエリー';
         return s || '-';
       })()}</td>
-      <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;${stStyle}">
+      <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;width:100%;${stRound};appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M6 9l6 6 6-6&quot;/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px;padding-right:24px">
         <option value="">未設定</option>
         ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>30?memo.substring(0,30)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
+      <td><input type="date" class="kaiin-next-date" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${nextDate}" style="font-size:10px;padding:2px 3px;width:100%;box-sizing:border-box;border-radius:4px;${nextDateStyle}"></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+  }).join('') || '<tr><td colspan="8" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+
+  // 次回予定日の保存
+  container.querySelectorAll('.kaiin-next-date').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'bf_next_date', inp.value || null);
+      if (ok) {
+        inp.style.borderColor = '#0a0';
+        setTimeout(() => drawKaiinRows(treatment, rows, container), 300);
+      }
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
+  });
 
   // ステータス変更: 統一してsaveBFLifecycleField経由で保存 (bf_statusを再利用)
   container.querySelectorAll('.kaiin-status-sel').forEach(sel => {
