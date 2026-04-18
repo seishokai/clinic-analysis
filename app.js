@@ -204,9 +204,11 @@ function handleRealtimeChange(table, payload) {
     if (currentView === 'bookings') {
       debouncedRefresh('bookings', () => {
         if (typeof renderBookings === 'function') renderBookings();
-        // BF進捗タブが表示中なら
+        // BF進捗タブが表示中ならファネル+一覧だけ更新 (フィルター維持)
         const lc = document.getElementById('bf-lifecycle');
-        if (lc && !lc.hidden) renderBFLifecycle();
+        if (lc && !lc.hidden && typeof updateBFFunnelAndTable === 'function') {
+          updateBFFunnelAndTable(getBFRows());
+        }
       });
     }
   } else if (table === 'self_recordings') {
@@ -552,7 +554,7 @@ function setupEventListeners() {
       if (currentView === 'bookings') {
         if (typeof renderBookings === 'function') renderBookings();
         const lc = document.getElementById('bf-lifecycle');
-        if (lc && !lc.hidden && typeof renderBFLifecycle === 'function') renderBFLifecycle();
+        if (lc && !lc.hidden && typeof updateBFFunnelAndTable === 'function') updateBFFunnelAndTable(getBFRows());
       } else if (currentView === 'tc') {
         if (typeof renderRecordings === 'function') renderRecordings();
         if (typeof loadClinics === 'function') loadClinics();
@@ -4102,6 +4104,30 @@ async function renderBFLifecycle() {
 }
 
 const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
+
+// フィルターを維持してファネルと一覧だけ更新 (フィルターリセット防止)
+function updateBFFunnelAndTable(bfRows) {
+  // ファネル再計算
+  const counts = {};
+  BF_STATUSES.forEach(s => counts[s.value] = 0);
+  let noStatus = 0;
+  bfRows.forEach(d => {
+    const info = bfLifecycleCache[d.name + '|' + d.applyDate];
+    const st = info?.bf_status;
+    if (st && counts[st] !== undefined) counts[st]++;
+    else noStatus++;
+  });
+  const funnelEl = document.getElementById('bf-lc-funnel');
+  if (funnelEl) {
+    funnelEl.innerHTML = `
+      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700">${bfRows.length}</span></div>
+      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700">${noStatus}</span></div>
+      ${BF_STATUSES.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}">${counts[s.value]}</span></div>`).join('')}
+    `;
+  }
+  // 一覧だけ再描画 (フィルター値は保持)
+  drawBFLifecycleTable(bfRows);
+}
 const CSDR_DEFAULTS = ['小池','鶴田','立松','原','西村','山田'];
 function getCSDRList() {
   const saved = loadData('csdr-extra-list', []);
@@ -4251,8 +4277,8 @@ function drawBFLifecycleTable(bfRows) {
       if (ok) {
         el.style.borderColor = '#0a0';
         setTimeout(() => { el.style.borderColor = ''; }, 1000);
-        // ステータス変更はファネル更新
-        if (el.dataset.field === 'bf_status') renderBFLifecycle();
+        // ステータス変更時: フィルターは保持してファネルと一覧だけ更新
+        if (el.dataset.field === 'bf_status') updateBFFunnelAndTable(bfRows);
       }
     });
   });
