@@ -629,8 +629,11 @@
           <button class="bf-sub-btn" data-bfsub="bf-lifecycle" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">セット進捗</button>
         </div>
         <div id="bf-lifecycle" hidden>
-          <div class="page-header"><h2>BF セット進捗管理</h2><p class="page-desc">カウンセリング後〜セット完了までの全プロセスを一元管理</p></div>
-          <div id="bf-lc-funnel" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;overflow-x:auto"></div>
+          <div style="display:flex;align-items:baseline;gap:12px;margin:4px 0 8px">
+            <h2 style="font-size:17px;font-weight:700;margin:0">BF セット進捗管理</h2>
+            <span style="font-size:11px;color:var(--text-sub)">カウンセリング後〜セット完了までの全プロセスを一元管理</span>
+          </div>
+          <div id="bf-lc-funnel" style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;overflow-x:auto"></div>
           <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
             <select class="form-select" id="bf-lc-filter-status" style="width:auto;padding:6px 10px;font-size:12px"><option value="">BFステータス:全て</option></select>
             <select class="form-select" id="bf-lc-filter-fac" style="width:auto;padding:6px 10px;font-size:12px"><option value="">CS医院:全て</option></select>
@@ -638,9 +641,9 @@
             <select class="form-select" id="bf-lc-filter-next" style="width:auto;padding:6px 10px;font-size:12px"><option value="">次回予定:全て</option><option value="fixed">確定(日付あり)</option><option value="none">未定(日付なし)</option></select>
             <input type="text" class="form-input" id="bf-lc-search" placeholder="名前検索" style="width:120px;padding:6px 8px;font-size:12px">
           </div>
-          <div class="card" style="padding:8px">
-            <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">一覧 <span id="bf-lc-count" style="font-weight:400"></span></div>
-            <div class="data-table-wrap" style="max-height:calc(100vh - 380px);overflow-y:auto">
+          <div class="card" style="padding:6px">
+            <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">一覧 <span id="bf-lc-count" style="font-weight:400"></span></div>
+            <div class="data-table-wrap" style="max-height:calc(100vh - 240px);overflow-y:auto">
               <table class="data-table compact">
                 <thead><tr>
                   <th style="width:60px">来院日</th>
@@ -908,7 +911,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=138"></script>
+  <script src="app.js?v=139"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

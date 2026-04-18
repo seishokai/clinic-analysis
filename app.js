@@ -3588,9 +3588,9 @@ async function renderBFLifecycle() {
   const funnelEl = document.getElementById('bf-lc-funnel');
   if (funnelEl) {
     funnelEl.innerHTML = `
-      <div class="stat-card" style="padding:8px;min-width:90px"><span class="stat-label">総計</span><span class="stat-num">${bfRows.length}</span></div>
-      <div class="stat-card" style="padding:8px;min-width:90px;border-color:#ccc"><span class="stat-label">未設定</span><span class="stat-num">${noStatus}</span></div>
-      ${BF_STATUSES.map(s => `<div class="stat-card" style="padding:8px;min-width:80px;border-left:3px solid ${s.color}"><span class="stat-label" style="font-size:9px">${s.value}</span><span class="stat-num" style="color:${s.color}">${counts[s.value]}</span></div>`).join('')}
+      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700">${bfRows.length}</span></div>
+      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700">${noStatus}</span></div>
+      ${BF_STATUSES.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}">${counts[s.value]}</span></div>`).join('')}
     `;
   }
 
