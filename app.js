@@ -3725,7 +3725,7 @@ function drawBFLifecycleTable(bfRows) {
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_set_facility" style="font-size:10px;padding:2px 4px;width:100%">${FACS.map(f => `<option ${(info.bf_set_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
-      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_memo" value="${esc(info.bf_memo)}" placeholder="メモ" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
+      <td class="bf-lc-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;min-height:26px;background:${info.bf_memo?'#fff8e1':'transparent'};border:1px dashed ${info.bf_memo?'#f9a825':'var(--border)'};border-radius:4px;font-size:11px;line-height:1.5;max-width:320px" title="クリックで編集">${info.bf_memo ? (info.bf_memo.length > 60 ? info.bf_memo.substring(0,60)+'…' : info.bf_memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
       <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">📜${histCount}</button></td>
@@ -3755,6 +3755,37 @@ function drawBFLifecycleTable(bfRows) {
   tbody.querySelectorAll('.bf-lc-hist-btn').forEach(btn => {
     btn.addEventListener('click', () => openBFHistoryModal(btn.dataset.name, btn.dataset.apply));
   });
+  // メモモーダル
+  tbody.querySelectorAll('.bf-lc-memo-cell').forEach(td => {
+    td.addEventListener('click', () => openBFMemoModal(td.dataset.name, td.dataset.apply, bfRows));
+  });
+}
+
+function openBFMemoModal(name, applyDate, bfRows) {
+  const key = name + '|' + applyDate;
+  const info = bfLifecycleCache[key] || {};
+  document.getElementById('bf-lc-memo-title').textContent = '📝 ' + name + ' のメモ';
+  const st = info.bf_status || '未設定';
+  document.getElementById('bf-lc-memo-sub').textContent = `BFステータス: ${st}${st==='検討中'?' — 後追い状況を記録してください':''}`;
+  document.getElementById('bf-lc-memo-text').value = info.bf_memo || '';
+  document.getElementById('bf-lc-memo-status').textContent = '';
+  document.getElementById('bf-lc-memo-modal').hidden = false;
+  const saveBtn = document.getElementById('bf-lc-memo-save');
+  // 既存ハンドラを消して新しくバインド
+  const newBtn = saveBtn.cloneNode(true);
+  saveBtn.parentNode.replaceChild(newBtn, saveBtn);
+  newBtn.addEventListener('click', async () => {
+    const v = document.getElementById('bf-lc-memo-text').value;
+    const ok = await saveBFLifecycleField(name, applyDate, 'bf_memo', v || null);
+    if (ok) {
+      document.getElementById('bf-lc-memo-status').innerHTML = '<span style="color:#0a0">✓ 保存しました</span>';
+      setTimeout(() => {
+        document.getElementById('bf-lc-memo-modal').hidden = true;
+        if (bfRows) drawBFLifecycleTable(bfRows);
+      }, 600);
+    }
+  });
+  setTimeout(() => document.getElementById('bf-lc-memo-text').focus(), 100);
 }
 
 function openBFHistoryModal(name, applyDate) {

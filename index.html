@@ -666,6 +666,20 @@
               </table>
             </div>
           </div>
+          <div id="bf-lc-memo-modal" class="modal" hidden>
+            <div class="modal-overlay" onclick="document.getElementById('bf-lc-memo-modal').hidden=true"></div>
+            <div class="modal-content" style="max-width:620px;padding:24px;max-height:80vh;overflow-y:auto">
+              <button class="modal-close" onclick="document.getElementById('bf-lc-memo-modal').hidden=true">&times;</button>
+              <h3 style="font-size:15px;font-weight:700;margin-bottom:6px" id="bf-lc-memo-title">📝 メモ</h3>
+              <div style="font-size:11px;color:var(--text-sub);margin-bottom:10px" id="bf-lc-memo-sub"></div>
+              <textarea id="bf-lc-memo-text" rows="10" placeholder="検討中の方の後追い状況などを記録..." style="width:100%;padding:12px;border:1.5px solid var(--border);border-radius:6px;font-size:13px;line-height:1.7;resize:vertical;font-family:inherit"></textarea>
+              <div style="display:flex;gap:8px;margin-top:12px">
+                <button class="btn btn-dark" id="bf-lc-memo-save">保存</button>
+                <button class="btn btn-outline" onclick="document.getElementById('bf-lc-memo-modal').hidden=true">閉じる</button>
+                <span id="bf-lc-memo-status" style="font-size:11px;color:var(--text-sub);margin-left:auto;align-self:center"></span>
+              </div>
+            </div>
+          </div>
           <div id="bf-lc-history-modal" class="modal" hidden>
             <div class="modal-overlay" onclick="document.getElementById('bf-lc-history-modal').hidden=true"></div>
             <div class="modal-content" style="max-width:620px;padding:24px;max-height:80vh;overflow-y:auto">
@@ -917,7 +931,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=144"></script>
+  <script src="app.js?v=145"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
