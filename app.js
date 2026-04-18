@@ -4729,7 +4729,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
 
   el.innerHTML = `
     <button class="kaiin-header-toggle" style="padding:4px 10px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▼ ヘッダーを表示</button>
-    <div class="kaiin-topbar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:6px 8px;background:var(--card);border:1px solid var(--border);border-radius:6px">
+    <div class="kaiin-topbar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:4px 6px;background:var(--card);border:1px solid var(--border);border-radius:6px">
       <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px;padding:5px 8px;font-size:12px">
       <select class="form-select kaiin-filter-tool" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">ツール:全て</option><option>DXHUB</option><option>セレクト</option><option>手動</option></select>
       <select class="form-select kaiin-filter-promo" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">プロモ:全て</option></select>
@@ -4793,10 +4793,10 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   }
 
   // トグルボタンのみを page-header に移動してタイトル横に並べる
+  let toggleBtn = el.querySelector('.kaiin-header-toggle');
   try {
     const parentSub = el.closest('[id^="sub-kaiin-"]');
     const pageHeader = parentSub?.querySelector('.page-header');
-    const toggleBtn = el.querySelector('.kaiin-header-toggle');
     if (pageHeader && toggleBtn) {
       pageHeader.style.display = 'flex';
       pageHeader.style.alignItems = 'center';
@@ -4810,7 +4810,6 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   } catch(_){}
 
   // ヘッダー (サマリーカウント) の表示トグル
-  const toggleBtn = el.querySelector('.kaiin-header-toggle');
   toggleBtn?.addEventListener('click', () => {
     const w = el.querySelector('.kaiin-header-wrap');
     const shown = w.style.display !== 'none';
