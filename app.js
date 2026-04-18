@@ -3353,22 +3353,37 @@ let _memoTarget = null;
 function openMemoModal(name, apply, tdEl) {
   const key = name + '|' + apply;
   const memos = loadData('bk-memos', {});
-  // 優先順位: localStorage → bookingsData._memo (booking_status.memo/bf_memo含む) → BFライフサイクルキャッシュ
+  // 優先順位: localStorage 完全一致 → bookingsData._memo → BFキャッシュ(同患者なら日付跨ぎでもOK) → localStorage ファジー
   let current = memos[key] || '';
+  const nn = normName(name);
+  const nfac = normFac((bookingsData||[]).find(b => b.name===name && b.applyDate===apply)?.facility || '');
   if (!current) {
     const d = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
     if (d && d._memo) current = d._memo;
   }
   if (!current) {
-    // ファジー: 正規化名+日付 で BFキャッシュから探す
-    const nn = normName(name);
-    const dateKey = normDateKey(apply);
+    // BFキャッシュから 正規化名(+医院が一致する)のメモを検索 (日付は問わない)
     for (const k in bfLifecycleCache) {
       const info = bfLifecycleCache[k];
-      if (info && normName(info.name) === nn && normDateKey(info.apply_date) === dateKey) {
-        current = info.bf_memo || info.memo || '';
-        if (current) break;
-      }
+      if (!info) continue;
+      if (normName(info.name) !== nn) continue;
+      // 医院が指定されていれば一致確認、なければ名前一致のみ
+      if (nfac && info.bf_cs_facility && parseCsFac(info.bf_cs_facility).map(normFac).indexOf(nfac) < 0) continue;
+      const m = info.bf_memo || info.memo || '';
+      if (m) { current = m; break; }
+    }
+  }
+  if (!current) {
+    // localStorage の bk-memos をファジー検索 (名前のみで)
+    for (const k in memos) {
+      const kName = k.split('|')[0];
+      if (normName(kName) === nn && memos[k]) { current = memos[k]; break; }
+    }
+  }
+  if (!current) {
+    // bookingsData 全走査 (同名別表記)
+    for (const b of (bookingsData || [])) {
+      if (normName(b.name) === nn && b._memo) { current = b._memo; break; }
     }
   }
   _memoTarget = { name, apply, key, tdEl };
