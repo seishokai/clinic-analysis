@@ -566,6 +566,35 @@
           <select class="form-select" id="fac-status-filter" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="未対応">未対応</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select>
           <input type="text" class="form-input" id="fac-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
           <button class="btn btn-outline" id="fac-filter-reset" style="min-height:30px;padding:6px 10px;font-size:11px;border-radius:20px">全表示</button>
+          <button class="btn btn-dark" id="fac-bulk-btn" style="min-height:30px;padding:6px 12px;font-size:11px;border-radius:20px;margin-left:auto">📋 一括貼付け</button>
+        </div>
+        <div id="fac-bulk-modal" class="modal" hidden>
+          <div class="modal-overlay" onclick="document.getElementById('fac-bulk-modal').hidden=true"></div>
+          <div class="modal-content" style="max-width:720px;padding:24px;max-height:90vh;overflow-y:auto">
+            <button class="modal-close" onclick="document.getElementById('fac-bulk-modal').hidden=true">&times;</button>
+            <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">一括貼付け (<span id="fac-bulk-tab-name"></span>)</h3>
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:10px;line-height:1.7">
+              スプレッドシートから <b>タブ区切り</b> でコピーして貼り付け。形式:<br>
+              <code style="font-size:11px;background:var(--bg);padding:2px 6px;border-radius:4px">来院日 [tab] 名前 [tab] 由来 [tab] 相談(任意) [tab] ステータス(任意)</code><br>
+              <span style="color:var(--text-muted)">例: 4/13　加藤 教恵　インスタ　BF　来院済</span>
+            </div>
+            <textarea id="fac-bulk-text" rows="10" placeholder="4/13&#9;加藤 教恵&#9;インスタ&#9;BF&#9;来院済
+4/13&#9;山口 亜希子&#9;YouTube&#9;BF&#9;来院済" style="width:100%;padding:10px;border:1.5px solid var(--border);border-radius:6px;font-size:12px;line-height:1.6;font-family:monospace;resize:vertical"></textarea>
+            <div style="display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap">
+              <label style="font-size:11px;display:flex;align-items:center;gap:4px"><input type="checkbox" id="fac-bulk-samedate" checked> 来院日＝予約日 (同日扱い)</label>
+              <label style="font-size:11px;display:flex;align-items:center;gap:4px">デフォルト相談
+                <select id="fac-bulk-default-svc" class="form-select" style="font-size:11px;padding:2px 4px;width:auto"><option>BF</option><option>矯正</option><option>インプラント</option><option>セラミック</option></select>
+              </label>
+              <label style="font-size:11px;display:flex;align-items:center;gap:4px">デフォルト状態
+                <select id="fac-bulk-default-status" class="form-select" style="font-size:11px;padding:2px 4px;width:auto"><option>来院済</option><option>成約</option><option>未対応</option></select>
+              </label>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:14px">
+              <button class="btn btn-outline" id="fac-bulk-preview" style="font-size:12px">プレビュー</button>
+              <button class="btn btn-dark" id="fac-bulk-run" style="font-size:12px">登録実行</button>
+            </div>
+            <div id="fac-bulk-result" style="margin-top:14px;font-size:12px"></div>
+          </div>
         </div>
         <div class="card" style="margin-bottom:16px">
           <div class="card-header">予約一覧 <span id="fac-count" style="font-weight:400;color:var(--text-muted)"></span></div>
@@ -840,7 +869,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=131"></script>
+  <script src="app.js?v=132"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

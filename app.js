@@ -363,6 +363,15 @@ function setupEventListeners() {
     });
   });
   document.getElementById('fac-new-save').addEventListener('click', saveFacNewPatient);
+  // 一括貼付けモーダル
+  document.getElementById('fac-bulk-btn')?.addEventListener('click', () => {
+    document.getElementById('fac-bulk-tab-name').textContent = currentFacTab || '医院';
+    document.getElementById('fac-bulk-text').value = '';
+    document.getElementById('fac-bulk-result').innerHTML = '';
+    document.getElementById('fac-bulk-modal').hidden = false;
+  });
+  document.getElementById('fac-bulk-preview')?.addEventListener('click', () => runBulkInsert(true));
+  document.getElementById('fac-bulk-run')?.addEventListener('click', () => runBulkInsert(false));
   document.getElementById('fac-new-name').addEventListener('keydown', e => { if (e.key === 'Enter') saveFacNewPatient(); });
   // 医院タブフィルター
   ['fac-period','fac-month','fac-status-filter'].forEach(id => { document.getElementById(id)?.addEventListener('change', () => renderFacTab(currentFacTab)); });
@@ -3002,6 +3011,95 @@ function renderFacTab(facility) {
   document.querySelectorAll('#fac-tbody .fac-memo-cell').forEach(td => {
     td.addEventListener('click', () => openMemoModal(td.dataset.name, td.dataset.apply, td));
   });
+}
+
+// === 一括貼付け ===
+function parseBulkText(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  const today = new Date();
+  const year = today.getFullYear();
+  return lines.map((line, idx) => {
+    // タブ優先、次にカンマ
+    const cols = line.includes('\t') ? line.split('\t') : line.split(',');
+    const parts = cols.map(c => (c || '').trim());
+    const [rawDate, name, source, svc, status] = parts;
+    // 日付パース: "4/13", "2026/4/13", "4/13 10:00" 等
+    let dateStr = '';
+    if (rawDate) {
+      const m = rawDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/) || rawDate.match(/(\d{1,2})\D+(\d{1,2})/);
+      if (m) {
+        if (m.length === 4) dateStr = `${m[1]}/${String(m[2]).padStart(2,'0')}/${String(m[3]).padStart(2,'0')}`;
+        else dateStr = `${year}/${String(m[1]).padStart(2,'0')}/${String(m[2]).padStart(2,'0')}`;
+        // 時刻部分があれば維持
+        const timeM = rawDate.match(/(\d{1,2}:\d{2})/);
+        dateStr += timeM ? ' ' + timeM[1] : ' ' + String(10 + (idx % 6)).padStart(2,'0') + ':00';
+      }
+    }
+    return { lineNo: idx+1, rawLine: line, dateStr, name: name||'', source: source||'', svc: svc||'', status: status||'' };
+  });
+}
+
+async function runBulkInsert(previewOnly) {
+  const fac = currentFacTab;
+  if (!fac) { showToast('医院タブを選択してください', true); return; }
+  const text = document.getElementById('fac-bulk-text').value.trim();
+  if (!text) return;
+  const sameDate = document.getElementById('fac-bulk-samedate').checked;
+  const defSvc = document.getElementById('fac-bulk-default-svc').value;
+  const defStatus = document.getElementById('fac-bulk-default-status').value;
+  const resultEl = document.getElementById('fac-bulk-result');
+
+  const rows = parseBulkText(text);
+  if (!rows.length) { resultEl.innerHTML = '<span style="color:#c00">入力が空です</span>'; return; }
+
+  // 重複チェック (manual_bookings + 現在のbookingsData)
+  const { data: existing } = await sb.from('manual_bookings').select('name,facility').eq('facility', fac);
+  const existNames = new Set((existing || []).map(e => e.name));
+  (bookingsData || []).forEach(b => { if (normFac(b.facility) === fac) existNames.add(b.name); });
+
+  const toInsert = [];
+  const dupLines = [];
+  const errLines = [];
+  rows.forEach(r => {
+    if (!r.name) { errLines.push(r); return; }
+    if (!r.dateStr) { errLines.push(r); return; }
+    if (existNames.has(r.name)) { dupLines.push(r); return; }
+    toInsert.push({
+      apply_date: r.dateStr,
+      book_date: sameDate ? r.dateStr : '',
+      name: r.name,
+      service: (r.svc || defSvc) + (r.svc && r.svc.endsWith('相談') ? '' : '相談'),
+      facility: fac,
+      source: r.source || '',
+      status: r.status || defStatus,
+      tool: '手動'
+    });
+  });
+
+  // プレビュー表示
+  const previewHtml = `
+    <div style="padding:10px;background:var(--bg);border-radius:6px;margin-bottom:8px">
+      <div>📊 解析結果: <b>${rows.length}</b>行 / 登録対象 <b style="color:#0a0">${toInsert.length}</b>件 / 重複除外 <b style="color:#f90">${dupLines.length}</b>件 / エラー <b style="color:#c00">${errLines.length}</b>件</div>
+    </div>
+    ${toInsert.length ? `<details open style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600">➕ 登録対象 ${toInsert.length}件</summary><div style="max-height:200px;overflow-y:auto;margin-top:6px;border:1px solid var(--border-light);border-radius:4px;padding:6px">${toInsert.map(x=>`<div style="font-size:11px;padding:3px 0;border-bottom:1px dotted var(--border-light)">${x.apply_date} / ${x.name} / ${x.source||'-'} / ${x.service} / ${x.status}</div>`).join('')}</div></details>` : ''}
+    ${dupLines.length ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:#f90">⚠ 重複スキップ ${dupLines.length}件</summary><div style="max-height:150px;overflow-y:auto;margin-top:6px;padding:6px">${dupLines.map(x=>`<div style="font-size:11px;color:#f90">${x.name}</div>`).join('')}</div></details>` : ''}
+    ${errLines.length ? `<details style="margin-bottom:8px"><summary style="cursor:pointer;font-size:12px;font-weight:600;color:#c00">❌ エラー ${errLines.length}件 (日付or名前なし)</summary><div style="max-height:150px;overflow-y:auto;margin-top:6px;padding:6px">${errLines.map(x=>`<div style="font-size:11px;color:#c00">Line ${x.lineNo}: ${x.rawLine}</div>`).join('')}</div></details>` : ''}
+  `;
+
+  if (previewOnly) {
+    resultEl.innerHTML = previewHtml + '<div style="font-size:12px;color:var(--text-sub);margin-top:6px">問題なければ「登録実行」をクリック</div>';
+    return;
+  }
+
+  if (!toInsert.length) { resultEl.innerHTML = previewHtml + '<div style="color:#c00;margin-top:6px">登録対象がありません</div>'; return; }
+  if (!confirm(`${toInsert.length}件を登録します。よろしいですか？`)) return;
+
+  const { error } = await sb.from('manual_bookings').insert(toInsert);
+  if (error) { resultEl.innerHTML = previewHtml + '<div style="color:#c00;margin-top:6px">登録エラー: '+error.message+'</div>'; return; }
+  resultEl.innerHTML = previewHtml + `<div style="color:#0a0;margin-top:6px;font-weight:600">✓ ${toInsert.length}件登録完了</div>`;
+  showToast(`${toInsert.length}件を登録しました`);
+  // 画面更新
+  setTimeout(() => { document.getElementById('fac-bulk-modal').hidden = true; loadBookings(); }, 1200);
 }
 
 async function saveFacNewPatient() {
