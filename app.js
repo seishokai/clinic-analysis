@@ -4776,7 +4776,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
             <th style="width:85px">売上</th>
             <th style="width:70px">交通費</th>
             <th>メモ</th>
-            <th style="width:130px">次回予定</th>
+            <th style="width:55px">次回予定</th>
           </tr></thead>
           <tbody class="kaiin-tbody"></tbody>
         </table>
@@ -4994,14 +4994,25 @@ function drawKaiinRows(treatment, rows, container) {
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>22?memo.substring(0,22)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
-      <td><input type="date" class="kaiin-next-date" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${nextDate}" style="font-size:10px;padding:2px 3px;width:100%;box-sizing:border-box;border-radius:4px;${nextDateStyle}"></td>
+      <td><input type="text" class="kaiin-next-date-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${nextDate}" value="${nextDate?nextDate.substring(5).replace('-','/'):''}" placeholder="M/D" maxlength="5" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;${nextDateStyle}"></td>
     </tr>`;
   }).join('') || '<tr><td colspan="11" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
 
-  // 次回予定日の保存
-  container.querySelectorAll('.kaiin-next-date').forEach(inp => {
+  // 次回予定日 MM/DD 入力 → ISO に変換して保存
+  container.querySelectorAll('.kaiin-next-date-mmdd').forEach(inp => {
     inp.addEventListener('change', async () => {
-      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'bf_next_date', inp.value || null);
+      const v = inp.value.trim();
+      let iso = null;
+      const m = v.match(/^(\d{1,2})[\/\-\.](\d{1,2})$/);
+      if (m) {
+        iso = `${new Date().getFullYear()}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+      } else if (v) {
+        inp.value = inp.dataset.iso ? inp.dataset.iso.substring(5).replace('-','/') : '';
+        return;
+      }
+      inp.dataset.iso = iso || '';
+      inp.value = iso ? iso.substring(5).replace('-','/') : '';
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'bf_next_date', iso);
       if (ok) {
         inp.style.borderColor = '#0a0';
         setTimeout(() => drawKaiinRows(treatment, rows, container), 300);
