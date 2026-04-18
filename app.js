@@ -4728,8 +4728,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const CONSULT_TYPES = ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー','その他'];
 
   el.innerHTML = `
-    <div class="kaiin-topbar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:6px 8px;background:var(--card);border:1px solid var(--border);border-radius:6px;position:sticky;top:0;z-index:5">
-      <button class="kaiin-header-toggle" style="padding:4px 10px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▼ ヘッダーを表示</button>
+    <button class="kaiin-header-toggle" style="padding:4px 10px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▼ ヘッダーを表示</button>
+    <div class="kaiin-topbar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:6px 8px;background:var(--card);border:1px solid var(--border);border-radius:6px">
       <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px;padding:5px 8px;font-size:12px">
       <select class="form-select kaiin-filter-tool" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">ツール:全て</option><option>DXHUB</option><option>セレクト</option><option>手動</option></select>
       <select class="form-select kaiin-filter-promo" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">プロモ:全て</option></select>
@@ -4766,17 +4766,17 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
         <table class="data-table compact">
           <thead><tr>
-            <th style="width:55px">来院</th>
-            <th style="text-align:left;width:110px">名前</th>
+            <th style="width:140px">来院</th>
+            <th style="text-align:left;width:130px">名前</th>
             <th style="width:90px">ツール/プロモ</th>
             <th style="width:85px">CS医院</th>
             <th style="width:75px">セット医院</th>
-            <th style="width:75px">相談</th>
+            <th style="width:85px">相談</th>
             <th style="width:130px">ステータス</th>
             <th style="width:85px">売上</th>
             <th style="width:70px">交通費</th>
             <th>メモ</th>
-            <th style="width:95px">次回予定</th>
+            <th style="width:130px">次回予定</th>
           </tr></thead>
           <tbody class="kaiin-tbody"></tbody>
         </table>
@@ -4792,25 +4792,20 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.filter(p => p && p.trim() && p.trim() !== '?').map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
   }
 
-  // トップバー (フィルター群) を page-header に移動して、タイトル横に並べる
+  // トグルボタンのみを page-header に移動してタイトル横に並べる
   try {
     const parentSub = el.closest('[id^="sub-kaiin-"]');
     const pageHeader = parentSub?.querySelector('.page-header');
-    const topbar = el.querySelector('.kaiin-topbar');
-    if (pageHeader && topbar) {
+    const toggleBtn = el.querySelector('.kaiin-header-toggle');
+    if (pageHeader && toggleBtn) {
       pageHeader.style.display = 'flex';
       pageHeader.style.alignItems = 'center';
       pageHeader.style.gap = '12px';
-      pageHeader.style.flexWrap = 'wrap';
-      // 既存の注入済みトップバーを削除
-      pageHeader.querySelectorAll('.kaiin-topbar').forEach(n => n.remove());
+      pageHeader.style.flexWrap = 'nowrap';
+      pageHeader.querySelectorAll('.kaiin-header-toggle').forEach(n => { if (n !== toggleBtn) n.remove(); });
       const h2 = pageHeader.querySelector('h2');
-      if (h2) { h2.style.marginRight = '8px'; h2.style.flex = '0 0 auto'; }
-      topbar.style.position = 'static';
-      topbar.style.margin = '0';
-      topbar.style.flex = '1';
-      topbar.style.minWidth = '0';
-      pageHeader.appendChild(topbar);
+      if (h2) { h2.style.margin = '0'; h2.style.flex = '0 0 auto'; h2.style.whiteSpace = 'nowrap'; }
+      pageHeader.appendChild(toggleBtn);
     }
   } catch(_){}
 
@@ -4951,7 +4946,7 @@ function drawKaiinRows(treatment, rows, container) {
       return CONSULT_TYPES.includes(s) ? s : 'その他';
     })();
     return `<tr>
-      <td><input type="date" class="kaiin-bookdate" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${bookDateISO}" style="font-size:10px;padding:2px 3px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:4px"></td>
+      <td><input type="date" class="kaiin-bookdate" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${bookDateISO}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:4px"></td>
       <td><input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'"></td>
       <td style="text-align:left">${promoBadge}</td>
       <td><button type="button" class="kaiin-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:3px 6px;width:100%;text-align:center;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer">${csFacDisplay}</button></td>
