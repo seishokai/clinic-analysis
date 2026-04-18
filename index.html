@@ -871,6 +871,17 @@
       </div>
       <div id="sub-adm-history" hidden>
         <div class="page-header"><h2>変更履歴・復元</h2><p class="page-desc">全テーブルの変更を自動記録。誤編集・誤削除はここから復元可能</p></div>
+        <div class="card" style="margin-bottom:12px;padding:12px;background:#f0f9ff;border:1px solid #0284c7">
+          <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+            <div style="flex:1;min-width:200px">
+              <div style="font-size:12px;font-weight:700;color:#0369a1">📦 日次自動バックアップ</div>
+              <div style="font-size:11px;color:var(--text-sub);margin-top:2px">24時間ごとに全データを JSON スナップショット化して Storage に保存。30日分保持。</div>
+            </div>
+            <button class="btn btn-dark" id="backup-now" style="background:#0284c7;border-color:#0284c7;padding:6px 16px;font-size:12px">📦 今すぐバックアップ</button>
+            <button class="btn btn-outline" id="backup-refresh" style="padding:6px 12px;font-size:12px">🔄 一覧更新</button>
+          </div>
+          <div id="backup-list" style="margin-top:10px;max-height:200px;overflow-y:auto;background:#fff;border-radius:4px;padding:4px"></div>
+        </div>
         <div class="card" style="margin-bottom:12px;padding:12px">
           <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <div class="form-group" style="margin:0;min-width:140px"><label class="form-label">テーブル</label><select class="form-select" id="ch-filter-table" style="padding:6px 8px;font-size:12px"><option value="">全て</option><option>booking_status</option><option>self_recordings</option><option>manual_bookings</option><option>accounts</option></select></div>
@@ -1000,7 +1011,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=158"></script>
+  <script src="app.js?v=159"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

@@ -607,7 +607,7 @@ function setupEventListeners() {
       if (sub === 'bk-bf') { if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); } }
       if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
       if (sub === 'recordings') renderRecordings();
-      if (sub === 'adm-history') renderChangeLog();
+      if (sub === 'adm-history') { renderChangeLog(); renderBackupsList(); }
     });
   });
 
@@ -896,6 +896,15 @@ function setupEventListeners() {
     // 変更履歴
     document.getElementById('ch-reload')?.addEventListener('click', renderChangeLog);
     document.getElementById('ch-export')?.addEventListener('click', exportChangeLogCsv);
+    // バックアップ
+    document.getElementById('backup-now')?.addEventListener('click', async () => {
+      const btn = document.getElementById('backup-now');
+      btn.disabled = true; btn.textContent = '⏳ 作成中...';
+      await createBackup(true);
+      btn.disabled = false; btn.textContent = '📦 今すぐバックアップ';
+      renderBackupsList();
+    });
+    document.getElementById('backup-refresh')?.addEventListener('click', renderBackupsList);
     ['ch-filter-table','ch-filter-op','ch-filter-period'].forEach(id => {
       document.getElementById(id)?.addEventListener('change', renderChangeLog);
     });
@@ -1334,6 +1343,8 @@ function showApp() {
   try { setupRealtime(); } catch(e) { console.warn('realtime setup failed', e); }
   // A3: キューに残っている保存を試行
   try { processQueue(true); } catch(_){}
+  // Layer 3: 日次自動バックアップ (admin のみ、24h経過時)
+  setTimeout(() => { try { maybeAutoBackup(); } catch(_){} }, 5000);
 
   // ヘッダーのロール表示
   const header = document.querySelector('.header');
@@ -5239,6 +5250,111 @@ async function renderAdBudgets() {
       </div>
     `;
   }).join('');
+}
+
+// === Layer 3: 日次自動バックアップ ===
+const BACKUP_TABLES = ['booking_status','manual_bookings','self_recordings','bf_history','accounts','promo_rates','ad_budget_headers','ad_budget_details'];
+const BACKUP_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24時間
+const BACKUP_KEEP_DAYS = 30;
+
+async function createBackup(manual) {
+  const stamp = new Date().toISOString().replace(/[:.]/g,'-').substring(0,19);
+  const payload = { generated_at: new Date().toISOString(), generated_by: getLoggedUserName ? getLoggedUserName() : 'admin', tables: {} };
+  for (const tbl of BACKUP_TABLES) {
+    try {
+      const { data } = await sb.from(tbl).select('*').limit(10000);
+      payload.tables[tbl] = data || [];
+    } catch(e) { payload.tables[tbl] = { error: e.message }; }
+  }
+  // change_log は直近7日分
+  try {
+    const since = new Date(Date.now() - 7*86400000).toISOString();
+    const { data } = await sb.from('change_log').select('*').gte('changed_at', since).limit(5000);
+    payload.tables.change_log_recent = data || [];
+  } catch(_){}
+
+  const json = JSON.stringify(payload);
+  const blob = new Blob([json], { type: 'application/json' });
+  const fileName = `backup-${stamp}.json`;
+  try {
+    const { error } = await sb.storage.from('backups').upload(fileName, blob, { contentType: 'application/json', upsert: false });
+    if (error) throw error;
+    localStorage.setItem('last-backup-at', Date.now().toString());
+    localStorage.setItem('last-backup-file', fileName);
+    if (manual) showToast('✓ バックアップ作成: ' + fileName);
+    // 古いバックアップ削除
+    await cleanOldBackups();
+    return { ok: true, fileName };
+  } catch(e) {
+    console.error('backup failed', e);
+    if (manual) showToast('バックアップ失敗: ' + e.message, true);
+    return { ok: false, error: e };
+  }
+}
+
+async function cleanOldBackups() {
+  try {
+    const { data } = await sb.storage.from('backups').list();
+    if (!data) return;
+    const cutoff = Date.now() - BACKUP_KEEP_DAYS * 86400000;
+    const old = data.filter(f => {
+      const m = f.name.match(/backup-(\d{4}-\d{2}-\d{2})/);
+      if (!m) return false;
+      return new Date(m[1]).getTime() < cutoff;
+    });
+    if (old.length) {
+      await sb.storage.from('backups').remove(old.map(f => f.name));
+      console.log(`[Backup] Cleaned ${old.length} old backups`);
+    }
+  } catch(e) { console.warn('cleanOldBackups', e); }
+}
+
+async function maybeAutoBackup() {
+  const last = Number(localStorage.getItem('last-backup-at')) || 0;
+  if (Date.now() - last < BACKUP_INTERVAL_MS) return;
+  // 管理者のみが作成 (重複防止)
+  if (userRole !== 'admin') return;
+  console.log('[Backup] Running daily backup...');
+  await createBackup(false);
+}
+
+async function listBackups() {
+  try {
+    const { data, error } = await sb.storage.from('backups').list('', { limit: 100, sortBy: { column: 'name', order: 'desc' } });
+    if (error) throw error;
+    return (data || []).filter(f => f.name.endsWith('.json'));
+  } catch(e) { return []; }
+}
+
+async function downloadBackup(fileName) {
+  try {
+    const { data, error } = await sb.storage.from('backups').download(fileName);
+    if (error) throw error;
+    const url = URL.createObjectURL(data);
+    const a = document.createElement('a');
+    a.href = url; a.download = fileName; a.click();
+    URL.revokeObjectURL(url);
+  } catch(e) { showToast('ダウンロード失敗: ' + e.message, true); }
+}
+
+async function renderBackupsList() {
+  const el = document.getElementById('backup-list');
+  if (!el) return;
+  el.innerHTML = '<div style="font-size:11px;color:var(--text-muted)">読込中...</div>';
+  const list = await listBackups();
+  if (!list.length) { el.innerHTML = '<div style="font-size:11px;color:var(--text-muted);padding:10px">バックアップなし</div>'; return; }
+  el.innerHTML = list.slice(0, 30).map(f => {
+    const m = f.name.match(/backup-(\d{4}-\d{2}-\d{2})T(\d{2})-(\d{2})-(\d{2})/);
+    const label = m ? `${m[1]} ${m[2]}:${m[3]}` : f.name;
+    const size = f.metadata?.size ? (f.metadata.size/1024).toFixed(1) + ' KB' : '';
+    return `<div style="display:flex;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--border-light);font-size:11px">
+      <span style="flex:1">📦 ${label} ${size ? `<span style="color:var(--text-muted)">(${size})</span>` : ''}</span>
+      <button class="btn btn-outline backup-dl-btn" data-file="${f.name}" style="font-size:10px;padding:2px 10px">⬇ DL</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.backup-dl-btn').forEach(btn => {
+    btn.addEventListener('click', () => downloadBackup(btn.dataset.file));
+  });
 }
 
 // === 変更履歴・復元 (Layer 1) ===
