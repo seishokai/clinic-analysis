@@ -552,3 +552,15 @@ body {
   0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
   50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
 }
+
+/* 来院タブ: 四角枠を外した選択UIのホバー表示 */
+.kaiin-plain-sel:hover,
+.kaiin-csfac-btn:hover {
+  background: rgba(0,0,0,0.04) !important;
+  border-radius: 4px;
+}
+.kaiin-plain-sel:focus {
+  background: #fff !important;
+  outline: 1px solid var(--border);
+  border-radius: 4px;
+}
