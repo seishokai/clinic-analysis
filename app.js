@@ -2643,7 +2643,10 @@ async function loadBookings() {
             bkEx2[key].incentiveAmount = inc;
             d.incentiveAmount = inc;
             // DBにも書き戻し
-            sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, incentive_amount: inc }, { onConflict: 'name,apply_date' }).then(()=>{});
+            (async () => {
+              const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
+              if (res && res.ok === false) console.warn('incentive upsert queued', d.name);
+            })();
             recalcCount++;
           }
         } else if (ex.incentiveAmount) {
@@ -3124,12 +3127,16 @@ function renderBookings() {
             upsertData.bf_status = targetBF;
             if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
             bfLifecycleCache[key].bf_status = targetBF;
-            // 履歴記録
-            sb.from('bf_history').insert({
-              booking_name: name, booking_apply_date: applyDate,
-              from_status: curBF || null, to_status: targetBF,
-              changed_by: getLoggedUserName() + '(自動連動:状態→BF)'
-            }).then(()=>{});
+            // 履歴記録 (失敗時は warn のみ)
+            (async () => {
+              try {
+                await sb.from('bf_history').insert({
+                  booking_name: name, booking_apply_date: applyDate,
+                  from_status: curBF || null, to_status: targetBF,
+                  changed_by: getLoggedUserName() + '(自動連動:状態→BF)'
+                });
+              } catch(e) { console.warn('bf_history insert failed:', e); }
+            })();
           }
         }
         // A2+A3: 楽観的ロック付き保存 + リトライキュー
@@ -3298,7 +3305,10 @@ function renderBookings() {
             d.bookDate = newDate;
             td.innerHTML = fmtBookDate(newDate);
             showToast('予約日を変更しました');
-            sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, book_date: newDate }, { onConflict: 'name,apply_date' }).then(() => {});
+            (async () => {
+              const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+              if (res && res.ok === false) showToast('⚠ 予約日保存に失敗。再送信します', true);
+            })();
           } else {
             td.innerHTML = orig;
           }
@@ -3375,7 +3385,10 @@ function saveRowEdit() {
   saveData('bk-extra', bkEx);
 
   // DB保存（バックグラウンド：ステータス・予約日のみ。他編集項目はlocalStorage）
-  sb.from('booking_status').upsert({ name: oldName, apply_date: oldApply, status: d.status, book_date: d.bookDate }, { onConflict: 'name,apply_date' }).then(() => {});
+  (async () => {
+    const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: oldName, apply_date: oldApply, status: d.status, book_date: d.bookDate }, options: { onConflict:'name,apply_date' } });
+    if (res && res.ok === false) showToast('⚠ 行編集の保存に失敗。再送信します', true);
+  })();
   if (d.tool === '手動') {
     sb.from('manual_bookings').update({ name: d.name, book_date: d.bookDate, service: d.service, facility: d.facility, phone: d.phone, email: d.email, source: d.source, status: d.status }).eq('name', oldName).eq('apply_date', oldApply).then(() => {});
   }
@@ -4071,7 +4084,18 @@ let bfHistoryCache = {}; // key: name|applyDate → [events]
 
 async function loadBFLifecycleData() {
   try {
-    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, updated_at');
+    // edited_book_date / edited_name / edited_service を含めて読み込み
+    // ※ DBにカラム未追加の環境では select が失敗する場合があるのでフォールバック付き
+    let data;
+    try {
+      const r1 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, updated_at');
+      data = r1.data;
+      if (r1.error) throw r1.error;
+    } catch(eCol) {
+      console.warn('edited_* columns missing, falling back', eCol);
+      const r2 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, updated_at');
+      data = r2.data;
+    }
     bfLifecycleCache = {};
     (data || []).forEach(r => {
       // 両方のキー (生の name+date と 正規化 name+date) にマップ → ルックアップ時にスペース差を吸収
@@ -4081,6 +4105,17 @@ async function loadBFLifecycleData() {
       // 正規化キーでも引ける (空白有無どちらでもヒット)
       if (!bfLifecycleCache[normKey]) bfLifecycleCache[normKey] = r;
       if (r.updated_at) setVersion('booking_status', key, r.updated_at);
+      // edited_* がDB側にあれば bk-extra にマージ (DB優先、ローカルを更新)
+      try {
+        if (r.edited_book_date || r.edited_name || r.edited_service) {
+          const bkEx = loadData('bk-extra', {});
+          if (!bkEx[key]) bkEx[key] = {};
+          if (r.edited_book_date != null) bkEx[key].editedBookDate = r.edited_book_date;
+          if (r.edited_name != null) bkEx[key].editedName = r.edited_name;
+          if (r.edited_service != null) bkEx[key].editedService = r.edited_service;
+          saveData('bk-extra', bkEx);
+        }
+      } catch(_){}
     });
   } catch(e) { console.warn('BF lifecycle load', e); }
 }
@@ -4122,21 +4157,26 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   if (field === 'memo' && value) update.bf_memo = value;
 
   // === 連動: BFステータス変更時、予約一覧の状態も自動更新 ===
-  if (field === 'bf_status' && value && BF_TO_STATUS[value]) {
-    const targetStatus = BF_TO_STATUS[value];
-    update.status = targetStatus;
-    // ファジーで同名別表記の bookingsData 行もまとめて更新
-    const nnTarget = normName(name);
-    const dateKey = normDateKey(applyDate);
-    (bookingsData || []).forEach(b => {
-      if (normName(b.name) === nnTarget && normDateKey(b.bookDate || b.applyDate) === dateKey) {
-        b.status = targetStatus;
-      }
-    });
+  // BF_TO_STATUS にマッピングが無い場合も、editedStatus に value を直接書く
+  // (矯正/インプラント等の非BF治療でもステータスが予約一覧と同期するように)
+  if (field === 'bf_status' && value) {
+    const mapped = BF_TO_STATUS[value];
+    if (mapped) {
+      // マッピング有: DBとメモリの両方に正規化された status を設定
+      update.status = mapped;
+      const nnTarget = normName(name);
+      const dateKey = normDateKey(applyDate);
+      (bookingsData || []).forEach(b => {
+        if (normName(b.name) === nnTarget && normDateKey(b.bookDate || b.applyDate) === dateKey) {
+          b.status = mapped;
+        }
+      });
+    }
+    // マッピング有無に関わらず、bk-extra.editedStatus は常に value で上書き (クリア含む)
     try {
       const bkEx = loadData('bk-extra', {});
       if (!bkEx[key]) bkEx[key] = {};
-      bkEx[key].editedStatus = targetStatus;
+      bkEx[key].editedStatus = mapped || value;
       saveData('bk-extra', bkEx);
     } catch(_){}
   }
@@ -4211,7 +4251,7 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
       memo: current.bf_memo || null,
       changed_by: getLoggedUserName()
     };
-    await sb.from('bf_history').insert(hist);
+    try { await sb.from('bf_history').insert(hist); } catch(e) { console.warn('bf_history insert failed:', e); }
     if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
     bfHistoryCache[key].unshift({ ...hist, created_at: new Date().toISOString() });
   }
@@ -4422,15 +4462,17 @@ async function syncStatusToBFStatus(bfRows) {
     // サイレント更新 (履歴は自動連動として残す)
     if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: d.name, apply_date: d.applyDate };
     bfLifecycleCache[key].bf_status = mappedBF;
-    tasks.push(
-      sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, bf_status: mappedBF }, { onConflict: 'name,apply_date' }).then(() => {
-        sb.from('bf_history').insert({
+    tasks.push((async () => {
+      const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, bf_status: mappedBF }, options: { onConflict:'name,apply_date' } });
+      if (res && res.ok === false) { console.warn('sync status->bf queued', d.name); return; }
+      try {
+        await sb.from('bf_history').insert({
           booking_name: d.name, booking_apply_date: d.applyDate,
           from_status: curBF || null, to_status: mappedBF,
           changed_by: 'システム(一括連動)'
-        }).catch(()=>{});
-      }).catch(e => console.warn('sync status->bf failed', e))
-    );
+        });
+      } catch(e) { console.warn('bf_history insert failed:', e); }
+    })());
   });
   if (tasks.length) {
     console.log(`[BF Sync] 状態→BFステータス 一括連動: ${tasks.length}件`);
@@ -5024,7 +5066,8 @@ function drawKaiinRows(treatment, rows, container) {
     inp.addEventListener('click', e => e.stopPropagation());
   });
 
-  // 来院日/名前/相談 → bk-extra に永続化 (既存のoverride仕組みを使用)
+  // 来院日/名前/相談 → bk-extra に永続化 + Supabase booking_status にも同期
+  // ※DBカラムが無い環境では保存失敗するが、localStorage側は維持される(オフライン保持用)
   const saveBkExtraField = (name, applyDate, field, value) => {
     try {
       const bkEx = loadData('bk-extra', {});
@@ -5032,16 +5075,27 @@ function drawKaiinRows(treatment, rows, container) {
       if (!bkEx[key]) bkEx[key] = {};
       bkEx[key][field] = value;
       saveData('bk-extra', bkEx);
-      // メモリ側も更新
-      const nnTarget = normName(name);
-      const dateKey = (applyDate||'').substring(0,10);
+      // メモリ側も更新 (厳密一致: name と applyDate の完全一致のみ。同名別人への誤同期防止)
       (bookingsData || []).forEach(b => {
-        if (normName(b.name) === nnTarget && (b.applyDate||'').substring(0,10) === dateKey) {
+        if (b.name === name && b.applyDate === applyDate) {
           if (field === 'editedBookDate') b.bookDate = value;
           if (field === 'editedName') b.name = value;
           if (field === 'editedService') b.service = value;
         }
       });
+      // Supabase booking_status にも upsert (saveBFLifecycleField と同じ形式)
+      const dbFieldMap = { editedBookDate: 'edited_book_date', editedName: 'edited_name', editedService: 'edited_service' };
+      const dbField = dbFieldMap[field];
+      if (dbField) {
+        const payload = { name, apply_date: applyDate };
+        payload[dbField] = value;
+        (async () => {
+          try {
+            const res = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+            if (res && res.ok === false) console.warn('bk-extra supabase sync failed (column missing?)', field);
+          } catch(e) { console.warn('bk-extra supabase sync exception', e); }
+        })();
+      }
       return true;
     } catch(e) { console.warn('bk-extra save error', e); return false; }
   };
@@ -5200,7 +5254,7 @@ function drawBFLifecycleTable(bfRows) {
       const fac = normFac(d.facility);
       if (fac && fac !== '-') {
         autoFacPromises.push(
-          sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, bf_cs_facility: fac }, { onConflict: 'name,apply_date' })
+          safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, bf_cs_facility: fac }, options: { onConflict:'name,apply_date' } })
         );
         if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: d.name, apply_date: d.applyDate };
         bfLifecycleCache[key].bf_cs_facility = fac;
@@ -5342,7 +5396,10 @@ function drawBFLifecycleTable(bfRows) {
             const inc = calcIncentive(d.source, n);
             if (inc) {
               d.incentiveAmount = inc;
-              sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, incentive_amount: inc }, { onConflict: 'name,apply_date' }).then(()=>{});
+              (async () => {
+                const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
+                if (res && res.ok === false) showToast('⚠ インセ保存に失敗。再送信します', true);
+              })();
             }
           }
         }
@@ -5594,7 +5651,10 @@ function renderBFBookings(allBFData) {
         if (match) match.status = newStatus;
         sel.style.borderColor = 'var(--green)';
         setTimeout(() => sel.style.borderColor = '', 1000);
-        sb.from('booking_status').upsert({ name, apply_date: apply, status: newStatus }, { onConflict: 'name,apply_date' }).then(() => {});
+        (async () => {
+          const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
+          if (res && res.ok === false) showToast('⚠ ステータス保存に失敗。再送信します', true);
+        })();
       });
     });
     // メモ
@@ -5611,7 +5671,10 @@ function renderBFBookings(allBFData) {
       const dbField = field==='contractService'?'contract_service':field==='contractAmount'?'contract_amount':field==='paymentMonth'?'payment_month':field==='incentiveAmount'?'incentive_amount':'incentive_month';
       const update = { name, apply_date: apply };
       update[dbField] = field==='contractAmount'||field==='incentiveAmount' ? Number(value)||0 : value;
-      sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' }).then(() => {});
+      (async () => {
+        const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
+        if (res && res.ok === false) showToast('⚠ 保存に失敗。再送信します', true);
+      })();
     };
     tbody.querySelectorAll('.bf-bk-field').forEach(el => {
       el.addEventListener('change', () => {
@@ -6582,7 +6645,10 @@ async function savePromoRate() {
           if (!bkEx[key]) bkEx[key] = {};
           bkEx[key].incentiveAmount = inc;
           d.incentiveAmount = inc;
-          sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, incentive_amount: inc }, { onConflict: 'name,apply_date' }).then(()=>{});
+          (async () => {
+            const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
+            if (res && res.ok === false) console.warn('promo incentive queued', d.name);
+          })();
           recalc++;
         }
       }
