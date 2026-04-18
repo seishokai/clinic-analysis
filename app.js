@@ -2554,14 +2554,23 @@ async function loadBookings() {
       const { data: dbStatuses } = await sb.from('booking_status').select('*');
       if (dbStatuses && dbStatuses.length) {
         const statusMap = {};
+        const fuzzyMap = {}; // 正規化名+医院+来院日(date部) → status行 (複数あれば情報リッチな方)
         dbStatuses.forEach(s => {
           statusMap[s.name + '|' + s.apply_date] = s;
-          // A2: バージョンキャッシュ
           if (s.updated_at) setVersion('booking_status', s.name + '|' + s.apply_date, s.updated_at);
         });
         bookingsData.forEach(d => {
           const key = d.name + '|' + d.applyDate;
-          const dbRow = statusMap[key];
+          const exact = statusMap[key];
+          // ファジーマッチ: 完全一致無しでも、正規化名+日付キーでブッキング情報を探す
+          let dbRow = exact;
+          if (!dbRow) {
+            const nnTarget = normName(d.name);
+            const dateKey = normDateKey(d.bookDate || d.applyDate);
+            // 同じ正規化名+来院日キー の booking_status 行を探す
+            const candidate = dbStatuses.find(s => normName(s.name) === nnTarget && normDateKey(s.apply_date) === dateKey);
+            if (candidate) dbRow = candidate;
+          }
           if (dbRow) {
             if (dbRow.status) d.status = dbRow.status;
             if (dbRow.contract_service) d.contractService = dbRow.contract_service;
@@ -2569,7 +2578,7 @@ async function loadBookings() {
             if (dbRow.payment_month) d.paymentMonth = dbRow.payment_month;
             if (dbRow.incentive_month) d.incentiveMonth = dbRow.incentive_month;
             if (dbRow.memo) d._memo = dbRow.memo;
-            else if (dbRow.bf_memo) d._memo = dbRow.bf_memo; // BFメモを通常メモとしても表示
+            else if (dbRow.bf_memo) d._memo = dbRow.bf_memo;
             if (dbRow.book_date) d.bookDate = dbRow.book_date;
           }
         });
@@ -2983,9 +2992,18 @@ function renderBookings() {
 
   const isAdmin = userRole === 'admin' || (userRole === 'custom' && sessionStorage.getItem('customEditRole') === 'edit');
   const displayLimit = window._bkDisplayLimit || 200;
+  // 重複検出 (正規化名+医院 で2件以上あるもの)
+  const dupCounts = {};
+  sorted.forEach(d => {
+    const k = normName(d.name) + '|' + normFac(d.facility);
+    dupCounts[k] = (dupCounts[k] || 0) + 1;
+  });
   tbody.innerHTML = sorted.slice(0, displayLimit).map((d, idx) => {
     const overdue = isOverdue(d);
-    const rowStyle = d.status==='除外' ? 'background:#f5f5f5;opacity:0.4;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#f8f8f8;color:#9ca3af' : (!d.status||d.status==='未対応') ? 'background:#fff5f5' : '';
+    const dupKey = normName(d.name) + '|' + normFac(d.facility);
+    const isDup = dupCounts[dupKey] > 1;
+    const dupStyle = isDup ? 'border-left:3px solid #f59e0b;' : '';
+    const rowStyle = dupStyle + (d.status==='除外' ? 'background:#f5f5f5;opacity:0.4;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#f8f8f8;color:#9ca3af' : (!d.status||d.status==='未対応') ? 'background:#fff5f5' : '');
     return `<tr style="${rowStyle}">
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
