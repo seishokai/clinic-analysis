@@ -4797,13 +4797,12 @@ function drawKaiinRows(treatment, rows, container) {
     // プロモ表示: 手動は空欄で入力可、セレクト/DXはsourceをバッジ表示
     let promoBadge = '';
     if (d.tool === '手動') {
-      // 手動は空入力可能なテキストボックス
-      promoBadge = `<input type="text" class="kaiin-promo-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.source||'')}" placeholder="プロモ入力" style="width:100%;padding:2px 6px;font-size:10px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box">`;
+      promoBadge = `<input type="text" class="kaiin-promo-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.source||'')}" placeholder="プロモ入力" title="手動登録: 編集可" style="width:100%;padding:2px 6px;font-size:10px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box">`;
     } else if (d.tool === 'セレクト') {
       const lbl = d.source || 'セレクトタイプ';
-      promoBadge = `<span style="display:inline-block;padding:2px 6px;background:#fef3c7;color:#b45309;border-radius:4px;font-size:10px;font-weight:600">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
+      promoBadge = `<span title="セレクトタイプ予約 (変更不可)" style="display:inline-block;padding:2px 6px;background:#fef3c7;color:#b45309;border-radius:4px;font-size:10px;font-weight:600;cursor:help">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
     } else if (d.source) {
-      promoBadge = `<span style="display:inline-block;padding:2px 6px;background:#e0f2fe;color:#0369a1;border-radius:4px;font-size:10px;font-weight:600">${d.source.length>14?d.source.slice(0,14)+'…':d.source}</span>`;
+      promoBadge = `<span title="DXHUB予約 (自動取得・変更不可)" style="display:inline-block;padding:2px 6px;background:#e0f2fe;color:#0369a1;border-radius:4px;font-size:10px;font-weight:600;cursor:help">${d.source.length>14?d.source.slice(0,14)+'…':d.source}</span>`;
     } else {
       promoBadge = '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     }
