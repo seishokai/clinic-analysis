@@ -4766,13 +4766,13 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
         <table class="data-table compact">
           <thead><tr>
-            <th style="width:140px">来院</th>
+            <th style="width:55px">来院</th>
             <th style="text-align:left;width:130px">名前</th>
             <th style="width:90px">ツール/プロモ</th>
             <th style="width:85px">CS医院</th>
-            <th style="width:75px">セット医院</th>
             <th style="width:85px">相談</th>
             <th style="width:130px">ステータス</th>
+            <th style="width:75px">セット医院</th>
             <th style="width:85px">売上</th>
             <th style="width:70px">交通費</th>
             <th>メモ</th>
@@ -4974,20 +4974,22 @@ function drawKaiinRows(treatment, rows, container) {
       if (/ジュエリー/.test(s)) return 'ティースジュエリー';
       return CONSULT_TYPES.includes(s) ? s : 'その他';
     })();
+    // 来院日 MM/DD 表示
+    const bookMMDD = bookDateISO ? bookDateISO.substring(5).replace('-','/') : '';
     return `<tr>
-      <td><input type="date" class="kaiin-bookdate" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${bookDateISO}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:4px"></td>
+      <td><input type="text" class="kaiin-bookdate-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${bookDateISO}" value="${bookMMDD}" placeholder="M/D" maxlength="5" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:4px;text-align:center"></td>
       <td><input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'"></td>
       <td style="text-align:left">${promoBadge}</td>
       <td><button type="button" class="kaiin-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:3px 6px;width:100%;text-align:center;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer">${csFacDisplay}</button></td>
-      <td><select class="kaiin-setfac-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
-        ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''}>${f}</option>`).join('')}
-      </select></td>
       <td><select class="kaiin-consult-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
         ${CONSULT_TYPES.map(t => `<option ${curConsult===t?'selected':''}>${t}</option>`).join('')}
       </select></td>
       <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;width:100%;${stRound};appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M6 9l6 6 6-6&quot;/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px;padding-right:24px">
         <option value="">未設定</option>
         ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
+      </select></td>
+      <td><select class="kaiin-setfac-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
+        ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''}>${f}</option>`).join('')}
       </select></td>
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
@@ -5029,10 +5031,23 @@ function drawKaiinRows(treatment, rows, container) {
       return true;
     } catch(e) { console.warn('bk-extra save error', e); return false; }
   };
-  // 来院日
-  container.querySelectorAll('.kaiin-bookdate').forEach(inp => {
+  // 来院日 MM/DD 入力 → ISO に変換して保存
+  container.querySelectorAll('.kaiin-bookdate-mmdd').forEach(inp => {
     inp.addEventListener('change', () => {
-      const ok = saveBkExtraField(inp.dataset.name, inp.dataset.apply, 'editedBookDate', inp.value);
+      const v = inp.value.trim();
+      let iso = '';
+      const m = v.match(/^(\d{1,2})[\/\-\.](\d{1,2})$/);
+      if (m) {
+        iso = `${new Date().getFullYear()}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
+      } else if (!v) {
+        iso = '';
+      } else {
+        inp.value = inp.dataset.iso ? inp.dataset.iso.substring(5).replace('-','/') : '';
+        return;
+      }
+      inp.dataset.iso = iso;
+      inp.value = iso ? iso.substring(5).replace('-','/') : '';
+      const ok = saveBkExtraField(inp.dataset.name, inp.dataset.apply, 'editedBookDate', iso);
       if (ok) { inp.style.borderColor = '#0a0'; setTimeout(() => { inp.style.borderColor = ''; }, 1000); }
     });
     inp.addEventListener('click', e => e.stopPropagation());
