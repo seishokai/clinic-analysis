@@ -4176,6 +4176,35 @@ async function renderBFLifecycle() {
 
 const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
 
+// BF行を削除 (重複行を消す用途)
+// - manual_bookings から削除 (手動登録分のみ)
+// - booking_status を除外ステータスに
+// - bk-extra に editedStatus=除外
+// → 予約一覧にも表示されなくなる
+async function deleteBFRow(name, applyDate) {
+  try {
+    // manual_bookings 削除 (手動登録されたもの)
+    await sb.from('manual_bookings').delete().eq('name', name).eq('apply_date', applyDate).catch(()=>{});
+    // booking_status を除外に
+    await sb.from('booking_status').upsert({ name, apply_date: applyDate, status: '除外' }, { onConflict: 'name,apply_date' }).catch(()=>{});
+    // bk-extra にも
+    const bkEx = loadData('bk-extra', {});
+    const key = name + '|' + applyDate;
+    if (!bkEx[key]) bkEx[key] = {};
+    bkEx[key].editedStatus = '除外';
+    saveData('bk-extra', bkEx);
+    // キャッシュ反映
+    const idx = bookingsData.findIndex(b => b.name === name && b.applyDate === applyDate);
+    if (idx >= 0) bookingsData[idx].status = '除外';
+    showToast(name + ' を削除しました');
+    renderBFLifecycle();
+    if (typeof renderBookings === 'function') renderBookings();
+  } catch(e) {
+    console.error(e);
+    showToast('削除エラー: ' + e.message, true);
+  }
+}
+
 // 患者名を編集 (予約一覧と双方向同期)
 async function editPatientName(oldName, applyDate, newName, bfRows) {
   if (!newName) return;
@@ -4319,6 +4348,16 @@ const BF_TO_STATUS = {
 function normName(n) {
   return (n || '').replace(/[\s\u3000]+/g, '').toLowerCase();
 }
+// 日付正規化: "2026/04/13"/"2026/4/13"/"4/13" 等を yyyy-mm-dd に統一
+function normDateKey(s) {
+  if (!s) return '';
+  const s2 = String(s);
+  const m3 = s2.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if (m3) return `${m3[1]}-${String(m3[2]).padStart(2,'0')}-${String(m3[3]).padStart(2,'0')}`;
+  const m2 = s2.match(/(\d{1,2})\D+(\d{1,2})/);
+  if (m2) { const y = new Date().getFullYear(); return `${y}-${String(m2[1]).padStart(2,'0')}-${String(m2[2]).padStart(2,'0')}`; }
+  return s2;
+}
 // BF用: 同一人物を名前正規化でグルーピング (同じ facility かつ同日)
 // 生存ルール: メモ/BF進捗がある方を優先で残す (情報を失わない)
 function dedupBFRows(rows) {
@@ -4341,7 +4380,8 @@ function dedupBFRows(rows) {
   rows.forEach(d => {
     const nn = normName(d.name);
     const fac = normFac(d.facility);
-    const dateKey = (d.applyDate || '').substring(0, 10);
+    // 来院日(bookDate)で正規化キー生成 (applyDateより信頼性高い)
+    const dateKey = normDateKey(d.bookDate || d.applyDate);
     const key = nn + '|' + fac + '|' + dateKey;
     if (!seen.has(key)) {
       seen.set(key, d);
@@ -4468,7 +4508,9 @@ function drawBFLifecycleTable(bfRows) {
       <td class="bf-lc-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;min-height:26px;background:${(info.bf_memo||d._memo)?'#fff8e1':'transparent'};border:1px dashed ${(info.bf_memo||d._memo)?'#f9a825':'var(--border)'};border-radius:4px;font-size:11px;line-height:1.5;max-width:320px" title="クリックで編集">${(info.bf_memo||d._memo) ? ((info.bf_memo||d._memo).length > 60 ? (info.bf_memo||d._memo).substring(0,60)+'…' : (info.bf_memo||d._memo)).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:9px;padding:1px 2px;width:100%;box-sizing:border-box;border-radius:3px;${info.bf_next_date?'background:#dcfce7;border:1px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1px solid #f59e0b;color:#92400e'}"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
-      <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">📜${histCount}</button></td>
+      <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">📜${histCount}</button>
+        <button class="bf-lc-del-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="この行を削除 (重複時)" style="font-size:10px;padding:2px 5px;margin-left:2px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>
+      </td>
     </tr>`;
   }).join('');
 
@@ -4494,6 +4536,14 @@ function drawBFLifecycleTable(bfRows) {
   // 履歴モーダル
   tbody.querySelectorAll('.bf-lc-hist-btn').forEach(btn => {
     btn.addEventListener('click', () => openBFHistoryModal(btn.dataset.name, btn.dataset.apply));
+  });
+  // 行削除 (重複削除用)
+  tbody.querySelectorAll('.bf-lc-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const n = btn.dataset.name, a = btn.dataset.apply;
+      if (!confirm(`${n} (${a}) を削除しますか？\n※同名患者で重複している場合、この行だけ削除されます。情報のある方は残ります。`)) return;
+      await deleteBFRow(n, a);
+    });
   });
   // メモモーダル
   tbody.querySelectorAll('.bf-lc-memo-cell').forEach(td => {
