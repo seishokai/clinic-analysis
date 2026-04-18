@@ -3642,8 +3642,7 @@ async function renderBFLifecycle() {
   const drs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_doctor).filter(Boolean))].sort();
   if (drSel) drSel.innerHTML = '<option value="">CSDR:全て</option>' + drs.map(d => `<option>${d}</option>`).join('');
   const setFacSel = document.getElementById('bf-lc-filter-setfac');
-  const setFacs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_set_facility).filter(Boolean))].sort();
-  if (setFacSel) setFacSel.innerHTML = '<option value="">セット医院:全て</option>' + setFacs.map(f => `<option>${f}</option>`).join('');
+  if (setFacSel) setFacSel.innerHTML = '<option value="">セット医院:全て</option>' + ['BF銀座','ルミナス','中日'].map(f => `<option>${f}</option>`).join('');
 
   // 一覧描画
   drawBFLifecycleTable(bfRows);
@@ -3656,6 +3655,8 @@ async function renderBFLifecycle() {
   const searchEl = document.getElementById('bf-lc-search');
   if (searchEl && !searchEl._bound) { searchEl.addEventListener('input', () => drawBFLifecycleTable(bfRows)); searchEl._bound = true; }
 }
+
+const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
 
 function drawBFLifecycleTable(bfRows) {
   const fstSel = document.getElementById('bf-lc-filter-status')?.value || '';
@@ -3724,7 +3725,7 @@ function drawBFLifecycleTable(bfRows) {
         <option value="">未設定</option>
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
-      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_set_facility" style="font-size:10px;padding:2px 4px;width:100%">${FACS.map(f => `<option ${(info.bf_set_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_set_facility" style="font-size:10px;padding:2px 4px;width:100%">${BF_SET_FACS.map(f => `<option ${(info.bf_set_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
       <td class="bf-lc-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;min-height:26px;background:${info.bf_memo?'#fff8e1':'transparent'};border:1px dashed ${info.bf_memo?'#f9a825':'var(--border)'};border-radius:4px;font-size:11px;line-height:1.5;max-width:320px" title="クリックで編集">${info.bf_memo ? (info.bf_memo.length > 60 ? info.bf_memo.substring(0,60)+'…' : info.bf_memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
