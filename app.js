@@ -4861,27 +4861,42 @@ function drawKaiinRows(treatment, rows, container) {
     const csFacDisplay = csFacList.length ? csFacList.join(', ') : '<span style="color:var(--text-muted)">未選択</span>';
     // セット医院
     const setFac = info.bf_set_facility || '';
+    // 来院日 (編集可, bookDate を YYYY-MM-DD 化)
+    const bookDateISO = (() => {
+      const b = d.bookDate || '';
+      const m = String(b).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+      if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      // 「4/18」のような短縮形式は今年の日付として扱う
+      const m2 = String(b).match(/^(\d{1,2})\/(\d{1,2})/);
+      if (m2) return `${new Date().getFullYear()}-${String(m2[1]).padStart(2,'0')}-${String(m2[2]).padStart(2,'0')}`;
+      return '';
+    })();
+    // 相談種別 (編集可)
+    const CONSULT_TYPES = ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー','その他'];
+    const curConsult = (() => {
+      const s = d.service || '';
+      if (/ラミネート|ブラックフィルム|BF/i.test(s)) return 'BF相談';
+      if (/矯正|インビザ|ワイヤー/.test(s)) return '矯正相談';
+      if (/インプラント/.test(s)) return 'インプラント相談';
+      if (/ラブリエ/.test(s)) return 'ラブリエ相談';
+      if (/セラミック|補綴/.test(s)) return '自費補綴相談';
+      if (/根治|根管/.test(s)) return '自費根治相談';
+      if (/ホワイトニング/.test(s)) return 'ホワイトニング';
+      if (/リップ/.test(s)) return 'リップアート';
+      if (/ジュエリー/.test(s)) return 'ティースジュエリー';
+      return CONSULT_TYPES.includes(s) ? s : 'その他';
+    })();
     return `<tr>
-      <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
-      <td style="font-weight:500;text-align:left">${d.name}</td>
+      <td><input type="date" class="kaiin-bookdate" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${bookDateISO}" style="font-size:10px;padding:2px 3px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:4px"></td>
+      <td><input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'"></td>
       <td style="text-align:left">${promoBadge}</td>
       <td><button type="button" class="kaiin-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:3px 6px;width:100%;text-align:center;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer">${csFacDisplay}</button></td>
       <td><select class="kaiin-setfac-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
         ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''}>${f}</option>`).join('')}
       </select></td>
-      <td style="font-size:10px">${(() => {
-        const s = d.service || '';
-        if (/ラミネート|ブラックフィルム|BF/i.test(s)) return 'BF相談';
-        if (/矯正|インビザ|ワイヤー/.test(s)) return '矯正相談';
-        if (/インプラント/.test(s)) return 'インプラント相談';
-        if (/ラブリエ/.test(s)) return 'ラブリエ相談';
-        if (/セラミック|補綴/.test(s)) return '自費補綴相談';
-        if (/根治|根管/.test(s)) return '自費根治相談';
-        if (/ホワイトニング/.test(s)) return 'ホワイトニング';
-        if (/リップ/.test(s)) return 'リップアート';
-        if (/ジュエリー/.test(s)) return 'ティースジュエリー';
-        return s || '-';
-      })()}</td>
+      <td><select class="kaiin-consult-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
+        ${CONSULT_TYPES.map(t => `<option ${curConsult===t?'selected':''}>${t}</option>`).join('')}
+      </select></td>
       <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;width:100%;${stRound};appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M6 9l6 6 6-6&quot;/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px;padding-right:24px">
         <option value="">未設定</option>
         ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
@@ -4903,6 +4918,56 @@ function drawKaiinRows(treatment, rows, container) {
       }
     });
     inp.addEventListener('click', e => e.stopPropagation());
+  });
+
+  // 来院日/名前/相談 → bk-extra に永続化 (既存のoverride仕組みを使用)
+  const saveBkExtraField = (name, applyDate, field, value) => {
+    try {
+      const bkEx = loadData('bk-extra', {});
+      const key = name + '|' + applyDate;
+      if (!bkEx[key]) bkEx[key] = {};
+      bkEx[key][field] = value;
+      saveData('bk-extra', bkEx);
+      // メモリ側も更新
+      const nnTarget = normName(name);
+      const dateKey = (applyDate||'').substring(0,10);
+      (bookingsData || []).forEach(b => {
+        if (normName(b.name) === nnTarget && (b.applyDate||'').substring(0,10) === dateKey) {
+          if (field === 'editedBookDate') b.bookDate = value;
+          if (field === 'editedName') b.name = value;
+          if (field === 'editedService') b.service = value;
+        }
+      });
+      return true;
+    } catch(e) { console.warn('bk-extra save error', e); return false; }
+  };
+  // 来院日
+  container.querySelectorAll('.kaiin-bookdate').forEach(inp => {
+    inp.addEventListener('change', () => {
+      const ok = saveBkExtraField(inp.dataset.name, inp.dataset.apply, 'editedBookDate', inp.value);
+      if (ok) { inp.style.borderColor = '#0a0'; setTimeout(() => { inp.style.borderColor = ''; }, 1000); }
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
+  });
+  // 名前
+  container.querySelectorAll('.kaiin-name').forEach(inp => {
+    const originalName = inp.dataset.name;
+    inp.addEventListener('change', () => {
+      const newName = inp.value.trim();
+      if (!newName || newName === originalName) return;
+      const ok = saveBkExtraField(originalName, inp.dataset.apply, 'editedName', newName);
+      if (ok) {
+        inp.style.background = '#dcfce7';
+        setTimeout(() => { inp.style.background = 'transparent'; }, 1000);
+      }
+    });
+  });
+  // 相談種別
+  container.querySelectorAll('.kaiin-consult-sel').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const ok = saveBkExtraField(sel.dataset.name, sel.dataset.apply, 'editedService', sel.value);
+      if (ok) { sel.style.borderColor = '#0a0'; setTimeout(() => { sel.style.borderColor = ''; }, 1000); }
+    });
   });
 
   // CS医院 (複数選択モーダル再利用)
