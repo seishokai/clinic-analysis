@@ -3250,8 +3250,10 @@ function saveMemoModal() {
     _memoTarget.tdEl.innerHTML = val ? val.slice(0,6) + (val.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>';
     _memoTarget.tdEl.title = val;
   }
-  // 予約一覧メモとBFメモを連動
-  safeSave({ type:'upsert', table:'booking_status', payload: { name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val, bf_memo: val }, options: { onConflict:'name,apply_date' } });
+  // 予約一覧メモとBFメモを連動 (空上書き防止)
+  const payload = { name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val };
+  if (val) payload.bf_memo = val; // 空の時はbf_memo側を上書きしない
+  safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
   // BFライフサイクルキャッシュも同期
   if (bfLifecycleCache[_memoTarget.key]) bfLifecycleCache[_memoTarget.key].bf_memo = val;
   showToast('メモを保存しました');
@@ -3906,9 +3908,9 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   const fromStatus = current.bf_status || null;
   const update = { name, apply_date: applyDate };
   update[field] = value;
-  // メモ連動: bf_memo保存時は memo も、逆も同期
-  if (field === 'bf_memo') update.memo = value;
-  if (field === 'memo') update.bf_memo = value;
+  // メモ連動: 空値で上書きしないよう条件付き
+  if (field === 'bf_memo' && value) update.memo = value;
+  if (field === 'memo' && value) update.bf_memo = value;
 
   // === 連動: BFステータス変更時、予約一覧の状態も自動更新 ===
   if (field === 'bf_status' && value && BF_TO_STATUS[value]) {
