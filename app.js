@@ -435,6 +435,11 @@ function setupEventListeners() {
       });
       // sub-bk-bf自体は表示のまま
       document.getElementById('sub-bk-bf').hidden = false;
+      // ページトップにスクロール
+      window.scrollTo({ top: 0, behavior: 'instant' });
+      // セット進捗では他のメインサブナビを隠す (予約一覧/患者検索など)
+      const mainSubNav = document.getElementById('bk-sub-nav');
+      if (mainSubNav) mainSubNav.style.display = (sub === 'bf-lifecycle') ? 'none' : '';
       if (sub === 'bf-progress') renderBF('all');
       if (sub === 'bf-patients' || sub === 'bf-contracts') {
         if (bfPatientData.length === 0) loadBFSheetData().then(() => renderBF('all'));
@@ -3636,6 +3641,25 @@ function drawBFLifecycleTable(bfRows) {
   document.getElementById('bf-lc-count').textContent = filtered.length + '件';
 
   const today = new Date(); today.setHours(0,0,0,0);
+  // CS医院自動反映: bf_cs_facilityが未設定なら来院医院を自動セット
+  const autoFacPromises = [];
+  filtered.forEach(d => {
+    const key = d.name + '|' + d.applyDate;
+    const info = bfLifecycleCache[key] || {};
+    if (!info.bf_cs_facility && d.facility) {
+      const fac = normFac(d.facility);
+      if (fac && fac !== '-') {
+        autoFacPromises.push(
+          sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, bf_cs_facility: fac }, { onConflict: 'name,apply_date' })
+        );
+        if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: d.name, apply_date: d.applyDate };
+        bfLifecycleCache[key].bf_cs_facility = fac;
+      }
+    }
+  });
+  // 非同期で保存（待たない）
+  if (autoFacPromises.length) Promise.all(autoFacPromises).catch(e => console.warn('auto CS fac save', e));
+
   const rowsHtml = filtered.map(d => {
     const key = d.name + '|' + d.applyDate;
     const info = bfLifecycleCache[key] || {};
@@ -3645,16 +3669,20 @@ function drawBFLifecycleTable(bfRows) {
     const daysSince = bookDate ? Math.floor((today - bookDate) / 86400000) : '-';
     const histCount = (bfHistoryCache[key] || []).length;
     const esc = (s) => String(s||'').replace(/"/g,'&quot;');
+    const csFac = info.bf_cs_facility || normFac(d.facility) || '';
+    const stStyle = st
+      ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700`
+      : `background:#fff;color:#111;border:1px solid var(--border);font-weight:500`;
     return `<tr>
       <td style="font-weight:500;text-align:left">${d.name}</td>
-      <td style="white-space:nowrap;font-size:10px">${fmtBookDate(d.bookDate)}</td>
-      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:10px;padding:2px 6px;border-radius:4px;background:${stColor}20;color:${stColor};border:1px solid ${stColor}50;font-weight:600">
-        <option value="">-</option>
-        ${BF_STATUSES.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
+      <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:11px;padding:3px 8px;border-radius:4px;min-width:120px;${stStyle}">
+        <option value="">未設定</option>
+        ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
       <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:2px 4px;width:120px"></td>
       <td><button class="bf-lc-fixed-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${info.bf_next_fixed?'#0a0':'#f90'};background:${info.bf_next_fixed?'#dcfce7':'#fef3c7'};color:${info.bf_next_fixed?'#0a0':'#b45309'};cursor:pointer;font-weight:600">${info.bf_next_fixed?'🟢 確定':'🟡 未定'}</button></td>
-      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px">${FACS.map(f => `<option ${(info.bf_cs_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px">${FACS.map(f => `<option ${csFac===f?'selected':''}>${f}</option>`).join('')}</select></td>
       <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:90px"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
       <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_memo" value="${esc(info.bf_memo)}" placeholder="メモ" style="font-size:10px;padding:2px 6px;width:120px"></td>
