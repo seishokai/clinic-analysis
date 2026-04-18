@@ -4064,7 +4064,7 @@ const BF_STATUSES = [
   { value: 'セット日確定待ち', color: '#0891b2' },
   { value: 'セット待ち', color: '#0e7490' },
   { value: 'セット完了', color: '#059669' },
-  { value: 'キャンセル(未来院)', color: '#dc2626' }
+  { value: 'キャンセル', color: '#dc2626' }
 ];
 let bfLifecycleCache = {}; // key: name|applyDate → {bf_status, bf_next_date, ...}
 let bfHistoryCache = {}; // key: name|applyDate → [events]
@@ -4415,7 +4415,7 @@ async function syncStatusToBFStatus(bfRows) {
     if (!mappedBF) return;
     // 上書き条件: 成約/キャンセルは常に、来院済は未設定時のみ
     let shouldUpdate = false;
-    if (status === 'キャンセル') shouldUpdate = (curBF !== 'キャンセル(未来院)');
+    if (status === 'キャンセル') shouldUpdate = (curBF !== 'キャンセル');
     else if (status === '成約') shouldUpdate = (!curBF || (curBF === '離脱' || curBF === '検討中'));
     else if (status === '来院済') shouldUpdate = !curBF;
     if (!shouldUpdate) return;
@@ -4481,7 +4481,7 @@ function addCSDR(name) {
 const STATUS_TO_BF = {
   '来院済': '検討中',       // 来院したら検討中スタート (BF未設定時のみ)
   '成約': '成約',
-  'キャンセル': 'キャンセル(未来院)',
+  'キャンセル': 'キャンセル',
   '除外': null
 };
 // BFステータス → 予約一覧の状態 (上書き)
@@ -4498,7 +4498,7 @@ const BF_TO_STATUS = {
   'セット日確定待ち': '成約',
   'セット待ち': '成約',
   'セット完了': '成約',
-  'キャンセル(未来院)': 'キャンセル'
+  'キャンセル': 'キャンセル'
 };
 
 // 名前正規化: 全空白(半角/全角)除去+小文字化 で一致判定
@@ -4609,7 +4609,7 @@ function getTreatmentCategory(d) {
   if (bfSt === 'ラブリエ決定(BF保留)') return 'ラブリエ';
   if (bfSt === 'インプラント決定(BF保留)') return 'インプラント';
   // BF系ステータスが設定されているならBF
-  if (bfSt && !['キャンセル(未来院)', '離脱'].includes(bfSt)) return 'BF';
+  if (bfSt && !['キャンセル', '離脱'].includes(bfSt)) return 'BF';
   const cs = (d.contractService || '').toLowerCase();
   const sv = (d.service || '').toLowerCase();
   const both = cs + ' ' + sv;
