@@ -4070,14 +4070,30 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   if (field === 'bf_status' && value && BF_TO_STATUS[value]) {
     const targetStatus = BF_TO_STATUS[value];
     update.status = targetStatus;
-    const bk = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
-    if (bk) bk.status = targetStatus;
+    // ファジーで同名別表記の bookingsData 行もまとめて更新
+    const nnTarget = normName(name);
+    const dateKey = normDateKey(applyDate);
+    (bookingsData || []).forEach(b => {
+      if (normName(b.name) === nnTarget && normDateKey(b.bookDate || b.applyDate) === dateKey) {
+        b.status = targetStatus;
+      }
+    });
     try {
       const bkEx = loadData('bk-extra', {});
       if (!bkEx[key]) bkEx[key] = {};
       bkEx[key].editedStatus = targetStatus;
       saveData('bk-extra', bkEx);
     } catch(_){}
+  }
+  // === 金額連動: contract_amount は bookingsData.contractAmount と同期 ===
+  if (field === 'contract_amount') {
+    const nnTarget = normName(name);
+    const dateKey = normDateKey(applyDate);
+    (bookingsData || []).forEach(b => {
+      if (normName(b.name) === nnTarget && normDateKey(b.bookDate || b.applyDate) === dateKey) {
+        b.contractAmount = Number(value) || 0;
+      }
+    });
   }
 
 
