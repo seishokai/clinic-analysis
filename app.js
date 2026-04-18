@@ -4716,22 +4716,29 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const FACS_OPTS = ['','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
 
   el.innerHTML = `
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto">
-      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700">${rows.length}</span></div>
-      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700">${noSt}</span></div>
-      ${statuses.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}">${byStatus[s.value]}</span></div>`).join('')}
+    <div class="kaiin-header-wrap">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto;align-items:center">
+        <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700">${rows.length}</span></div>
+        <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700">${noSt}</span></div>
+        ${statuses.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}">${byStatus[s.value]}</span></div>`).join('')}
+        <button class="kaiin-collapse-btn" style="margin-left:auto;padding:4px 12px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▲ 折りたたむ</button>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+        <select class="form-select kaiin-filter-fac" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">医院:全て</option>${FACS_OPTS.slice(1).map(f => `<option>${f}</option>`).join('')}</select>
+        <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="名前検索" style="width:140px;padding:6px 8px;font-size:12px">
+        <select class="form-select kaiin-filter-tool" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">ツール:全て</option><option>DXHUB</option><option>セレクト</option><option>手動</option></select>
+        <select class="form-select kaiin-filter-promo" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">プロモ:全て</option></select>
+      </div>
     </div>
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-      <select class="form-select kaiin-filter-fac" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">医院:全て</option>${FACS_OPTS.slice(1).map(f => `<option>${f}</option>`).join('')}</select>
-      <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="名前検索" style="width:140px;padding:6px 8px;font-size:12px">
-    </div>
+    <div class="kaiin-expand-wrap" style="display:none;margin:4px 0 8px"><button class="kaiin-expand-btn" style="padding:4px 12px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer">▼ ヘッダーを表示</button></div>
     <div class="card" style="padding:6px">
       <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">一覧 <span class="kaiin-count">${rows.length}件</span></div>
-      <div class="data-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
+      <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
         <table class="data-table compact">
           <thead><tr>
             <th style="width:60px">来院</th>
             <th style="text-align:left;width:120px">名前</th>
+            <th style="width:100px">ツール/プロモ</th>
             <th style="width:80px">医院</th>
             <th style="width:90px">相談</th>
             <th style="width:120px">ステータス</th>
@@ -4742,18 +4749,41 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       </div>
     </div>
   `;
+
+  // プロモフィルター選択肢を埋める
+  const promos = [...new Set(rows.map(d => d.source).filter(Boolean))].sort();
+  const promoSel = el.querySelector('.kaiin-filter-promo');
+  if (promoSel) promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.map(p => `<option>${p}</option>`).join('');
+
+  // 折りたたみ
+  el.querySelector('.kaiin-collapse-btn')?.addEventListener('click', () => {
+    el.querySelector('.kaiin-header-wrap').style.display = 'none';
+    el.querySelector('.kaiin-expand-wrap').style.display = 'block';
+    const w = el.querySelector('.kaiin-table-wrap'); if (w) w.style.maxHeight = 'calc(100vh - 150px)';
+  });
+  el.querySelector('.kaiin-expand-btn')?.addEventListener('click', () => {
+    el.querySelector('.kaiin-header-wrap').style.display = '';
+    el.querySelector('.kaiin-expand-wrap').style.display = 'none';
+    const w = el.querySelector('.kaiin-table-wrap'); if (w) w.style.maxHeight = 'calc(100vh - 320px)';
+  });
   drawKaiinRows(treatment, rows, el);
   // フィルターイベント
   el.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   el.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-filter-tool')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-filter-promo')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
 }
 
 function drawKaiinRows(treatment, rows, container) {
   const fac = container.querySelector('.kaiin-filter-fac')?.value || '';
   const q = (container.querySelector('.kaiin-filter-search')?.value || '').trim().toLowerCase();
+  const toolF = container.querySelector('.kaiin-filter-tool')?.value || '';
+  const promoF = container.querySelector('.kaiin-filter-promo')?.value || '';
   let filtered = rows.slice();
   if (fac) filtered = filtered.filter(d => normFac(d.facility) === fac);
   if (q) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(q));
+  if (toolF) filtered = filtered.filter(d => d.tool === toolF);
+  if (promoF) filtered = filtered.filter(d => d.source === promoF);
   filtered.sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
   const statuses = getStatusesForTreatment(treatment);
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
@@ -4764,9 +4794,13 @@ function drawKaiinRows(treatment, rows, container) {
     const stColor = statuses.find(s => s.value === st)?.color || '';
     const stStyle = st ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700` : '';
     const memo = d._memo || findAnyMemo(d.name);
+    // ツール/プロモ表示
+    const toolBadge = d.tool === 'セレクト' ? '<span style="display:inline-block;padding:1px 5px;background:#fef3c7;color:#b45309;border-radius:3px;font-size:9px;font-weight:700">セレクト</span>' : d.tool === '手動' ? '<span style="display:inline-block;padding:1px 5px;background:#e0e7ff;color:#4338ca;border-radius:3px;font-size:9px;font-weight:700">手動</span>' : '<span style="display:inline-block;padding:1px 5px;background:#f3f4f6;color:#6b7280;border-radius:3px;font-size:9px">DX</span>';
+    const promoBadge = d.source ? `<span style="font-size:10px;color:#0369a1">${d.source.length>12?d.source.slice(0,12)+'…':d.source}</span>` : '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
+      <td style="text-align:left"><div style="display:flex;flex-direction:column;gap:2px">${toolBadge}${promoBadge}</div></td>
       <td>${normFac(d.facility)||'-'}</td>
       <td style="font-size:10px">${d.service || '-'}</td>
       <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;${stStyle}">
@@ -4775,7 +4809,7 @@ function drawKaiinRows(treatment, rows, container) {
       </select></td>
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>30?memo.substring(0,30)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
     </tr>`;
-  }).join('') || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+  }).join('') || '<tr><td colspan="7" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
 
   // ステータス変更: 統一してsaveBFLifecycleField経由で保存 (bf_statusを再利用)
   container.querySelectorAll('.kaiin-status-sel').forEach(sel => {
