@@ -626,6 +626,35 @@
           <button class="bf-sub-btn" data-bfsub="bf-progress" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">進捗</button>
           <button class="bf-sub-btn" data-bfsub="bf-patients" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">患者</button>
           <button class="bf-sub-btn" data-bfsub="bf-contracts" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">成約</button>
+          <button class="bf-sub-btn" data-bfsub="bf-lifecycle" style="padding:6px 10px;border:none;background:transparent;font-size:11px;color:var(--text-sub);cursor:pointer;white-space:nowrap;border-bottom:2px solid transparent">セット進捗</button>
+        </div>
+        <div id="bf-lifecycle" hidden>
+          <div class="page-header"><h2>BF セット進捗管理</h2><p class="page-desc">カウンセリング後〜セット完了までの全プロセスを一元管理</p></div>
+          <div id="bf-lc-funnel" style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;overflow-x:auto"></div>
+          <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+            <select class="form-select" id="bf-lc-filter-status" style="width:auto;padding:6px 10px;font-size:12px"><option value="">BFステータス:全て</option></select>
+            <select class="form-select" id="bf-lc-filter-fac" style="width:auto;padding:6px 10px;font-size:12px"><option value="">CS医院:全て</option></select>
+            <select class="form-select" id="bf-lc-filter-dr" style="width:auto;padding:6px 10px;font-size:12px"><option value="">Dr:全て</option></select>
+            <select class="form-select" id="bf-lc-filter-next" style="width:auto;padding:6px 10px;font-size:12px"><option value="">次回予定:全て</option><option value="fixed">確定のみ</option><option value="unfixed">未定のみ</option><option value="none">未設定</option></select>
+            <input type="text" class="form-input" id="bf-lc-search" placeholder="名前検索" style="width:120px;padding:6px 8px;font-size:12px">
+          </div>
+          <div class="card" style="padding:8px">
+            <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">一覧 <span id="bf-lc-count" style="font-weight:400"></span></div>
+            <div class="data-table-wrap" style="max-height:calc(100vh - 380px);overflow-y:auto">
+              <table class="data-table compact">
+                <thead><tr><th style="text-align:left">名前</th><th>来院日</th><th>BFステータス</th><th>次回予定日</th><th>確定</th><th>CS医院</th><th>Dr</th><th>経過</th><th>メモ</th><th>履歴</th></tr></thead>
+                <tbody id="bf-lc-tbody"></tbody>
+              </table>
+            </div>
+          </div>
+          <div id="bf-lc-history-modal" class="modal" hidden>
+            <div class="modal-overlay" onclick="document.getElementById('bf-lc-history-modal').hidden=true"></div>
+            <div class="modal-content" style="max-width:620px;padding:24px;max-height:80vh;overflow-y:auto">
+              <button class="modal-close" onclick="document.getElementById('bf-lc-history-modal').hidden=true">&times;</button>
+              <h3 style="font-size:15px;font-weight:700;margin-bottom:12px" id="bf-lc-history-title">📜 履歴</h3>
+              <div id="bf-lc-history-body"></div>
+            </div>
+          </div>
         </div>
         <div id="bf-progress" hidden><div class="page-header"><h2>BF 進捗管理</h2></div><div class="stats-row" id="bf-stats" style="margin-bottom:16px"></div><div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap"><button class="btn btn-dark bf-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button><button class="btn btn-outline bf-period-btn" data-period="month" style="font-size:11px;padding:6px 12px;min-height:28px">今月</button><button class="btn btn-outline bf-period-btn" data-period="week" style="font-size:11px;padding:6px 12px;min-height:28px">今週</button><button class="btn btn-outline bf-period-btn" data-period="today" style="font-size:11px;padding:6px 12px;min-height:28px">今日</button></div><div class="card" style="margin-bottom:16px"><div class="card-header">医院別</div><div class="bar-chart" id="bf-facility-chart"></div></div><div class="card" style="margin-bottom:16px"><div class="card-header">プロモ別</div><div class="bar-chart" id="bf-promo-chart"></div></div><div class="card" style="margin-bottom:16px"><div class="card-header">日別申込推移</div><div class="bar-chart" id="bf-daily-chart"></div></div></div>
         <div id="bf-patients" hidden><div class="page-header"><h2>BF 患者リスト</h2></div><div class="card"><div class="card-header">患者リスト（スプレッドシート同期）<span id="bf-sheet-count" style="font-weight:400;color:var(--text-muted)"></span></div><div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto"><table class="data-table"><thead><tr><th>予約日</th><th>名前</th><th>経路</th><th>医院</th><th>DR</th><th>性別</th><th>地域</th><th>状況</th><th>本数</th><th>売上</th><th>入金</th><th>完了</th></tr></thead><tbody id="bf-sheet-tbody"></tbody></table></div></div></div>
@@ -869,7 +898,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=132"></script>
+  <script src="app.js?v=133"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

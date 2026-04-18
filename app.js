@@ -429,7 +429,7 @@ function setupEventListeners() {
       btn.style.color = 'var(--text)';
       btn.style.fontWeight = '600';
       const sub = btn.dataset.bfsub;
-      ['bf-progress','bf-patients','bf-contracts','bf-bookings'].forEach(id => {
+      ['bf-progress','bf-patients','bf-contracts','bf-bookings','bf-lifecycle'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.hidden = el.id !== sub;
       });
@@ -441,6 +441,7 @@ function setupEventListeners() {
         else renderBF('all');
       }
       if (sub === 'bf-bookings') { renderBF('all'); }
+      if (sub === 'bf-lifecycle') { renderBFLifecycle(); }
     });
   });
 
@@ -3481,6 +3482,238 @@ function renderBF(period) {
   // BF予約一覧（メイン予約一覧と同じ機能）
   _bfAllData = data;
   renderBFBookings(data);
+}
+
+// === BF セット進捗 (lifecycle) ===
+const BF_STATUSES = [
+  { value: '離脱', color: '#9ca3af' },
+  { value: '検討中', color: '#f59e0b' },
+  { value: '成約', color: '#10b981' },
+  { value: '矯正決定(BF保留)', color: '#8b5cf6' },
+  { value: '印象待ち(治療無)', color: '#3b82f6' },
+  { value: '印象待ち(治療有)', color: '#2563eb' },
+  { value: '治療中', color: '#1d4ed8' },
+  { value: 'セット日確定待ち', color: '#0891b2' },
+  { value: 'セット待ち', color: '#0e7490' },
+  { value: 'セット完了', color: '#059669' }
+];
+let bfLifecycleCache = {}; // key: name|applyDate → {bf_status, bf_next_date, ...}
+let bfHistoryCache = {}; // key: name|applyDate → [events]
+
+async function loadBFLifecycleData() {
+  try {
+    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_memo');
+    bfLifecycleCache = {};
+    (data || []).forEach(r => {
+      bfLifecycleCache[r.name + '|' + r.apply_date] = r;
+    });
+  } catch(e) { console.warn('BF lifecycle load', e); }
+}
+
+async function loadBFHistory(names) {
+  try {
+    const { data } = await sb.from('bf_history').select('*').in('booking_name', names).order('created_at', { ascending: false });
+    bfHistoryCache = {};
+    (data || []).forEach(h => {
+      const key = h.booking_name + '|' + h.booking_apply_date;
+      if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
+      bfHistoryCache[key].push(h);
+    });
+  } catch(e) { console.warn('BF history load', e); }
+}
+
+function getLoggedUserName() {
+  const role = sessionStorage.getItem('role') || 'admin';
+  if (role === 'custom') return sessionStorage.getItem('customName') || 'custom';
+  return role;
+}
+
+async function saveBFLifecycleField(name, applyDate, field, value) {
+  const key = name + '|' + applyDate;
+  const current = bfLifecycleCache[key] || {};
+  const fromStatus = current.bf_status || null;
+  const update = { name, apply_date: applyDate };
+  update[field] = value;
+  const { error } = await sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' });
+  if (error) { showToast('保存エラー: ' + error.message, true); return false; }
+  // キャッシュ更新
+  if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
+  bfLifecycleCache[key][field] = value;
+  // ステータス変更時は履歴記録
+  if (field === 'bf_status' && fromStatus !== value) {
+    const hist = {
+      booking_name: name,
+      booking_apply_date: applyDate,
+      from_status: fromStatus,
+      to_status: value,
+      next_date: current.bf_next_date || null,
+      next_fixed: current.bf_next_fixed || false,
+      cs_facility: current.bf_cs_facility || null,
+      cs_doctor: current.bf_cs_doctor || null,
+      memo: current.bf_memo || null,
+      changed_by: getLoggedUserName()
+    };
+    await sb.from('bf_history').insert(hist);
+    if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
+    bfHistoryCache[key].unshift({ ...hist, created_at: new Date().toISOString() });
+  }
+  return true;
+}
+
+async function renderBFLifecycle() {
+  await loadBFLifecycleData();
+  // BF相談の来院済データを抽出
+  const bfRows = (bookingsData || []).filter(d => {
+    const svc = (d.service || '').toLowerCase();
+    return svc.includes('bf') || svc.includes('ブラック');
+  });
+  // 履歴読み込み
+  await loadBFHistory(bfRows.map(r => r.name));
+
+  // ファネル
+  const counts = {};
+  BF_STATUSES.forEach(s => counts[s.value] = 0);
+  let noStatus = 0;
+  bfRows.forEach(d => {
+    const info = bfLifecycleCache[d.name + '|' + d.applyDate];
+    const st = info?.bf_status;
+    if (st && counts[st] !== undefined) counts[st]++;
+    else noStatus++;
+  });
+  const funnelEl = document.getElementById('bf-lc-funnel');
+  if (funnelEl) {
+    funnelEl.innerHTML = `
+      <div class="stat-card" style="padding:8px;min-width:90px"><span class="stat-label">総計</span><span class="stat-num">${bfRows.length}</span></div>
+      <div class="stat-card" style="padding:8px;min-width:90px;border-color:#ccc"><span class="stat-label">未設定</span><span class="stat-num">${noStatus}</span></div>
+      ${BF_STATUSES.map(s => `<div class="stat-card" style="padding:8px;min-width:80px;border-left:3px solid ${s.color}"><span class="stat-label" style="font-size:9px">${s.value}</span><span class="stat-num" style="color:${s.color}">${counts[s.value]}</span></div>`).join('')}
+    `;
+  }
+
+  // フィルター選択肢
+  const stSel = document.getElementById('bf-lc-filter-status');
+  if (stSel) stSel.innerHTML = '<option value="">BFステータス:全て</option><option value="__none">未設定</option>' + BF_STATUSES.map(s => `<option value="${s.value}">${s.value}</option>`).join('');
+  const csFacSel = document.getElementById('bf-lc-filter-fac');
+  const csFacs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_facility).filter(Boolean))].sort();
+  if (csFacSel) csFacSel.innerHTML = '<option value="">CS医院:全て</option>' + csFacs.map(f => `<option>${f}</option>`).join('');
+  const drSel = document.getElementById('bf-lc-filter-dr');
+  const drs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_doctor).filter(Boolean))].sort();
+  if (drSel) drSel.innerHTML = '<option value="">Dr:全て</option>' + drs.map(d => `<option>${d}</option>`).join('');
+
+  // 一覧描画
+  drawBFLifecycleTable(bfRows);
+
+  // イベント
+  ['bf-lc-filter-status','bf-lc-filter-fac','bf-lc-filter-dr','bf-lc-filter-next'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el && !el._bound) { el.addEventListener('change', () => drawBFLifecycleTable(bfRows)); el._bound = true; }
+  });
+  const searchEl = document.getElementById('bf-lc-search');
+  if (searchEl && !searchEl._bound) { searchEl.addEventListener('input', () => drawBFLifecycleTable(bfRows)); searchEl._bound = true; }
+}
+
+function drawBFLifecycleTable(bfRows) {
+  const fstSel = document.getElementById('bf-lc-filter-status')?.value || '';
+  const ffac = document.getElementById('bf-lc-filter-fac')?.value || '';
+  const fdr = document.getElementById('bf-lc-filter-dr')?.value || '';
+  const fnext = document.getElementById('bf-lc-filter-next')?.value || '';
+  const fs = (document.getElementById('bf-lc-search')?.value || '').trim().toLowerCase();
+  const FACS = ['','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都','岩田','アサノ'];
+
+  let filtered = bfRows.slice();
+  if (fstSel) {
+    if (fstSel === '__none') filtered = filtered.filter(d => !bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_status);
+    else filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_status === fstSel);
+  }
+  if (ffac) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_facility === ffac);
+  if (fdr) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_doctor === fdr);
+  if (fnext === 'fixed') filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_next_fixed);
+  if (fnext === 'unfixed') filtered = filtered.filter(d => { const v = bfLifecycleCache[d.name+'|'+d.applyDate]; return v?.bf_next_date && !v?.bf_next_fixed; });
+  if (fnext === 'none') filtered = filtered.filter(d => !bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_next_date);
+  if (fs) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(fs));
+
+  filtered.sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
+
+  document.getElementById('bf-lc-count').textContent = filtered.length + '件';
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const rowsHtml = filtered.map(d => {
+    const key = d.name + '|' + d.applyDate;
+    const info = bfLifecycleCache[key] || {};
+    const st = info.bf_status || '';
+    const stColor = BF_STATUSES.find(s => s.value === st)?.color || '#ccc';
+    const bookDate = parseDate(d.bookDate);
+    const daysSince = bookDate ? Math.floor((today - bookDate) / 86400000) : '-';
+    const histCount = (bfHistoryCache[key] || []).length;
+    const esc = (s) => String(s||'').replace(/"/g,'&quot;');
+    return `<tr>
+      <td style="font-weight:500;text-align:left">${d.name}</td>
+      <td style="white-space:nowrap;font-size:10px">${fmtBookDate(d.bookDate)}</td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:10px;padding:2px 6px;border-radius:4px;background:${stColor}20;color:${stColor};border:1px solid ${stColor}50;font-weight:600">
+        <option value="">-</option>
+        ${BF_STATUSES.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
+      </select></td>
+      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:2px 4px;width:120px"></td>
+      <td><button class="bf-lc-fixed-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${info.bf_next_fixed?'#0a0':'#f90'};background:${info.bf_next_fixed?'#dcfce7':'#fef3c7'};color:${info.bf_next_fixed?'#0a0':'#b45309'};cursor:pointer;font-weight:600">${info.bf_next_fixed?'🟢 確定':'🟡 未定'}</button></td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px">${FACS.map(f => `<option ${(info.bf_cs_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
+      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:90px"></td>
+      <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
+      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_memo" value="${esc(info.bf_memo)}" placeholder="メモ" style="font-size:10px;padding:2px 6px;width:120px"></td>
+      <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer">📜 ${histCount}</button></td>
+    </tr>`;
+  }).join('');
+
+  const tbody = document.getElementById('bf-lc-tbody');
+  tbody.innerHTML = rowsHtml || '<tr><td colspan="10" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+
+  // 各フィールドイベント
+  tbody.querySelectorAll('.bf-lc-field').forEach(el => {
+    el.addEventListener('change', async () => {
+      const ok = await saveBFLifecycleField(el.dataset.name, el.dataset.apply, el.dataset.field, el.value || null);
+      if (ok) {
+        el.style.borderColor = '#0a0';
+        setTimeout(() => { el.style.borderColor = ''; }, 1000);
+        // ステータス変更はファネル更新
+        if (el.dataset.field === 'bf_status') renderBFLifecycle();
+      }
+    });
+  });
+  // 確定バッジ
+  tbody.querySelectorAll('.bf-lc-fixed-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const name = btn.dataset.name; const apply = btn.dataset.apply;
+      const key = name + '|' + apply;
+      const cur = bfLifecycleCache[key]?.bf_next_fixed || false;
+      const ok = await saveBFLifecycleField(name, apply, 'bf_next_fixed', !cur);
+      if (ok) renderBFLifecycle();
+    });
+  });
+  // 履歴モーダル
+  tbody.querySelectorAll('.bf-lc-hist-btn').forEach(btn => {
+    btn.addEventListener('click', () => openBFHistoryModal(btn.dataset.name, btn.dataset.apply));
+  });
+}
+
+function openBFHistoryModal(name, applyDate) {
+  const key = name + '|' + applyDate;
+  const history = bfHistoryCache[key] || [];
+  document.getElementById('bf-lc-history-title').textContent = `📜 ${name} の履歴`;
+  const body = document.getElementById('bf-lc-history-body');
+  if (!history.length) {
+    body.innerHTML = '<p style="color:var(--text-muted);font-size:13px">履歴なし</p>';
+  } else {
+    body.innerHTML = history.map(h => `
+      <div style="padding:10px;margin-bottom:8px;background:var(--bg);border-left:3px solid #6366f1;border-radius:4px">
+        <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">${(h.created_at||'').substring(0,16).replace('T',' ')} — <b>${h.changed_by||'-'}</b></div>
+        <div style="font-size:13px;font-weight:600">${h.from_status||'(なし)'} → ${h.to_status||'(なし)'}</div>
+        <div style="font-size:11px;color:var(--text-sub);margin-top:4px">
+          ${h.next_date ? '次回: ' + h.next_date + (h.next_fixed?' 🟢確定':' 🟡未定') + ' / ' : ''}
+          ${h.cs_facility ? 'CS: ' + h.cs_facility + (h.cs_doctor ? '/' + h.cs_doctor : '') : ''}
+        </div>
+        ${h.memo ? `<div style="font-size:11px;margin-top:4px;padding:6px;background:#fff;border-radius:3px">${h.memo}</div>` : ''}
+      </div>
+    `).join('');
+  }
+  document.getElementById('bf-lc-history-modal').hidden = false;
 }
 
 function renderBFBookings(allBFData) {
