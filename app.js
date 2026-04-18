@@ -4666,35 +4666,36 @@ async function renderKaiinTab(treatment, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
 
-  // BFだけは既存の詳細機能を使う
-  if (treatment === 'BF') {
-    // BFのセット進捗をこのタブ内に描画
-    await loadBFLifecycleData();
-    const bfRowsRaw = (bookingsData || []).filter(d => {
-      if (getTreatmentCategory(d) !== 'BF') return false;
-      if (d.status === '除外') return false;
-      const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
-      const bd = parseDate(d.bookDate);
-      if (bd && bd > todayEnd) return false;
-      return true;
-    });
-    const bfRows = dedupBFRows(bfRowsRaw);
-    await loadBFHistory(bfRows.map(r => r.name));
-    // 簡易版 (フル機能は 予約>BFセット進捗 で)
-    renderKaiinSimpleList(treatment, bfRows, containerId);
-    return;
-  }
-
-  // 他の治療
-  const rows = (bookingsData || []).filter(d => {
+  // 高速表示: まずキャッシュで即描画、その後バックグラウンドで最新化
+  const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+  let rows = (bookingsData || []).filter(d => {
     if (getTreatmentCategory(d) !== treatment) return false;
     if (d.status === '除外') return false;
-    const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
     const bd = parseDate(d.bookDate);
     if (bd && bd > todayEnd) return false;
     return true;
   });
+  if (treatment === 'BF') rows = dedupBFRows(rows);
+
+  // 1. まずキャッシュで即表示 (待たない)
   renderKaiinSimpleList(treatment, rows, containerId);
+
+  // 2. バックグラウンドでBFキャッシュ更新→履歴取得→必要なら再描画
+  (async () => {
+    const before = JSON.stringify(bfLifecycleCache);
+    await loadBFLifecycleData();
+    if (treatment === 'BF') {
+      await loadBFHistory(rows.map(r => r.name));
+    }
+    if (before !== JSON.stringify(bfLifecycleCache)) {
+      // 変化あれば再描画
+      const el = document.getElementById(containerId);
+      if (el) {
+        const tbody = el.querySelector('.kaiin-tbody');
+        if (tbody) drawKaiinRows(treatment, rows, el);
+      }
+    }
+  })();
 }
 
 function renderKaiinSimpleList(treatment, rows, containerId) {
@@ -4754,8 +4755,10 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
             <th style="text-align:left;width:110px">名前</th>
             <th style="width:90px">ツール/プロモ</th>
             <th style="width:70px">医院</th>
-            <th style="width:80px">相談</th>
+            <th style="width:75px">相談</th>
             <th style="width:130px">ステータス</th>
+            <th style="width:85px">売上</th>
+            <th style="width:70px">交通費</th>
             <th>メモ</th>
             <th style="width:95px">次回予定</th>
           </tr></thead>
@@ -4768,7 +4771,10 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   // プロモフィルター選択肢を埋める
   const promos = [...new Set(rows.map(d => d.source).filter(Boolean))].sort();
   const promoSel = el.querySelector('.kaiin-filter-promo');
-  if (promoSel) promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.map(p => `<option>${p}</option>`).join('');
+  if (promoSel) {
+    const escHtml = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.filter(p => p && p.trim() && p.trim() !== '?').map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
+  }
 
   // 折りたたみ (SEISHOKAIヘッダー+治療別タブも含めて非表示)
   el.querySelector('.kaiin-collapse-btn')?.addEventListener('click', () => {
@@ -4870,7 +4876,9 @@ function drawKaiinRows(treatment, rows, container) {
         <option value="">未設定</option>
         ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
-      <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>30?memo.substring(0,30)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
+      <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
+      <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
+      <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>22?memo.substring(0,22)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="date" class="kaiin-next-date" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${nextDate}" style="font-size:10px;padding:2px 3px;width:100%;box-sizing:border-box;border-radius:4px;${nextDateStyle}"></td>
     </tr>`;
   }).join('') || '<tr><td colspan="8" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
