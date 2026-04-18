@@ -2649,7 +2649,7 @@ function renderBookings() {
   // ステータス変更イベント
   if (isAdmin) {
     tbody.querySelectorAll('.bk-status-select').forEach(sel => {
-      sel.addEventListener('change', (e) => {
+      sel.addEventListener('change', async (e) => {
         const name = sel.dataset.name;
         const applyDate = sel.dataset.apply;
         const newStatus = sel.value;
@@ -2660,16 +2660,34 @@ function renderBookings() {
           return;
         }
         if (match) match.status = newStatus;
-        // bk-extra にも永続化 (DB失敗時の保険)
+        // bk-extra にも永続化
         const bkEx = loadData('bk-extra', {});
         const key = name + '|' + applyDate;
         if (!bkEx[key]) bkEx[key] = {};
         bkEx[key].editedStatus = newStatus;
         saveData('bk-extra', bkEx);
         // DB保存
-        sb.from('booking_status').upsert({ name, apply_date: applyDate, status: newStatus }, { onConflict: 'name,apply_date' }).then(({error}) => { if (error) showToast('DB保存失敗: ' + error.message, true); });
+        const upsertData = { name, apply_date: applyDate, status: newStatus };
+        // === 連動: BFなら bf_status も自動設定 ===
+        if (match && isBFBooking(match) && STATUS_TO_BF[newStatus] !== undefined) {
+          const targetBF = STATUS_TO_BF[newStatus];
+          // 成約/キャンセル系は常に上書き、来院済は未設定時のみ
+          const curBF = bfLifecycleCache[key]?.bf_status;
+          const shouldUpdate = (newStatus === '成約' || newStatus === 'キャンセル' || !curBF);
+          if (shouldUpdate && targetBF !== null) {
+            upsertData.bf_status = targetBF;
+            if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
+            bfLifecycleCache[key].bf_status = targetBF;
+            // 履歴記録
+            sb.from('bf_history').insert({
+              booking_name: name, booking_apply_date: applyDate,
+              from_status: curBF || null, to_status: targetBF,
+              changed_by: getLoggedUserName() + '(自動連動:状態→BF)'
+            }).then(()=>{});
+          }
+        }
+        sb.from('booking_status').upsert(upsertData, { onConflict: 'name,apply_date' }).then(({error}) => { if (error) showToast('DB保存失敗: ' + error.message, true); });
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
-        // 再描画で統計カード・行色・成約率を更新
         renderBookings();
       });
     });
@@ -3542,6 +3560,23 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   const fromStatus = current.bf_status || null;
   const update = { name, apply_date: applyDate };
   update[field] = value;
+
+  // === 連動: BFステータス変更時、予約一覧の状態も自動更新 ===
+  if (field === 'bf_status' && value && BF_TO_STATUS[value]) {
+    const targetStatus = BF_TO_STATUS[value];
+    update.status = targetStatus;
+    // bookingsDataのキャッシュも更新
+    const bk = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
+    if (bk) bk.status = targetStatus;
+    // bk-extra にも保存
+    try {
+      const bkEx = loadData('bk-extra', {});
+      if (!bkEx[key]) bkEx[key] = {};
+      bkEx[key].editedStatus = targetStatus;
+      saveData('bk-extra', bkEx);
+    } catch(_){}
+  }
+
   const { error } = await sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' });
   if (error) { showToast('保存エラー: ' + error.message, true); return false; }
   // キャッシュ更新
@@ -3662,6 +3697,37 @@ async function renderBFLifecycle() {
 
 const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
 const CSDR_LIST = ['小池','鶴田','立松','原','西村','山田']; // 固定Dr、追加はdatalistで
+
+// === 全体連動マッピング ===
+// 予約一覧の状態 → BFステータスの初期値 (BF相談のみ適用)
+const STATUS_TO_BF = {
+  '来院済': '検討中',       // 来院したら検討中スタート (BF未設定時のみ)
+  '成約': '成約',
+  'キャンセル': 'キャンセル(未来院)',
+  '除外': null
+};
+// BFステータス → 予約一覧の状態 (上書き)
+const BF_TO_STATUS = {
+  '離脱': '来院済',
+  '検討中': '来院済',
+  '成約': '成約',
+  'ローン審査中': '成約',
+  'ローン審査落': '成約',
+  '矯正決定(BF保留)': '成約',
+  '印象待ち(治療無)': '成約',
+  '印象待ち(治療有)': '成約',
+  '治療中': '成約',
+  'セット日確定待ち': '成約',
+  'セット待ち': '成約',
+  'セット完了': '成約',
+  'キャンセル(未来院)': 'キャンセル'
+};
+
+// BFか判定
+function isBFBooking(d) {
+  const svc = (d?.service || '').toLowerCase();
+  return svc.includes('bf') || svc.includes('ブラック');
+}
 
 // CS医院(複数可): JSON array文字列 or 単一文字列 を配列に
 function parseCsFac(v) {
