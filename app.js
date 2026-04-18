@@ -3250,7 +3250,10 @@ function saveMemoModal() {
     _memoTarget.tdEl.innerHTML = val ? val.slice(0,6) + (val.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>';
     _memoTarget.tdEl.title = val;
   }
-  sb.from('booking_status').upsert({ name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val }, { onConflict: 'name,apply_date' }).then(() => {});
+  // 予約一覧メモとBFメモを連動
+  safeSave({ type:'upsert', table:'booking_status', payload: { name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val, bf_memo: val }, options: { onConflict:'name,apply_date' } });
+  // BFライフサイクルキャッシュも同期
+  if (bfLifecycleCache[_memoTarget.key]) bfLifecycleCache[_memoTarget.key].bf_memo = val;
   showToast('メモを保存しました');
   closeMemoModal();
 }
@@ -3903,6 +3906,9 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   const fromStatus = current.bf_status || null;
   const update = { name, apply_date: applyDate };
   update[field] = value;
+  // メモ連動: bf_memo保存時は memo も、逆も同期
+  if (field === 'bf_memo') update.memo = value;
+  if (field === 'memo') update.bf_memo = value;
 
   // === 連動: BFステータス変更時、予約一覧の状態も自動更新 ===
   if (field === 'bf_status' && value && BF_TO_STATUS[value]) {
@@ -3945,6 +3951,18 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   // キャッシュ更新
   if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
   bfLifecycleCache[key][field] = value;
+  // メモ連動: 予約一覧の d._memo も更新
+  if (field === 'bf_memo' || field === 'memo') {
+    const bk = (bookingsData || []).find(b => b.name === name && b.applyDate === applyDate);
+    if (bk) bk._memo = value;
+    try {
+      const memos = loadData('bk-memos', {});
+      memos[key] = value;
+      saveData('bk-memos', memos);
+    } catch(_){}
+    bfLifecycleCache[key].memo = value;
+    bfLifecycleCache[key].bf_memo = value;
+  }
   // ステータス変更時は履歴記録
   if (field === 'bf_status' && fromStatus !== value) {
     const hist = {
@@ -4191,7 +4209,7 @@ function drawBFLifecycleTable(bfRows) {
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_set_facility" style="font-size:10px;padding:2px 4px;width:100%">${BF_SET_FACS.map(f => `<option ${(info.bf_set_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
       <td><input type="text" inputmode="numeric" class="bf-lc-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():(info.contract_amount?Number(info.contract_amount).toLocaleString():'')}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
       <td><input type="text" inputmode="numeric" class="bf-lc-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
-      <td class="bf-lc-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;min-height:26px;background:${info.bf_memo?'#fff8e1':'transparent'};border:1px dashed ${info.bf_memo?'#f9a825':'var(--border)'};border-radius:4px;font-size:11px;line-height:1.5;max-width:320px" title="クリックで編集">${info.bf_memo ? (info.bf_memo.length > 60 ? info.bf_memo.substring(0,60)+'…' : info.bf_memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
+      <td class="bf-lc-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;min-height:26px;background:${(info.bf_memo||d._memo)?'#fff8e1':'transparent'};border:1px dashed ${(info.bf_memo||d._memo)?'#f9a825':'var(--border)'};border-radius:4px;font-size:11px;line-height:1.5;max-width:320px" title="クリックで編集">${(info.bf_memo||d._memo) ? ((info.bf_memo||d._memo).length > 60 ? (info.bf_memo||d._memo).substring(0,60)+'…' : (info.bf_memo||d._memo)).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:9px;padding:2px 3px;width:100%;box-sizing:border-box;border-radius:3px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
       <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">📜${histCount}</button></td>
@@ -4332,7 +4350,9 @@ function openBFMemoModal(name, applyDate, bfRows) {
   document.getElementById('bf-lc-memo-title').textContent = '📝 ' + name + ' のメモ';
   const st = info.bf_status || '未設定';
   document.getElementById('bf-lc-memo-sub').textContent = `BFステータス: ${st}${st==='検討中'?' — 後追い状況を記録してください':''}`;
-  document.getElementById('bf-lc-memo-text').value = info.bf_memo || '';
+  // 予約一覧メモと連動
+  const bk = (bookingsData || []).find(b => b.name === name && b.applyDate === applyDate);
+  document.getElementById('bf-lc-memo-text').value = info.bf_memo || (bk && bk._memo) || '';
   document.getElementById('bf-lc-memo-status').textContent = '';
   document.getElementById('bf-lc-memo-modal').hidden = false;
   const saveBtn = document.getElementById('bf-lc-memo-save');
