@@ -193,6 +193,7 @@ function handleRealtimeChange(table, payload) {
         if (row.incentive_month !== undefined) d.incentiveMonth = row.incentive_month;
         if (row.book_date !== undefined && row.book_date) d.bookDate = row.book_date;
         if (row.memo !== undefined) d._memo = row.memo;
+        if (row.bf_memo !== undefined && !d._memo) d._memo = row.bf_memo;
       }
       // BFキャッシュも更新
       if (row.bf_status !== undefined || row.bf_next_date !== undefined || row.bf_cs_facility !== undefined || row.bf_cs_doctor !== undefined || row.bf_memo !== undefined || row.bf_set_facility !== undefined || row.bf_travel_cost !== undefined) {
@@ -2553,6 +2554,7 @@ async function loadBookings() {
             if (dbRow.payment_month) d.paymentMonth = dbRow.payment_month;
             if (dbRow.incentive_month) d.incentiveMonth = dbRow.incentive_month;
             if (dbRow.memo) d._memo = dbRow.memo;
+            else if (dbRow.bf_memo) d._memo = dbRow.bf_memo; // BFメモを通常メモとしても表示
             if (dbRow.book_date) d.bookDate = dbRow.book_date;
           }
         });
@@ -4034,10 +4036,16 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   // キャッシュ更新
   if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
   bfLifecycleCache[key][field] = value;
-  // メモ連動: 予約一覧の d._memo も更新
+  // メモ連動: 予約一覧の d._memo も更新 (スペース差含めた同名患者も対応)
   if (field === 'bf_memo' || field === 'memo') {
+    const nnTarget = normName(name);
+    const dateKey = (applyDate || '').substring(0,10);
+    (bookingsData || []).forEach(b => {
+      if (normName(b.name) === nnTarget && (b.applyDate||'').substring(0,10) === dateKey) {
+        b._memo = value;
+      }
+    });
     const bk = (bookingsData || []).find(b => b.name === name && b.applyDate === applyDate);
-    if (bk) bk._memo = value;
     try {
       const memos = loadData('bk-memos', {});
       memos[key] = value;
