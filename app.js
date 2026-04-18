@@ -3602,7 +3602,7 @@ async function renderBFLifecycle() {
   if (csFacSel) csFacSel.innerHTML = '<option value="">CS医院:全て</option>' + csFacs.map(f => `<option>${f}</option>`).join('');
   const drSel = document.getElementById('bf-lc-filter-dr');
   const drs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_doctor).filter(Boolean))].sort();
-  if (drSel) drSel.innerHTML = '<option value="">Dr:全て</option>' + drs.map(d => `<option>${d}</option>`).join('');
+  if (drSel) drSel.innerHTML = '<option value="">CSDR:全て</option>' + drs.map(d => `<option>${d}</option>`).join('');
 
   // 一覧描画
   drawBFLifecycleTable(bfRows);
@@ -3680,13 +3680,13 @@ function drawBFLifecycleTable(bfRows) {
         <option value="">未設定</option>
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
-      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:2px 4px;width:120px"></td>
-      <td><button class="bf-lc-fixed-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 8px;border-radius:10px;border:1px solid ${info.bf_next_fixed?'#0a0':'#f90'};background:${info.bf_next_fixed?'#dcfce7':'#fef3c7'};color:${info.bf_next_fixed?'#0a0':'#b45309'};cursor:pointer;font-weight:600">${info.bf_next_fixed?'🟢 確定':'🟡 未定'}</button></td>
-      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px">${FACS.map(f => `<option ${csFac===f?'selected':''}>${f}</option>`).join('')}</select></td>
-      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:90px"></td>
-      <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
-      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_memo" value="${esc(info.bf_memo)}" placeholder="メモ" style="font-size:10px;padding:2px 6px;width:120px"></td>
-      <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 8px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer">📜 ${histCount}</button></td>
+      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:2px 4px;width:100%;box-sizing:border-box"></td>
+      <td><button class="bf-lc-fixed-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;border-radius:10px;border:1px solid ${info.bf_next_fixed?'#0a0':'#f90'};background:${info.bf_next_fixed?'#dcfce7':'#fef3c7'};color:${info.bf_next_fixed?'#0a0':'#b45309'};cursor:pointer;font-weight:600;white-space:nowrap">${info.bf_next_fixed?'🟢確定':'🟡未定'}</button></td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px;width:100%">${FACS.map(f => `<option ${csFac===f?'selected':''}>${f}</option>`).join('')}</select></td>
+      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
+      <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
+      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_memo" value="${esc(info.bf_memo)}" placeholder="メモ" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
+      <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">📜${histCount}</button></td>
     </tr>`;
   }).join('');
 
