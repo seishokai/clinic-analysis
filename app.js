@@ -531,6 +531,48 @@ function setupEventListeners() {
   document.getElementById('logout-btn').addEventListener('click', logout);
   document.getElementById('logout-btn-mobile').addEventListener('click', logout);
 
+  // 🔄 データ更新ボタン
+  document.getElementById('refresh-btn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('refresh-btn');
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = '⏳ 更新中...';
+    try {
+      // 並列で全データ再取得
+      await Promise.all([
+        typeof loadBookings === 'function' ? loadBookings() : null,
+        typeof loadBFLifecycleData === 'function' ? loadBFLifecycleData() : null,
+        typeof loadPromoRates === 'function' ? loadPromoRates() : null,
+      ].filter(Boolean));
+      // リアルタイムチャンネルも再接続
+      try { setupRealtime(); } catch(_){}
+      // 保存キューがあれば即処理
+      try { processQueue(true); } catch(_){}
+      // 現在表示中のビューを再描画
+      if (currentView === 'bookings') {
+        if (typeof renderBookings === 'function') renderBookings();
+        const lc = document.getElementById('bf-lifecycle');
+        if (lc && !lc.hidden && typeof renderBFLifecycle === 'function') renderBFLifecycle();
+      } else if (currentView === 'tc') {
+        if (typeof renderRecordings === 'function') renderRecordings();
+        if (typeof loadClinics === 'function') loadClinics();
+      } else if (currentView === 'sales' && typeof renderSales === 'function') {
+        renderSales();
+      } else if (currentView === 'admin') {
+        if (typeof renderAccounts === 'function') renderAccounts();
+        if (typeof renderPromoRates === 'function') renderPromoRates();
+      } else if (currentView === 'adbudget' && typeof renderAdBudgets === 'function') {
+        renderAdBudgets();
+      }
+      btn.textContent = '✓ 最新';
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1200);
+    } catch(e) {
+      console.error(e);
+      btn.textContent = '⚠ エラー';
+      setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 1500);
+    }
+  });
+
   // Main nav
   document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.addEventListener('click', () => switchView(b.dataset.view)));
