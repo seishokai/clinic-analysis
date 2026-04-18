@@ -847,6 +847,7 @@
         <button class="sub-nav-btn active" data-sub="adm-account">アカウント発行</button>
         <button class="sub-nav-btn" data-sub="adm-list">発行済み一覧</button>
         <button class="sub-nav-btn" data-sub="adm-rates">プロモ別インセ率</button>
+        <button class="sub-nav-btn" data-sub="adm-history">変更履歴・復元</button>
       </div>
       <div id="sub-adm-account">
       <div class="page-header"><h2>権限管理</h2><p class="page-desc">閲覧用アカウントの発行・管理</p></div>
@@ -867,6 +868,43 @@
         </div>
         <div class="data-table-wrap"><table class="data-table" id="pr-table"><thead><tr><th>プロモコード</th><th>インセ率</th><th>更新日</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
+      </div>
+      <div id="sub-adm-history" hidden>
+        <div class="page-header"><h2>変更履歴・復元</h2><p class="page-desc">全テーブルの変更を自動記録。誤編集・誤削除はここから復元可能</p></div>
+        <div class="card" style="margin-bottom:12px;padding:12px">
+          <div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
+            <div class="form-group" style="margin:0;min-width:140px"><label class="form-label">テーブル</label><select class="form-select" id="ch-filter-table" style="padding:6px 8px;font-size:12px"><option value="">全て</option><option>booking_status</option><option>self_recordings</option><option>manual_bookings</option><option>accounts</option></select></div>
+            <div class="form-group" style="margin:0;min-width:140px"><label class="form-label">操作</label><select class="form-select" id="ch-filter-op" style="padding:6px 8px;font-size:12px"><option value="">全て</option><option>INSERT</option><option>UPDATE</option><option>DELETE</option></select></div>
+            <div class="form-group" style="margin:0;min-width:140px"><label class="form-label">名前/キー</label><input type="text" class="form-input" id="ch-filter-key" placeholder="検索" style="padding:6px 8px;font-size:12px"></div>
+            <div class="form-group" style="margin:0;min-width:140px"><label class="form-label">期間</label><select class="form-select" id="ch-filter-period" style="padding:6px 8px;font-size:12px"><option value="24h">過去24時間</option><option value="7d" selected>過去7日</option><option value="30d">過去30日</option><option value="all">全て</option></select></div>
+            <button class="btn btn-dark" id="ch-reload" style="min-height:32px">🔄 読込</button>
+            <button class="btn btn-outline" id="ch-export" style="min-height:32px">📥 CSVエクスポート</button>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header">履歴 <span id="ch-count" style="font-weight:400;color:var(--text-muted)"></span></div>
+          <div class="data-table-wrap" style="max-height:calc(100vh - 350px);overflow-y:auto">
+            <table class="data-table compact">
+              <thead><tr>
+                <th style="width:130px">日時</th>
+                <th style="width:120px">テーブル</th>
+                <th style="width:80px">操作</th>
+                <th style="text-align:left">対象</th>
+                <th>変更内容</th>
+                <th style="width:90px">復元</th>
+              </tr></thead>
+              <tbody id="ch-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+        <div id="ch-detail-modal" class="modal" hidden>
+          <div class="modal-overlay" onclick="document.getElementById('ch-detail-modal').hidden=true"></div>
+          <div class="modal-content" style="max-width:800px;padding:24px;max-height:90vh;overflow-y:auto">
+            <button class="modal-close" onclick="document.getElementById('ch-detail-modal').hidden=true">&times;</button>
+            <h3 style="font-size:15px;font-weight:700;margin-bottom:12px" id="ch-detail-title">変更詳細</h3>
+            <div id="ch-detail-body"></div>
+          </div>
+        </div>
       </div>
     </main>
 
@@ -962,7 +1000,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=157"></script>
+  <script src="app.js?v=158"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

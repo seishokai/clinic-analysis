@@ -607,6 +607,7 @@ function setupEventListeners() {
       if (sub === 'bk-bf') { if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); } }
       if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
       if (sub === 'recordings') renderRecordings();
+      if (sub === 'adm-history') renderChangeLog();
     });
   });
 
@@ -891,6 +892,17 @@ function setupEventListeners() {
     document.getElementById('pr-save')?.addEventListener('click', savePromoRate);
     loadPromoRates();
     renderPromoRates();
+
+    // 変更履歴
+    document.getElementById('ch-reload')?.addEventListener('click', renderChangeLog);
+    document.getElementById('ch-export')?.addEventListener('click', exportChangeLogCsv);
+    ['ch-filter-table','ch-filter-op','ch-filter-period'].forEach(id => {
+      document.getElementById(id)?.addEventListener('change', renderChangeLog);
+    });
+    document.getElementById('ch-filter-key')?.addEventListener('input', () => {
+      clearTimeout(window._chSearchTimer);
+      window._chSearchTimer = setTimeout(renderChangeLog, 500);
+    });
     document.getElementById('rec-file')?.addEventListener('change', e => {
       const f = e.target.files[0];
       const lbl = document.getElementById('rec-file-label');
@@ -5227,6 +5239,148 @@ async function renderAdBudgets() {
       </div>
     `;
   }).join('');
+}
+
+// === 変更履歴・復元 (Layer 1) ===
+async function renderChangeLog() {
+  const table = document.getElementById('ch-filter-table').value;
+  const op = document.getElementById('ch-filter-op').value;
+  const key = (document.getElementById('ch-filter-key').value || '').trim();
+  const period = document.getElementById('ch-filter-period').value;
+
+  let query = sb.from('change_log').select('*').order('changed_at', { ascending: false }).limit(500);
+  if (table) query = query.eq('table_name', table);
+  if (op) query = query.eq('operation', op);
+  if (key) query = query.ilike('row_key', '%' + key + '%');
+  if (period !== 'all') {
+    const days = period === '24h' ? 1 : period === '7d' ? 7 : 30;
+    const since = new Date(Date.now() - days*86400000).toISOString();
+    query = query.gte('changed_at', since);
+  }
+  const { data, error } = await query;
+  if (error) { showToast('読込失敗: ' + error.message, true); return; }
+  const tbody = document.getElementById('ch-tbody');
+  if (!data || !data.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:20px">履歴なし</td></tr>';
+    document.getElementById('ch-count').textContent = '0件';
+    return;
+  }
+  document.getElementById('ch-count').textContent = data.length + '件' + (data.length >= 500 ? ' (上限500)' : '');
+  const opColor = { INSERT: '#10b981', UPDATE: '#3b82f6', DELETE: '#dc2626' };
+  tbody.innerHTML = data.map(h => {
+    const diff = computeDiff(h.old_data, h.new_data);
+    const diffText = diff.length
+      ? diff.slice(0, 3).map(d => `<span style="color:var(--text-sub)">${d.field}:</span> <span style="color:#c00">${esc(d.old).substring(0,30)}</span> → <span style="color:#0a0">${esc(d.new).substring(0,30)}</span>`).join('<br>') + (diff.length>3?`<br><span style="color:var(--text-muted)">...他${diff.length-3}件</span>`:'')
+      : (h.operation==='INSERT' ? '(新規作成)' : h.operation==='DELETE' ? '(削除)' : '(変更なし)');
+    return `
+      <tr>
+        <td style="font-size:10px;white-space:nowrap">${(h.changed_at||'').substring(0,16).replace('T',' ')}</td>
+        <td style="font-size:10px">${h.table_name}</td>
+        <td><span style="font-size:10px;font-weight:700;color:${opColor[h.operation]||'#666'}">${h.operation}</span></td>
+        <td style="font-size:10px;text-align:left;max-width:160px;overflow:hidden;text-overflow:ellipsis">${esc(h.row_key)}</td>
+        <td style="font-size:11px;line-height:1.5">${diffText}</td>
+        <td style="text-align:center">
+          <button class="btn btn-outline ch-view-btn" data-id="${h.id}" style="font-size:10px;padding:2px 8px;margin-bottom:2px">詳細</button>
+          ${h.old_data ? `<button class="btn btn-dark ch-restore-btn" data-id="${h.id}" style="font-size:10px;padding:2px 8px;background:#f59e0b;border-color:#f59e0b">↺ 復元</button>` : ''}
+        </td>
+      </tr>`;
+  }).join('');
+
+  // 詳細ボタン
+  tbody.querySelectorAll('.ch-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const h = data.find(x => x.id == btn.dataset.id);
+      if (h) openChangeDetailModal(h);
+    });
+  });
+  // 復元ボタン
+  tbody.querySelectorAll('.ch-restore-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const h = data.find(x => x.id == btn.dataset.id);
+      if (!h || !h.old_data) return;
+      if (!confirm(`${h.table_name} の「${h.row_key}」を この変更前の状態 に戻します。よろしいですか？`)) return;
+      await restoreChange(h);
+    });
+  });
+}
+
+function computeDiff(oldData, newData) {
+  if (!oldData || !newData) return [];
+  const diff = [];
+  const keys = new Set([...Object.keys(oldData), ...Object.keys(newData)]);
+  keys.forEach(k => {
+    if (k === 'updated_at' || k === 'created_at') return;
+    const o = oldData[k]; const n = newData[k];
+    if (JSON.stringify(o) !== JSON.stringify(n)) {
+      diff.push({ field: k, old: String(o == null ? '' : o), new: String(n == null ? '' : n) });
+    }
+  });
+  return diff;
+}
+
+function openChangeDetailModal(h) {
+  document.getElementById('ch-detail-title').textContent = `${h.table_name} / ${h.row_key} — ${h.operation}`;
+  const body = document.getElementById('ch-detail-body');
+  const diff = computeDiff(h.old_data, h.new_data);
+  body.innerHTML = `
+    <div style="font-size:11px;color:var(--text-sub);margin-bottom:12px">${(h.changed_at||'').substring(0,19).replace('T',' ')}</div>
+    ${diff.length ? `<table class="data-table" style="font-size:12px"><thead><tr><th>フィールド</th><th style="color:#c00">変更前</th><th style="color:#0a0">変更後</th></tr></thead><tbody>
+      ${diff.map(d => `<tr><td style="text-align:left;font-weight:600">${d.field}</td><td style="color:#c00;background:#fee2e2">${esc(d.old)||'(空)'}</td><td style="color:#0a0;background:#dcfce7">${esc(d.new)||'(空)'}</td></tr>`).join('')}
+    </tbody></table>` : '<p>変更なし</p>'}
+    <details style="margin-top:12px"><summary style="cursor:pointer;font-size:11px">生データ (JSON)</summary>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
+        <div><div style="font-size:11px;color:#c00;font-weight:600">OLD</div><pre style="font-size:10px;background:#fee2e2;padding:8px;border-radius:4px;overflow:auto;max-height:300px">${esc(JSON.stringify(h.old_data, null, 2) || '(なし)')}</pre></div>
+        <div><div style="font-size:11px;color:#0a0;font-weight:600">NEW</div><pre style="font-size:10px;background:#dcfce7;padding:8px;border-radius:4px;overflow:auto;max-height:300px">${esc(JSON.stringify(h.new_data, null, 2) || '(なし)')}</pre></div>
+      </div>
+    </details>
+    ${h.old_data ? `<div style="margin-top:14px"><button class="btn btn-dark" id="ch-detail-restore" style="background:#f59e0b;border-color:#f59e0b">↺ この変更前の状態に復元</button></div>` : ''}
+  `;
+  const rb = document.getElementById('ch-detail-restore');
+  if (rb) rb.addEventListener('click', async () => {
+    if (!confirm('この変更前の状態に戻します。よろしいですか？')) return;
+    await restoreChange(h);
+    document.getElementById('ch-detail-modal').hidden = true;
+  });
+  document.getElementById('ch-detail-modal').hidden = false;
+}
+
+async function restoreChange(h) {
+  if (!h.old_data) { showToast('復元元データなし', true); return; }
+  const restoreData = { ...h.old_data };
+  // updated_at / id は除外してupsert
+  delete restoreData.updated_at;
+  const table = h.table_name;
+  try {
+    let conflictKey = 'id';
+    if (table === 'booking_status' || table === 'manual_bookings') conflictKey = 'name,apply_date';
+    const { error } = await sb.from(table).upsert(restoreData, { onConflict: conflictKey });
+    if (error) throw error;
+    showToast('復元しました。次回リロード/更新で反映');
+    renderChangeLog();
+  } catch(e) {
+    showToast('復元エラー: ' + e.message, true);
+  }
+}
+
+function exportChangeLogCsv() {
+  const tbody = document.getElementById('ch-tbody');
+  const rows = tbody.querySelectorAll('tr');
+  // change_log データをCSV化
+  sb.from('change_log').select('*').order('changed_at', { ascending: false }).limit(2000).then(({ data }) => {
+    if (!data || !data.length) { showToast('データなし', true); return; }
+    const csvRows = [['id','changed_at','table_name','row_key','operation','old_data','new_data']];
+    data.forEach(h => {
+      csvRows.push([h.id, h.changed_at, h.table_name, h.row_key, h.operation, JSON.stringify(h.old_data||{}), JSON.stringify(h.new_data||{})]);
+    });
+    const csv = csvRows.map(row => row.map(c => '"' + String(c||'').replace(/"/g,'""') + '"').join(',')).join('\r\n');
+    const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `change_log_${new Date().toISOString().substring(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  });
 }
 
 // === プロモ別インセ率 ===
