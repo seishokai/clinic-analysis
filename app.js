@@ -4854,28 +4854,31 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     }
   });
   drawKaiinRows(treatment, rows, el);
-  // フィルターイベント
-  el.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-filter-tool')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-filter-promo')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-filter-csfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-filter-setfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-filter-consult')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-filter-status')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  el.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  // フィルターイベント (topbar は page-header に移動済み → 親 sub-kaiin-* から取る)
+  const filterScope = el.closest('[id^="sub-kaiin-"]') || el;
+  filterScope.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-tool')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-promo')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-csfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-setfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-consult')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-status')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
 }
 
 function drawKaiinRows(treatment, rows, container) {
-  const fac = container.querySelector('.kaiin-filter-fac')?.value || '';
-  const q = (container.querySelector('.kaiin-filter-search')?.value || '').trim().toLowerCase();
-  const toolF = container.querySelector('.kaiin-filter-tool')?.value || '';
-  const promoF = container.querySelector('.kaiin-filter-promo')?.value || '';
-  const csFacF = container.querySelector('.kaiin-filter-csfac')?.value || '';
-  const setFacF = container.querySelector('.kaiin-filter-setfac')?.value || '';
-  const consultF = container.querySelector('.kaiin-filter-consult')?.value || '';
-  const stF = container.querySelector('.kaiin-filter-status')?.value || '';
-  const sortBy = container.querySelector('.kaiin-sort')?.value || 'date-desc';
+  // フィルター群は page-header 側に移動しているため、親 sub-kaiin-* から取得
+  const scope = container.closest('[id^="sub-kaiin-"]') || container;
+  const fac = scope.querySelector('.kaiin-filter-fac')?.value || '';
+  const q = (scope.querySelector('.kaiin-filter-search')?.value || '').trim().toLowerCase();
+  const toolF = scope.querySelector('.kaiin-filter-tool')?.value || '';
+  const promoF = scope.querySelector('.kaiin-filter-promo')?.value || '';
+  const csFacF = scope.querySelector('.kaiin-filter-csfac')?.value || '';
+  const setFacF = scope.querySelector('.kaiin-filter-setfac')?.value || '';
+  const consultF = scope.querySelector('.kaiin-filter-consult')?.value || '';
+  const stF = scope.querySelector('.kaiin-filter-status')?.value || '';
+  const sortBy = scope.querySelector('.kaiin-sort')?.value || 'date-desc';
   const statuses = getStatusesForTreatment(treatment);
   let filtered = rows.slice();
   if (fac) filtered = filtered.filter(d => normFac(d.facility) === fac);
