@@ -4728,6 +4728,20 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="名前検索" style="width:140px;padding:6px 8px;font-size:12px">
         <select class="form-select kaiin-filter-tool" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">ツール:全て</option><option>DXHUB</option><option>セレクト</option><option>手動</option></select>
         <select class="form-select kaiin-filter-promo" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">プロモ:全て</option></select>
+        <select class="form-select kaiin-filter-status" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto">
+          <option value="exclude-cancel" selected>キャンセル除外</option>
+          <option value="">全て表示</option>
+          <option value="exclude-cancel-unset">キャンセル・未設定除外</option>
+          <option value="active">対応中のみ (検討中/成約~セット待ち)</option>
+          <option value="done">完了のみ (セット完了)</option>
+          ${statuses.map(s => `<option value="only:${s.value}">${s.value}のみ</option>`).join('')}
+        </select>
+        <select class="form-select kaiin-sort" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto">
+          <option value="date-desc" selected>来院日(新→古)</option>
+          <option value="date-asc">来院日(古→新)</option>
+          <option value="status">ステータス順</option>
+          <option value="name">名前順</option>
+        </select>
       </div>
     </div>
     <div class="kaiin-expand-wrap" style="display:none;margin:4px 0 8px"><button class="kaiin-expand-btn" style="padding:4px 12px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer">▼ ヘッダーを表示</button></div>
@@ -4755,16 +4769,21 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const promoSel = el.querySelector('.kaiin-filter-promo');
   if (promoSel) promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.map(p => `<option>${p}</option>`).join('');
 
-  // 折りたたみ
+  // 折りたたみ (SEISHOKAIヘッダー+治療別タブも含めて非表示)
   el.querySelector('.kaiin-collapse-btn')?.addEventListener('click', () => {
     el.querySelector('.kaiin-header-wrap').style.display = 'none';
     el.querySelector('.kaiin-expand-wrap').style.display = 'block';
-    const w = el.querySelector('.kaiin-table-wrap'); if (w) w.style.maxHeight = 'calc(100vh - 150px)';
+    const w = el.querySelector('.kaiin-table-wrap'); if (w) w.style.maxHeight = 'calc(100vh - 80px)';
+    // トップヘッダー+治療別サブナビも隠す
+    const hdr = document.querySelector('.header'); if (hdr) hdr.style.display = 'none';
+    const subNav = document.getElementById('kaiin-sub-nav'); if (subNav) subNav.style.display = 'none';
   });
   el.querySelector('.kaiin-expand-btn')?.addEventListener('click', () => {
     el.querySelector('.kaiin-header-wrap').style.display = '';
     el.querySelector('.kaiin-expand-wrap').style.display = 'none';
     const w = el.querySelector('.kaiin-table-wrap'); if (w) w.style.maxHeight = 'calc(100vh - 320px)';
+    const hdr = document.querySelector('.header'); if (hdr) hdr.style.display = '';
+    const subNav = document.getElementById('kaiin-sub-nav'); if (subNav) subNav.style.display = '';
   });
   drawKaiinRows(treatment, rows, el);
   // フィルターイベント
@@ -4772,6 +4791,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   el.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
   el.querySelector('.kaiin-filter-tool')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   el.querySelector('.kaiin-filter-promo')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-filter-status')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
 }
 
 function drawKaiinRows(treatment, rows, container) {
@@ -4779,13 +4800,27 @@ function drawKaiinRows(treatment, rows, container) {
   const q = (container.querySelector('.kaiin-filter-search')?.value || '').trim().toLowerCase();
   const toolF = container.querySelector('.kaiin-filter-tool')?.value || '';
   const promoF = container.querySelector('.kaiin-filter-promo')?.value || '';
+  const stF = container.querySelector('.kaiin-filter-status')?.value || '';
+  const sortBy = container.querySelector('.kaiin-sort')?.value || 'date-desc';
+  const statuses = getStatusesForTreatment(treatment);
   let filtered = rows.slice();
   if (fac) filtered = filtered.filter(d => normFac(d.facility) === fac);
   if (q) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(q));
   if (toolF) filtered = filtered.filter(d => d.tool === toolF);
   if (promoF) filtered = filtered.filter(d => d.source === promoF);
-  filtered.sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
-  const statuses = getStatusesForTreatment(treatment);
+  // ステータスフィルター
+  const getSt = (d) => (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
+  if (stF === 'exclude-cancel') filtered = filtered.filter(d => getSt(d) !== 'キャンセル');
+  else if (stF === 'exclude-cancel-unset') filtered = filtered.filter(d => { const s = getSt(d); return s && s !== 'キャンセル'; });
+  else if (stF === 'active') filtered = filtered.filter(d => { const s = getSt(d); return s && !['キャンセル','離脱','セット完了','完了'].includes(s); });
+  else if (stF === 'done') filtered = filtered.filter(d => ['セット完了','完了'].includes(getSt(d)));
+  else if (stF && stF.startsWith('only:')) { const only = stF.slice(5); filtered = filtered.filter(d => getSt(d) === only); }
+  // ソート
+  const statusOrder = (s) => { const i = statuses.findIndex(x => x.value === s); return i < 0 ? 999 : i; };
+  if (sortBy === 'date-asc') filtered.sort((a,b) => (a.applyDate||'').localeCompare(b.applyDate||''));
+  else if (sortBy === 'status') filtered.sort((a,b) => statusOrder(getSt(a)) - statusOrder(getSt(b)) || (b.applyDate||'').localeCompare(a.applyDate||''));
+  else if (sortBy === 'name') filtered.sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
+  else filtered.sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
   const esc = s => String(s||'').replace(/"/g,'&quot;');
   container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
