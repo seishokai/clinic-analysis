@@ -4754,7 +4754,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
             <th style="width:55px">来院</th>
             <th style="text-align:left;width:110px">名前</th>
             <th style="width:90px">ツール/プロモ</th>
-            <th style="width:70px">医院</th>
+            <th style="width:85px">CS医院</th>
+            <th style="width:75px">セット医院</th>
             <th style="width:75px">相談</th>
             <th style="width:130px">ステータス</th>
             <th style="width:85px">売上</th>
@@ -4854,11 +4855,20 @@ function drawKaiinRows(treatment, rows, container) {
     const nextDateStyle = nextDate ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600' : 'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e';
     // 丸いステータスバッジ
     const stRound = st ? `border-radius:20px;background:${stColor}22;color:${stColor};border:1.5px solid ${stColor};font-weight:700;padding:4px 10px` : 'border-radius:20px;padding:4px 10px';
+    // CS医院 (複数選択可)
+    const csFac = info.bf_cs_facility || normFac(d.facility) || '';
+    const csFacList = parseCsFac(csFac);
+    const csFacDisplay = csFacList.length ? csFacList.join(', ') : '<span style="color:var(--text-muted)">未選択</span>';
+    // セット医院
+    const setFac = info.bf_set_facility || '';
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
       <td style="text-align:left">${promoBadge}</td>
-      <td>${normFac(d.facility)||'-'}</td>
+      <td><button type="button" class="kaiin-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:3px 6px;width:100%;text-align:center;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer">${csFacDisplay}</button></td>
+      <td><select class="kaiin-setfac-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
+        ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''}>${f}</option>`).join('')}
+      </select></td>
       <td style="font-size:10px">${(() => {
         const s = d.service || '';
         if (/ラミネート|ブラックフィルム|BF/i.test(s)) return 'BF相談';
@@ -4881,7 +4891,7 @@ function drawKaiinRows(treatment, rows, container) {
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>22?memo.substring(0,22)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="date" class="kaiin-next-date" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${nextDate}" style="font-size:10px;padding:2px 3px;width:100%;box-sizing:border-box;border-radius:4px;${nextDateStyle}"></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="8" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+  }).join('') || '<tr><td colspan="11" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
 
   // 次回予定日の保存
   container.querySelectorAll('.kaiin-next-date').forEach(inp => {
@@ -4890,6 +4900,37 @@ function drawKaiinRows(treatment, rows, container) {
       if (ok) {
         inp.style.borderColor = '#0a0';
         setTimeout(() => drawKaiinRows(treatment, rows, container), 300);
+      }
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
+  });
+
+  // CS医院 (複数選択モーダル再利用)
+  container.querySelectorAll('.kaiin-csfac-btn').forEach(btn => {
+    btn.addEventListener('click', () => openBFCsFacModal(btn.dataset.name, btn.dataset.apply, rows));
+  });
+
+  // セット医院の保存
+  container.querySelectorAll('.kaiin-setfac-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const ok = await saveBFLifecycleField(sel.dataset.name, sel.dataset.apply, 'bf_set_facility', sel.value || null);
+      if (ok) {
+        sel.style.borderColor = '#0a0';
+        setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+      }
+    });
+  });
+
+  // 売上/交通費の保存
+  container.querySelectorAll('.kaiin-money').forEach(inp => {
+    inp.addEventListener('focus', () => { inp.value = inp.value.replace(/,/g,''); });
+    inp.addEventListener('blur', () => { const n = Number(inp.value.replace(/,/g,'')); inp.value = n ? n.toLocaleString() : ''; });
+    inp.addEventListener('change', async () => {
+      const n = Number(inp.value.replace(/,/g,'')) || 0;
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, inp.dataset.field, n);
+      if (ok) {
+        inp.style.borderColor = '#0a0';
+        setTimeout(() => { inp.style.borderColor = ''; }, 1000);
       }
     });
     inp.addEventListener('click', e => e.stopPropagation());
