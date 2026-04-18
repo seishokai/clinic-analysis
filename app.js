@@ -4772,9 +4772,9 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
             <th style="width:85px">CS医院</th>
             <th style="width:85px">相談</th>
             <th style="width:130px">ステータス</th>
-            <th style="width:75px">セット医院</th>
+            ${treatment === 'BF' ? '<th style="width:75px">セット医院</th>' : ''}
             <th style="width:85px">売上</th>
-            <th style="width:70px">交通費</th>
+            ${treatment === 'BF' ? '<th style="width:70px">交通費</th>' : ''}
             <th>メモ</th>
             <th style="width:55px">次回予定</th>
           </tr></thead>
@@ -4934,8 +4934,8 @@ function drawKaiinRows(treatment, rows, container) {
       // 手動 = 値があれば青バッジ風、なければ点線で入力促す
       promoBadge = `<input type="text" class="kaiin-promo-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.source||'')}" placeholder="プロモ入力" title="手動登録: 編集可 (クリックで入力)" style="width:100%;padding:3px 8px;font-size:10px;border:1px dashed ${d.source?'#0369a1':'#cbd5e1'};border-radius:12px;box-sizing:border-box;background:${d.source?'#e0f2fe':'#fff'};color:${d.source?'#0369a1':'#94a3b8'};font-weight:${d.source?'600':'400'};text-align:center">`;
     } else if (d.tool === 'セレクト') {
-      const lbl = d.source || 'セレクトタイプ';
-      promoBadge = `<span title="セレクトタイプ予約 (変更不可)" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#b45309;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #fde68a">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
+      const lbl = d.source || 'ｾﾚｸﾄﾀｲﾌﾟ';
+      promoBadge = `<span title="セレクトタイプ予約 (変更不可)" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#b45309;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #fde68a;white-space:nowrap">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
     } else if (d.source) {
       promoBadge = `<span title="DXHUB予約 (自動取得・変更不可)" style="display:inline-block;padding:3px 8px;background:#e0f2fe;color:#0369a1;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #bae6fd">${d.source.length>14?d.source.slice(0,14)+'…':d.source}</span>`;
     } else {
@@ -4991,15 +4991,15 @@ function drawKaiinRows(treatment, rows, container) {
         <option value="">未設定</option>
         ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
-      <td><select class="kaiin-setfac-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
+      ${treatment === 'BF' ? `<td><select class="kaiin-setfac-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%">
         ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''}>${f}</option>`).join('')}
-      </select></td>
+      </select></td>` : ''}
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
-      <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
+      ${treatment === 'BF' ? `<td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>` : ''}
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>22?memo.substring(0,22)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
       <td><input type="text" class="kaiin-next-date-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${nextDate}" value="${nextDate?nextDate.substring(5).replace('-','/'):''}" placeholder="M/D" maxlength="5" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;${nextDateStyle}"></td>
     </tr>`;
-  }).join('') || '<tr><td colspan="11" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+  }).join('') || `<tr><td colspan="${treatment==='BF'?11:9}" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>`;
 
   // 次回予定日 MM/DD 入力 → ISO に変換して保存
   container.querySelectorAll('.kaiin-next-date-mmdd').forEach(inp => {
