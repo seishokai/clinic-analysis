@@ -3631,8 +3631,7 @@ function drawBFLifecycleTable(bfRows) {
   }
   if (ffac) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_facility === ffac);
   if (fdr) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_doctor === fdr);
-  if (fnext === 'fixed') filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_next_fixed);
-  if (fnext === 'unfixed') filtered = filtered.filter(d => { const v = bfLifecycleCache[d.name+'|'+d.applyDate]; return v?.bf_next_date && !v?.bf_next_fixed; });
+  if (fnext === 'fixed') filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_next_date);
   if (fnext === 'none') filtered = filtered.filter(d => !bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_next_date);
   if (fs) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(fs));
 
@@ -3680,8 +3679,7 @@ function drawBFLifecycleTable(bfRows) {
         <option value="">未設定</option>
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
-      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:2px 4px;width:100%;box-sizing:border-box"></td>
-      <td><button class="bf-lc-fixed-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;border-radius:10px;border:1px solid ${info.bf_next_fixed?'#0a0':'#f90'};background:${info.bf_next_fixed?'#dcfce7':'#fef3c7'};color:${info.bf_next_fixed?'#0a0':'#b45309'};cursor:pointer;font-weight:600;white-space:nowrap">${info.bf_next_fixed?'🟢確定':'🟡未定'}</button></td>
+      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px;width:100%">${FACS.map(f => `<option ${csFac===f?'selected':''}>${f}</option>`).join('')}</select></td>
       <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
       <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
@@ -3705,15 +3703,9 @@ function drawBFLifecycleTable(bfRows) {
       }
     });
   });
-  // 確定バッジ
-  tbody.querySelectorAll('.bf-lc-fixed-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const name = btn.dataset.name; const apply = btn.dataset.apply;
-      const key = name + '|' + apply;
-      const cur = bfLifecycleCache[key]?.bf_next_fixed || false;
-      const ok = await saveBFLifecycleField(name, apply, 'bf_next_fixed', !cur);
-      if (ok) renderBFLifecycle();
-    });
+  // 次回予定日変更時に即再描画（色更新）
+  tbody.querySelectorAll('input[data-field="bf_next_date"]').forEach(inp => {
+    inp.addEventListener('change', () => { setTimeout(() => drawBFLifecycleTable(bfRows), 200); });
   });
   // 履歴モーダル
   tbody.querySelectorAll('.bf-lc-hist-btn').forEach(btn => {
