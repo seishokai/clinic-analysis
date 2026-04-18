@@ -2610,6 +2610,9 @@ async function loadBookings() {
       }
     } catch(e) { console.warn('promo rate auto-calc skipped', e); }
 
+    // BF相談のbf_status表示のためBFキャッシュもロード
+    try { await loadBFLifecycleData(); } catch(_){}
+
     populateBookingFilters();
     renderBookings();
     renderAnalysis();
@@ -2967,14 +2970,23 @@ function renderBookings() {
     <td style="font-size:10px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
     <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? (d.email || '-') : '***'}</td>
     <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${d.source || '-'}</td>
-    <td style="text-align:center">${isAdmin ? `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
+    <td style="text-align:center">${isAdmin ? (isBFBooking(d) ? (() => {
+      const info = getBFInfo(d.name, d.applyDate) || {};
+      const curBf = info.bf_status || '';
+      const bfColor = BF_STATUSES.find(s => s.value === curBf)?.color || '';
+      const bfStyle = curBf ? `background:${bfColor}22;color:${bfColor};border-color:${bfColor};font-weight:600` : '';
+      return `<select class="form-select bk-bfstatus-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:110px;text-align:center;${bfStyle}">
+        <option value="">${d.status==='未対応'?'未対応':(d.status==='確認済'?'確認済':(d.status==='キャンセル'?'キャンセル':'未設定'))}</option>
+        ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${s.value}</option>`).join('')}
+      </select>`;
+    })() : `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
       <option ${d.status==='成約'?'selected':''}>成約</option>
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
       <option ${d.status==='除外'?'selected':''}>除外</option>
-    </select>` : statusBadge(d.status)}</td>
+    </select>`) : statusBadge(isBFBooking(d) ? (getBFInfo(d.name, d.applyDate)?.bf_status || d.status) : d.status)}</td>
     <td style="font-size:10px;max-width:50px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer" class="bk-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(d._memo||'').replace(/"/g,'&quot;')}">${isAdmin ? (d._memo ? d._memo.slice(0,6) + (d._memo.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>') : (d._memo || '-')}</td>
     <td style="text-align:center">${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px;text-align:center;${d.contractService?'background:#dcfce7;color:#15803d':(d.status==='成約'?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':'')}">
       <option value="">-</option>
@@ -3054,6 +3066,23 @@ function renderBookings() {
         })();
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
         renderBookings();
+      });
+    });
+
+    // BF相談用: BFステータスドロップダウン
+    tbody.querySelectorAll('.bk-bfstatus-select').forEach(sel => {
+      sel.addEventListener('change', async (e) => {
+        const name = sel.dataset.name;
+        const applyDate = sel.dataset.apply;
+        const newBFStatus = sel.value;
+        if (!newBFStatus) return; // 未設定行は何もしない
+        // saveBFLifecycleField経由で bf_status 保存 + 状態への自動連動も発動
+        const ok = await saveBFLifecycleField(name, applyDate, 'bf_status', newBFStatus);
+        if (ok) {
+          sel.style.borderColor = '#0a0';
+          setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+          renderBookings();
+        }
       });
     });
 
