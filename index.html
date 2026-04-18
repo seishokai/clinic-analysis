@@ -329,6 +329,7 @@
       </div>
       <nav class="desktop-nav">
         <button class="nav-btn active" data-view="bookings">予約</button>
+        <button class="nav-btn" data-view="kaiin">来院</button>
         <button class="nav-btn" data-view="tc">TC</button>
         <button class="nav-btn" data-view="sales">売上</button>
         <button class="nav-btn" data-view="adbudget">広告</button>
@@ -747,6 +748,32 @@
       </div>
     </main>
 
+    <!-- ==================== 来院 ==================== -->
+    <main id="view-kaiin" class="view view-wide" hidden>
+      <div class="sub-nav" id="kaiin-sub-nav">
+        <button class="sub-nav-btn active" data-sub="kaiin-bf">BF</button>
+        <button class="sub-nav-btn" data-sub="kaiin-kyosei">矯正</button>
+        <button class="sub-nav-btn" data-sub="kaiin-implant">インプラント</button>
+        <button class="sub-nav-btn" data-sub="kaiin-labrie">ラブリエ</button>
+        <button class="sub-nav-btn" data-sub="kaiin-hotetsu">自費補綴</button>
+        <button class="sub-nav-btn" data-sub="kaiin-konchi">自費根治</button>
+        <button class="sub-nav-btn" data-sub="kaiin-whitening">ホワイトニング</button>
+        <button class="sub-nav-btn" data-sub="kaiin-lipart">リップアート</button>
+        <button class="sub-nav-btn" data-sub="kaiin-jewelry">ティースジュエリー</button>
+        <button class="sub-nav-btn" data-sub="kaiin-other">その他</button>
+      </div>
+      <div id="sub-kaiin-bf"><div class="page-header"><h2>BF 来院管理</h2></div><div id="kaiin-bf-content"><p style="color:var(--text-muted);padding:20px">BF進捗（移植中...）</p></div></div>
+      <div id="sub-kaiin-kyosei" hidden><div class="page-header"><h2>矯正 来院管理</h2></div><div id="kaiin-kyosei-content"></div></div>
+      <div id="sub-kaiin-implant" hidden><div class="page-header"><h2>インプラント 来院管理</h2></div><div id="kaiin-implant-content"></div></div>
+      <div id="sub-kaiin-labrie" hidden><div class="page-header"><h2>ラブリエ 来院管理</h2></div><div id="kaiin-labrie-content"></div></div>
+      <div id="sub-kaiin-hotetsu" hidden><div class="page-header"><h2>自費補綴 来院管理</h2></div><div id="kaiin-hotetsu-content"></div></div>
+      <div id="sub-kaiin-konchi" hidden><div class="page-header"><h2>自費根治 来院管理</h2></div><div id="kaiin-konchi-content"></div></div>
+      <div id="sub-kaiin-whitening" hidden><div class="page-header"><h2>ホワイトニング 来院管理</h2></div><div id="kaiin-whitening-content"></div></div>
+      <div id="sub-kaiin-lipart" hidden><div class="page-header"><h2>リップアート 来院管理</h2></div><div id="kaiin-lipart-content"></div></div>
+      <div id="sub-kaiin-jewelry" hidden><div class="page-header"><h2>ティースジュエリー 来院管理</h2></div><div id="kaiin-jewelry-content"></div></div>
+      <div id="sub-kaiin-other" hidden><div class="page-header"><h2>その他 来院管理</h2></div><div id="kaiin-other-content"></div></div>
+    </main>
+
     <!-- ==================== TC ==================== -->
     <main id="view-tc" class="view" hidden>
       <div class="sub-nav">
@@ -1013,7 +1040,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=182"></script>
+  <script src="app.js?v=183"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

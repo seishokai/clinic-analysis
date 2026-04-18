@@ -626,6 +626,12 @@ function setupEventListeners() {
       if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
       if (sub === 'recordings') renderRecordings();
       if (sub === 'adm-history') { renderChangeLog(); renderBackupsList(); }
+      // 来院タブのサブ
+      if (sub && sub.startsWith('kaiin-')) {
+        const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
+        const t = map[sub];
+        if (t) renderKaiinTab(t, sub.replace('kaiin-','kaiin-') + '-content');
+      }
     });
   });
 
@@ -1533,10 +1539,16 @@ function switchView(view) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
   window.scrollTo(0, 0);
-  const titles = {tc:'TC',sales:'売上',bookings:'予約',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
+  const titles = {tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
-  // 現在のビューを記憶（リロード時に復元）
   try { sessionStorage.setItem('lastView', view); } catch(_){}
+  // 来院タブ切替時にアクティブなサブの再描画
+  if (view === 'kaiin') {
+    const activeSub = document.querySelector('#kaiin-sub-nav .sub-nav-btn.active')?.dataset.sub || 'kaiin-bf';
+    const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
+    const t = map[activeSub];
+    if (t) setTimeout(() => renderKaiinTab(t, activeSub + '-content'), 50);
+  }
 }
 
 // === Facility Tabs ===
@@ -4584,6 +4596,198 @@ function dedupBFRows(rows) {
 function isBFBooking(d) {
   const svc = (d?.service || '').toLowerCase();
   return svc.includes('bf') || svc.includes('ブラック');
+}
+
+// === 治療カテゴリー判定 (来院タブ用) ===
+// 優先順位: BFステータス(転向) > 成約施術 > 相談内容
+function getTreatmentCategory(d) {
+  if (!d) return 'その他';
+  const info = getBFInfo(d.name, d.applyDate) || {};
+  const bfSt = info.bf_status || '';
+  // BF→他治療へ確定したケース
+  if (bfSt === '矯正決定(BF保留)') return '矯正';
+  if (bfSt === 'ラブリエ決定(BF保留)') return 'ラブリエ';
+  if (bfSt === 'インプラント決定(BF保留)') return 'インプラント';
+  // BF系ステータスが設定されているならBF
+  if (bfSt && !['キャンセル(未来院)', '離脱'].includes(bfSt)) return 'BF';
+  const cs = (d.contractService || '').toLowerCase();
+  const sv = (d.service || '').toLowerCase();
+  const both = cs + ' ' + sv;
+  // 成約→相談の順で判定 (より確定度の高い方優先)
+  if (/bf|ブラック/i.test(both)) return 'BF';
+  if (/矯正|インビザ|ワイヤー|ﾋﾟｰｽ|マウスピース/i.test(both)) return '矯正';
+  if (/インプラント|ｲﾝﾌﾟﾗﾝﾄ/i.test(both)) return 'インプラント';
+  if (/ラブリエ|ﾗﾌﾞﾘｴ/i.test(both)) return 'ラブリエ';
+  if (/セラミック|補綴|クラウン|ベニア/i.test(both)) return '自費補綴';
+  if (/根治|根管|endo/i.test(both)) return '自費根治';
+  if (/ホワイトニング|ホワイト/i.test(both)) return 'ホワイトニング';
+  if (/リップ/i.test(both)) return 'リップアート';
+  if (/ジュエリー/i.test(both)) return 'ティースジュエリー';
+  return 'その他';
+}
+
+// 治療別のステータス選択肢
+const TREATMENT_STATUSES = {
+  'BF': BF_STATUSES, // 既存15段階
+  '矯正': [
+    { value: '検討中', color: '#f59e0b' },
+    { value: '成約', color: '#10b981' },
+    { value: '光学印象', color: '#3b82f6' },
+    { value: '治療中', color: '#1d4ed8' },
+    { value: '保定', color: '#0891b2' },
+    { value: '完了', color: '#059669' },
+    { value: 'キャンセル', color: '#dc2626' }
+  ],
+  'インプラント': [
+    { value: '検討中', color: '#f59e0b' },
+    { value: '成約', color: '#10b981' },
+    { value: 'CT/診断', color: '#3b82f6' },
+    { value: '手術予定', color: '#2563eb' },
+    { value: '治癒期間', color: '#1d4ed8' },
+    { value: '印象', color: '#0891b2' },
+    { value: 'セット', color: '#0e7490' },
+    { value: '完了', color: '#059669' },
+    { value: 'キャンセル', color: '#dc2626' }
+  ],
+  'デフォルト': [
+    { value: '検討中', color: '#f59e0b' },
+    { value: '成約', color: '#10b981' },
+    { value: '治療中', color: '#1d4ed8' },
+    { value: '完了', color: '#059669' },
+    { value: 'キャンセル', color: '#dc2626' }
+  ]
+};
+function getStatusesForTreatment(treatment) {
+  return TREATMENT_STATUSES[treatment] || TREATMENT_STATUSES['デフォルト'];
+}
+
+// 来院タブの共通レンダラー (治療種別で絞り込み)
+async function renderKaiinTab(treatment, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+
+  // BFだけは既存の詳細機能を使う
+  if (treatment === 'BF') {
+    // BFのセット進捗をこのタブ内に描画
+    await loadBFLifecycleData();
+    const bfRowsRaw = (bookingsData || []).filter(d => {
+      if (getTreatmentCategory(d) !== 'BF') return false;
+      if (d.status === '除外') return false;
+      const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+      const bd = parseDate(d.bookDate);
+      if (bd && bd > todayEnd) return false;
+      return true;
+    });
+    const bfRows = dedupBFRows(bfRowsRaw);
+    await loadBFHistory(bfRows.map(r => r.name));
+    // 簡易版 (フル機能は 予約>BFセット進捗 で)
+    renderKaiinSimpleList(treatment, bfRows, containerId);
+    return;
+  }
+
+  // 他の治療
+  const rows = (bookingsData || []).filter(d => {
+    if (getTreatmentCategory(d) !== treatment) return false;
+    if (d.status === '除外') return false;
+    const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+    const bd = parseDate(d.bookDate);
+    if (bd && bd > todayEnd) return false;
+    return true;
+  });
+  renderKaiinSimpleList(treatment, rows, containerId);
+}
+
+function renderKaiinSimpleList(treatment, rows, containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const statuses = getStatusesForTreatment(treatment);
+  // カウント
+  const byStatus = {};
+  statuses.forEach(s => byStatus[s.value] = 0);
+  let noSt = 0;
+  rows.forEach(d => {
+    const info = getBFInfo(d.name, d.applyDate) || {};
+    const st = info.bf_status;
+    if (st && byStatus[st] !== undefined) byStatus[st]++;
+    else noSt++;
+  });
+
+  const facs = ['全て','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
+  const FACS_OPTS = ['','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
+
+  el.innerHTML = `
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto">
+      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700">${rows.length}</span></div>
+      <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700">${noSt}</span></div>
+      ${statuses.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}">${byStatus[s.value]}</span></div>`).join('')}
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
+      <select class="form-select kaiin-filter-fac" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">医院:全て</option>${FACS_OPTS.slice(1).map(f => `<option>${f}</option>`).join('')}</select>
+      <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="名前検索" style="width:140px;padding:6px 8px;font-size:12px">
+    </div>
+    <div class="card" style="padding:6px">
+      <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">一覧 <span class="kaiin-count">${rows.length}件</span></div>
+      <div class="data-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
+        <table class="data-table compact">
+          <thead><tr>
+            <th style="width:60px">来院</th>
+            <th style="text-align:left;width:120px">名前</th>
+            <th style="width:80px">医院</th>
+            <th style="width:90px">相談</th>
+            <th style="width:120px">ステータス</th>
+            <th>メモ</th>
+          </tr></thead>
+          <tbody class="kaiin-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  drawKaiinRows(treatment, rows, el);
+  // フィルターイベント
+  el.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
+}
+
+function drawKaiinRows(treatment, rows, container) {
+  const fac = container.querySelector('.kaiin-filter-fac')?.value || '';
+  const q = (container.querySelector('.kaiin-filter-search')?.value || '').trim().toLowerCase();
+  let filtered = rows.slice();
+  if (fac) filtered = filtered.filter(d => normFac(d.facility) === fac);
+  if (q) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(q));
+  filtered.sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
+  const statuses = getStatusesForTreatment(treatment);
+  container.querySelector('.kaiin-count').textContent = filtered.length + '件';
+  const esc = s => String(s||'').replace(/"/g,'&quot;');
+  container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
+    const info = getBFInfo(d.name, d.applyDate) || {};
+    const st = info.bf_status || '';
+    const stColor = statuses.find(s => s.value === st)?.color || '';
+    const stStyle = st ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700` : '';
+    const memo = d._memo || findAnyMemo(d.name);
+    return `<tr>
+      <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
+      <td style="font-weight:500;text-align:left">${d.name}</td>
+      <td>${normFac(d.facility)||'-'}</td>
+      <td style="font-size:10px">${d.service || '-'}</td>
+      <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;${stStyle}">
+        <option value="">未設定</option>
+        ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
+      </select></td>
+      <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>30?memo.substring(0,30)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
+    </tr>`;
+  }).join('') || '<tr><td colspan="6" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>';
+
+  // ステータス変更: 統一してsaveBFLifecycleField経由で保存 (bf_statusを再利用)
+  container.querySelectorAll('.kaiin-status-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const ok = await saveBFLifecycleField(sel.dataset.name, sel.dataset.apply, 'bf_status', sel.value || null);
+      if (ok) { sel.style.borderColor = '#0a0'; setTimeout(() => { sel.style.borderColor = ''; }, 1000); drawKaiinRows(treatment, rows, container); }
+    });
+  });
+  // メモセル → 予約一覧のメモモーダルを再利用
+  container.querySelectorAll('.kaiin-memo-cell').forEach(td => {
+    td.addEventListener('click', () => openMemoModal(td.dataset.name, td.dataset.apply, td));
+  });
 }
 
 // CS医院(複数可): JSON array文字列 or 単一文字列 を配列に
