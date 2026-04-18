@@ -2456,7 +2456,11 @@ async function loadBookings() {
       const { data: dbStatuses } = await sb.from('booking_status').select('*');
       if (dbStatuses && dbStatuses.length) {
         const statusMap = {};
-        dbStatuses.forEach(s => { statusMap[s.name + '|' + s.apply_date] = s; });
+        dbStatuses.forEach(s => {
+          statusMap[s.name + '|' + s.apply_date] = s;
+          // A2: バージョンキャッシュ
+          if (s.updated_at) setVersion('booking_status', s.name + '|' + s.apply_date, s.updated_at);
+        });
         bookingsData.forEach(d => {
           const key = d.name + '|' + d.applyDate;
           const dbRow = statusMap[key];
@@ -2949,7 +2953,23 @@ function renderBookings() {
             }).then(()=>{});
           }
         }
-        sb.from('booking_status').upsert(upsertData, { onConflict: 'name,apply_date' }).then(({error}) => { if (error) showToast('DB保存失敗: ' + error.message, true); });
+        // A2+A3: 楽観的ロック付き保存 + リトライキュー
+        (async () => {
+          const seen = getVersion('booking_status', key);
+          const { name: _n, apply_date: _a, ...changes } = upsertData;
+          if (seen) {
+            const lockRes = await conditionalUpdate('booking_status', { name, apply_date: applyDate }, seen, changes);
+            if (lockRes.conflict) {
+              showConflictDialog(`${name} は他の人が先に変更しました。最新を読み込みます。`, () => loadBookings());
+              return;
+            }
+            if (!lockRes.ok) {
+              await safeSave({ type:'upsert', table:'booking_status', payload: upsertData, options: { onConflict:'name,apply_date' } });
+            }
+          } else {
+            await safeSave({ type:'upsert', table:'booking_status', payload: upsertData, options: { onConflict:'name,apply_date' } });
+          }
+        })();
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
         renderBookings();
       });
@@ -2966,7 +2986,22 @@ function renderBookings() {
       const dbField = field === 'contractService' ? 'contract_service' : field === 'contractAmount' ? 'contract_amount' : field === 'paymentMonth' ? 'payment_month' : field === 'incentiveAmount' ? 'incentive_amount' : 'incentive_month';
       const update = { name, apply_date: apply };
       update[dbField] = (field === 'contractAmount' || field === 'incentiveAmount') ? Number(String(value).replace(/,/g,'')) || 0 : value;
-      sb.from('booking_status').upsert(update, { onConflict: 'name,apply_date' }).then(() => {});
+      // A2+A3
+      const bkKey = name + '|' + apply;
+      const seen = getVersion('booking_status', bkKey);
+      (async () => {
+        if (seen) {
+          const { name:_n, apply_date:_a, ...changes } = update;
+          const lockRes = await conditionalUpdate('booking_status', { name, apply_date: apply }, seen, changes);
+          if (lockRes.conflict) {
+            showConflictDialog(`${name} は他の人が先に編集しました。最新を読み込みます。`, () => loadBookings());
+            return;
+          }
+          if (!lockRes.ok) await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
+        } else {
+          await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
+        }
+      })();
     };
     // セレクト
     tbody.querySelectorAll('.bk-field-select').forEach(sel => {
@@ -3791,10 +3826,13 @@ let bfHistoryCache = {}; // key: name|applyDate → [events]
 
 async function loadBFLifecycleData() {
   try {
-    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost');
+    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, updated_at');
     bfLifecycleCache = {};
     (data || []).forEach(r => {
-      bfLifecycleCache[r.name + '|' + r.apply_date] = r;
+      const key = r.name + '|' + r.apply_date;
+      bfLifecycleCache[key] = r;
+      // A2: バージョン保存
+      if (r.updated_at) setVersion('booking_status', key, r.updated_at);
     });
   } catch(e) { console.warn('BF lifecycle load', e); }
 }
@@ -3838,9 +3876,30 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     } catch(_){}
   }
 
-  // A3: safeSave でリトライキュー経由
-  const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
-  if (!res.ok) { showToast('⚠ 一時保存に失敗。自動再送信します', true); /* キューに積まれる */ }
+  // A2: 楽観的ロック - 既存行は updated_at チェック付きで更新
+  const seenVersion = getVersion('booking_status', key);
+  if (seenVersion) {
+    // 既存行がある → 条件付き更新
+    const { ...changes } = update;
+    delete changes.name; delete changes.apply_date;
+    const lockRes = await conditionalUpdate('booking_status', { name, apply_date: applyDate }, seenVersion, changes);
+    if (lockRes.conflict) {
+      showConflictDialog(
+        `${name} のデータが他の人によって先に更新されました。最新を読み込んでから編集してください。`,
+        async () => { await loadBFLifecycleData(); renderBFLifecycle(); }
+      );
+      return false;
+    }
+    if (!lockRes.ok) {
+      // ネットワークエラー等 → safeSave でリトライ
+      const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
+      if (!res.ok) showToast('⚠ 一時保存に失敗。自動再送信します', true);
+    }
+  } else {
+    // 新規 → 通常 upsert (safeSaveでリトライ付き)
+    const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
+    if (!res.ok) showToast('⚠ 一時保存に失敗。自動再送信します', true);
+  }
   // キャッシュ更新
   if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
   bfLifecycleCache[key][field] = value;
