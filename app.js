@@ -3353,7 +3353,24 @@ let _memoTarget = null;
 function openMemoModal(name, apply, tdEl) {
   const key = name + '|' + apply;
   const memos = loadData('bk-memos', {});
-  const current = memos[key] || '';
+  // 優先順位: localStorage → bookingsData._memo (booking_status.memo/bf_memo含む) → BFライフサイクルキャッシュ
+  let current = memos[key] || '';
+  if (!current) {
+    const d = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+    if (d && d._memo) current = d._memo;
+  }
+  if (!current) {
+    // ファジー: 正規化名+日付 で BFキャッシュから探す
+    const nn = normName(name);
+    const dateKey = normDateKey(apply);
+    for (const k in bfLifecycleCache) {
+      const info = bfLifecycleCache[k];
+      if (info && normName(info.name) === nn && normDateKey(info.apply_date) === dateKey) {
+        current = info.bf_memo || info.memo || '';
+        if (current) break;
+      }
+    }
+  }
   _memoTarget = { name, apply, key, tdEl };
   document.getElementById('memo-modal-title').textContent = name + ' のメモ';
   document.getElementById('memo-modal-text').value = current;
@@ -4247,9 +4264,13 @@ const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
 async function deleteBFRow(name, applyDate) {
   try {
     // manual_bookings 削除 (手動登録されたもの)
-    await sb.from('manual_bookings').delete().eq('name', name).eq('apply_date', applyDate).catch(()=>{});
+    try {
+      await sb.from('manual_bookings').delete().eq('name', name).eq('apply_date', applyDate);
+    } catch(e) { console.warn('manual_bookings delete skip', e); }
     // booking_status を除外に
-    await sb.from('booking_status').upsert({ name, apply_date: applyDate, status: '除外' }, { onConflict: 'name,apply_date' }).catch(()=>{});
+    try {
+      await sb.from('booking_status').upsert({ name, apply_date: applyDate, status: '除外' }, { onConflict: 'name,apply_date' });
+    } catch(e) { console.warn('booking_status upsert skip', e); }
     // bk-extra にも
     const bkEx = loadData('bk-extra', {});
     const key = name + '|' + applyDate;
@@ -4260,7 +4281,9 @@ async function deleteBFRow(name, applyDate) {
     const idx = bookingsData.findIndex(b => b.name === name && b.applyDate === applyDate);
     if (idx >= 0) bookingsData[idx].status = '除外';
     showToast(name + ' を削除しました');
-    renderBFLifecycle();
+    if (document.getElementById('bf-lifecycle') && !document.getElementById('bf-lifecycle').hidden) {
+      renderBFLifecycle();
+    }
     if (typeof renderBookings === 'function') renderBookings();
   } catch(e) {
     console.error(e);
