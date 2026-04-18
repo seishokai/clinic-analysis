@@ -3673,17 +3673,17 @@ function drawBFLifecycleTable(bfRows) {
       ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700`
       : `background:#fff;color:#111;border:1px solid var(--border);font-weight:500`;
     return `<tr>
-      <td style="font-weight:500;text-align:left">${d.name}</td>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
+      <td style="font-weight:500;text-align:left">${d.name}</td>
+      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px;width:100%">${FACS.map(f => `<option ${csFac===f?'selected':''}>${f}</option>`).join('')}</select></td>
+      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:11px;padding:3px 8px;border-radius:4px;min-width:120px;${stStyle}">
         <option value="">未設定</option>
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
-      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
-      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px;width:100%">${FACS.map(f => `<option ${csFac===f?'selected':''}>${f}</option>`).join('')}</select></td>
-      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
-      <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
       <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_memo" value="${esc(info.bf_memo)}" placeholder="メモ" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
+      <td><input type="date" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_next_date" value="${info.bf_next_date||''}" style="font-size:10px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;${info.bf_next_date?'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600':'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e'}"></td>
+      <td style="font-size:10px;color:${daysSince>14?'#c00':'#666'};text-align:center;white-space:nowrap">${daysSince !== '-' ? daysSince+'日' : '-'}</td>
       <td><button class="bf-lc-hist-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 6px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">📜${histCount}</button></td>
     </tr>`;
   }).join('');
