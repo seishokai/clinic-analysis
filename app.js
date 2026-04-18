@@ -887,6 +887,21 @@ function setupEventListeners() {
   document.getElementById('bk-search').addEventListener('input', () => highlightActiveFilter(document.getElementById('bk-search')));
   window._highlightBkFilters = () => ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-period','bk-month','bk-search'].forEach(id => highlightActiveFilter(document.getElementById(id)));
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
+  // 重複フィルターボタン
+  document.getElementById('bk-dup-filter')?.addEventListener('click', () => {
+    window._bkDupFilter = !window._bkDupFilter;
+    const btn = document.getElementById('bk-dup-filter');
+    if (window._bkDupFilter) {
+      btn.style.background = '#f59e0b';
+      btn.style.color = '#fff';
+      btn.innerHTML = '✓ 重複のみ';
+    } else {
+      btn.style.background = '#fef3c7';
+      btn.style.color = '#b45309';
+      btn.innerHTML = '🔍 重複';
+    }
+    renderBookings();
+  });
   document.getElementById('bk-csv').addEventListener('click', exportCSV);
 
   // Ad Budget
@@ -2819,6 +2834,17 @@ function renderBookings() {
   if (monthFilter) {
     filtered = filtered.filter(d => getYM(d) === monthFilter);
   }
+  // 重複フィルター (同一正規化名+医院 が2件以上ある行のみ表示)
+  if (window._bkDupFilter) {
+    const groups = {};
+    filtered.forEach(d => {
+      const key = normName(d.name) + '|' + normFac(d.facility);
+      if (!groups[key]) groups[key] = [];
+      groups[key].push(d);
+    });
+    const dupKeys = new Set(Object.entries(groups).filter(([k,arr]) => arr.length > 1).map(([k])=>k));
+    filtered = filtered.filter(d => dupKeys.has(normName(d.name) + '|' + normFac(d.facility)));
+  }
   // 今日予約フィルター（クリアするまで保持）
   if (window._bkTodayFilter) {
     const td3 = new Date(); const todayStr = `${td3.getFullYear()}-${String(td3.getMonth()+1).padStart(2,'0')}-${String(td3.getDate()).padStart(2,'0')}`;
@@ -3003,10 +3029,11 @@ function renderBookings() {
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.paymentMonth || '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
     <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:80px;text-align:right;font-variant-numeric:tabular-nums">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
-  </tr>`}).join('') || '<tr><td colspan="16" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+    <td>${isAdmin ? `<button class="bk-del-btn" data-name="${d.name}" data-apply="${d.applyDate}" title="この予約を削除" style="font-size:10px;padding:2px 6px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>` : ''}</td>
+  </tr>`}).join('') || '<tr><td colspan="17" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > displayLimit) {
-    tbody.innerHTML += `<tr><td colspan="16" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
+    tbody.innerHTML += `<tr><td colspan="17" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
   }
 
   // ステータス変更イベント
@@ -3068,6 +3095,16 @@ function renderBookings() {
         })();
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
         renderBookings();
+      });
+    });
+
+    // 削除ボタン (予約一覧)
+    tbody.querySelectorAll('.bk-del-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const n = btn.dataset.name;
+        const a = btn.dataset.apply;
+        if (!confirm(`${n} (${a}) を削除しますか？\n重複削除用: manual_bookings削除 + status=除外 に設定します。\n(変更履歴から復元可能)`)) return;
+        await deleteBFRow(n, a);
       });
     });
 

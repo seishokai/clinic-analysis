@@ -490,13 +490,14 @@
           <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px">
           <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px">更新</button>
           <button class="btn btn-outline" id="bk-csv" style="min-height:30px;padding:6px 12px;font-size:11px">CSV</button>
+          <button class="btn" id="bk-dup-filter" style="min-height:30px;padding:6px 12px;font-size:11px;background:#fef3c7;color:#b45309;border:1.5px solid #f59e0b;font-weight:600;border-radius:20px">🔍 重複</button>
           <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center" id="bk-quick-promos"></div>
         </div>
         <div class="card" style="padding:12px">
           <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)">読み込み中...</span></div>
           <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
             <table class="data-table compact" id="bk-table">
-              <thead><tr><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>相談</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>流入元</th><th>状態</th><th>メモ</th><th>成約</th><th>金額（税抜）</th><th>入金月</th><th>インセ月</th><th>インセ（税抜）</th></tr></thead>
+              <thead><tr><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>相談</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>流入元</th><th>状態</th><th>メモ</th><th>成約</th><th>金額（税抜）</th><th>入金月</th><th>インセ月</th><th>インセ（税抜）</th><th></th></tr></thead>
               <tbody id="bk-tbody"></tbody>
             </table>
           </div>
@@ -1011,7 +1012,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=170"></script>
+  <script src="app.js?v=171"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
