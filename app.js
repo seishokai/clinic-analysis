@@ -2936,7 +2936,15 @@ function renderBookings() {
 
   // Table
   const tbody = document.getElementById('bk-tbody');
-  const sorted = [...filtered].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
+  // 重複モードの時は 正規化名+医院 でグルーピングして隣接表示
+  const sorted = window._bkDupFilter
+    ? [...filtered].sort((a, b) => {
+        const ka = normName(a.name) + '|' + normFac(a.facility);
+        const kb = normName(b.name) + '|' + normFac(b.facility);
+        if (ka !== kb) return ka.localeCompare(kb);
+        return (b.applyDate || '').localeCompare(a.applyDate || '');
+      })
+    : [...filtered].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
 
   const statusBadge = (s) => {
     if (!s || s === '未対応') return '<span class="badge badge-default">未対応</span>';
