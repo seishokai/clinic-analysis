@@ -3963,9 +3963,19 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   if (field === 'bf_memo' && value) update.memo = value;
   if (field === 'memo' && value) update.bf_memo = value;
 
-  // === 連動: BFステータス → 予約一覧の状態 は自動更新しない ===
-  // (ユーザー要望により停止。BFステータスと予約状態を独立管理)
-  // 予約状態→BFステータスの連動は引き続き有効 (状態=成約 → BF未設定なら成約にセット 等)
+  // === 連動: BFステータス変更時、予約一覧の状態も自動更新 ===
+  if (field === 'bf_status' && value && BF_TO_STATUS[value]) {
+    const targetStatus = BF_TO_STATUS[value];
+    update.status = targetStatus;
+    const bk = bookingsData.find(d => d.name === name && d.applyDate === applyDate);
+    if (bk) bk.status = targetStatus;
+    try {
+      const bkEx = loadData('bk-extra', {});
+      if (!bkEx[key]) bkEx[key] = {};
+      bkEx[key].editedStatus = targetStatus;
+      saveData('bk-extra', bkEx);
+    } catch(_){}
+  }
 
 
   // A2: 楽観的ロック - 既存行は updated_at チェック付きで更新
