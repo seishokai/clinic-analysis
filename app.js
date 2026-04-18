@@ -239,7 +239,7 @@ function handleRealtimeChange(table, payload) {
 
 function getBFRows() {
   const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
-  return (bookingsData || []).filter(d => {
+  const raw = (bookingsData || []).filter(d => {
     const svc = (d.service || '').toLowerCase();
     if (!(svc.includes('bf') || svc.includes('ブラック'))) return false;
     if (d.status === '除外') return false;
@@ -247,6 +247,7 @@ function getBFRows() {
     if (bd && bd > todayEnd) return false;
     return true;
   });
+  return dedupBFRows(raw);
 }
 
 let rtIndicatorTimer = null;
@@ -3912,15 +3913,26 @@ let bfHistoryCache = {}; // key: name|applyDate → [events]
 
 async function loadBFLifecycleData() {
   try {
-    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, updated_at');
+    const { data } = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, updated_at');
     bfLifecycleCache = {};
     (data || []).forEach(r => {
+      // 両方のキー (生の name+date と 正規化 name+date) にマップ → ルックアップ時にスペース差を吸収
       const key = r.name + '|' + r.apply_date;
+      const normKey = normName(r.name) + '|' + (r.apply_date||'').substring(0,10);
       bfLifecycleCache[key] = r;
-      // A2: バージョン保存
+      // 正規化キーでも引ける (空白有無どちらでもヒット)
+      if (!bfLifecycleCache[normKey]) bfLifecycleCache[normKey] = r;
       if (r.updated_at) setVersion('booking_status', key, r.updated_at);
     });
   } catch(e) { console.warn('BF lifecycle load', e); }
+}
+
+// BFキャッシュから正規化キーでも引くヘルパー
+function getBFInfo(name, applyDate) {
+  const k1 = name + '|' + applyDate;
+  if (bfLifecycleCache[k1]) return bfLifecycleCache[k1];
+  const k2 = normName(name) + '|' + (applyDate||'').substring(0,10);
+  return bfLifecycleCache[k2] || null;
 }
 
 async function loadBFHistory(names) {
@@ -4060,17 +4072,22 @@ async function renderBFLifecycle() {
   }
   // BF相談のデータを抽出 (予約日が今日以前のみ、未来分/除外 は非表示)
   const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
-  const bfRows = (bookingsData || []).filter(d => {
+  let bfRowsRaw = (bookingsData || []).filter(d => {
     const svc = (d.service || '').toLowerCase();
     if (!(svc.includes('bf') || svc.includes('ブラック'))) return false;
-    if (d.status === '除外') return false; // 除外は非表示
+    if (d.status === '除外') return false;
     const bd = parseDate(d.bookDate);
-    if (bd && bd > todayEnd) return false; // 明日以降は除外
+    if (bd && bd > todayEnd) return false;
     return true;
   });
+  // 同一人物(名前スペース差)を重複排除
+  const bfRows = dedupBFRows(bfRowsRaw);
 
-  // 既存データの状態→BFステータス 一括同期
-  await syncStatusToBFStatus(bfRows);
+  // 既存データの状態→BFステータス 一括同期 (重複防止のため1セッションに1回のみ実行)
+  if (!window._bfSyncDone) {
+    window._bfSyncDone = true;
+    await syncStatusToBFStatus(bfRows);
+  }
 
   // 履歴読み込み
   await loadBFHistory(bfRows.map(r => r.name));
@@ -4267,6 +4284,36 @@ const BF_TO_STATUS = {
   'セット完了': '成約',
   'キャンセル(未来院)': 'キャンセル'
 };
+
+// 名前正規化: 全空白(半角/全角)除去+小文字化 で一致判定
+function normName(n) {
+  return (n || '').replace(/[\s\u3000]+/g, '').toLowerCase();
+}
+// BF用: 同一人物を名前正規化でグルーピング (同じ facility かつ同日)
+function dedupBFRows(rows) {
+  const seen = new Map();
+  rows.forEach(d => {
+    const nn = normName(d.name);
+    const fac = normFac(d.facility);
+    const dateKey = (d.applyDate || '').substring(0, 10);
+    const key = nn + '|' + fac + '|' + dateKey;
+    if (!seen.has(key)) {
+      seen.set(key, d);
+    } else {
+      // マージ: ステータス優先度, メモがある方, 金額がある方を採用
+      const existing = seen.get(key);
+      // BFステータスが設定されている方を優先
+      // _memoがある方を優先
+      if (!existing._memo && d._memo) existing._memo = d._memo;
+      if (!existing.contractAmount && d.contractAmount) existing.contractAmount = d.contractAmount;
+      if (!existing.contractService && d.contractService) existing.contractService = d.contractService;
+      if (!existing.status && d.status) existing.status = d.status;
+      if (d.status === '成約') existing.status = '成約';
+      else if (d.status === '来院済' && existing.status !== '成約') existing.status = '来院済';
+    }
+  });
+  return [...seen.values()];
+}
 
 // BFか判定
 function isBFBooking(d) {
