@@ -4039,6 +4039,8 @@ const BF_STATUSES = [
   { value: 'ローン審査中', color: '#eab308' },
   { value: 'ローン審査落', color: '#b91c1c' },
   { value: '矯正決定(BF保留)', color: '#8b5cf6' },
+  { value: 'ラブリエ決定(BF保留)', color: '#a855f7' },
+  { value: 'インプラント決定(BF保留)', color: '#c026d3' },
   { value: '印象待ち(治療無)', color: '#3b82f6' },
   { value: '印象待ち(治療有)', color: '#2563eb' },
   { value: '治療中', color: '#1d4ed8' },
