@@ -2556,7 +2556,6 @@ async function loadBookings() {
       const { data: dbStatuses } = await sb.from('booking_status').select('*');
       if (dbStatuses && dbStatuses.length) {
         const statusMap = {};
-        const fuzzyMap = {}; // 正規化名+医院+来院日(date部) → status行 (複数あれば情報リッチな方)
         dbStatuses.forEach(s => {
           statusMap[s.name + '|' + s.apply_date] = s;
           if (s.updated_at) setVersion('booking_status', s.name + '|' + s.apply_date, s.updated_at);
@@ -2564,12 +2563,10 @@ async function loadBookings() {
         bookingsData.forEach(d => {
           const key = d.name + '|' + d.applyDate;
           const exact = statusMap[key];
-          // ファジーマッチ: 完全一致無しでも、正規化名+日付キーでブッキング情報を探す
           let dbRow = exact;
           if (!dbRow) {
             const nnTarget = normName(d.name);
             const dateKey = normDateKey(d.bookDate || d.applyDate);
-            // 同じ正規化名+来院日キー の booking_status 行を探す
             const candidate = dbStatuses.find(s => normName(s.name) === nnTarget && normDateKey(s.apply_date) === dateKey);
             if (candidate) dbRow = candidate;
           }
@@ -2582,6 +2579,15 @@ async function loadBookings() {
             if (dbRow.memo) d._memo = dbRow.memo;
             else if (dbRow.bf_memo) d._memo = dbRow.bf_memo;
             if (dbRow.book_date) d.bookDate = dbRow.book_date;
+          }
+          // メモだけは名前だけのフォールバック: 同じ正規化名+医院 の booking_status 行からメモを取得
+          if (!d._memo) {
+            const nnTarget = normName(d.name);
+            const fTarget = normFac(d.facility);
+            const fallback = dbStatuses.find(s => normName(s.name) === nnTarget && (s.memo || s.bf_memo));
+            if (fallback) {
+              d._memo = fallback.memo || fallback.bf_memo;
+            }
           }
         });
       }
@@ -3036,7 +3042,7 @@ function renderBookings() {
       const curBf = info.bf_status || '';
       const bfColor = BF_STATUSES.find(s => s.value === curBf)?.color || '';
       const bfStyle = curBf ? `background:${bfColor}22;color:${bfColor};border-color:${bfColor};font-weight:600` : '';
-      return `<select class="form-select bk-bfstatus-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:110px;text-align:center;${bfStyle}">
+      return `<select class="form-select bk-bfstatus-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;width:100%;max-width:115px;text-align:center;${bfStyle}">
         <option value="">${d.status==='未対応'?'未対応':(d.status==='確認済'?'確認済':(d.status==='キャンセル'?'キャンセル':'未設定'))}</option>
         ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select>`;
