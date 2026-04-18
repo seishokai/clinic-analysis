@@ -3567,10 +3567,14 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
 
 async function renderBFLifecycle() {
   await loadBFLifecycleData();
-  // BF相談の来院済データを抽出
+  // BF相談のデータを抽出 (予約日が今日以前のみ、未来分は除外)
+  const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
   const bfRows = (bookingsData || []).filter(d => {
     const svc = (d.service || '').toLowerCase();
-    return svc.includes('bf') || svc.includes('ブラック');
+    if (!(svc.includes('bf') || svc.includes('ブラック'))) return false;
+    const bd = parseDate(d.bookDate);
+    if (bd && bd > todayEnd) return false; // 明日以降は除外
+    return true;
   });
   // 履歴読み込み
   await loadBFHistory(bfRows.map(r => r.name));
