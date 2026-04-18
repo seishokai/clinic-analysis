@@ -4794,15 +4794,40 @@ function drawKaiinRows(treatment, rows, container) {
     const stColor = statuses.find(s => s.value === st)?.color || '';
     const stStyle = st ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700` : '';
     const memo = d._memo || findAnyMemo(d.name);
-    // ツール/プロモ表示
-    const toolBadge = d.tool === 'セレクト' ? '<span style="display:inline-block;padding:1px 5px;background:#fef3c7;color:#b45309;border-radius:3px;font-size:9px;font-weight:700">セレクト</span>' : d.tool === '手動' ? '<span style="display:inline-block;padding:1px 5px;background:#e0e7ff;color:#4338ca;border-radius:3px;font-size:9px;font-weight:700">手動</span>' : '<span style="display:inline-block;padding:1px 5px;background:#f3f4f6;color:#6b7280;border-radius:3px;font-size:9px">DX</span>';
-    const promoBadge = d.source ? `<span style="font-size:10px;color:#0369a1">${d.source.length>12?d.source.slice(0,12)+'…':d.source}</span>` : '<span style="font-size:10px;color:var(--text-muted)">-</span>';
+    // プロモ表示: DX→そのままsource、セレクト→セレクトタイプ、手動→手動登録
+    let promoLabel = '';
+    let promoColor = '#0369a1';
+    let promoBg = '#e0f2fe';
+    if (d.tool === 'セレクト') {
+      promoLabel = d.source || 'セレクトタイプ';
+      promoColor = '#b45309';
+      promoBg = '#fef3c7';
+    } else if (d.tool === '手動') {
+      promoLabel = d.source || '手動登録';
+      promoColor = '#4338ca';
+      promoBg = '#e0e7ff';
+    } else {
+      promoLabel = d.source || '-';
+    }
+    const promoBadge = promoLabel !== '-' ? `<span style="display:inline-block;padding:2px 6px;background:${promoBg};color:${promoColor};border-radius:4px;font-size:10px;font-weight:600">${promoLabel.length>14?promoLabel.slice(0,14)+'…':promoLabel}</span>` : '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
-      <td style="text-align:left"><div style="display:flex;flex-direction:column;gap:2px">${toolBadge}${promoBadge}</div></td>
+      <td style="text-align:left">${promoBadge}</td>
       <td>${normFac(d.facility)||'-'}</td>
-      <td style="font-size:10px">${d.service || '-'}</td>
+      <td style="font-size:10px">${(() => {
+        const s = d.service || '';
+        if (/ラミネート|ブラックフィルム|BF/i.test(s)) return 'BF相談';
+        if (/矯正|インビザ|ワイヤー/.test(s)) return '矯正相談';
+        if (/インプラント/.test(s)) return 'インプラント相談';
+        if (/ラブリエ/.test(s)) return 'ラブリエ相談';
+        if (/セラミック|補綴/.test(s)) return '自費補綴相談';
+        if (/根治|根管/.test(s)) return '自費根治相談';
+        if (/ホワイトニング/.test(s)) return 'ホワイトニング';
+        if (/リップ/.test(s)) return 'リップアート';
+        if (/ジュエリー/.test(s)) return 'ティースジュエリー';
+        return s || '-';
+      })()}</td>
       <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;${stStyle}">
         <option value="">未設定</option>
         ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
