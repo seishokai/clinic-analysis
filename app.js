@@ -3054,7 +3054,12 @@ function renderBookings() {
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
       <option ${d.status==='除外'?'selected':''}>除外</option>
     </select>`) : statusBadge(isBFBooking(d) ? (getBFInfo(d.name, d.applyDate)?.bf_status || d.status) : d.status)}</td>
-    <td style="font-size:10px;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:center" class="bk-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(d._memo||'').replace(/"/g,'&quot;')}">${isAdmin ? (d._memo ? `<span style="display:inline-block;padding:2px 6px;background:#fff8e1;border:1px solid #f9a825;border-radius:4px;color:#b45309;font-weight:600">📝 ${d._memo.slice(0,4)}${d._memo.length>4?'…':''}</span>` : '<span style="display:inline-block;padding:2px 8px;color:#bbb;border:1px dashed #ddd;border-radius:4px">＋</span>') : (d._memo ? '📝 ' + d._memo : '-')}</td>
+    <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:center" class="bk-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(d._memo||findAnyMemo(d.name)||'').replace(/"/g,'&quot;')}">${(() => {
+      const memo = d._memo || findAnyMemo(d.name);
+      if (!isAdmin) return memo ? '📝 ' + memo : '-';
+      if (memo) return `<span style="display:inline-block;padding:3px 10px;background:#fef3c7;border:2px solid #f59e0b;border-radius:6px;color:#92400e;font-weight:700;box-shadow:0 1px 3px rgba(245,158,11,.3)">📝 あり</span>`;
+      return '<span style="display:inline-block;padding:2px 8px;color:#bbb;border:1px dashed #ddd;border-radius:4px">＋</span>';
+    })()}</td>
     <td style="text-align:center">${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px;text-align:center;${d.contractService?'background:#dcfce7;color:#15803d':(d.status==='成約'?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':'')}">
       <option value="">-</option>
       <option ${d.contractService==='BF'?'selected':''}>BF</option>
@@ -4498,6 +4503,33 @@ function normDateKey(s) {
   if (m2) { const y = new Date().getFullYear(); return `${y}-${String(m2[1]).padStart(2,'0')}-${String(m2[2]).padStart(2,'0')}`; }
   return s2;
 }
+// 同一正規化名の患者のメモをどこからでも探す (bfLifecycleCache/bk-memos/bookingsData全走査)
+function findAnyMemo(name) {
+  if (!name) return '';
+  const nn = normName(name);
+  // BF lifecycle cache (bf_memo or memo)
+  for (const k in bfLifecycleCache) {
+    const info = bfLifecycleCache[k];
+    if (!info) continue;
+    if (normName(info.name) === nn) {
+      const m = info.bf_memo || info.memo || '';
+      if (m) return m;
+    }
+  }
+  // localStorage bk-memos
+  try {
+    const memos = loadData('bk-memos', {});
+    for (const k in memos) {
+      if (normName(k.split('|')[0]) === nn && memos[k]) return memos[k];
+    }
+  } catch(_){}
+  // bookingsData 他の行
+  for (const b of (bookingsData || [])) {
+    if (normName(b.name) === nn && b._memo) return b._memo;
+  }
+  return '';
+}
+
 // BF用: 同一人物を名前正規化でグルーピング (同じ facility かつ同日)
 // 生存ルール: メモ/BF進捗がある方を優先で残す (情報を失わない)
 function dedupBFRows(rows) {
