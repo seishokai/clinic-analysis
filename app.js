@@ -3639,8 +3639,12 @@ async function renderBFLifecycle() {
   const csFacs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_facility).filter(Boolean))].sort();
   if (csFacSel) csFacSel.innerHTML = '<option value="">CS医院:全て</option>' + csFacs.map(f => `<option>${f}</option>`).join('');
   const drSel = document.getElementById('bf-lc-filter-dr');
-  const drs = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_doctor).filter(Boolean))].sort();
-  if (drSel) drSel.innerHTML = '<option value="">CSDR:全て</option>' + drs.map(d => `<option>${d}</option>`).join('');
+  const drsFromDB = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_doctor).filter(Boolean))];
+  const allDrs = [...new Set([...CSDR_LIST, ...drsFromDB])].sort();
+  if (drSel) drSel.innerHTML = '<option value="">CSDR:全て</option>' + allDrs.map(d => `<option>${d}</option>`).join('');
+  // datalist (一覧の入力候補)
+  const dl = document.getElementById('bf-lc-dr-options');
+  if (dl) dl.innerHTML = allDrs.map(d => `<option value="${d}">`).join('');
   const setFacSel = document.getElementById('bf-lc-filter-setfac');
   if (setFacSel) setFacSel.innerHTML = '<option value="">セット医院:全て</option>' + ['BF銀座','ルミナス','中日'].map(f => `<option>${f}</option>`).join('');
 
@@ -3657,6 +3661,23 @@ async function renderBFLifecycle() {
 }
 
 const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
+const CSDR_LIST = ['小池','鶴田','立松','原','西村','山田']; // 固定Dr、追加はdatalistで
+
+// CS医院(複数可): JSON array文字列 or 単一文字列 を配列に
+function parseCsFac(v) {
+  if (!v) return [];
+  if (Array.isArray(v)) return v;
+  if (typeof v === 'string') {
+    const s = v.trim();
+    if (s.startsWith('[')) { try { return JSON.parse(s); } catch(_) {} }
+    return s ? [s] : [];
+  }
+  return [];
+}
+function stringifyCsFac(arr) {
+  if (!arr || !arr.length) return '';
+  return JSON.stringify(arr);
+}
 
 function drawBFLifecycleTable(bfRows) {
   const fstSel = document.getElementById('bf-lc-filter-status')?.value || '';
@@ -3719,8 +3740,8 @@ function drawBFLifecycleTable(bfRows) {
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
-      <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_facility" style="font-size:10px;padding:2px 4px;width:100%">${FACS.map(f => `<option ${csFac===f?'selected':''}>${f}</option>`).join('')}</select></td>
-      <td><input type="text" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr名" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
+      <td><button type="button" class="bf-lc-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-value="${esc(info.bf_cs_facility||csFac||'')}" style="font-size:10px;padding:3px 6px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;min-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${parseCsFac(info.bf_cs_facility||csFac||'').join(', ') || '<span style="color:var(--text-muted)">未選択</span>'}</button></td>
+      <td><input type="text" list="bf-lc-dr-options" class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_cs_doctor" value="${esc(info.bf_cs_doctor)}" placeholder="Dr選択/入力" style="font-size:10px;padding:2px 6px;width:100%;box-sizing:border-box"></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:11px;padding:3px 8px;border-radius:4px;min-width:120px;${stStyle}">
         <option value="">未設定</option>
         ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
@@ -3760,6 +3781,36 @@ function drawBFLifecycleTable(bfRows) {
   tbody.querySelectorAll('.bf-lc-memo-cell').forEach(td => {
     td.addEventListener('click', () => openBFMemoModal(td.dataset.name, td.dataset.apply, bfRows));
   });
+  // CS医院複数選択
+  tbody.querySelectorAll('.bf-lc-csfac-btn').forEach(btn => {
+    btn.addEventListener('click', () => openBFCsFacModal(btn.dataset.name, btn.dataset.apply, bfRows));
+  });
+}
+
+function openBFCsFacModal(name, applyDate, bfRows) {
+  const key = name + '|' + applyDate;
+  const info = bfLifecycleCache[key] || {};
+  const current = parseCsFac(info.bf_cs_facility);
+  document.getElementById('bf-lc-csfac-title').textContent = `CS医院を選択 (複数可) — ${name}`;
+  const opts = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都','岩田','アサノ'];
+  document.getElementById('bf-lc-csfac-options').innerHTML = opts.map(f => `
+    <label style="display:flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid var(--border);border-radius:6px;cursor:pointer;font-size:12px;background:${current.includes(f)?'#dcfce7':'#fff'}">
+      <input type="checkbox" value="${f}" ${current.includes(f)?'checked':''} style="cursor:pointer">
+      <span>${f}</span>
+    </label>
+  `).join('');
+  document.getElementById('bf-lc-csfac-modal').hidden = false;
+  const saveBtn = document.getElementById('bf-lc-csfac-save');
+  const newBtn = saveBtn.cloneNode(true);
+  saveBtn.parentNode.replaceChild(newBtn, saveBtn);
+  newBtn.addEventListener('click', async () => {
+    const selected = [...document.getElementById('bf-lc-csfac-options').querySelectorAll('input:checked')].map(i => i.value);
+    const ok = await saveBFLifecycleField(name, applyDate, 'bf_cs_facility', stringifyCsFac(selected));
+    if (ok) {
+      document.getElementById('bf-lc-csfac-modal').hidden = true;
+      if (bfRows) drawBFLifecycleTable(bfRows);
+    }
+  });
 }
 
 function openBFMemoModal(name, applyDate, bfRows) {
@@ -3798,7 +3849,8 @@ function openBFHistoryModal(name, applyDate) {
     body.innerHTML = '<p style="color:var(--text-muted);font-size:13px">履歴なし</p>';
   } else {
     body.innerHTML = history.map(h => `
-      <div style="padding:10px;margin-bottom:8px;background:var(--bg);border-left:3px solid #6366f1;border-radius:4px">
+      <div style="padding:10px;margin-bottom:8px;background:var(--bg);border-left:3px solid #6366f1;border-radius:4px;position:relative">
+        ${h.id ? `<button class="bf-hist-del" data-id="${h.id}" data-name="${name.replace(/"/g,'&quot;')}" data-apply="${applyDate.replace(/"/g,'&quot;')}" style="position:absolute;top:6px;right:6px;width:22px;height:22px;border:1px solid #fecaca;background:#fff;color:#c00;border-radius:4px;cursor:pointer;font-size:12px;line-height:1;font-weight:700" title="この履歴を削除">×</button>` : ''}
         <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">${(h.created_at||'').substring(0,16).replace('T',' ')} — <b>${h.changed_by||'-'}</b></div>
         <div style="font-size:13px;font-weight:600">${h.from_status||'(なし)'} → ${h.to_status||'(なし)'}</div>
         <div style="font-size:11px;color:var(--text-sub);margin-top:4px">
@@ -3808,6 +3860,21 @@ function openBFHistoryModal(name, applyDate) {
         ${h.memo ? `<div style="font-size:11px;margin-top:4px;padding:6px;background:#fff;border-radius:3px">${h.memo}</div>` : ''}
       </div>
     `).join('');
+    // 削除ボタン
+    body.querySelectorAll('.bf-hist-del').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        if (!confirm('この履歴を削除しますか？')) return;
+        const id = Number(btn.dataset.id);
+        const { error } = await sb.from('bf_history').delete().eq('id', id);
+        if (error) { showToast('削除エラー: ' + error.message, true); return; }
+        // キャッシュ更新
+        const nm = btn.dataset.name, ap = btn.dataset.apply;
+        const k = nm + '|' + ap;
+        if (bfHistoryCache[k]) bfHistoryCache[k] = bfHistoryCache[k].filter(x => x.id !== id);
+        showToast('削除しました');
+        openBFHistoryModal(nm, ap); // 再描画
+      });
+    });
   }
   document.getElementById('bf-lc-history-modal').hidden = false;
 }

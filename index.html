@@ -646,14 +646,15 @@
             <select class="form-select" id="bf-lc-filter-next" style="width:auto;padding:6px 10px;font-size:12px"><option value="">次回予定:全て</option><option value="fixed">確定(日付あり)</option><option value="none">未定(日付なし)</option></select>
             <input type="text" class="form-input" id="bf-lc-search" placeholder="名前検索" style="width:120px;padding:6px 8px;font-size:12px">
           </div>
+          <datalist id="bf-lc-dr-options"></datalist>
           <div class="card" style="padding:6px">
             <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">一覧 <span id="bf-lc-count" style="font-weight:400"></span></div>
             <div class="data-table-wrap" style="max-height:calc(100vh - 240px);overflow-y:auto">
               <table class="data-table compact">
                 <thead><tr>
-                  <th style="width:60px">来院日</th>
+                  <th style="width:72px">来院予定日</th>
                   <th style="text-align:left;width:100px">名前</th>
-                  <th style="width:90px">CS医院</th>
+                  <th style="width:130px">CS医院</th>
                   <th style="width:90px">CSDR</th>
                   <th style="width:130px">BFステータス</th>
                   <th style="width:90px">セット医院</th>
@@ -664,6 +665,18 @@
                 </tr></thead>
                 <tbody id="bf-lc-tbody"></tbody>
               </table>
+            </div>
+          </div>
+          <div id="bf-lc-csfac-modal" class="modal" hidden>
+            <div class="modal-overlay" onclick="document.getElementById('bf-lc-csfac-modal').hidden=true"></div>
+            <div class="modal-content" style="max-width:420px;padding:20px;max-height:80vh;overflow-y:auto">
+              <button class="modal-close" onclick="document.getElementById('bf-lc-csfac-modal').hidden=true">&times;</button>
+              <h3 style="font-size:14px;font-weight:700;margin-bottom:12px" id="bf-lc-csfac-title">CS医院を選択 (複数可)</h3>
+              <div id="bf-lc-csfac-options" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+              <div style="display:flex;gap:8px;margin-top:14px">
+                <button class="btn btn-dark" id="bf-lc-csfac-save">保存</button>
+                <button class="btn btn-outline" onclick="document.getElementById('bf-lc-csfac-modal').hidden=true">閉じる</button>
+              </div>
             </div>
           </div>
           <div id="bf-lc-memo-modal" class="modal" hidden>
@@ -931,7 +944,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=146"></script>
+  <script src="app.js?v=148"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
