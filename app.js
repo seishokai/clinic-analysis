@@ -3996,7 +3996,7 @@ async function renderBFLifecycle() {
   if (csFacSel) csFacSel.innerHTML = '<option value="">CS医院:全て</option>' + csFacs.map(f => `<option>${f}</option>`).join('');
   const drSel = document.getElementById('bf-lc-filter-dr');
   const drsFromDB = [...new Set(Object.values(bfLifecycleCache).map(v => v.bf_cs_doctor).filter(Boolean))];
-  const allDrs = [...new Set([...CSDR_LIST, ...drsFromDB])].sort();
+  const allDrs = [...new Set([...getCSDRList(), ...drsFromDB])].sort();
   if (drSel) drSel.innerHTML = '<option value="">CSDR:全て</option>' + allDrs.map(d => `<option>${d}</option>`).join('');
   // datalist (一覧の入力候補)
   const dl = document.getElementById('bf-lc-dr-options');
