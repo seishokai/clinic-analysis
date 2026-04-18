@@ -242,6 +242,7 @@ function getBFRows() {
   return (bookingsData || []).filter(d => {
     const svc = (d.service || '').toLowerCase();
     if (!(svc.includes('bf') || svc.includes('ブラック'))) return false;
+    if (d.status === '除外') return false;
     const bd = parseDate(d.bookDate);
     if (bd && bd > todayEnd) return false;
     return true;
@@ -606,7 +607,20 @@ function setupEventListeners() {
       }
       if (sub === 'bk-analysis' && bookingsData.length > 0) renderAnalysis();
       if (sub === 'bk-apply' && bookingsData.length > 0) renderApplyAnalysis('today');
-      if (sub === 'bk-bf') { if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); } }
+      if (sub === 'bk-bf') {
+        if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); }
+        // デフォルトで「セット進捗」を表示
+        setTimeout(() => {
+          document.querySelectorAll('.bf-sub-btn').forEach(b => { b.style.borderBottomColor = 'transparent'; b.style.color = 'var(--text-sub)'; b.style.fontWeight = '400'; });
+          const lcBtn = document.querySelector('.bf-sub-btn[data-bfsub="bf-lifecycle"]');
+          if (lcBtn) { lcBtn.style.borderBottomColor = 'var(--accent)'; lcBtn.style.color = 'var(--text)'; lcBtn.style.fontWeight = '600'; }
+          ['bf-progress','bf-patients','bf-contracts','bf-bookings','bf-lifecycle'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.hidden = id !== 'bf-lifecycle';
+          });
+          if (typeof renderBFLifecycle === 'function') renderBFLifecycle();
+        }, 50);
+      }
       if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
       if (sub === 'recordings') renderRecordings();
       if (sub === 'adm-history') { renderChangeLog(); renderBackupsList(); }
@@ -4044,15 +4058,20 @@ async function renderBFLifecycle() {
     expandBtn._bound = true;
     expandBtn.addEventListener('click', () => applyCollapse(false));
   }
-  // BF相談のデータを抽出 (予約日が今日以前のみ、未来分は除外)
+  // BF相談のデータを抽出 (予約日が今日以前のみ、未来分/除外 は非表示)
   const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
   const bfRows = (bookingsData || []).filter(d => {
     const svc = (d.service || '').toLowerCase();
     if (!(svc.includes('bf') || svc.includes('ブラック'))) return false;
+    if (d.status === '除外') return false; // 除外は非表示
     const bd = parseDate(d.bookDate);
     if (bd && bd > todayEnd) return false; // 明日以降は除外
     return true;
   });
+
+  // 既存データの状態→BFステータス 一括同期
+  await syncStatusToBFStatus(bfRows);
+
   // 履歴読み込み
   await loadBFHistory(bfRows.map(r => r.name));
 
@@ -4109,6 +4128,82 @@ async function renderBFLifecycle() {
 }
 
 const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
+
+// 患者名を編集 (予約一覧と双方向同期)
+async function editPatientName(oldName, applyDate, newName, bfRows) {
+  if (!newName) return;
+  try {
+    // bookingsDataのキャッシュ更新
+    const d = bookingsData.find(b => b.name === oldName && b.applyDate === applyDate);
+    if (d) d.name = newName;
+
+    // bk-extra (localStorage) 更新
+    try {
+      const bkEx = loadData('bk-extra', {});
+      const key = oldName + '|' + applyDate;
+      if (!bkEx[key]) bkEx[key] = {};
+      bkEx[key].editedName = newName;
+      saveData('bk-extra', bkEx);
+    } catch(_){}
+
+    // booking_status を name update (同じ apply_date で新しい name に)
+    await sb.from('booking_status').update({ name: newName }).eq('name', oldName).eq('apply_date', applyDate);
+    // manual_bookings も (手動登録分)
+    await sb.from('manual_bookings').update({ name: newName }).eq('name', oldName).eq('apply_date', applyDate).catch(()=>{});
+    // bfLifecycleCacheキー付け替え
+    const oldKey = oldName + '|' + applyDate;
+    const newKey = newName + '|' + applyDate;
+    if (bfLifecycleCache[oldKey]) {
+      bfLifecycleCache[newKey] = { ...bfLifecycleCache[oldKey], name: newName };
+      delete bfLifecycleCache[oldKey];
+    }
+    // GAS (Google Sheets) にも反映
+    fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ oldName, applyDate, newName }) }).catch(()=>{});
+
+    showToast(`${oldName} → ${newName} に変更`);
+    // 予約一覧とBFセット進捗 両方再描画
+    if (typeof renderBookings === 'function') renderBookings();
+    if (bfRows) updateBFFunnelAndTable(bfRows);
+  } catch(e) {
+    console.error(e);
+    showToast('名前変更エラー: ' + e.message, true);
+  }
+}
+
+// 既存のBF予約データで 予約状態 → BFステータス を同期
+async function syncStatusToBFStatus(bfRows) {
+  const tasks = [];
+  bfRows.forEach(d => {
+    const key = d.name + '|' + d.applyDate;
+    const info = bfLifecycleCache[key] || {};
+    const curBF = info.bf_status;
+    const status = d.status;
+    const mappedBF = STATUS_TO_BF[status];
+    if (!mappedBF) return;
+    // 上書き条件: 成約/キャンセルは常に、来院済は未設定時のみ
+    let shouldUpdate = false;
+    if (status === 'キャンセル') shouldUpdate = (curBF !== 'キャンセル(未来院)');
+    else if (status === '成約') shouldUpdate = (!curBF || (curBF === '離脱' || curBF === '検討中'));
+    else if (status === '来院済') shouldUpdate = !curBF;
+    if (!shouldUpdate) return;
+    // サイレント更新 (履歴は自動連動として残す)
+    if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: d.name, apply_date: d.applyDate };
+    bfLifecycleCache[key].bf_status = mappedBF;
+    tasks.push(
+      sb.from('booking_status').upsert({ name: d.name, apply_date: d.applyDate, bf_status: mappedBF }, { onConflict: 'name,apply_date' }).then(() => {
+        sb.from('bf_history').insert({
+          booking_name: d.name, booking_apply_date: d.applyDate,
+          from_status: curBF || null, to_status: mappedBF,
+          changed_by: 'システム(一括連動)'
+        }).catch(()=>{});
+      }).catch(e => console.warn('sync status->bf failed', e))
+    );
+  });
+  if (tasks.length) {
+    console.log(`[BF Sync] 状態→BFステータス 一括連動: ${tasks.length}件`);
+    await Promise.allSettled(tasks);
+  }
+}
 
 // フィルターを維持してファネルと一覧だけ更新 (フィルターリセット防止)
 function updateBFFunnelAndTable(bfRows) {
@@ -4255,7 +4350,7 @@ function drawBFLifecycleTable(bfRows) {
       : `background:#fff;color:#111;border:1px solid var(--border);font-weight:500`;
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
-      <td style="font-weight:500;text-align:left">${d.name}</td>
+      <td class="bf-lc-name-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-weight:500;text-align:left;cursor:pointer;text-decoration:underline dotted;text-decoration-color:#ccc" title="クリックで編集">${d.name}</td>
       <td><button type="button" class="bf-lc-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-value="${esc(info.bf_cs_facility||csFac||'')}" style="font-size:10px;padding:3px 6px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;min-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${parseCsFac(info.bf_cs_facility||csFac||'').join(', ') || '<span style="color:var(--text-muted)">未選択</span>'}</button></td>
       <td><select class="bf-lc-csdr-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;background:#fff;border:1px solid var(--border);border-radius:4px">
         <option value="">未選択</option>
@@ -4303,6 +4398,16 @@ function drawBFLifecycleTable(bfRows) {
   // メモモーダル
   tbody.querySelectorAll('.bf-lc-memo-cell').forEach(td => {
     td.addEventListener('click', () => openBFMemoModal(td.dataset.name, td.dataset.apply, bfRows));
+  });
+  // 名前クリックで編集 (予約一覧と同期)
+  tbody.querySelectorAll('.bf-lc-name-cell').forEach(td => {
+    td.addEventListener('click', () => {
+      const oldName = td.dataset.name;
+      const apply = td.dataset.apply;
+      const newName = prompt('患者名を編集:', oldName);
+      if (!newName || newName === oldName) return;
+      editPatientName(oldName, apply, newName.trim(), bfRows);
+    });
   });
   // CS医院複数選択
   tbody.querySelectorAll('.bf-lc-csfac-btn').forEach(btn => {
