@@ -4716,36 +4716,51 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const facs = ['全て','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
   const FACS_OPTS = ['','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
 
+  // CS医院・セット医院・相談のユニーク値を算出
+  const csFacSet = new Set();
+  rows.forEach(d => {
+    const info = getBFInfo(d.name, d.applyDate) || {};
+    const csFac = info.bf_cs_facility || normFac(d.facility) || '';
+    parseCsFac(csFac).forEach(f => f && csFacSet.add(f));
+  });
+  const csFacOpts = [...csFacSet].sort();
+  const setFacOpts = ['BF銀座','ルミナス','中日'];
+  const CONSULT_TYPES = ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー','その他'];
+
   el.innerHTML = `
-    <div class="kaiin-header-wrap">
+    <div class="kaiin-topbar" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:6px 8px;background:var(--card);border:1px solid var(--border);border-radius:6px;position:sticky;top:0;z-index:5">
+      <button class="kaiin-header-toggle" style="padding:4px 10px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▼ ヘッダーを表示</button>
+      <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px;padding:5px 8px;font-size:12px">
+      <select class="form-select kaiin-filter-tool" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">ツール:全て</option><option>DXHUB</option><option>セレクト</option><option>手動</option></select>
+      <select class="form-select kaiin-filter-promo" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">プロモ:全て</option></select>
+      <select class="form-select kaiin-filter-csfac" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">CS医院:全て</option>${csFacOpts.map(f => `<option>${f}</option>`).join('')}</select>
+      <select class="form-select kaiin-filter-setfac" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">セット医院:全て</option>${setFacOpts.map(f => `<option>${f}</option>`).join('')}</select>
+      <select class="form-select kaiin-filter-consult" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">相談:全て</option>${CONSULT_TYPES.map(t => `<option>${t}</option>`).join('')}</select>
+      <select class="form-select kaiin-filter-status" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto">
+        <option value="exclude-cancel" selected>ｽﾃｰﾀｽ:ｷｬﾝｾﾙ除外</option>
+        <option value="">ｽﾃｰﾀｽ:全て</option>
+        <option value="exclude-cancel-unset">ｷｬﾝｾﾙ･未設定除外</option>
+        <option value="active">対応中のみ</option>
+        <option value="done">完了のみ</option>
+        ${statuses.map(s => `<option value="only:${s.value}">${s.value}のみ</option>`).join('')}
+      </select>
+      <select class="form-select kaiin-sort" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto">
+        <option value="date-desc" selected>ソート:来院日(新→古)</option>
+        <option value="date-asc">来院日(古→新)</option>
+        <option value="status">ステータス順</option>
+        <option value="name">名前順</option>
+      </select>
+    </div>
+    <div class="kaiin-header-wrap" style="display:none">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto;align-items:center">
         <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700">${rows.length}</span></div>
         <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700">${noSt}</span></div>
         ${statuses.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}">${byStatus[s.value]}</span></div>`).join('')}
-        <button class="kaiin-collapse-btn" style="margin-left:auto;padding:4px 12px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▲ 折りたたむ</button>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
-        <select class="form-select kaiin-filter-fac" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">医院:全て</option>${FACS_OPTS.slice(1).map(f => `<option>${f}</option>`).join('')}</select>
-        <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="名前検索" style="width:140px;padding:6px 8px;font-size:12px">
-        <select class="form-select kaiin-filter-tool" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">ツール:全て</option><option>DXHUB</option><option>セレクト</option><option>手動</option></select>
-        <select class="form-select kaiin-filter-promo" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">プロモ:全て</option></select>
-        <select class="form-select kaiin-filter-status" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto">
-          <option value="exclude-cancel" selected>キャンセル除外</option>
-          <option value="">全て表示</option>
-          <option value="exclude-cancel-unset">キャンセル・未設定除外</option>
-          <option value="active">対応中のみ (検討中/成約~セット待ち)</option>
-          <option value="done">完了のみ (セット完了)</option>
-          ${statuses.map(s => `<option value="only:${s.value}">${s.value}のみ</option>`).join('')}
-        </select>
-        <select class="form-select kaiin-sort" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto">
-          <option value="date-desc" selected>来院日(新→古)</option>
-          <option value="date-asc">来院日(古→新)</option>
-          <option value="status">ステータス順</option>
-          <option value="name">名前順</option>
-        </select>
+        <select class="form-select kaiin-filter-fac" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">医院(旧):全て</option>${FACS_OPTS.slice(1).map(f => `<option>${f}</option>`).join('')}</select>
       </div>
     </div>
-    <div class="kaiin-expand-wrap" style="display:none;margin:4px 0 8px"><button class="kaiin-expand-btn" style="padding:4px 12px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer">▼ ヘッダーを表示</button></div>
     <div class="card" style="padding:6px">
       <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">一覧 <span class="kaiin-count">${rows.length}件</span></div>
       <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
@@ -4777,21 +4792,42 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.filter(p => p && p.trim() && p.trim() !== '?').map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
   }
 
-  // 折りたたみ (SEISHOKAIヘッダー+治療別タブも含めて非表示)
-  el.querySelector('.kaiin-collapse-btn')?.addEventListener('click', () => {
-    el.querySelector('.kaiin-header-wrap').style.display = 'none';
-    el.querySelector('.kaiin-expand-wrap').style.display = 'block';
-    const w = el.querySelector('.kaiin-table-wrap'); if (w) w.style.maxHeight = 'calc(100vh - 80px)';
-    // トップヘッダー+治療別サブナビも隠す
-    const hdr = document.querySelector('.header'); if (hdr) hdr.style.display = 'none';
-    const subNav = document.getElementById('kaiin-sub-nav'); if (subNav) subNav.style.display = 'none';
-  });
-  el.querySelector('.kaiin-expand-btn')?.addEventListener('click', () => {
-    el.querySelector('.kaiin-header-wrap').style.display = '';
-    el.querySelector('.kaiin-expand-wrap').style.display = 'none';
-    const w = el.querySelector('.kaiin-table-wrap'); if (w) w.style.maxHeight = 'calc(100vh - 320px)';
-    const hdr = document.querySelector('.header'); if (hdr) hdr.style.display = '';
-    const subNav = document.getElementById('kaiin-sub-nav'); if (subNav) subNav.style.display = '';
+  // トップバー (フィルター群) を page-header に移動して、タイトル横に並べる
+  try {
+    const parentSub = el.closest('[id^="sub-kaiin-"]');
+    const pageHeader = parentSub?.querySelector('.page-header');
+    const topbar = el.querySelector('.kaiin-topbar');
+    if (pageHeader && topbar) {
+      pageHeader.style.display = 'flex';
+      pageHeader.style.alignItems = 'center';
+      pageHeader.style.gap = '12px';
+      pageHeader.style.flexWrap = 'wrap';
+      // 既存の注入済みトップバーを削除
+      pageHeader.querySelectorAll('.kaiin-topbar').forEach(n => n.remove());
+      const h2 = pageHeader.querySelector('h2');
+      if (h2) { h2.style.marginRight = '8px'; h2.style.flex = '0 0 auto'; }
+      topbar.style.position = 'static';
+      topbar.style.margin = '0';
+      topbar.style.flex = '1';
+      topbar.style.minWidth = '0';
+      pageHeader.appendChild(topbar);
+    }
+  } catch(_){}
+
+  // ヘッダー (サマリーカウント) の表示トグル
+  const toggleBtn = el.querySelector('.kaiin-header-toggle');
+  toggleBtn?.addEventListener('click', () => {
+    const w = el.querySelector('.kaiin-header-wrap');
+    const shown = w.style.display !== 'none';
+    if (shown) {
+      w.style.display = 'none';
+      toggleBtn.textContent = '▼ ヘッダーを表示';
+      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 180px)';
+    } else {
+      w.style.display = '';
+      toggleBtn.textContent = '▲ ヘッダーを隠す';
+      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 320px)';
+    }
   });
   drawKaiinRows(treatment, rows, el);
   // フィルターイベント
@@ -4799,6 +4835,9 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   el.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
   el.querySelector('.kaiin-filter-tool')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   el.querySelector('.kaiin-filter-promo')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-filter-csfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-filter-setfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  el.querySelector('.kaiin-filter-consult')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   el.querySelector('.kaiin-filter-status')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   el.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
 }
@@ -4808,6 +4847,9 @@ function drawKaiinRows(treatment, rows, container) {
   const q = (container.querySelector('.kaiin-filter-search')?.value || '').trim().toLowerCase();
   const toolF = container.querySelector('.kaiin-filter-tool')?.value || '';
   const promoF = container.querySelector('.kaiin-filter-promo')?.value || '';
+  const csFacF = container.querySelector('.kaiin-filter-csfac')?.value || '';
+  const setFacF = container.querySelector('.kaiin-filter-setfac')?.value || '';
+  const consultF = container.querySelector('.kaiin-filter-consult')?.value || '';
   const stF = container.querySelector('.kaiin-filter-status')?.value || '';
   const sortBy = container.querySelector('.kaiin-sort')?.value || 'date-desc';
   const statuses = getStatusesForTreatment(treatment);
@@ -4816,6 +4858,28 @@ function drawKaiinRows(treatment, rows, container) {
   if (q) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(q));
   if (toolF) filtered = filtered.filter(d => d.tool === toolF);
   if (promoF) filtered = filtered.filter(d => d.source === promoF);
+  if (csFacF) filtered = filtered.filter(d => {
+    const info = getBFInfo(d.name, d.applyDate) || {};
+    const csFac = info.bf_cs_facility || normFac(d.facility) || '';
+    return parseCsFac(csFac).includes(csFacF);
+  });
+  if (setFacF) filtered = filtered.filter(d => (getBFInfo(d.name, d.applyDate)||{}).bf_set_facility === setFacF);
+  if (consultF) filtered = filtered.filter(d => {
+    const s = d.service || '';
+    const c = (() => {
+      if (/ラミネート|ブラックフィルム|BF/i.test(s)) return 'BF相談';
+      if (/矯正|インビザ|ワイヤー/.test(s)) return '矯正相談';
+      if (/インプラント/.test(s)) return 'インプラント相談';
+      if (/ラブリエ/.test(s)) return 'ラブリエ相談';
+      if (/セラミック|補綴/.test(s)) return '自費補綴相談';
+      if (/根治|根管/.test(s)) return '自費根治相談';
+      if (/ホワイトニング/.test(s)) return 'ホワイトニング';
+      if (/リップ/.test(s)) return 'リップアート';
+      if (/ジュエリー/.test(s)) return 'ティースジュエリー';
+      return ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー'].includes(s) ? s : 'その他';
+    })();
+    return c === consultF;
+  });
   // ステータスフィルター
   const getSt = (d) => (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
   if (stF === 'exclude-cancel') filtered = filtered.filter(d => getSt(d) !== 'キャンセル');
