@@ -4830,15 +4830,16 @@ function drawKaiinRows(treatment, rows, container) {
     const stColor = statuses.find(s => s.value === st)?.color || '';
     const stStyle = st ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700` : '';
     const memo = d._memo || findAnyMemo(d.name);
-    // プロモ表示: 手動は空欄で入力可、セレクト/DXはsourceをバッジ表示
+    // プロモ表示: 統一スタイル (バッジ風) + 手動はクリックで編集
     let promoBadge = '';
     if (d.tool === '手動') {
-      promoBadge = `<input type="text" class="kaiin-promo-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.source||'')}" placeholder="プロモ入力" title="手動登録: 編集可" style="width:100%;padding:2px 6px;font-size:10px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box">`;
+      // 手動 = 値があれば青バッジ風、なければ点線で入力促す
+      promoBadge = `<input type="text" class="kaiin-promo-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.source||'')}" placeholder="プロモ入力" title="手動登録: 編集可 (クリックで入力)" style="width:100%;padding:3px 8px;font-size:10px;border:1px dashed ${d.source?'#0369a1':'#cbd5e1'};border-radius:12px;box-sizing:border-box;background:${d.source?'#e0f2fe':'#fff'};color:${d.source?'#0369a1':'#94a3b8'};font-weight:${d.source?'600':'400'};text-align:center">`;
     } else if (d.tool === 'セレクト') {
       const lbl = d.source || 'セレクトタイプ';
-      promoBadge = `<span title="セレクトタイプ予約 (変更不可)" style="display:inline-block;padding:2px 6px;background:#fef3c7;color:#b45309;border-radius:4px;font-size:10px;font-weight:600;cursor:help">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
+      promoBadge = `<span title="セレクトタイプ予約 (変更不可)" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#b45309;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #fde68a">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
     } else if (d.source) {
-      promoBadge = `<span title="DXHUB予約 (自動取得・変更不可)" style="display:inline-block;padding:2px 6px;background:#e0f2fe;color:#0369a1;border-radius:4px;font-size:10px;font-weight:600;cursor:help">${d.source.length>14?d.source.slice(0,14)+'…':d.source}</span>`;
+      promoBadge = `<span title="DXHUB予約 (自動取得・変更不可)" style="display:inline-block;padding:3px 8px;background:#e0f2fe;color:#0369a1;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #bae6fd">${d.source.length>14?d.source.slice(0,14)+'…':d.source}</span>`;
     } else {
       promoBadge = '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     }
