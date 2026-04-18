@@ -4794,22 +4794,19 @@ function drawKaiinRows(treatment, rows, container) {
     const stColor = statuses.find(s => s.value === st)?.color || '';
     const stStyle = st ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700` : '';
     const memo = d._memo || findAnyMemo(d.name);
-    // プロモ表示: DX→そのままsource、セレクト→セレクトタイプ、手動→手動登録
-    let promoLabel = '';
-    let promoColor = '#0369a1';
-    let promoBg = '#e0f2fe';
-    if (d.tool === 'セレクト') {
-      promoLabel = d.source || 'セレクトタイプ';
-      promoColor = '#b45309';
-      promoBg = '#fef3c7';
-    } else if (d.tool === '手動') {
-      promoLabel = d.source || '手動登録';
-      promoColor = '#4338ca';
-      promoBg = '#e0e7ff';
+    // プロモ表示: 手動は空欄で入力可、セレクト/DXはsourceをバッジ表示
+    let promoBadge = '';
+    if (d.tool === '手動') {
+      // 手動は空入力可能なテキストボックス
+      promoBadge = `<input type="text" class="kaiin-promo-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.source||'')}" placeholder="プロモ入力" style="width:100%;padding:2px 6px;font-size:10px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box">`;
+    } else if (d.tool === 'セレクト') {
+      const lbl = d.source || 'セレクトタイプ';
+      promoBadge = `<span style="display:inline-block;padding:2px 6px;background:#fef3c7;color:#b45309;border-radius:4px;font-size:10px;font-weight:600">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
+    } else if (d.source) {
+      promoBadge = `<span style="display:inline-block;padding:2px 6px;background:#e0f2fe;color:#0369a1;border-radius:4px;font-size:10px;font-weight:600">${d.source.length>14?d.source.slice(0,14)+'…':d.source}</span>`;
     } else {
-      promoLabel = d.source || '-';
+      promoBadge = '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     }
-    const promoBadge = promoLabel !== '-' ? `<span style="display:inline-block;padding:2px 6px;background:${promoBg};color:${promoColor};border-radius:4px;font-size:10px;font-weight:600">${promoLabel.length>14?promoLabel.slice(0,14)+'…':promoLabel}</span>` : '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
       <td style="font-weight:500;text-align:left">${d.name}</td>
@@ -4846,6 +4843,24 @@ function drawKaiinRows(treatment, rows, container) {
   // メモセル → 予約一覧のメモモーダルを再利用
   container.querySelectorAll('.kaiin-memo-cell').forEach(td => {
     td.addEventListener('click', () => openMemoModal(td.dataset.name, td.dataset.apply, td));
+  });
+  // プロモ入力 (手動のみ)
+  container.querySelectorAll('.kaiin-promo-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const name = inp.dataset.name; const apply = inp.dataset.apply;
+      const v = inp.value.trim();
+      // manual_bookings を更新
+      try {
+        await sb.from('manual_bookings').update({ source: v || null }).eq('name', name).eq('apply_date', apply);
+        // bookingsDataにも反映
+        const d = bookingsData.find(b => b.name === name && b.applyDate === apply);
+        if (d) d.source = v;
+        inp.style.borderColor = '#0a0';
+        setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+        showToast('プロモを保存しました');
+      } catch(e) { showToast('保存エラー: ' + e.message, true); }
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
   });
 }
 
