@@ -3500,7 +3500,8 @@ const BF_STATUSES = [
   { value: '治療中', color: '#1d4ed8' },
   { value: 'セット日確定待ち', color: '#0891b2' },
   { value: 'セット待ち', color: '#0e7490' },
-  { value: 'セット完了', color: '#059669' }
+  { value: 'セット完了', color: '#059669' },
+  { value: 'キャンセル', color: '#dc2626' }
 ];
 let bfLifecycleCache = {}; // key: name|applyDate → {bf_status, bf_next_date, ...}
 let bfHistoryCache = {}; // key: name|applyDate → [events]
