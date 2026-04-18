@@ -3494,6 +3494,8 @@ const BF_STATUSES = [
   { value: '離脱', color: '#9ca3af' },
   { value: '検討中', color: '#f59e0b' },
   { value: '成約', color: '#10b981' },
+  { value: 'ローン審査中', color: '#eab308' },
+  { value: 'ローン審査落', color: '#b91c1c' },
   { value: '矯正決定(BF保留)', color: '#8b5cf6' },
   { value: '印象待ち(治療無)', color: '#3b82f6' },
   { value: '印象待ち(治療有)', color: '#2563eb' },
@@ -3501,7 +3503,7 @@ const BF_STATUSES = [
   { value: 'セット日確定待ち', color: '#0891b2' },
   { value: 'セット待ち', color: '#0e7490' },
   { value: 'セット完了', color: '#059669' },
-  { value: 'キャンセル', color: '#dc2626' }
+  { value: 'キャンセル(未来院)', color: '#dc2626' }
 ];
 let bfLifecycleCache = {}; // key: name|applyDate → {bf_status, bf_next_date, ...}
 let bfHistoryCache = {}; // key: name|applyDate → [events]
