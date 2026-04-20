@@ -1,0 +1,96 @@
+# Supabase Auth 移行 / マイグレーション手順書
+
+このフォルダには、既存 `accounts` テーブル (平文 password 認証) から
+**Supabase Auth** への段階的な移行用 SQL が入っている。
+
+基本方針:
+
+- **既存データは一切削除・変更しない**
+- **旧ログイン (accounts.password) は並走期間中そのまま動く**
+- **ダウンタイムゼロ** で新 Auth を追加
+- 実行はユーザが Supabase Dashboard → SQL Editor で手動で行う
+
+---
+
+## Phase 一覧
+
+| Phase | ファイル            | 目的                                               | いつ実行                 |
+|:-----:|:--------------------|:---------------------------------------------------|:-------------------------|
+|   1   | `auth_phase1.sql`   | accounts 拡張 + RLS(許容) + RPC + 監査ログ          | **今すぐ** (データ安全)   |
+|   2   | `auth_phase2.sql`   | 初期 admin ユーザ作成と既存レコードのリンク         | Phase 1 と同時 / 直後可  |
+|   3   | 未作成               | RLS 引き締め、他ユーザ移行、旧 password 廃止        | 別計画 (後日)            |
+
+---
+
+## Phase 1: 基盤構築 (`auth_phase1.sql`)
+
+### 実行内容
+1. `accounts` に `supabase_user_id`, `email`, `migrated_at` カラム追加 (NULL 許容)
+2. `accounts` の RLS を有効化 (ただし Phase 1 は全許可ポリシーで既存動作を維持)
+3. `public.get_my_account()` RPC を作成 (認証済みユーザが自分の accounts 行を取得)
+4. `auth_audit` テーブル (新規) を作成
+
+### 実行方法
+1. Supabase Dashboard → **SQL Editor**
+2. `auth_phase1.sql` の中身をコピペ
+3. **Run** を押す
+4. エラーがなければ完了。既存データは無変更。
+
+### 影響
+- 既存の `attemptLogin()` (accounts.password チェック) は **そのまま動く**
+- Supabase Auth は未設定なので「メールでログイン」は失敗する (Phase 2 で設定)
+
+---
+
+## Phase 2: 初期 admin ユーザのリンク (`auth_phase2.sql`)
+
+### 手順
+1. Supabase Dashboard → **Authentication** → **Users** → **Add user**
+   - Email: 管理者のメール (例 `admin@example.com`)
+   - Password: 強固な新パスワード
+   - **Auto Confirm User: ON**
+2. 作成されたユーザの UUID をコピー
+3. `auth_phase2.sql` を開き、セクション A の UPDATE 文のコメントを外し、
+   `<USER_UUID>` と `<EMAIL>` を実際の値に書き換える
+4. **SQL Editor** で実行
+5. ブラウザで `index.html` を開き、ログインセクションの
+   「メールでログイン (Supabase Auth)」 リンクから新認証を試す
+6. 成功すれば admin の移行完了
+
+### 並走期間
+- 同じ admin ユーザは、**旧パスワードでも / メール Auth でも** ログイン可能
+- 他ユーザ (sales, tc, promo, custom) は旧パスワードのまま
+- 監視期間を経て、順次 Phase 3 で全員移行
+
+---
+
+## Phase 3 (予定): 引き締め
+
+- 全ユーザを Supabase Auth に移行
+- `accounts.password` 列を廃止
+- RLS ポリシーを `supabase_user_id` / `account_type` ベースに書き換え
+- 旧 `attemptLogin()` 関数をアプリから削除
+
+別計画として、動作が安定してから実施する。
+
+---
+
+## ロールバック
+
+Phase 1 の SQL は加算のみ (ALTER ADD, CREATE)。どうしても巻き戻したい場合:
+
+```sql
+-- 追加カラムを削除 (既存データは無関係)
+ALTER TABLE accounts DROP COLUMN IF EXISTS supabase_user_id;
+ALTER TABLE accounts DROP COLUMN IF EXISTS email;
+ALTER TABLE accounts DROP COLUMN IF EXISTS migrated_at;
+
+-- RPC 削除
+DROP FUNCTION IF EXISTS public.get_my_account();
+
+-- 監査テーブル削除
+DROP TABLE IF EXISTS auth_audit;
+
+-- RLS 無効化 (元の anon 全許可状態に戻す)
+ALTER TABLE accounts DISABLE ROW LEVEL SECURITY;
+```

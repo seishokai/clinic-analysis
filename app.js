@@ -633,6 +633,17 @@ document.addEventListener('DOMContentLoaded', () => {
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     return;
   }
+  // Supabase Auth セッション復元 (並走期間 / Phase 1)
+  // 既存 sessionStorage チェックの前に非同期で走らせ、見つかれば復元する
+  (async () => {
+    if (sessionStorage.getItem('authenticated') !== 'true') {
+      const restored = await restoreSupabaseAuthIfAny();
+      if (restored) {
+        setupEventListeners();
+        showApp();
+      }
+    }
+  })();
   if (sessionStorage.getItem('authenticated') === 'true') {
     userRole = sessionStorage.getItem('role') || 'admin';
     promoFilter = sessionStorage.getItem('promoFilter') || '';
@@ -642,7 +653,13 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 // === Auth ===
-function logout() {
+async function logout() {
+  // Supabase Auth 並走モードでログインしていたら signOut
+  try {
+    if (sessionStorage.getItem('authMode') === 'supabase' && sb && sb.auth) {
+      await sb.auth.signOut();
+    }
+  } catch (_) { /* ignore */ }
   sessionStorage.clear();
   userRole = 'admin';
   promoFilter = '';
@@ -658,6 +675,64 @@ function logout() {
   hdr.classList.remove('role-promo', 'role-custom');
   const userBadge = hdr.querySelector('.header-user');
   if (userBadge) userBadge.remove();
+}
+
+// === Supabase Auth 並走モード (Phase 1) ===
+// 既存 attemptLogin() と並行して動作する新ログイン経路。
+// 旧ログインは無変更、DB スキーマもデータ変更なし (migrations/auth_phase1.sql 参照)。
+function _applyAccountProfileToSession(profile) {
+  sessionStorage.setItem('authenticated', 'true');
+  const type = profile.account_type || 'custom';
+  sessionStorage.setItem('role', type);
+  sessionStorage.setItem('authMode', 'supabase'); // 識別用 (旧ログインと区別)
+  if (type === 'promo') {
+    const pf = (profile.promos && profile.promos[0]) || '';
+    sessionStorage.setItem('promoFilter', pf);
+    userRole = 'promo'; promoFilter = pf;
+  } else if (type === 'admin' || type === 'sales' || type === 'tc') {
+    userRole = type; promoFilter = '';
+  } else {
+    // custom
+    sessionStorage.setItem('customPerms', JSON.stringify(profile.permissions || []));
+    sessionStorage.setItem('customPromos', JSON.stringify(profile.promos || []));
+    sessionStorage.setItem('customServices', JSON.stringify(profile.services || []));
+    sessionStorage.setItem('customFacilities', JSON.stringify(profile.facilities || []));
+    sessionStorage.setItem('customEditRole', profile.role || 'view');
+    sessionStorage.setItem('customAgency', profile.agency || '');
+    sessionStorage.setItem('customName', profile.name || '');
+    userRole = 'custom';
+  }
+}
+
+async function attemptLoginViaSupabaseAuth(email, password) {
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    if (error) return { ok: false, error: error.message || 'ログインに失敗しました' };
+    const { data: profile, error: pErr } = await sb.rpc('get_my_account');
+    if (pErr || !profile) {
+      try { await sb.auth.signOut(); } catch(_) {}
+      return { ok: false, error: 'プロファイルが見つかりません (accounts 未リンク)' };
+    }
+    _applyAccountProfileToSession(profile);
+    return { ok: true, profile };
+  } catch (e) {
+    return { ok: false, error: (e && e.message) || '予期せぬエラー' };
+  }
+}
+
+async function restoreSupabaseAuthIfAny() {
+  try {
+    if (!sb || !sb.auth) return false;
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return false;
+    const { data: profile, error } = await sb.rpc('get_my_account');
+    if (error || !profile) return false;
+    _applyAccountProfileToSession(profile);
+    return true;
+  } catch (e) {
+    console.warn('restoreSupabaseAuthIfAny failed', e);
+    return false;
+  }
 }
 
 function setupEventListeners() {
@@ -717,6 +792,42 @@ function setupEventListeners() {
     finish();
   }
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
+  // --- Supabase Auth 並走モード UI (Phase 1) ---
+  const emailToggle = document.getElementById('show-email-login');
+  const emailSection = document.getElementById('email-login-section');
+  if (emailToggle && emailSection) {
+    emailToggle.addEventListener('click', (e) => {
+      e.preventDefault();
+      emailSection.style.display = (emailSection.style.display === 'none' || !emailSection.style.display) ? 'block' : 'none';
+    });
+  }
+  const authLoginBtn = document.getElementById('auth-login-btn');
+  if (authLoginBtn) {
+    const runAuthLogin = async () => {
+      const email = (document.getElementById('auth-email').value || '').trim();
+      const pw = document.getElementById('auth-password').value || '';
+      const errEl = document.getElementById('auth-login-err');
+      errEl.hidden = true; errEl.textContent = '';
+      if (!email || !pw) { errEl.textContent = 'メールとパスワードを入力してください'; errEl.hidden = false; return; }
+      authLoginBtn.disabled = true;
+      const origLabel = authLoginBtn.textContent;
+      authLoginBtn.textContent = 'ログイン中...';
+      const res = await attemptLoginViaSupabaseAuth(email, pw);
+      authLoginBtn.disabled = false;
+      authLoginBtn.textContent = origLabel;
+      if (!res.ok) {
+        errEl.textContent = res.error || 'ログインに失敗しました';
+        errEl.hidden = false;
+        document.getElementById('auth-password').value = '';
+        return;
+      }
+      document.getElementById('auth-password').value = '';
+      showApp();
+    };
+    authLoginBtn.addEventListener('click', runAuthLogin);
+    const pwInp = document.getElementById('auth-password');
+    if (pwInp) pwInp.addEventListener('keydown', e => { if (e.key === 'Enter') runAuthLogin(); });
+  }
   // 予約管理ログイン
   const bkLoginBtn = document.getElementById('login-btn-booking');
   if (bkLoginBtn) {

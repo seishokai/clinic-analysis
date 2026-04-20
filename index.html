@@ -272,6 +272,15 @@
               <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
               <button type="button" class="btn-primary" id="login-btn">ログイン</button>
               <p id="login-error" class="error-msg" hidden>パスワードが正しくありません</p>
+              <div style="margin-top:12px;text-align:center;font-size:11px">
+                <a href="#" id="show-email-login" style="color:#6b7280;text-decoration:underline">メールでログイン (Supabase Auth)</a>
+              </div>
+              <div id="email-login-section" style="display:none;margin-top:16px;padding-top:16px;border-top:1px dashed #e5e7eb">
+                <div class="input-group"><label for="auth-email">Email</label><input type="email" id="auth-email" class="form-input" autocomplete="email"></div>
+                <div class="input-group"><label for="auth-password">Password</label><input type="password" id="auth-password" class="form-input" autocomplete="current-password"></div>
+                <button type="button" class="btn-primary" id="auth-login-btn">Supabase Auth でログイン</button>
+                <p id="auth-login-err" class="error-msg" hidden></p>
+              </div>
             </div>
           </div>
 
@@ -1077,7 +1086,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=225"></script>
+  <script src="app.js?v=226"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
