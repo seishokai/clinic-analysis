@@ -1109,6 +1109,22 @@ function setupEventListeners() {
     renderBookings();
   });
   document.getElementById('bk-csv').addEventListener('click', exportCSV);
+  document.getElementById('bk-pdf')?.addEventListener('click', () => {
+    const prevLimit = window._bkDisplayLimit;
+    const prevTitle = document.title;
+    printTable(
+      () => {
+        window._bkDisplayLimit = 99999;
+        if (typeof renderBookings === 'function') renderBookings();
+        document.title = `予約一覧_${new Date().toISOString().slice(0,10)}`;
+      },
+      () => {
+        window._bkDisplayLimit = prevLimit || 200;
+        if (typeof renderBookings === 'function') renderBookings();
+        document.title = prevTitle;
+      }
+    );
+  });
 
   // Ad Budget
   document.getElementById('ad-save').addEventListener('click', saveAdBudget);
@@ -5187,6 +5203,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         <option value="status">ステータス順</option>
         <option value="name">名前順</option>
       </select>
+      <button class="btn btn-outline kaiin-pdf-btn" data-treatment="${treatment}" style="font-size:11px;padding:5px 8px;min-height:28px;white-space:nowrap">📄 PDF出力</button>
     </div>
     <div class="kaiin-header-wrap" style="display:none">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto;align-items:center">
@@ -5325,6 +5342,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   filterScope.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-pdf-btn')?.addEventListener('click', () => {
+    const prevTitle = document.title;
+    const today = new Date().toISOString().slice(0,10);
+    printTable(
+      () => { document.title = `来院管理_${treatment}_${today}`; },
+      () => { document.title = prevTitle; }
+    );
+  });
 }
 
 function drawKaiinRows(treatment, rows, container) {
@@ -8470,4 +8495,17 @@ function initParaExternal() {
   };
   btn.addEventListener('click', submit);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+}
+
+// ══ 印刷用ヘルパー (ブラウザの印刷→PDF保存) ══
+function printTable(beforeFn, afterFn) {
+  try { if (beforeFn) beforeFn(); } catch(_) {}
+  document.body.classList.add('printing');
+  setTimeout(() => {
+    try { window.print(); } catch(_) {}
+    setTimeout(() => {
+      document.body.classList.remove('printing');
+      try { if (afterFn) afterFn(); } catch(_) {}
+    }, 500);
+  }, 100);
 }
