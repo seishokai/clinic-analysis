@@ -5344,9 +5344,9 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     </div>
     <div class="kaiin-header-wrap" style="display:none">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto;align-items:center">
-        <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700">${rows.length}</span></div>
-        <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700">${noSt}</span></div>
-        ${statuses.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}">${byStatus[s.value]}</span></div>`).join('')}
+        <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid var(--border);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">総計</span><span style="font-size:16px;font-weight:700" class="kaiin-count-total">${rows.length}</span></div>
+        <div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border:1px solid #ccc;border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub)">未設定</span><span style="font-size:16px;font-weight:700" class="kaiin-count-unset">${noSt}</span></div>
+        ${statuses.map(s => `<div style="display:inline-flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 10px;background:var(--card);border-left:3px solid ${s.color};border-top:1px solid var(--border-light);border-right:1px solid var(--border-light);border-bottom:1px solid var(--border-light);border-radius:6px;min-width:60px"><span style="font-size:9px;color:var(--text-sub);white-space:nowrap">${s.value}</span><span style="font-size:15px;font-weight:700;color:${s.color}" class="kaiin-count-st" data-st="${s.value}">${byStatus[s.value]}</span></div>`).join('')}
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;align-items:center">
         <select class="form-select kaiin-filter-fac" data-treatment="${treatment}" style="font-size:12px;padding:6px 10px;width:auto"><option value="">医院(旧):全て</option>${FACS_OPTS.slice(1).map(f => `<option>${f}</option>`).join('')}</select>
@@ -5553,6 +5553,25 @@ function drawKaiinRows(treatment, rows, container) {
   else if (sortBy === 'name') filtered.sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
   else filtered.sort((a,b) => bookKey(b) - bookKey(a));
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
+  // サマリー数値もフィルター結果で更新
+  (function updateSummary(){
+    const byStatusF = {};
+    statuses.forEach(s => byStatusF[s.value] = 0);
+    let unsetF = 0;
+    filtered.forEach(d => {
+      const info = getBFInfo(d.name, d.applyDate) || {};
+      const st = info.bf_status;
+      if (st && byStatusF[st] !== undefined) byStatusF[st]++; else unsetF++;
+    });
+    const elTotal = container.querySelector('.kaiin-count-total');
+    const elUnset = container.querySelector('.kaiin-count-unset');
+    if (elTotal) elTotal.textContent = filtered.length;
+    if (elUnset) elUnset.textContent = unsetF;
+    container.querySelectorAll('.kaiin-count-st').forEach(el => {
+      const v = el.dataset.st;
+      el.textContent = byStatusF[v] || 0;
+    });
+  })();
   container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
     const info = getBFInfo(d.name, d.applyDate) || {};
     const st = info.bf_status || '';
