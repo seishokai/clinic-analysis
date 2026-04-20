@@ -262,7 +262,7 @@
         <!-- 管理系 -->
         <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
           <h3>管理系</h3>
-          <button onclick="var s=document.getElementById('login-section');document.getElementById('login-section-booking').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">顧客管理</button>
+          <button id="portal-manage-btn" onclick="var s=document.getElementById('login-section');s.style.display=(s.style.display==='block'?'none':'block');if(s.style.display==='block'){setTimeout(function(){document.getElementById('login-email').focus()},50)}" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:#1a1a1a;color:white;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#000'" onmouseout="this.style.background='#1a1a1a'">管理</button>
           <div id="login-section" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
             <div id="login-form">
               <div class="input-group">
@@ -276,17 +276,8 @@
               <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
               <button type="button" class="btn-primary" id="login-btn">ログイン</button>
               <p id="login-error" class="error-msg" hidden>メールまたはパスワードが正しくありません</p>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center">入力した権限に応じた画面が表示されます</p>
             </div>
-          </div>
-
-          <button onclick="var s=document.getElementById('login-section-booking');document.getElementById('login-section').style.display='none';s.style.display=(s.style.display==='block'?'none':'block')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">売上管理</button>
-          <div id="login-section-booking" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
-            <div class="input-group">
-              <label for="password-booking">Password</label>
-              <input type="password" id="password-booking" placeholder="パスワードを入力" autocomplete="new-password">
-            </div>
-            <button type="button" class="btn-primary" id="login-btn-booking">ログイン</button>
-            <p id="login-error-booking" class="error-msg" hidden style="color:#b91c1c;font-size:12px;margin-top:6px">パスワードが正しくありません</p>
           </div>
 
           <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">労務管理（ピノキオ）</a>
@@ -1086,7 +1077,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=230"></script>
+  <script src="app.js?v=231"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

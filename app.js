@@ -831,24 +831,6 @@ function setupEventListeners() {
     }
   }
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
-  // 予約管理ログイン
-  const bkLoginBtn = document.getElementById('login-btn-booking');
-  if (bkLoginBtn) {
-    bkLoginBtn.addEventListener('click', () => {
-      const pw = document.getElementById('password-booking').value;
-      document.getElementById('password').value = pw;
-      attemptLogin();
-      setTimeout(() => {
-        if (!sessionStorage.getItem('authenticated')) {
-          document.getElementById('login-error-booking').hidden = false;
-          document.getElementById('password-booking').value = '';
-        }
-      }, 500);
-    });
-    document.getElementById('password-booking').addEventListener('keypress', e => {
-      if (e.key === 'Enter') bkLoginBtn.click();
-    });
-  }
   document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
   document.getElementById('login-email')?.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('password')?.focus(); });
   // #20 パスワード表示トグル
