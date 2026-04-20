@@ -721,11 +721,17 @@ function applyRoleUI() {
   const agency = isAgencyRole();
   // 新 UI ガード: body に data 属性を付けて CSS 側で制御可能にする
   document.body.dataset.role = currentRole || '';
-  // admin 以外は管理タブ / TC / 広告タブを非表示
+  // すべてのナビを一度リセットしてから、ロール別に隠す
+  // (以前 hide されたままにならないよう必ず display='' を先に設定)
+  document.querySelectorAll('.desktop-nav .nav-btn, .bottom-nav-btn').forEach(b => {
+    b.style.display = '';
+  });
+  // admin は全タブ見える → これで終了
+  if (admin) return;
+  // staff_promo / agency / その他: 一部タブを非表示
   document.querySelectorAll('.desktop-nav .nav-btn, .bottom-nav-btn').forEach(b => {
     const v = b.dataset.view;
     if (!v) return;
-    if (admin) return; // admin は全部見える
     if (v === 'admin' || v === 'tc' || v === 'adbudget' || v === 'sales') {
       b.style.display = 'none';
     }
