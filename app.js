@@ -7719,35 +7719,41 @@ function renderReviews() {
 // =========================================
 // パラ管理 (歯科金属スクラップ回収)
 // =========================================
-const PARA_PASSCODE = 'para2026';
+const PARA_PASSCODE = 'para';
 const PARA_CLINICS = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
 let paraRecordsCache = {}; // key: year_month+'|'+clinic_name → record
+let paraSaveTimers = {}; // debounce per cell
 
-function currentYearMonth() {
-  const d = new Date();
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-}
+function currentYear() { return new Date().getFullYear(); }
+function ymKey(y, m) { return `${y}-${String(m).padStart(2,'0')}`; }
 
-async function loadParaRecords(ym) {
+async function loadParaYear(year) {
   try {
-    const { data, error } = await sb.from('para_records').select('*').eq('year_month', ym);
+    const start = `${year}-01`;
+    const end = `${year}-12`;
+    const { data, error } = await sb.from('para_records').select('*').gte('year_month', start).lte('year_month', end);
     if (error) throw error;
-    const map = {};
-    (data || []).forEach(r => { map[r.year_month + '|' + r.clinic_name] = r; });
-    paraRecordsCache = map;
+    // 該当年のキャッシュだけリセット
+    for (const k of Object.keys(paraRecordsCache)) {
+      if (k.startsWith(String(year) + '-')) delete paraRecordsCache[k];
+    }
+    (data || []).forEach(r => { paraRecordsCache[r.year_month + '|' + r.clinic_name] = r; });
     return data || [];
   } catch(e) {
-    console.warn('loadParaRecords failed', e);
+    console.warn('loadParaYear failed', e);
     showToast && showToast('データ読込失敗: ' + (e.message || e));
     return [];
   }
 }
 
-async function saveParaRecord(clinic, patch) {
-  const monthEl = document.getElementById('para-month');
-  const ym = (monthEl && monthEl.value) || currentYearMonth();
+// 後方互換 (外注画面などが呼ぶ可能性)
+async function loadParaRecords(ym) {
+  const [y] = ym.split('-');
+  return loadParaYear(Number(y));
+}
+
+async function saveParaCell(clinic, ym, patch) {
   const payload = { year_month: ym, clinic_name: clinic, ...patch };
-  // 空欄は null に正規化
   if (payload.collected_date === '') payload.collected_date = null;
   if (payload.grams === '' || payload.grams == null) payload.grams = null;
   else payload.grams = Number(payload.grams);
@@ -7755,103 +7761,196 @@ async function saveParaRecord(clinic, patch) {
   const res = await safeSave({ type:'upsert', table:'para_records', payload, options:{ onConflict:'year_month,clinic_name' } });
   if (res.ok) {
     paraRecordsCache[ym + '|' + clinic] = { ...(paraRecordsCache[ym + '|' + clinic] || {}), ...payload };
-    updateParaTotal();
-    showToast && showToast('保存しました');
+    updateParaTotals();
   } else {
     showToast && showToast('保存失敗 (キューに登録)');
   }
 }
 
-function updateParaTotal() {
+function scheduleParaSave(clinic, ym, patch) {
+  const key = clinic + '|' + ym;
+  clearTimeout(paraSaveTimers[key]);
+  paraSaveTimers[key] = setTimeout(() => { saveParaCell(clinic, ym, patch); }, 500);
+}
+
+function updateParaTotals() {
   const tbody = document.getElementById('para-tbody');
-  if (!tbody) return;
-  let total = 0;
-  tbody.querySelectorAll('input.para-grams').forEach(inp => {
-    const v = Number(inp.value);
-    if (!isNaN(v)) total += v;
+  const tfoot = document.getElementById('para-tfoot');
+  if (!tbody || !tfoot) return;
+  const yearEl = document.getElementById('para-year');
+  const year = Number(yearEl?.value || currentYear());
+  // 各行の合計
+  let grand = 0;
+  const monthSums = Array(13).fill(0); // index 1-12
+  PARA_CLINICS.forEach(c => {
+    let row = 0;
+    for (let m = 1; m <= 12; m++) {
+      const r = paraRecordsCache[ymKey(year,m) + '|' + c];
+      const g = r?.grams;
+      if (g != null && !isNaN(Number(g))) {
+        row += Number(g);
+        monthSums[m] += Number(g);
+        grand += Number(g);
+      }
+    }
+    const el = tbody.querySelector(`tr[data-clinic="${c}"] .para-row-total`);
+    if (el) el.textContent = row ? (Math.round(row*100)/100).toLocaleString() : '';
   });
-  const el = document.getElementById('para-total');
-  if (el) el.textContent = (Math.round(total * 100) / 100).toLocaleString();
+  for (let m = 1; m <= 12; m++) {
+    const el = tfoot.querySelector(`.para-col-total[data-m="${m}"]`);
+    if (el) el.textContent = monthSums[m] ? (Math.round(monthSums[m]*100)/100).toLocaleString() : '';
+  }
+  const totalEl = document.getElementById('para-total');
+  if (totalEl) totalEl.textContent = (Math.round(grand*100)/100).toLocaleString();
 }
 
 async function renderPara() {
-  const monthEl = document.getElementById('para-month');
-  if (!monthEl) return;
-  if (!monthEl.value) monthEl.value = currentYearMonth();
+  const yearEl = document.getElementById('para-year');
+  if (!yearEl) return;
+  if (!yearEl.value) yearEl.value = currentYear();
   initParaControls();
-  const ym = monthEl.value;
+  const year = Number(yearEl.value);
+  const thead = document.getElementById('para-thead');
   const tbody = document.getElementById('para-tbody');
-  tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">読込中...</td></tr>`;
-  await loadParaRecords(ym);
+  const tfoot = document.getElementById('para-tfoot');
+  // ヘッダー (医院 | 1月 ... 12月 | 合計)
+  thead.innerHTML = `<tr>
+    <th style="width:90px;text-align:left;position:sticky;left:0;background:var(--card);z-index:2">医院</th>
+    ${Array.from({length:12},(_,i)=>`<th style="width:72px;text-align:center">${i+1}月</th>`).join('')}
+    <th style="width:80px;text-align:right">合計(g)</th>
+  </tr>`;
+  tbody.innerHTML = `<tr><td colspan="14" style="text-align:center;color:var(--text-muted);padding:20px">読込中...</td></tr>`;
+  await loadParaYear(year);
+  // 本体
   tbody.innerHTML = PARA_CLINICS.map(c => {
-    const r = paraRecordsCache[ym + '|' + c] || {};
-    const date = r.collected_date || '';
-    const grams = r.grams != null ? r.grams : '';
-    const memo = r.memo || '';
+    const memoAny = (() => {
+      // 年間で最新のメモを表示用に1つ拾う (なくても可)
+      for (let m = 12; m >= 1; m--) { const r = paraRecordsCache[ymKey(year,m)+'|'+c]; if (r?.memo) return r.memo; }
+      return '';
+    })();
+    const cells = [];
+    for (let m = 1; m <= 12; m++) {
+      const ym = ymKey(year, m);
+      const r = paraRecordsCache[ym + '|' + c] || {};
+      const grams = r.grams != null ? r.grams : '';
+      const date = r.collected_date || '';
+      const md = date ? date.substring(5).replace('-','/') : '';
+      cells.push(`<td style="padding:2px" data-clinic="${c}" data-ym="${ym}">
+        <input type="number" step="0.01" class="para-grams" value="${grams}" placeholder="g" style="width:100%;padding:3px 4px;font-size:11px;text-align:right;border:1px solid var(--border);border-radius:3px;box-sizing:border-box">
+        <input type="text" class="para-mmdd" value="${md}" placeholder="M/D" maxlength="5" style="width:100%;padding:2px 4px;margin-top:2px;font-size:10px;text-align:center;border:1px solid var(--border);border-radius:3px;box-sizing:border-box;color:var(--text-sub)">
+      </td>`);
+    }
     return `<tr data-clinic="${c}">
-      <td style="font-weight:600">${c}</td>
-      <td><input type="date" class="form-input para-date" value="${date}" style="padding:4px 6px;font-size:12px"></td>
-      <td><input type="number" step="0.01" class="form-input para-grams" value="${grams}" style="padding:4px 6px;font-size:12px;text-align:right" placeholder="0"></td>
-      <td><input type="text" class="form-input para-memo" value="${memo.replace(/"/g,'&quot;')}" style="padding:4px 6px;font-size:12px" placeholder="メモ"></td>
-      <td><button class="btn btn-dark para-save" style="padding:4px 12px;font-size:11px">保存</button></td>
+      <td style="font-weight:600;position:sticky;left:0;background:var(--card);z-index:1;cursor:pointer" class="para-clinic-cell" title="クリックでメモ編集: ${String(memoAny).replace(/"/g,'&quot;')}">${c}${memoAny?' 📝':''}</td>
+      ${cells.join('')}
+      <td class="para-row-total" style="text-align:right;font-weight:600;color:var(--text-sub)"></td>
     </tr>`;
   }).join('');
-  // リスナー
-  tbody.querySelectorAll('input.para-grams').forEach(inp => inp.addEventListener('input', updateParaTotal));
-  tbody.querySelectorAll('tr').forEach(tr => {
-    const clinic = tr.dataset.clinic;
-    tr.querySelector('.para-save').addEventListener('click', () => {
-      const date = tr.querySelector('.para-date').value;
-      const grams = tr.querySelector('.para-grams').value;
-      const memo = tr.querySelector('.para-memo').value;
-      saveParaRecord(clinic, { collected_date: date, grams, memo });
+  // フッター (各月合計)
+  tfoot.innerHTML = `<tr style="background:var(--bg)">
+    <th style="text-align:left;position:sticky;left:0;background:var(--bg)">月合計</th>
+    ${Array.from({length:12},(_,i)=>`<td class="para-col-total" data-m="${i+1}" style="text-align:right;font-weight:600;font-size:11px;padding:6px 4px"></td>`).join('')}
+    <td style="text-align:right;font-weight:700"><span id="para-total-foot"></span></td>
+  </tr>`;
+  // リスナー: grams / mmdd → debounced 保存
+  tbody.querySelectorAll('td[data-clinic][data-ym]').forEach(td => {
+    const clinic = td.dataset.clinic;
+    const ym = td.dataset.ym;
+    const gInp = td.querySelector('.para-grams');
+    const dInp = td.querySelector('.para-mmdd');
+    gInp.addEventListener('input', () => {
+      updateParaTotals();
+      scheduleParaSave(clinic, ym, { grams: gInp.value });
+      gInp.style.background = '#fef3c7';
+      setTimeout(() => { gInp.style.background = ''; }, 600);
+    });
+    dInp.addEventListener('change', () => {
+      const v = dInp.value.trim();
+      let iso = null;
+      const m = v.match(/^(\d{1,2})[\/\-\.](\d{1,2})$/);
+      if (m) {
+        const [_, mm, dd] = m;
+        const y = ym.split('-')[0];
+        iso = `${y}-${String(mm).padStart(2,'0')}-${String(dd).padStart(2,'0')}`;
+        dInp.value = `${mm}/${dd}`;
+      } else if (!v) { iso = null; }
+      else { dInp.value = ''; return; }
+      scheduleParaSave(clinic, ym, { collected_date: iso });
     });
   });
-  updateParaTotal();
+  // 医院名クリック → メモ編集モーダル
+  tbody.querySelectorAll('.para-clinic-cell').forEach(cell => {
+    cell.addEventListener('click', () => openParaMemoModal(cell.closest('tr').dataset.clinic, year));
+  });
+  updateParaTotals();
   // 外注URL表示
   const urlEl = document.getElementById('para-ext-url');
   if (urlEl) urlEl.textContent = location.origin + location.pathname + '?view=para';
 }
 
-function initParaControls() {
-  const monthEl = document.getElementById('para-month');
-  if (!monthEl || monthEl.dataset.bound) return;
-  monthEl.dataset.bound = '1';
-  if (!monthEl.value) monthEl.value = currentYearMonth();
-  monthEl.addEventListener('change', () => renderPara());
-  const copyBtn = document.getElementById('para-copy-prev');
-  if (copyBtn) copyBtn.addEventListener('click', async () => {
-    const ym = monthEl.value;
-    if (!ym) return;
-    const [y, m] = ym.split('-').map(Number);
-    const prevDate = new Date(y, m - 2, 1);
-    const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
-    if (!confirm(`${prevYm} のデータを ${ym} にコピーしますか？（既存の入力は上書きされます）`)) return;
-    try {
-      const { data } = await sb.from('para_records').select('*').eq('year_month', prevYm);
-      if (!data || !data.length) { showToast && showToast('前月データがありません'); return; }
-      for (const r of data) {
-        await safeSave({ type:'upsert', table:'para_records',
-          payload: { year_month: ym, clinic_name: r.clinic_name, collected_date: null, grams: r.grams, memo: r.memo },
-          options: { onConflict:'year_month,clinic_name' } });
+function openParaMemoModal(clinic, year) {
+  // 既存のモーダルを再利用せず、軽量なオーバーレイを作る
+  const monthsOpts = Array.from({length:12},(_,i)=>{
+    const ym = ymKey(year, i+1);
+    const r = paraRecordsCache[ym + '|' + clinic] || {};
+    return `<div style="margin-bottom:8px">
+      <label style="font-size:11px;color:var(--text-sub);display:block;margin-bottom:2px">${i+1}月 メモ</label>
+      <input type="text" class="para-memo-input" data-ym="${ym}" value="${(r.memo||'').replace(/"/g,'&quot;')}" style="width:100%;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box">
+    </div>`;
+  }).join('');
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:center;justify-content:center';
+  ov.innerHTML = `<div style="background:#fff;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;padding:20px;border-radius:8px">
+    <div style="font-size:14px;font-weight:700;margin-bottom:12px">${clinic} - ${year}年 月別メモ</div>
+    ${monthsOpts}
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <button id="para-memo-cancel" class="btn btn-outline" style="padding:6px 16px">閉じる</button>
+      <button id="para-memo-save" class="btn btn-dark" style="padding:6px 16px">保存</button>
+    </div>
+  </div>`;
+  document.body.appendChild(ov);
+  ov.querySelector('#para-memo-cancel').onclick = () => ov.remove();
+  ov.querySelector('#para-memo-save').onclick = async () => {
+    const inputs = ov.querySelectorAll('.para-memo-input');
+    for (const inp of inputs) {
+      const ym = inp.dataset.ym;
+      const cur = paraRecordsCache[ym + '|' + clinic]?.memo || '';
+      if (inp.value !== cur) {
+        await saveParaCell(clinic, ym, { memo: inp.value });
       }
-      await renderPara();
-      showToast && showToast('前月データをコピーしました');
-    } catch(e) { console.warn(e); showToast && showToast('コピー失敗: ' + (e.message || e)); }
-  });
+    }
+    ov.remove();
+    renderPara();
+  };
+}
+
+function initParaControls() {
+  const yearEl = document.getElementById('para-year');
+  if (!yearEl || yearEl.dataset.bound) return;
+  yearEl.dataset.bound = '1';
+  if (!yearEl.value) yearEl.value = currentYear();
+  yearEl.addEventListener('change', () => renderPara());
   const csvBtn = document.getElementById('para-csv');
   if (csvBtn) csvBtn.addEventListener('click', () => {
-    const ym = monthEl.value;
-    const rows = [['医院','回収日','回収グラム','メモ']];
+    const year = Number(yearEl.value);
+    const rows = [['医院', ...Array.from({length:12},(_,i)=>`${i+1}月(g)`), '合計(g)']];
     PARA_CLINICS.forEach(c => {
-      const r = paraRecordsCache[ym + '|' + c] || {};
-      rows.push([c, r.collected_date || '', r.grams != null ? r.grams : '', (r.memo || '').replace(/\n/g,' ')]);
+      const row = [c];
+      let sum = 0;
+      for (let m = 1; m <= 12; m++) {
+        const r = paraRecordsCache[ymKey(year,m) + '|' + c] || {};
+        const g = r.grams;
+        row.push(g != null ? g : '');
+        if (g != null) sum += Number(g);
+      }
+      row.push(sum || '');
+      rows.push(row);
     });
-    const csv = rows.map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const csv = rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
     const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
-    a.download = `para_${ym}.csv`;
+    a.download = `para_${year}.csv`;
     a.click();
   });
 }
@@ -7870,29 +7969,27 @@ function initParaExternal() {
       wrap = document.createElement('div');
       wrap.id = 'para-ext-wrap';
       wrap.style.cssText = 'max-width:900px;margin:0 auto;padding:20px;font-family:inherit';
+      wrap.style.cssText = 'max-width:1200px;margin:0 auto;padding:20px;font-family:inherit';
       wrap.innerHTML = `
         <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #111">
           <div style="font-size:14px;font-weight:800;letter-spacing:2px">SEISHOKAI / パラ管理 (外注)</div>
         </div>
         <div class="card" style="margin-bottom:16px;padding:16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-            <label style="font-size:12px;font-weight:600">対象月</label>
-            <input type="month" id="para-month" style="padding:6px 10px;font-size:13px;border:1px solid #ccc;border-radius:4px">
+            <label style="font-size:12px;font-weight:600">対象年</label>
+            <input type="number" id="para-year" min="2020" max="2099" step="1" style="width:100px;padding:6px 10px;font-size:13px;border:1px solid #ccc;border-radius:4px">
+            <button id="para-csv" style="padding:6px 14px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer">CSVエクスポート</button>
             <div style="flex:1"></div>
-            <div style="font-size:13px;color:#666">合計: <strong id="para-total" style="color:#111;font-size:15px">0</strong> g</div>
+            <div style="font-size:13px;color:#666">年間合計: <strong id="para-total" style="color:#111;font-size:15px">0</strong> g</div>
           </div>
-          <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px" class="data-table">
-            <thead><tr style="background:#f5f5f5">
-              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">医院</th>
-              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">回収日</th>
-              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">回収グラム</th>
-              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">メモ</th>
-              <th style="padding:8px;border-bottom:1px solid #ddd"></th>
-            </tr></thead>
+          <div style="overflow-x:auto"><table id="para-year-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:1100px">
+            <thead id="para-thead"></thead>
             <tbody id="para-tbody"></tbody>
+            <tfoot id="para-tfoot"></tfoot>
           </table></div>
+          <div style="font-size:10px;color:#999;margin-top:6px">※ 上段=グラム(g) / 下段=回収日(M/D) 自動保存。メモは医院名クリックで編集</div>
         </div>
-        <div style="font-size:11px;color:#999">※ 保存はリアルタイムで医院側と同期されます</div>
+        <div style="font-size:11px;color:#999">保存はリアルタイムで医院側と同期されます</div>
       `;
       document.body.appendChild(wrap);
     }

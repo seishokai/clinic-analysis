@@ -882,19 +882,22 @@
         <button class="sub-nav-btn" data-sub="para-manage">パラ管理</button>
       </div>
       <div id="sub-para-manage" hidden>
-        <div class="page-header"><h2>パラ管理</h2><p class="page-desc">歯科金属スクラップ回収管理 (月次)</p></div>
+        <div class="page-header"><h2>パラ管理</h2><p class="page-desc">歯科金属スクラップ回収管理 (年間一覧)</p></div>
         <div class="card" style="margin-bottom:16px">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
-            <label class="form-label" style="margin:0">対象月</label>
-            <input type="month" class="form-input" id="para-month" style="width:auto;padding:6px 10px;font-size:13px">
-            <button class="btn btn-outline" id="para-copy-prev" style="padding:6px 14px;font-size:12px">前月コピー</button>
+            <label class="form-label" style="margin:0">対象年</label>
+            <input type="number" class="form-input" id="para-year" min="2020" max="2099" step="1" style="width:100px;padding:6px 10px;font-size:13px">
             <button class="btn btn-outline" id="para-csv" style="padding:6px 14px;font-size:12px">CSVエクスポート</button>
             <div style="flex:1"></div>
-            <div style="font-size:13px;color:var(--text-sub)">合計: <strong id="para-total" style="color:var(--text);font-size:15px">0</strong> g</div>
+            <div style="font-size:13px;color:var(--text-sub)">年間合計: <strong id="para-total" style="color:var(--text);font-size:15px">0</strong> g</div>
           </div>
-          <div class="data-table-wrap"><table class="data-table"><thead><tr><th style="width:140px">医院</th><th style="width:160px">回収日</th><th style="width:140px">回収グラム</th><th>メモ</th><th style="width:100px"></th></tr></thead><tbody id="para-tbody"></tbody></table></div>
+          <div class="data-table-wrap" style="overflow-x:auto"><table class="data-table" id="para-year-table" style="min-width:1100px"><thead id="para-thead"></thead><tbody id="para-tbody"></tbody><tfoot id="para-tfoot"></tfoot></table></div>
+          <div style="font-size:10px;color:var(--text-muted);margin-top:6px">※ 上段=グラム(g) / 下段=回収日(MM/DD) 空欄可。値を変更すると自動保存。メモは医院名クリックで編集</div>
         </div>
-        <div style="font-size:11px;color:var(--text-muted)">外注先用URL: <code id="para-ext-url" style="background:var(--bg);padding:2px 6px;border-radius:3px;user-select:all"></code> <span style="margin-left:6px">(パスワード: <code>para2026</code>)</span></div>
+        <div style="font-size:11px;color:var(--text-muted);padding:10px;background:var(--bg);border-radius:6px">
+          <div style="margin-bottom:4px"><strong>外注先用URL:</strong> <code id="para-ext-url" style="background:#fff;padding:2px 6px;border-radius:3px;user-select:all;font-size:12px"></code></div>
+          <div>パスワード: <code style="background:#fff;padding:2px 6px;border-radius:3px;user-select:all">para</code></div>
+        </div>
       </div>
       <div id="sub-adm-account">
       <div class="page-header"><h2>権限管理</h2><p class="page-desc">閲覧用アカウントの発行・管理</p></div>
@@ -1058,7 +1061,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=209"></script>
+  <script src="app.js?v=210"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
