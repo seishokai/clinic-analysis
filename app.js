@@ -7967,9 +7967,12 @@ function initParaExternal() {
   if (loginScreen) loginScreen.style.display = 'none';
 
   const showUI = () => {
-    // 通常 app を隠し、独自コンテナを用意
+    // 通常 app を完全に削除 (ID衝突を防ぐ: para-year 等が両方あるとgetElementByIdがadmin側を返してしまう)
     const app = document.getElementById('app');
-    if (app) app.hidden = true;
+    if (app) app.remove();
+    // ログイン画面も削除
+    const login = document.getElementById('login-screen');
+    if (login) login.remove();
     let wrap = document.getElementById('para-ext-wrap');
     if (!wrap) {
       wrap = document.createElement('div');
