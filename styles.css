@@ -564,3 +564,13 @@ body {
   outline: 1px solid var(--border);
   border-radius: 4px;
 }
+/* マルチセレクトフィルターボタン */
+.multi-select-btn {
+  transition: background 0.15s, border-color 0.15s;
+}
+.multi-select-btn:hover {
+  border-color: #1d4ed8 !important;
+}
+@media (max-width: 640px) {
+  .multi-select-popup { max-width: 90vw !important; }
+}

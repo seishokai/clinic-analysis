@@ -279,6 +279,182 @@ function showToast(msg, isError) {
   setTimeout(() => t.className = 'toast', 2000);
 }
 
+// === Multi-select dropdown helper (スプレッドシート風フィルター) ===
+// opts = { label, options: [string]|[{value,label}], selected: Set, onChange, placement? }
+// returns { buttonElement, updateLabel, openPopup, closePopup, setOptions }
+function createMultiSelectDropdown(opts) {
+  const label = opts.label || '';
+  let options = (opts.options || []).map(o => typeof o === 'string' ? { value: o, label: o } : o);
+  const selected = opts.selected instanceof Set ? opts.selected : new Set(opts.selected || []);
+  opts.selected = selected;
+  const onChange = opts.onChange || (() => {});
+
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'form-select multi-select-btn';
+  btn.style.cssText = 'font-size:12px;padding:5px 22px 5px 8px;width:auto;text-align:left;cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:4px;white-space:nowrap;position:relative;min-height:28px;line-height:1.3';
+
+  const caret = document.createElement('span');
+  caret.textContent = '▾';
+  caret.style.cssText = 'position:absolute;right:6px;top:50%;transform:translateY(-50%);font-size:10px;color:#666;pointer-events:none';
+  btn.appendChild(caret);
+
+  const textSpan = document.createElement('span');
+  textSpan.className = 'multi-select-text';
+  btn.insertBefore(textSpan, caret);
+
+  function updateLabel() {
+    let txt;
+    const n = selected.size;
+    if (n === 0) {
+      txt = `${label}: 全て`;
+      btn.style.background = '#fff';
+      btn.style.color = '';
+      btn.style.borderColor = 'var(--border)';
+      btn.style.fontWeight = '';
+    } else if (n === 1) {
+      const v = [...selected][0];
+      const found = options.find(o => o.value === v);
+      txt = `${label}: ${found ? found.label : v}`;
+      btn.style.background = '#1d4ed8';
+      btn.style.color = '#fff';
+      btn.style.borderColor = '#1d4ed8';
+      btn.style.fontWeight = '700';
+    } else {
+      txt = `${label}: ${n}件選択中`;
+      btn.style.background = '#1d4ed8';
+      btn.style.color = '#fff';
+      btn.style.borderColor = '#1d4ed8';
+      btn.style.fontWeight = '700';
+    }
+    textSpan.textContent = txt;
+    caret.style.color = n > 0 ? '#fff' : '#666';
+  }
+
+  let popup = null;
+  function closePopup() {
+    if (popup) {
+      popup.remove();
+      popup = null;
+      document.removeEventListener('mousedown', onDocClick, true);
+      document.removeEventListener('keydown', onKey, true);
+    }
+  }
+  function onDocClick(e) {
+    if (popup && !popup.contains(e.target) && e.target !== btn && !btn.contains(e.target)) closePopup();
+  }
+  function onKey(e) {
+    if (e.key === 'Escape') closePopup();
+  }
+
+  function renderPopup(items) {
+    const list = popup.querySelector('.mspopup-list');
+    list.innerHTML = '';
+    items.forEach(o => {
+      const row = document.createElement('label');
+      row.style.cssText = 'display:flex;align-items:center;gap:6px;padding:4px 8px;font-size:12px;cursor:pointer;white-space:nowrap;user-select:none';
+      row.onmouseenter = () => row.style.background = '#f3f4f6';
+      row.onmouseleave = () => row.style.background = '';
+      const cb = document.createElement('input');
+      cb.type = 'checkbox';
+      cb.checked = selected.has(o.value);
+      cb.style.margin = '0';
+      cb.addEventListener('change', () => {
+        if (cb.checked) selected.add(o.value); else selected.delete(o.value);
+        updateLabel();
+        onChange();
+      });
+      const span = document.createElement('span');
+      span.textContent = o.label;
+      row.appendChild(cb);
+      row.appendChild(span);
+      list.appendChild(row);
+    });
+  }
+
+  function openPopup() {
+    if (popup) { closePopup(); return; }
+    popup = document.createElement('div');
+    popup.className = 'multi-select-popup';
+    popup.style.cssText = 'position:absolute;z-index:10000;background:#fff;border:1px solid #cbd5e1;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,0.15);min-width:180px;max-width:280px;padding:6px 0;font-size:12px';
+    popup.innerHTML = `
+      <div style="padding:4px 8px">
+        <input type="text" class="mspopup-search" placeholder="🔍 検索" style="width:100%;box-sizing:border-box;padding:4px 6px;font-size:12px;border:1px solid #d1d5db;border-radius:4px">
+      </div>
+      <div style="display:flex;gap:4px;padding:2px 8px 4px">
+        <button type="button" class="mspopup-all" style="flex:1;padding:3px 6px;font-size:11px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;cursor:pointer">全選択</button>
+        <button type="button" class="mspopup-none" style="flex:1;padding:3px 6px;font-size:11px;background:#f3f4f6;border:1px solid #d1d5db;border-radius:4px;cursor:pointer">全解除</button>
+      </div>
+      <div style="border-top:1px solid #e5e7eb;margin:2px 0"></div>
+      <div class="mspopup-list" style="max-height:320px;overflow-y:auto"></div>
+    `;
+    document.body.appendChild(popup);
+    // 位置調整
+    const r = btn.getBoundingClientRect();
+    const scrollY = window.scrollY || document.documentElement.scrollTop;
+    const scrollX = window.scrollX || document.documentElement.scrollLeft;
+    popup.style.top = (r.bottom + scrollY + 2) + 'px';
+    let left = r.left + scrollX;
+    // 画面内に収める
+    const pw = popup.offsetWidth;
+    const vw = window.innerWidth;
+    if (left + pw > vw - 8) left = Math.max(8, vw - pw - 8);
+    popup.style.left = left + 'px';
+
+    renderPopup(options);
+
+    const search = popup.querySelector('.mspopup-search');
+    search.addEventListener('input', () => {
+      const q = search.value.trim().toLowerCase();
+      const filt = q ? options.filter(o => o.label.toLowerCase().includes(q)) : options;
+      renderPopup(filt);
+    });
+    popup.querySelector('.mspopup-all').addEventListener('click', () => {
+      const q = search.value.trim().toLowerCase();
+      const filt = q ? options.filter(o => o.label.toLowerCase().includes(q)) : options;
+      filt.forEach(o => selected.add(o.value));
+      renderPopup(filt);
+      updateLabel();
+      onChange();
+    });
+    popup.querySelector('.mspopup-none').addEventListener('click', () => {
+      const q = search.value.trim().toLowerCase();
+      const filt = q ? options.filter(o => o.label.toLowerCase().includes(q)) : options;
+      filt.forEach(o => selected.delete(o.value));
+      renderPopup(filt);
+      updateLabel();
+      onChange();
+    });
+
+    setTimeout(() => {
+      document.addEventListener('mousedown', onDocClick, true);
+      document.addEventListener('keydown', onKey, true);
+      search.focus();
+    }, 0);
+  }
+
+  btn.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    openPopup();
+  });
+
+  function setOptions(newOptions) {
+    options = (newOptions || []).map(o => typeof o === 'string' ? { value: o, label: o } : o);
+    // selected から存在しない値を削除しない (初期化時に意図的セット可)
+    updateLabel();
+    if (popup) {
+      const search = popup.querySelector('.mspopup-search');
+      const q = search ? search.value.trim().toLowerCase() : '';
+      const filt = q ? options.filter(o => o.label.toLowerCase().includes(q)) : options;
+      renderPopup(filt);
+    }
+  }
+
+  updateLabel();
+  return { buttonElement: btn, updateLabel, openPopup, closePopup, setOptions, selected };
+}
+
 // === Facility Name Normalizer ===
 function normFac(f) {
   if (!f) return '-';
@@ -842,7 +1018,7 @@ function setupEventListeners() {
     window._bkTodayFilter = false;
     if (window._bkProgressFilter) {
       document.getElementById('bk-overdue-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#dc2626;color:white;border:2px solid #dc2626;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(220,38,38,0.3)';
-      document.getElementById('bk-status').value = '';
+      if (window._bkDD?.status) { window._bkDD.status.selected.clear(); window._bkDD.status.updateLabel(); }
     }
     renderBookings();
   });
@@ -853,17 +1029,17 @@ function setupEventListeners() {
     window._bkProgressFilter = false;
     if (window._bkTodayFilter) {
       document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#1d4ed8;color:white;border:2px solid #1d4ed8;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(29,78,216,0.3)';
-      document.getElementById('bk-status').value = '';
+      if (window._bkDD?.status) { window._bkDD.status.selected.clear(); window._bkDD.status.updateLabel(); }
     }
     renderBookings();
   });
   document.getElementById('bk-reset').addEventListener('click', () => {
-    document.getElementById('bk-status').value = '';
+    if (window._bkDD) {
+      ['tool','facility','promo','service','status','contract'].forEach(k => {
+        if (window._bkDD[k]) { window._bkDD[k].selected.clear(); window._bkDD[k].updateLabel(); }
+      });
+    }
     document.getElementById('bk-search').value = '';
-    document.getElementById('bk-tool').value = '';
-    document.getElementById('bk-facility').value = '';
-    document.getElementById('bk-promo').value = '';
-    document.getElementById('bk-service').value = '';
     document.getElementById('bk-period').value = '';
     document.getElementById('bk-month').value = '';
     window._bkDateFilter = null;
@@ -896,13 +1072,13 @@ function setupEventListeners() {
       el.style.fontWeight = '';
     }
   };
-  ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-period','bk-month'].forEach(id => {
+  ['bk-period','bk-month'].forEach(id => {
     const el = document.getElementById(id);
-    el.addEventListener('change', () => { highlightActiveFilter(el); renderBookings(); });
+    if (el) el.addEventListener('change', () => { highlightActiveFilter(el); renderBookings(); });
   });
   // 検索欄も色付け
   document.getElementById('bk-search').addEventListener('input', () => highlightActiveFilter(document.getElementById('bk-search')));
-  window._highlightBkFilters = () => ['bk-tool','bk-facility','bk-promo','bk-service','bk-status','bk-period','bk-month','bk-search'].forEach(id => highlightActiveFilter(document.getElementById(id)));
+  window._highlightBkFilters = () => ['bk-period','bk-month','bk-search'].forEach(id => { const el = document.getElementById(id); if (el) highlightActiveFilter(el); });
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
   // 除外も表示チェックボックス
   document.getElementById('bk-show-excluded')?.addEventListener('change', () => renderBookings());
@@ -2785,19 +2961,23 @@ function populateBookingFilters() {
   const facilities = [...new Set(filteredForOptions.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
   const promos = [...new Set(filteredForOptions.map(d => d.source).filter(Boolean))].sort();
   const services = [...new Set(filteredForOptions.map(d => normSvc(d.service)).filter(s => s && s !== '-'))].sort();
-
-  const facEl = document.getElementById('bk-facility');
-  facEl.innerHTML = '<option value="">医院:全て</option>' + facilities.map(f => `<option>${f}</option>`).join('');
+  const contractServices = ['BF','矯正(表)','矯正(裏)','矯正(ﾋﾟｰｽ)','ﾗﾌﾞﾘｴ','ｲﾝﾌﾟﾗﾝﾄ'];
 
   // プロモを件数順にソート
   const promoCounts2 = {};
   filteredForOptions.forEach(d => { if (d.source) promoCounts2[d.source] = (promoCounts2[d.source]||0) + 1; });
   const promosSorted = promos.sort((a, b) => (promoCounts2[b]||0) - (promoCounts2[a]||0));
-  const promoEl = document.getElementById('bk-promo');
-  promoEl.innerHTML = '<option value="">プロモ:全て</option>' + promosSorted.map(p => `<option value="${p}">${p} (${promoCounts2[p]||0})</option>`).join('');
+  const promoOpts = promosSorted.map(p => ({ value: p, label: `${p} (${promoCounts2[p]||0})` }));
 
-  const svcEl = document.getElementById('bk-service');
-  svcEl.innerHTML = '<option value="">相談:全て</option>' + services.map(s => `<option>${s}</option>`).join('');
+  // Multi-select 初期化 (初回のみ)
+  ensureBkMultiSelects();
+  const dd = window._bkDD;
+  dd.tool.setOptions([{value:'DXHUB',label:'DXHUB'},{value:'セレクト',label:'セレクト'}]);
+  dd.facility.setOptions(facilities);
+  dd.promo.setOptions(promoOpts);
+  dd.service.setOptions(services);
+  dd.contract.setOptions(contractServices);
+  // status/contract は固定options (ensureBkMultiSelects で一度だけセット)
 
   // プロモ・カスタムユーザーはQuick行を非表示
   const quickEl = document.getElementById('bk-quick-promos');
@@ -2815,39 +2995,68 @@ function populateBookingFilters() {
     ).join('');
     quickEl.querySelectorAll('.bk-quick-promo').forEach((btn, i) => {
       btn.addEventListener('click', () => {
-        // 選択状態をトグル
-        const isActive = btn.style.background === 'rgb(219, 234, 254)';
+        const promoSet = window._bkDD?.promo?.selected;
+        if (!promoSet) return;
+        const val = top5[i][0];
+        const isActive = promoSet.has(val) && promoSet.size === 1;
         quickEl.querySelectorAll('.bk-quick-promo').forEach(b => { b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; });
-        if (isActive) {
-          promoEl.value = '';
-        } else {
-          promoEl.value = top5[i][0];
+        promoSet.clear();
+        if (!isActive) {
+          promoSet.add(val);
           btn.style.background = '#dbeafe';
           btn.style.color = '#1d4ed8';
           btn.style.borderColor = '#93c5fd';
         }
+        window._bkDD.promo.updateLabel();
         renderBookings();
       });
     });
   }
 }
 
+// Multi-select 初期化 (予約一覧)
+function ensureBkMultiSelects() {
+  if (window._bkDD) return;
+  const triggerRedraw = () => { if (typeof renderBookings === 'function') renderBookings(); };
+  const statusList = ['要対応','未対応','確認済','来院済','成約','キャンセル','除外'];
+  const dd = {
+    tool: createMultiSelectDropdown({ label:'ツール', options:[], selected:new Set(), onChange:triggerRedraw }),
+    facility: createMultiSelectDropdown({ label:'医院', options:[], selected:new Set(), onChange:triggerRedraw }),
+    promo: createMultiSelectDropdown({ label:'プロモ', options:[], selected:new Set(), onChange:triggerRedraw }),
+    service: createMultiSelectDropdown({ label:'相談', options:[], selected:new Set(), onChange:triggerRedraw }),
+    // 既存のステータスデフォルト = 全表示 (空) なので Set は空で開始
+    status: createMultiSelectDropdown({ label:'状態', options:statusList, selected:new Set(), onChange:triggerRedraw }),
+    contract: createMultiSelectDropdown({ label:'成約商材', options:[], selected:new Set(), onChange:triggerRedraw }),
+  };
+  const fill = (id, obj) => { const s = document.getElementById(id); if (s) s.replaceWith(obj.buttonElement); };
+  fill('bk-tool-slot', dd.tool);
+  fill('bk-facility-slot', dd.facility);
+  fill('bk-promo-slot', dd.promo);
+  fill('bk-service-slot', dd.service);
+  fill('bk-status-slot', dd.status);
+  fill('bk-contract-slot', dd.contract);
+  window._bkDD = dd;
+}
+
 function renderBookings() {
   const searchVal = (document.getElementById('bk-search').value || '').trim().toLowerCase();
-  const toolFilter = document.getElementById('bk-tool').value;
-  const facFilterVal = document.getElementById('bk-facility').value;
-  const promoFilterVal = document.getElementById('bk-promo').value;
-  const svcFilter = document.getElementById('bk-service').value;
-  const statusFilter = document.getElementById('bk-status').value;
+  const dd = window._bkDD || {};
+  const toolSet = dd.tool?.selected || new Set();
+  const facSet = dd.facility?.selected || new Set();
+  const promoSet = dd.promo?.selected || new Set();
+  const svcSet = dd.service?.selected || new Set();
+  const statusSet = dd.status?.selected || new Set();
+  const contractSet = dd.contract?.selected || new Set();
   const monthFilter = document.getElementById('bk-month').value;
 
   let filtered = bookingsData;
   if (searchVal) filtered = filtered.filter(d => d.name && d.name.toLowerCase().includes(searchVal));
-  if (toolFilter) filtered = filtered.filter(d => d.tool === toolFilter);
+  if (toolSet.size) filtered = filtered.filter(d => toolSet.has(d.tool));
   // プロモユーザーの場合、自分のプロモのみ表示
   if (userRole === 'promo' && promoFilter) {
     filtered = filtered.filter(d => d.source && d.source.trim() === promoFilter.trim());
-    document.getElementById('bk-promo').closest('.form-group').style.display = 'none';
+    const pbtn = window._bkDD?.promo?.buttonElement;
+    if (pbtn) pbtn.style.display = 'none';
   }
   // カスタムユーザーの制限（完全一致）
   if (userRole === 'custom') {
@@ -2864,16 +3073,27 @@ function renderBookings() {
       filtered = filtered.filter(d => d.facility && cFacilities.includes(d.facility));
     }
   }
-  if (facFilterVal) filtered = filtered.filter(d => normFac(d.facility) === facFilterVal);
-  if (promoFilterVal) filtered = filtered.filter(d => d.source === promoFilterVal);
-  if (svcFilter) filtered = filtered.filter(d => normSvc(d.service) === svcFilter);
-  if (statusFilter) {
-    if (statusFilter === '要対応') {
-      const td = new Date(); td.setHours(0,0,0,0);
-      filtered = filtered.filter(d => (!d.status || d.status === '未対応') && (() => { const bd = parseDate(d.bookDate); return bd && bd < td; })());
-    } else if (statusFilter === '未対応') filtered = filtered.filter(d => !d.status || d.status === '未対応');
-    else filtered = filtered.filter(d => d.status === statusFilter);
+  if (facSet.size) filtered = filtered.filter(d => facSet.has(normFac(d.facility)));
+  if (promoSet.size) filtered = filtered.filter(d => promoSet.has(d.source));
+  if (svcSet.size) filtered = filtered.filter(d => svcSet.has(normSvc(d.service)));
+  if (statusSet.size) {
+    const td = new Date(); td.setHours(0,0,0,0);
+    filtered = filtered.filter(d => {
+      const s = d.status || '未対応';
+      for (const sel of statusSet) {
+        if (sel === '要対応') {
+          if ((!d.status || d.status === '未対応')) {
+            const bd = parseDate(d.bookDate);
+            if (bd && bd < td) return true;
+          }
+        } else if (sel === '未対応') {
+          if (!d.status || d.status === '未対応') return true;
+        } else if (s === sel) return true;
+      }
+      return false;
+    });
   }
+  if (contractSet.size) filtered = filtered.filter(d => contractSet.has(d.contractService));
   // 期間フィルター
   const periodFilter = document.getElementById('bk-period')?.value || '';
   if (periodFilter) {
@@ -4871,19 +5091,12 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     <button class="kaiin-header-toggle" style="padding:4px 10px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▼ ヘッダーを表示</button>
     <div class="kaiin-topbar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:4px 6px;background:var(--card);border:1px solid var(--border);border-radius:6px">
       <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px;padding:5px 8px;font-size:12px">
-      <select class="form-select kaiin-filter-tool" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">ツール:全て</option><option>DXHUB</option><option>セレクト</option><option>手動</option></select>
-      <select class="form-select kaiin-filter-promo" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">プロモ:全て</option></select>
-      <select class="form-select kaiin-filter-csfac" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">CS医院:全て</option>${csFacOpts.map(f => `<option>${f}</option>`).join('')}</select>
-      <select class="form-select kaiin-filter-setfac" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">セット医院:全て</option>${setFacOpts.map(f => `<option>${f}</option>`).join('')}</select>
-      <select class="form-select kaiin-filter-consult" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto"><option value="">相談:全て</option>${CONSULT_TYPES.map(t => `<option>${t}</option>`).join('')}</select>
-      <select class="form-select kaiin-filter-status" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto">
-        <option value="exclude-cancel" selected>ｽﾃｰﾀｽ:ｷｬﾝｾﾙ除外</option>
-        <option value="">ｽﾃｰﾀｽ:全て</option>
-        <option value="exclude-cancel-unset">ｷｬﾝｾﾙ･未設定除外</option>
-        <option value="active">対応中のみ</option>
-        <option value="done">完了のみ</option>
-        ${statuses.map(s => `<option value="only:${s.value}">${s.value}のみ</option>`).join('')}
-      </select>
+      <span class="kaiin-filter-tool-slot"></span>
+      <span class="kaiin-filter-promo-slot"></span>
+      <span class="kaiin-filter-csfac-slot"></span>
+      <span class="kaiin-filter-setfac-slot"></span>
+      <span class="kaiin-filter-consult-slot"></span>
+      <span class="kaiin-filter-status-slot"></span>
       <select class="form-select kaiin-sort" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto">
         <option value="date-desc" selected>ソート:来院日(新→古)</option>
         <option value="date-asc">来院日(古→新)</option>
@@ -4923,14 +5136,6 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       </div>
     </div>
   `;
-
-  // プロモフィルター選択肢を埋める
-  const promos = [...new Set(rows.map(d => d.source).filter(Boolean))].sort();
-  const promoSel = el.querySelector('.kaiin-filter-promo');
-  if (promoSel) {
-    const escHtml = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-    promoSel.innerHTML = '<option value="">プロモ:全て</option>' + promos.filter(p => p && p.trim() && p.trim() !== '?').map(p => `<option value="${escHtml(p)}">${escHtml(p)}</option>`).join('');
-  }
 
   // トグル + フィルター群を page-header に移動してタイトル横に1行で並べる
   let toggleBtn = el.querySelector('.kaiin-header-toggle');
@@ -4993,17 +5198,48 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       applyCompact(false);
     }
   });
+  // === マルチセレクトフィルター初期化 ===
+  // プロモの値をrowsから抽出
+  const promoList = [...new Set(rows.map(d => d.source).filter(p => p && p.trim() && p.trim() !== '?'))].sort();
+  // ステータスフィルター: キャンセル除外をデフォルトにするため、キャンセル以外の全ステータス + 未設定 を初期選択
+  const statusValues = statuses.map(s => s.value);
+  const defaultStatusSelected = new Set(statusValues.filter(v => v !== 'キャンセル'));
+  defaultStatusSelected.add('__UNSET__'); // 未設定も含める
+
+  const state = {
+    tool: new Set(),
+    promo: new Set(),
+    csfac: new Set(),
+    setfac: new Set(),
+    consult: new Set(),
+    status: defaultStatusSelected,
+  };
+  el._kaiinFilterState = state;
+
+  const triggerRedraw = () => drawKaiinRows(treatment, rows, el);
+
+  const toolDD = createMultiSelectDropdown({ label: 'ツール', options: ['DXHUB','セレクト','手動'], selected: state.tool, onChange: triggerRedraw });
+  const promoDD = createMultiSelectDropdown({ label: 'プロモ', options: promoList, selected: state.promo, onChange: triggerRedraw });
+  const csfacDD = createMultiSelectDropdown({ label: 'CS医院', options: csFacOpts, selected: state.csfac, onChange: triggerRedraw });
+  const setfacDD = createMultiSelectDropdown({ label: 'セット医院', options: setFacOpts, selected: state.setfac, onChange: triggerRedraw });
+  const consultDD = createMultiSelectDropdown({ label: '相談', options: CONSULT_TYPES, selected: state.consult, onChange: triggerRedraw });
+  const statusOpts = [...statusValues.map(v => ({ value: v, label: v })), { value: '__UNSET__', label: '未設定' }];
+  const statusDD = createMultiSelectDropdown({ label: 'ｽﾃｰﾀｽ', options: statusOpts, selected: state.status, onChange: triggerRedraw });
+
+  const filterScopeInit = el.closest('[id^="sub-kaiin-"]') || el;
+  const fillSlot = (sel, dd) => { const s = filterScopeInit.querySelector(sel); if (s) s.replaceWith(dd.buttonElement); };
+  fillSlot('.kaiin-filter-tool-slot', toolDD);
+  fillSlot('.kaiin-filter-promo-slot', promoDD);
+  fillSlot('.kaiin-filter-csfac-slot', csfacDD);
+  fillSlot('.kaiin-filter-setfac-slot', setfacDD);
+  fillSlot('.kaiin-filter-consult-slot', consultDD);
+  fillSlot('.kaiin-filter-status-slot', statusDD);
+
   drawKaiinRows(treatment, rows, el);
   // フィルターイベント (topbar は page-header に移動済み → 親 sub-kaiin-* から取る)
   const filterScope = el.closest('[id^="sub-kaiin-"]') || el;
   filterScope.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
-  filterScope.querySelector('.kaiin-filter-tool')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  filterScope.querySelector('.kaiin-filter-promo')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  filterScope.querySelector('.kaiin-filter-csfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  filterScope.querySelector('.kaiin-filter-setfac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  filterScope.querySelector('.kaiin-filter-consult')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  filterScope.querySelector('.kaiin-filter-status')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
 }
 
@@ -5012,26 +5248,27 @@ function drawKaiinRows(treatment, rows, container) {
   const scope = container.closest('[id^="sub-kaiin-"]') || container;
   const fac = scope.querySelector('.kaiin-filter-fac')?.value || '';
   const q = (scope.querySelector('.kaiin-filter-search')?.value || '').trim().toLowerCase();
-  const toolF = scope.querySelector('.kaiin-filter-tool')?.value || '';
-  const promoF = scope.querySelector('.kaiin-filter-promo')?.value || '';
-  const csFacF = scope.querySelector('.kaiin-filter-csfac')?.value || '';
-  const setFacF = scope.querySelector('.kaiin-filter-setfac')?.value || '';
-  const consultF = scope.querySelector('.kaiin-filter-consult')?.value || '';
-  const stF = scope.querySelector('.kaiin-filter-status')?.value || '';
+  const state = container._kaiinFilterState || {};
+  const toolSet = state.tool || new Set();
+  const promoSet = state.promo || new Set();
+  const csFacSet = state.csfac || new Set();
+  const setFacSet = state.setfac || new Set();
+  const consultSet = state.consult || new Set();
+  const statusSet = state.status || new Set();
   const sortBy = scope.querySelector('.kaiin-sort')?.value || 'date-desc';
   const statuses = getStatusesForTreatment(treatment);
   let filtered = rows.slice();
   if (fac) filtered = filtered.filter(d => normFac(d.facility) === fac);
   if (q) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(q));
-  if (toolF) filtered = filtered.filter(d => d.tool === toolF);
-  if (promoF) filtered = filtered.filter(d => d.source === promoF);
-  if (csFacF) filtered = filtered.filter(d => {
+  if (toolSet.size) filtered = filtered.filter(d => toolSet.has(d.tool));
+  if (promoSet.size) filtered = filtered.filter(d => promoSet.has(d.source));
+  if (csFacSet.size) filtered = filtered.filter(d => {
     const info = getBFInfo(d.name, d.applyDate) || {};
     const csFac = info.bf_cs_facility || normFac(d.facility) || '';
-    return parseCsFac(csFac).includes(csFacF);
+    return parseCsFac(csFac).some(f => csFacSet.has(f));
   });
-  if (setFacF) filtered = filtered.filter(d => (getBFInfo(d.name, d.applyDate)||{}).bf_set_facility === setFacF);
-  if (consultF) filtered = filtered.filter(d => {
+  if (setFacSet.size) filtered = filtered.filter(d => setFacSet.has((getBFInfo(d.name, d.applyDate)||{}).bf_set_facility));
+  if (consultSet.size) filtered = filtered.filter(d => {
     const s = d.service || '';
     const c = (() => {
       if (/ラミネート|ブラックフィルム|BF/i.test(s)) return 'BF相談';
@@ -5045,15 +5282,17 @@ function drawKaiinRows(treatment, rows, container) {
       if (/ジュエリー/.test(s)) return 'ティースジュエリー';
       return ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー'].includes(s) ? s : 'その他';
     })();
-    return c === consultF;
+    return consultSet.has(c);
   });
-  // ステータスフィルター
+  // ステータスフィルター (multi-select)
   const getSt = (d) => (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
-  if (stF === 'exclude-cancel') filtered = filtered.filter(d => getSt(d) !== 'キャンセル');
-  else if (stF === 'exclude-cancel-unset') filtered = filtered.filter(d => { const s = getSt(d); return s && s !== 'キャンセル'; });
-  else if (stF === 'active') filtered = filtered.filter(d => { const s = getSt(d); return s && !['キャンセル','離脱','セット完了','完了'].includes(s); });
-  else if (stF === 'done') filtered = filtered.filter(d => ['セット完了','完了'].includes(getSt(d)));
-  else if (stF && stF.startsWith('only:')) { const only = stF.slice(5); filtered = filtered.filter(d => getSt(d) === only); }
+  if (statusSet.size) {
+    filtered = filtered.filter(d => {
+      const s = getSt(d);
+      if (!s) return statusSet.has('__UNSET__');
+      return statusSet.has(s);
+    });
+  }
   // ソート
   const statusOrder = (s) => { const i = statuses.findIndex(x => x.value === s); return i < 0 ? 999 : i; };
   if (sortBy === 'date-asc') filtered.sort((a,b) => (a.applyDate||'').localeCompare(b.applyDate||''));

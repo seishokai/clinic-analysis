@@ -496,13 +496,12 @@
           <button class="btn" id="bk-today-btn" style="min-height:34px;padding:6px 16px;font-size:12px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px;transition:all 0.2s">今日予約</button>
           <button class="btn btn-outline" id="bk-reset" style="min-height:34px;padding:6px 14px;font-size:11px;border-radius:20px">全表示</button>
           <input type="text" class="form-input" id="bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
-          <select class="form-select" id="bk-tool" style="width:auto;padding:6px 8px;font-size:11px"><option value="">ツール:全て</option><option value="DXHUB">DXHUB</option><option value="セレクト">セレクト</option></select>
-          <select class="form-select" id="bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select>
-          <select class="form-select" id="bk-promo" style="width:auto;padding:6px 8px;font-size:11px"><option value="">プロモ:全て</option></select>
-          <select class="form-select" id="bk-service" style="width:auto;padding:6px 8px;font-size:11px"><option value="">相談:全て</option></select>
-          <select class="form-select" id="bk-status" style="width:auto;padding:6px 8px;font-size:11px">
-            <option value="">状態:全て</option><option value="要対応">要対応</option><option value="未対応">未対応</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option><option value="除外">除外</option>
-          </select>
+          <span id="bk-tool-slot"></span>
+          <span id="bk-facility-slot"></span>
+          <span id="bk-promo-slot"></span>
+          <span id="bk-service-slot"></span>
+          <span id="bk-status-slot"></span>
+          <span id="bk-contract-slot"></span>
           <select class="form-select" id="bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option><option value="fiscal">今期</option></select>
           <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px">
           <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px">更新</button>
@@ -1077,7 +1076,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=217"></script>
+  <script src="app.js?v=218"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
