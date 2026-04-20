@@ -3149,9 +3149,11 @@ function renderBookings() {
         // === 連動: BFなら bf_status も自動設定 ===
         if (match && isBFBooking(match) && STATUS_TO_BF[newStatus] !== undefined) {
           const targetBF = STATUS_TO_BF[newStatus];
-          // 成約/キャンセル系は常に上書き、来院済は未設定時のみ
+          // 成約/キャンセル系は常に上書き、来院済は進行中でなければ上書き
           const curBF = bfLifecycleCache[key]?.bf_status;
-          const shouldUpdate = (newStatus === '成約' || newStatus === 'キャンセル' || !curBF);
+          // 来院済 の場合: 未設定 / 離脱 / キャンセル / '' は上書き可 (進行中は保護)
+          const resettable = !curBF || curBF === '離脱' || curBF === 'キャンセル';
+          const shouldUpdate = (newStatus === '成約' || newStatus === 'キャンセル' || resettable);
           if (shouldUpdate && targetBF !== null) {
             upsertData.bf_status = targetBF;
             if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
@@ -4552,7 +4554,7 @@ async function syncStatusToBFStatus(bfRows) {
     let shouldUpdate = false;
     if (status === 'キャンセル') shouldUpdate = (curBF !== 'キャンセル');
     else if (status === '成約') shouldUpdate = (!curBF || (curBF === '離脱' || curBF === '検討中'));
-    else if (status === '来院済') shouldUpdate = !curBF;
+    else if (status === '来院済') shouldUpdate = !curBF || curBF === '離脱' || curBF === 'キャンセル';
     if (!shouldUpdate) return;
     // サイレント更新 (履歴は自動連動として残す)
     if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: d.name, apply_date: d.applyDate };
@@ -4731,8 +4733,9 @@ function dedupBFRows(rows) {
 
 // BFか判定
 function isBFBooking(d) {
-  const svc = (d?.service || '').toLowerCase();
-  return svc.includes('bf') || svc.includes('ブラック');
+  const svc = d?.service || '';
+  // ラミネート / ブラックフィルム / BF を含めてBF相談として扱う
+  return /bf|ブラック|ラミネート/i.test(svc);
 }
 
 // === 治療カテゴリー判定 (来院タブ用) ===
