@@ -590,7 +590,7 @@ body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
   }
-  /* 不要な UI を非表示 */
+  /* 不要な UI を非表示 (テーブル内部の input/select/button は残す) */
   .header,
   .sub-nav,
   #kaiin-sub-nav,
@@ -598,12 +598,6 @@ body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .kaiin-header-toggle,
   .kaiin-header-wrap,
   .bk-toolbar,
-  .btn,
-  button,
-  .form-select,
-  .form-input,
-  input,
-  select,
   .multi-select-btn,
   .multi-select-popup,
   .toast,
@@ -614,8 +608,41 @@ body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   #bk-dup-filter,
   .kaiin-pdf-btn,
   .bk-pdf-btn,
+  .bk-del-btn,
+  .kaiin-del-btn,
   .page-header > *:not(h2):not(.print-title) {
     display: none !important;
+  }
+  /* テーブルセル内の編集UIはテキストに見せる (枠/背景/矢印/スピナー を消す) */
+  .data-table td input,
+  .data-table td select,
+  .data-table td button,
+  .data-table td textarea {
+    display: inline-block !important;
+    border: none !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    font-size: 10px !important;
+    color: #000 !important;
+    width: auto !important;
+    min-width: 0 !important;
+    height: auto !important;
+    appearance: none !important;
+    -webkit-appearance: none !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  /* 隠しピッカー用 input は完全非表示 */
+  .data-table td .bk-next-date-hidden,
+  .data-table td .kaiin-next-date-hidden,
+  .data-table td .bk-month-hidden {
+    display: none !important;
+  }
+  /* select のドロップダウン矢印 (SVG background) を消す */
+  .data-table td select {
+    background-image: none !important;
+    padding-right: 0 !important;
   }
   .page-header {
     display: block !important;
