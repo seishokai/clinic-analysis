@@ -1,3 +1,9 @@
+// === HTML escaping utility (XSS対策) ===
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+const esc = escapeHtml; // 短縮エイリアス (innerHTML展開・属性値両対応)
+
 // === Supabase ===
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
@@ -13,6 +19,17 @@ function enqueueSave(op) {
   q.push({ ...op, id: Date.now() + Math.random(), attempts: 0, lastAttempt: 0 });
   localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(q));
   updateQueueBadge();
+  // #13 キュー非空時のみ定期処理を起動
+  startQueueProcessor();
+}
+// #13: キューが空のときは setInterval を動かさない
+let _qInterval = null;
+function startQueueProcessor() {
+  if (_qInterval) return;
+  _qInterval = setInterval(() => {
+    if (getQueue().length === 0) { clearInterval(_qInterval); _qInterval = null; return; }
+    processQueue(false);
+  }, 10000);
 }
 function getQueue() { return JSON.parse(localStorage.getItem(SAVE_QUEUE_KEY) || '[]'); }
 function setQueue(q) { localStorage.setItem(SAVE_QUEUE_KEY, JSON.stringify(q)); updateQueueBadge(); }
@@ -93,11 +110,15 @@ async function safeSave(op) {
     return { ok: false, error: e };
   }
 }
-// リトライ定期実行
-setInterval(() => processQueue(false), 10000);
-// オンライン復帰時にもリトライ
-window.addEventListener('online', () => { processQueue(true); });
-window.addEventListener('load', () => { updateQueueBadge(); setTimeout(() => processQueue(false), 2000); });
+// #13 リトライ定期実行: キュー非空のときのみ起動する方式 (上の startQueueProcessor)
+// 起動時/オンライン復帰時にキューがあれば再稼働させる
+window.addEventListener('online', () => { processQueue(true); if (getQueue().length) startQueueProcessor(); });
+window.addEventListener('load', () => {
+  updateQueueBadge();
+  if (getQueue().length) {
+    setTimeout(() => { processQueue(false); if (getQueue().length) startQueueProcessor(); }, 2000);
+  }
+});
 
 // =========================================
 // A2: 楽観的ロック (updated_at チェック)
@@ -826,6 +847,12 @@ function setupEventListeners() {
   document.getElementById('modal-close').addEventListener('click', closeModal);
   document.querySelector('.modal-overlay').addEventListener('click', closeModal);
   document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+  // #9 Esc で表示中の任意モーダル (.modal:not([hidden])) を全て閉じる
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    document.querySelectorAll('.modal:not([hidden])').forEach(m => { m.hidden = true; });
+    document.body.style.overflow = '';
+  });
 
   // Sales
   document.getElementById('sales-save').addEventListener('click', saveSalesEntry);
@@ -1112,9 +1139,13 @@ function setupEventListeners() {
   document.getElementById('bk-pdf')?.addEventListener('click', () => {
     const prevLimit = window._bkDisplayLimit;
     const prevTitle = document.title;
+    // #8 PDF安全上限
+    const SAFE_MAX = 1000;
+    const total = (typeof bookingsData !== 'undefined' ? bookingsData : []).length;
+    if (total > SAFE_MAX && !confirm(`${total}件あります。印刷はブラウザが停止する可能性があります。フィルタで絞り込むことを推奨。続行しますか?`)) return;
     printTable(
       () => {
-        window._bkDisplayLimit = 99999;
+        window._bkDisplayLimit = Math.min(Math.max(total, 1), SAFE_MAX);
         if (typeof renderBookings === 'function') renderBookings();
         document.title = `予約一覧_${new Date().toISOString().slice(0,10)}`;
       },
@@ -2638,8 +2669,13 @@ async function getDocuments() {
 }
 
 function saveNewClinic() {
+  // #7 連打ガード
+  const btn = document.getElementById('nc-save');
+  if (btn && btn.disabled) return;
+  if (btn) btn.disabled = true;
+  try {
   const name = document.getElementById('nc-name').value.trim();
-  if (!name) return;
+  if (!name) { if (btn) setTimeout(() => { btn.disabled = false; }, 600); return; }
   const newClinic = {
     id: Date.now(),
     name,
@@ -2675,6 +2711,9 @@ function saveNewClinic() {
   document.getElementById('clinic-add-modal').hidden = true;
   // フォームリセット
   ['nc-name','nc-time','nc-address','nc-da','nc-dr','nc-pricing','nc-strengths','nc-improvements','nc-summary'].forEach(id => document.getElementById(id).value = '');
+  } finally {
+    if (btn) setTimeout(() => { btn.disabled = false; }, 600);
+  }
 }
 
 function openDocModal(clinicName, type) {
@@ -3066,6 +3105,8 @@ function ensureBkMultiSelects() {
 }
 
 function renderBookings() {
+  // #13 loadData を一度だけ読み出して共有 (連打解消)
+  const _bkExtra = loadData('bk-extra', {});
   const searchVal = (document.getElementById('bk-search').value || '').trim().toLowerCase();
   const dd = window._bkDD || {};
   const toolSet = dd.tool?.selected || new Set();
@@ -3194,7 +3235,7 @@ function renderBookings() {
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
   // 成約金額集計（フィルター済みデータから）
-  const bkExtraStats = loadData('bk-extra', {});
+  const bkExtraStats = _bkExtra;
   let totalAmount = 0;
   active.forEach(d => {
     const key = d.name + '|' + d.applyDate;
@@ -3247,7 +3288,7 @@ function renderBookings() {
     if (s === '成約') return '<span class="badge badge-success">成約</span>';
     if (s === '確認済') return '<span class="badge badge-default" style="border-color:#6366f1;color:#6366f1">確認済</span>';
     if (s === '予約連絡待ち') return '<span class="badge badge-default" style="border-color:#a855f7;color:#7c3aed;background:#f5f3ff">予約連絡待ち</span>';
-    return `<span class="badge badge-default">${s}</span>`;
+    return `<span class="badge badge-default">${esc(s)}</span>`;
   };
 
   // fmtApplyDate, fmtBookDate are now global functions
@@ -3289,8 +3330,9 @@ function renderBookings() {
   const isOverdue = (d) => {
     if (d.status && d.status !== '未対応') return false;
     if (!d.bookDate) return false;
-    const bd = new Date(d.bookDate.replace(/\//g, '-'));
-    return bd < today;
+    // #12 parseDate 統一 (タイムゾーン差回避)
+    const bd = parseDate(d.bookDate);
+    return bd ? bd < today : false;
   };
 
   const isAdmin = userRole === 'admin' || (userRole === 'custom' && sessionStorage.getItem('customEditRole') === 'edit');
@@ -3311,24 +3353,24 @@ function renderBookings() {
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
     <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
-      ${fmtBookDate(d.bookDate)}</td>
-    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-row-edit" data-name="${d.name}" data-apply="${d.applyDate}" title="クリックで編集"`:''}>
-      ${d.name}</td>
-    <td style="font-size:10px;white-space:nowrap">${normSvc(d.service)}</td>
-    <td style="font-size:10px;white-space:nowrap">${normFac(d.facility)}</td>
-    <td style="font-size:10px;white-space:nowrap">${isAdmin ? fmtPhone(d.phone) : '***'}</td>
-    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? (d.email || '-') : '***'}</td>
-    <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${d.source || '-'}</td>
+      ${esc(fmtBookDate(d.bookDate))}</td>
+    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-row-edit" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="クリックで編集"`:''}>
+      ${esc(d.name)}</td>
+    <td style="font-size:10px;white-space:nowrap">${esc(normSvc(d.service))}</td>
+    <td style="font-size:10px;white-space:nowrap">${esc(normFac(d.facility))}</td>
+    <td style="font-size:10px;white-space:nowrap">${isAdmin ? esc(fmtPhone(d.phone)) : '***'}</td>
+    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? esc(d.email || '-') : '***'}</td>
+    <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${esc(d.source || '-')}</td>
     <td style="text-align:center">${isAdmin ? (isBFBooking(d) ? (() => {
       const info = getBFInfo(d.name, d.applyDate) || {};
       const curBf = info.bf_status || '';
       const bfColor = BF_STATUSES.find(s => s.value === curBf)?.color || '';
       const bfStyle = curBf ? `background:${bfColor}22;color:${bfColor};border-color:${bfColor};font-weight:600` : '';
-      return `<select class="form-select bk-bfstatus-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;width:100%;max-width:115px;text-align:center;${bfStyle}">
+      return `<select class="form-select bk-bfstatus-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;max-width:115px;text-align:center;${bfStyle}">
         <option value="">${d.status==='未対応'?'未対応':(d.status==='確認済'?'確認済':(d.status==='キャンセル'?'キャンセル':'未設定'))}</option>
-        ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${s.value}</option>`).join('')}
+        ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${esc(s.value)}</option>`).join('')}
       </select>`;
-    })() : `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
+    })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
       <option ${d.status==='予約連絡待ち'?'selected':''}>予約連絡待ち</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
@@ -3348,17 +3390,17 @@ function renderBookings() {
         ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
         : 'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e';
       return `<span style="display:inline-flex;gap:2px;align-items:center;position:relative">
-        <button type="button" class="bk-next-date-btn" data-name="${d.name}" data-apply="${d.applyDate}" data-iso="${iso}" style="font-size:10px;padding:3px 6px;width:70px;text-align:center;border-radius:4px;cursor:pointer;${style}">${label}</button>
-        <input type="date" class="bk-next-date-hidden" data-name="${d.name}" data-apply="${d.applyDate}" value="${iso}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
+        <button type="button" class="bk-next-date-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${esc(iso)}" style="font-size:10px;padding:3px 6px;width:70px;text-align:center;border-radius:4px;cursor:pointer;${style}">${esc(label)}</button>
+        <input type="date" class="bk-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(iso)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
       </span>`;
     })()}</td>
-    <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:center" class="bk-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(d._memo||findAnyMemo(d.name)||'').replace(/"/g,'&quot;')}">${(() => {
+    <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:center" class="bk-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${esc(d._memo||findAnyMemo(d.name)||'')}">${(() => {
       const memo = d._memo || findAnyMemo(d.name);
-      if (!isAdmin) return memo ? '📝 ' + memo : '-';
+      if (!isAdmin) return memo ? '📝 ' + esc(memo) : '-';
       if (memo) return `<span style="display:inline-block;padding:3px 10px;background:#fef3c7;border:2px solid #f59e0b;border-radius:6px;color:#92400e;font-weight:700;box-shadow:0 1px 3px rgba(245,158,11,.3)">📝 あり</span>`;
       return '<span style="display:inline-block;padding:2px 8px;color:#bbb;border:1px dashed #ddd;border-radius:4px">＋</span>';
     })()}</td>
-    <td style="text-align:center">${isAdmin ? `<select class="form-select bk-field-select" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px;text-align:center;${d.contractService?'background:#dcfce7;color:#15803d':(d.status==='成約'?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':'')}">
+    <td style="text-align:center">${isAdmin ? `<select class="form-select bk-field-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px;text-align:center;${d.contractService?'background:#dcfce7;color:#15803d':(d.status==='成約'?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':'')}">
       <option value="">-</option>
       <option ${d.contractService==='BF'?'selected':''}>BF</option>
       <option ${d.contractService==='矯正(表)'?'selected':''}>矯正(表)</option>
@@ -3366,22 +3408,22 @@ function renderBookings() {
       <option ${d.contractService==='矯正(ﾋﾟｰｽ)'?'selected':''}>矯正(ﾋﾟｰｽ)</option>
       <option ${d.contractService==='ﾗﾌﾞﾘｴ'?'selected':''}>ﾗﾌﾞﾘｴ</option>
       <option ${d.contractService==='ｲﾝﾌﾟﾗﾝﾄ'?'selected':''}>ｲﾝﾌﾟﾗﾝﾄ</option>
-    </select>` : (d.contractService || '-')}</td>
-    <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:90px;text-align:right;font-variant-numeric:tabular-nums;${d.status==='成約'&&!Number(d.contractAmount)?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':''}">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
-    <td style="position:relative">${isAdmin ? (() => { const v = d.paymentMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" data-iso="${v}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${lbl}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${v}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`; })() : (d.paymentMonth || '-')}</td>
-    <td style="position:relative">${isAdmin ? (() => { const v = d.incentiveMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" data-iso="${v}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${lbl}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${v}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`; })() : (d.incentiveMonth || '-')}</td>
-    <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:80px;text-align:right;font-variant-numeric:tabular-nums">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
+    </select>` : esc(d.contractService || '-')}</td>
+    <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contractAmount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:90px;text-align:right;font-variant-numeric:tabular-nums;${d.status==='成約'&&!Number(d.contractAmount)?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':''}">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
+    <td style="position:relative">${isAdmin ? (() => { const v = d.paymentMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" data-iso="${esc(v)}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${esc(lbl)}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" value="${esc(v)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`; })() : esc(d.paymentMonth || '-')}</td>
+    <td style="position:relative">${isAdmin ? (() => { const v = d.incentiveMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" data-iso="${esc(v)}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${esc(lbl)}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" value="${esc(v)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`; })() : esc(d.incentiveMonth || '-')}</td>
+    <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:80px;text-align:right;font-variant-numeric:tabular-nums">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
     <td style="text-align:center;white-space:nowrap">${(() => {
       const paid = d.incentivePaid === true;
       const dateStr = d.paidAt ? (() => { const dt = new Date(d.paidAt); return isNaN(dt) ? '' : `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}`; })() : '';
       const byStr = d.paidBy ? ` by ${d.paidBy}` : '';
       const badge = paid
-        ? `<span style="display:inline-block;padding:2px 8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;font-size:10px;font-weight:600">🔒 請求済</span>${dateStr?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${dateStr}${byStr}</div>`:''}`
+        ? `<span style="display:inline-block;padding:2px 8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;font-size:10px;font-weight:600">🔒 請求済</span>${dateStr?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${esc(dateStr)}${esc(byStr)}</div>`:''}`
         : `<span style="display:inline-block;padding:2px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:10px;font-size:10px;font-weight:600">未請求</span>`;
       const tip = paid ? '請求済みは管理者のみ解除可能' : 'クリックで請求済みにする';
-      return `<span class="bk-incpaid-toggle" data-name="${d.name}" data-apply="${d.applyDate}" data-paid="${paid?1:0}" style="cursor:pointer;display:inline-block" title="${tip}">${badge}</span>`;
+      return `<span class="bk-incpaid-toggle" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-paid="${paid?1:0}" style="cursor:pointer;display:inline-block" title="${tip}">${badge}</span>`;
     })()}</td>
-    <td>${isAdmin ? `<button class="bk-del-btn" data-name="${d.name}" data-apply="${d.applyDate}" title="この予約を削除" style="font-size:10px;padding:2px 6px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>` : ''}</td>
+    <td>${isAdmin ? `<button class="bk-del-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="この予約を削除" style="font-size:10px;padding:2px 6px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>` : ''}</td>
   </tr>`}).join('') || '<tr><td colspan="19" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > displayLimit) {
@@ -3537,7 +3579,7 @@ function renderBookings() {
     });
 
     // 追加フィールド（成約施術・金額・入金月・インセ月）のイベント
-    const bkExtra = loadData('bk-extra', {});
+    const bkExtra = _bkExtra;
     const saveExtra = (name, apply, field, value) => {
       const key = name + '|' + apply;
       if (!bkExtra[key]) bkExtra[key] = {};
@@ -3715,9 +3757,28 @@ function renderBookings() {
       // DB保存 (partnerでも動くよう customEditRole に依存しない)
       try {
         const payload = { name, apply_date: applyDate, incentive_paid: newPaid, paid_at: paidAt, paid_by: newPaid ? paidBy : null };
-        const res = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
-        if (res && res.ok === false) showToast('⚠ 請求状態保存に失敗。再送信します', true);
-        else showToast(newPaid ? '請求済みに変更しました' : '未請求に戻しました');
+        // #4 楽観ロック: キャッシュ済みバージョンがあれば conditionalUpdate
+        const seen = getVersion('booking_status', name + '|' + applyDate);
+        if (seen) {
+          const changes = { incentive_paid: newPaid, paid_at: paidAt, paid_by: newPaid ? paidBy : null };
+          const lockRes = await conditionalUpdate('booking_status', { name, apply_date: applyDate }, seen, changes);
+          if (lockRes.conflict) {
+            showConflictDialog('請求状態が他で更新されました。最新を読み込みます。', () => { if (typeof loadBookings === 'function') loadBookings(); });
+            return;
+          }
+          if (!lockRes.ok) {
+            // fallback: safeSave
+            const res = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+            if (res && res.ok === false) showToast('⚠ 請求状態保存に失敗。再送信します', true);
+            else showToast(newPaid ? '請求済みに変更しました' : '未請求に戻しました');
+          } else {
+            showToast(newPaid ? '請求済みに変更しました' : '未請求に戻しました');
+          }
+        } else {
+          const res = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+          if (res && res.ok === false) showToast('⚠ 請求状態保存に失敗。再送信します', true);
+          else showToast(newPaid ? '請求済みに変更しました' : '未請求に戻しました');
+        }
       } catch(e) {
         console.warn('incentive_paid save failed', e);
         showToast('⚠ 請求状態保存でエラー', true);
@@ -4145,7 +4206,21 @@ async function parseMailAndRegister() {
   const mdMatch1 = headerPart.match(/(\d{1,2})月(\d{1,2})日[^\d]*?(\d{1,2}):(\d{2})/);
   if (mdMatch1) {
     const now2 = new Date();
-    mailDate = `${now2.getFullYear()}/${String(parseInt(mdMatch1[1])).padStart(2,'0')}/${String(parseInt(mdMatch1[2])).padStart(2,'0')} ${mdMatch1[3]}:${mdMatch1[4]}`;
+    // #5 年またぎ補正: 受信月と抽出月の差で前後年を推定
+    const nowM = now2.getMonth() + 1;
+    let year = now2.getFullYear();
+    const mm = Number(mdMatch1[1]);
+    const dd = Number(mdMatch1[2]);
+    if (nowM === 12 && mm <= 3) year = year + 1;       // 12月受信で1-3月 → 翌年
+    else if (nowM <= 3 && mm >= 10) year = year - 1;    // 1-3月受信で10-12月 → 前年
+    // 日付妥当性検証 (閏年外の2/29等を排除)
+    const dt = new Date(year, mm - 1, dd);
+    if (dt.getMonth() !== mm - 1 || dt.getDate() !== dd) {
+      console.warn('invalid date parsed from mail', year, mm, dd);
+      mailDate = '';
+    } else {
+      mailDate = `${year}/${String(mm).padStart(2,'0')}/${String(dd).padStart(2,'0')} ${mdMatch1[3]}:${mdMatch1[4]}`;
+    }
   } else {
     const mdMatch2 = headerPart.match(/(\d{4})\/(\d{1,2})\/(\d{1,2})\s+(\d{1,2}):(\d{2})/);
     if (mdMatch2) {
@@ -4513,10 +4588,12 @@ async function loadBFLifecycleData() {
     bfLifecycleCache = {};
     (data || []).forEach(r => {
       // 両方のキー (生の name+date と 正規化 name+date) にマップ → ルックアップ時にスペース差を吸収
+      // ※ key / normKey は同一オブジェクト r への参照を共有するため、どちらを更新しても整合する。
+      //   名前変更 (editPatientName) 時は両キーを明示的に掃除する必要がある (#11)
       const key = r.name + '|' + r.apply_date;
       const normKey = normName(r.name) + '|' + (r.apply_date||'').substring(0,10);
       bfLifecycleCache[key] = r;
-      // 正規化キーでも引ける (空白有無どちらでもヒット)
+      // 正規化キーでも引ける (空白有無どちらでもヒット) - 同一参照 r を共有
       if (!bfLifecycleCache[normKey]) bfLifecycleCache[normKey] = r;
       if (r.updated_at) setVersion('booking_status', key, r.updated_at);
       // edited_* がDB側にあれば bk-extra にマージ (DB優先、ローカルを更新)
@@ -4837,13 +4914,20 @@ async function editPatientName(oldName, applyDate, newName, bfRows) {
     await sb.from('booking_status').update({ name: newName }).eq('name', oldName).eq('apply_date', applyDate);
     // manual_bookings も (手動登録分)
     await sb.from('manual_bookings').update({ name: newName }).eq('name', oldName).eq('apply_date', applyDate).catch(()=>{});
-    // bfLifecycleCacheキー付け替え
+    // bfLifecycleCacheキー付け替え (#11: normKey キャッシュも同期削除/付け替え)
     const oldKey = oldName + '|' + applyDate;
     const newKey = newName + '|' + applyDate;
+    const dateSuffix = (applyDate || '').substring(0,10);
+    const oldNormKey = normName(oldName) + '|' + dateSuffix;
+    const newNormKey = normName(newName) + '|' + dateSuffix;
     if (bfLifecycleCache[oldKey]) {
       bfLifecycleCache[newKey] = { ...bfLifecycleCache[oldKey], name: newName };
       delete bfLifecycleCache[oldKey];
     }
+    // normKey 側のキャッシュ (loadBFLifecycleData が 2キー登録する実装に対応)
+    // 元の normKey は必ず掃除、新しい normKey は newKey と同一参照になるよう再登録
+    if (bfLifecycleCache[oldNormKey] && oldNormKey !== oldKey) delete bfLifecycleCache[oldNormKey];
+    if (bfLifecycleCache[newKey] && newNormKey !== newKey) bfLifecycleCache[newNormKey] = bfLifecycleCache[newKey];
     // GAS (Google Sheets) にも反映
     fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ oldName, applyDate, newName }) }).catch(()=>{});
 
@@ -5020,9 +5104,12 @@ function dedupBFRows(rows) {
   rows.forEach(d => {
     const nn = normName(d.name);
     const fac = normFac(d.facility);
-    // 来院日(bookDate)で正規化キー生成 (applyDateより信頼性高い)
-    const dateKey = normDateKey(d.bookDate || d.applyDate);
-    const key = nn + '|' + fac + '|' + dateKey;
+    // #3/#6 対策: 同名者を誤マージしないよう、電話下4桁/メール/申込日 を複合キーに
+    const phone4 = (d.phone || '').toString().replace(/\D/g,'').slice(-4);
+    const emailKey = (d.email || '').toLowerCase().trim();
+    const dk = (d.applyDate || '').substring(0,10) || normDateKey(d.bookDate || '');
+    const idKey = phone4 || emailKey || 'X';
+    const key = nn + '|' + fac + '|' + dk + '|' + idKey;
     if (!seen.has(key)) {
       seen.set(key, d);
       return;
@@ -5416,7 +5503,6 @@ function drawKaiinRows(treatment, rows, container) {
   else if (sortBy === 'name') filtered.sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
   else filtered.sort((a,b) => bookKey(b) - bookKey(a));
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
-  const esc = s => String(s||'').replace(/"/g,'&quot;');
   container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
     const info = getBFInfo(d.name, d.applyDate) || {};
     const st = info.bf_status || '';
@@ -5430,9 +5516,9 @@ function drawKaiinRows(treatment, rows, container) {
       promoBadge = `<input type="text" class="kaiin-promo-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.source||'')}" placeholder="プロモ入力" title="手動登録: 編集可 (クリックで入力)" style="width:100%;padding:3px 8px;font-size:10px;border:1px dashed ${d.source?'#0369a1':'#cbd5e1'};border-radius:12px;box-sizing:border-box;background:${d.source?'#e0f2fe':'#fff'};color:${d.source?'#0369a1':'#94a3b8'};font-weight:${d.source?'600':'400'};text-align:center">`;
     } else if (d.tool === 'セレクト') {
       const lbl = d.source || 'ｾﾚｸﾄﾀｲﾌﾟ';
-      promoBadge = `<span title="セレクトタイプ予約 (変更不可)" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#b45309;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #fde68a;white-space:nowrap">${lbl.length>14?lbl.slice(0,14)+'…':lbl}</span>`;
+      promoBadge = `<span title="セレクトタイプ予約 (変更不可)" style="display:inline-block;padding:3px 8px;background:#fef3c7;color:#b45309;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #fde68a;white-space:nowrap">${esc(lbl.length>14?lbl.slice(0,14)+'…':lbl)}</span>`;
     } else if (d.source) {
-      promoBadge = `<span title="DXHUB予約 (自動取得・変更不可)" style="display:inline-block;padding:3px 8px;background:#e0f2fe;color:#0369a1;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #bae6fd">${d.source.length>14?d.source.slice(0,14)+'…':d.source}</span>`;
+      promoBadge = `<span title="DXHUB予約 (自動取得・変更不可)" style="display:inline-block;padding:3px 8px;background:#e0f2fe;color:#0369a1;border-radius:12px;font-size:10px;font-weight:600;cursor:help;border:1px solid #bae6fd">${esc(d.source.length>14?d.source.slice(0,14)+'…':d.source)}</span>`;
     } else {
       promoBadge = '<span style="font-size:10px;color:var(--text-muted)">-</span>';
     }
@@ -5444,7 +5530,7 @@ function drawKaiinRows(treatment, rows, container) {
     // CS医院 (複数選択可)
     const csFac = info.bf_cs_facility || normFac(d.facility) || '';
     const csFacList = parseCsFac(csFac);
-    const csFacDisplay = csFacList.length ? csFacList.join(', ') : '<span style="color:var(--text-muted)">未選択</span>';
+    const csFacDisplay = csFacList.length ? esc(csFacList.join(', ')) : '<span style="color:var(--text-muted)">未選択</span>';
     // セット医院
     const setFac = info.bf_set_facility || '';
     // 来院日 (編集可, bookDate を YYYY-MM-DD 化)
@@ -5495,7 +5581,7 @@ function drawKaiinRows(treatment, rows, container) {
       </select></td>` : ''}
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
       ${treatment === 'BF' ? `<td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>` : ''}
-      <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>22?memo.substring(0,22)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
+      <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? esc((memo.length>22?memo.substring(0,22)+'…':memo).replace(/\n/g,' ')) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
     </tr>`;
   }).join('') || `<tr><td colspan="${treatment==='BF'?11:9}" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>`;
 
@@ -5735,7 +5821,6 @@ function drawBFLifecycleTable(bfRows) {
     const bookDate = parseDate(d.bookDate);
     const daysSince = bookDate ? Math.floor((today - bookDate) / 86400000) : '-';
     const histCount = (bfHistoryCache[key] || []).length;
-    const esc = (s) => String(s||'').replace(/"/g,'&quot;');
     const csFac = info.bf_cs_facility || normFac(d.facility) || '';
     const stStyle = st
       ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700`
@@ -5975,14 +6060,14 @@ function openBFHistoryModal(name, applyDate) {
   } else {
     body.innerHTML = history.map(h => `
       <div style="padding:10px;margin-bottom:8px;background:var(--bg);border-left:3px solid #6366f1;border-radius:4px;position:relative">
-        ${h.id ? `<button class="bf-hist-del" data-id="${h.id}" data-name="${name.replace(/"/g,'&quot;')}" data-apply="${applyDate.replace(/"/g,'&quot;')}" style="position:absolute;top:6px;right:6px;width:22px;height:22px;border:1px solid #fecaca;background:#fff;color:#c00;border-radius:4px;cursor:pointer;font-size:12px;line-height:1;font-weight:700" title="この履歴を削除">×</button>` : ''}
-        <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">${(h.created_at||'').substring(0,16).replace('T',' ')} — <b>${h.changed_by||'-'}</b></div>
-        <div style="font-size:13px;font-weight:600">${h.from_status||'(なし)'} → ${h.to_status||'(なし)'}</div>
+        ${h.id ? `<button class="bf-hist-del" data-id="${h.id}" data-name="${esc(name)}" data-apply="${esc(applyDate)}" style="position:absolute;top:6px;right:6px;width:22px;height:22px;border:1px solid #fecaca;background:#fff;color:#c00;border-radius:4px;cursor:pointer;font-size:12px;line-height:1;font-weight:700" title="この履歴を削除" aria-label="この履歴を削除">×</button>` : ''}
+        <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">${esc((h.created_at||'').substring(0,16).replace('T',' '))} — <b>${esc(h.changed_by||'-')}</b></div>
+        <div style="font-size:13px;font-weight:600">${esc(h.from_status||'(なし)')} → ${esc(h.to_status||'(なし)')}</div>
         <div style="font-size:11px;color:var(--text-sub);margin-top:4px">
-          ${h.next_date ? '次回: ' + h.next_date + (h.next_fixed?' 🟢確定':' 🟡未定') + ' / ' : ''}
-          ${h.cs_facility ? 'CS: ' + h.cs_facility + (h.cs_doctor ? '/' + h.cs_doctor : '') : ''}
+          ${h.next_date ? '次回: ' + esc(h.next_date) + (h.next_fixed?' 🟢確定':' 🟡未定') + ' / ' : ''}
+          ${h.cs_facility ? 'CS: ' + esc(h.cs_facility) + (h.cs_doctor ? '/' + esc(h.cs_doctor) : '') : ''}
         </div>
-        ${h.memo ? `<div style="font-size:11px;margin-top:4px;padding:6px;background:#fff;border-radius:3px">${h.memo}</div>` : ''}
+        ${h.memo ? `<div style="font-size:11px;margin-top:4px;padding:6px;background:#fff;border-radius:3px">${esc(h.memo)}</div>` : ''}
       </div>
     `).join('');
     // 削除ボタン
@@ -7543,17 +7628,17 @@ function openRecordingDetail(id) {
   if (!r) return;
   const body = document.getElementById('rec-detail-body');
   body.innerHTML = `
-    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">${r.patient || '（患者名なし）'} 様 / ${r.facility}</h3>
-    <div style="font-size:12px;color:var(--text-sub);margin-bottom:16px">${r.date} ・ ${r.counselor} ・ ${r.service} ・ ${r.duration}分</div>
+    <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">${esc(r.patient || '（患者名なし）')} 様 / ${esc(r.facility)}</h3>
+    <div style="font-size:12px;color:var(--text-sub);margin-bottom:16px">${esc(r.date)} ・ ${esc(r.counselor)} ・ ${esc(r.service)} ・ ${esc(r.duration)}分</div>
     <div style="display:flex;gap:16px;margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px">
       <div><span style="font-size:11px;color:var(--text-sub)">成約</span><div style="font-size:16px;font-weight:700;color:${r.contracted?'#0a0':'#999'}">${r.contracted?'✓ 成約':'未成約'}</div></div>
       <div><span style="font-size:11px;color:var(--text-sub)">金額</span><div style="font-size:16px;font-weight:700">¥${fmt(r.amount)}</div></div>
       ${r.aiScore!=null?`<div><span style="font-size:11px;color:var(--text-sub)">AI評価</span><div style="font-size:16px;font-weight:700">${r.aiScore}/100</div></div>`:''}
     </div>
-    ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><audio controls src="${r.url}" style="width:100%;margin-bottom:4px"></audio><a href="${r.url}" target="_blank" style="font-size:11px;color:#0066cc;word-break:break-all">別タブで開く</a></div>` : ''}
-    <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">要点・メモ</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.notes || '(なし)'}</div></div>
-    ${r.aiTranscript ? `<details style="margin-bottom:12px"><summary style="font-size:11px;font-weight:600;color:var(--text-sub);cursor:pointer">📝 文字起こし (展開)</summary><div style="font-size:12px;line-height:1.7;white-space:pre-wrap;padding:10px;background:var(--bg);border-radius:4px;max-height:300px;overflow-y:auto;margin-top:6px">${r.aiTranscript}</div></details>` : ''}
-    ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:14px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:8px">🤖 AI フィードバック</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${r.aiAdvice}</div></div>` : ''}
+    ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><audio controls src="${esc(r.url)}" style="width:100%;margin-bottom:4px"></audio><a href="${esc(r.url)}" target="_blank" style="font-size:11px;color:#0066cc;word-break:break-all">別タブで開く</a></div>` : ''}
+    <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">要点・メモ</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(r.notes || '(なし)')}</div></div>
+    ${r.aiTranscript ? `<details style="margin-bottom:12px"><summary style="font-size:11px;font-weight:600;color:var(--text-sub);cursor:pointer">📝 文字起こし (展開)</summary><div style="font-size:12px;line-height:1.7;white-space:pre-wrap;padding:10px;background:var(--bg);border-radius:4px;max-height:300px;overflow-y:auto;margin-top:6px">${esc(r.aiTranscript)}</div></details>` : ''}
+    ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:14px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:8px">🤖 AI フィードバック</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(r.aiAdvice)}</div></div>` : ''}
     ${r.aiAdvice ? `
     <div style="margin-bottom:12px;padding:12px;background:#f0f9ff;border-left:3px solid #0284c7;border-radius:4px">
       <div style="font-size:11px;font-weight:600;color:#0369a1;margin-bottom:8px">💬 AIとディスカッション</div>
@@ -8297,8 +8382,8 @@ async function renderPara() {
         <input type="text" class="para-mmdd" value="${md}" placeholder="M/D" maxlength="5" style="width:100%;padding:2px 4px;margin-top:2px;font-size:10px;text-align:center;border:1px solid var(--border);border-radius:3px;box-sizing:border-box;color:var(--text-sub)">
       </td>`);
     }
-    return `<tr data-clinic="${c}">
-      <td style="font-weight:600;position:sticky;left:0;background:var(--card);z-index:1;cursor:pointer" class="para-clinic-cell" title="クリックでメモ編集: ${String(memoAny).replace(/"/g,'&quot;')}">${c}${memoAny?' 📝':''}</td>
+    return `<tr data-clinic="${esc(c)}">
+      <td style="font-weight:600;position:sticky;left:0;background:var(--card);z-index:1;cursor:pointer" class="para-clinic-cell" title="クリックでメモ編集: ${esc(memoAny)}">${esc(c)}${memoAny?' 📝':''}</td>
       ${cells.join('')}
       <td class="para-row-total" style="text-align:right;font-weight:600;color:var(--text-sub)"></td>
     </tr>`;
@@ -8352,13 +8437,13 @@ function openParaMemoModal(clinic, year) {
     const r = paraRecordsCache[ym + '|' + clinic] || {};
     return `<div style="margin-bottom:8px">
       <label style="font-size:11px;color:var(--text-sub);display:block;margin-bottom:2px">${i+1}月 メモ</label>
-      <input type="text" class="para-memo-input" data-ym="${ym}" value="${(r.memo||'').replace(/"/g,'&quot;')}" style="width:100%;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box">
+      <input type="text" class="para-memo-input" data-ym="${esc(ym)}" value="${esc(r.memo||'')}" style="width:100%;padding:6px;font-size:12px;border:1px solid var(--border);border-radius:4px;box-sizing:border-box">
     </div>`;
   }).join('');
   const ov = document.createElement('div');
   ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.4);z-index:10000;display:flex;align-items:center;justify-content:center';
   ov.innerHTML = `<div style="background:#fff;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;padding:20px;border-radius:8px">
-    <div style="font-size:14px;font-weight:700;margin-bottom:12px">${clinic} - ${year}年 月別メモ</div>
+    <div style="font-size:14px;font-weight:700;margin-bottom:12px">${esc(clinic)} - ${esc(year)}年 月別メモ</div>
     ${monthsOpts}
     <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
       <button id="para-memo-cancel" class="btn btn-outline" style="padding:6px 16px">閉じる</button>
