@@ -553,6 +553,10 @@ body {
   50%      { box-shadow: 0 0 0 4px rgba(239, 68, 68, 0); }
 }
 
+/* 予約タブ内のBFは来院管理へ移管したため非表示 (データは保持) */
+#bf-tab-btn,
+#sub-bk-bf { display: none !important; }
+
 /* 来院タブ: 四角枠を外した選択UIのホバー表示 */
 .kaiin-plain-sel:hover,
 .kaiin-csfac-btn:hover {

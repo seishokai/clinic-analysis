@@ -973,8 +973,19 @@ function setupEventListeners() {
       renderBF(btn.dataset.period);
     });
   });
-  // 管理者はBFタブを表示+データ読み込み
-  if (userRole === 'admin') { document.getElementById('bf-tab-btn').style.display = ''; bfUnlocked = true; loadBFSheetData(); }
+  // 管理者はBFデータ読み込みのみ (BFタブ自体は来院管理に移管済みで非表示)
+  if (userRole === 'admin') { bfUnlocked = true; loadBFSheetData(); }
+  // 起動時にBFタブがアクティブだった場合は予約一覧にフォールバック
+  try {
+    const bfBtn = document.getElementById('bf-tab-btn');
+    const bfSub = document.getElementById('sub-bk-bf');
+    if (bfBtn && bfBtn.classList.contains('active')) {
+      bfBtn.classList.remove('active');
+      const bkListBtn = document.querySelector('.sub-nav-btn[data-sub="bk-list"]');
+      if (bkListBtn) bkListBtn.click();
+    }
+    if (bfSub) bfSub.hidden = true;
+  } catch(_){}
 
   // Apply analysis period buttons
   document.querySelectorAll('.apply-period-btn').forEach(btn => {
