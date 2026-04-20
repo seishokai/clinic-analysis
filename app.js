@@ -952,6 +952,7 @@ function setupEventListeners() {
       if (sub === 'recordings') renderRecordings();
       if (sub === 'adm-history') { renderChangeLog(); renderBackupsList(); }
       if (sub === 'para-manage') { if (typeof renderPara === 'function') renderPara(); }
+      if (sub === 'adm-auth-migration') { if (typeof renderAuthMigration === 'function') renderAuthMigration(); }
       // 来院タブのサブ
       if (sub && sub.startsWith('kaiin-')) {
         const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
@@ -7560,31 +7561,49 @@ function initPartnerLogin() {
   ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:inherit;padding:20px';
   ov.innerHTML = `
     <div style="font-size:13px;font-weight:700;letter-spacing:3px;color:#111;margin-bottom:8px">SEISHOKAI PARTNERS</div>
-    <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase">Enter Password</div>
-    <input id="pt-pass-input" type="password" autocomplete="off"
+    <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase">Sign In</div>
+    <input id="pt-email-input" type="email" autocomplete="username" placeholder="メール (新方式の方のみ)"
+      style="width:280px;text-align:center;font-size:14px;padding:12px;border:2px solid #ddd;border-radius:8px;outline:none;font-family:inherit">
+    <input id="pt-pass-input" type="password" autocomplete="current-password" placeholder="パスワード"
       style="width:280px;text-align:center;font-size:16px;letter-spacing:2px;padding:14px;border:2px solid #111;border-radius:8px;outline:none;font-family:inherit">
     <div id="pt-pass-err" style="font-size:11px;color:#c00;min-height:14px"></div>
     <button id="pt-pass-btn" style="border:2px solid #111;background:#111;color:#fff;padding:10px 40px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit;letter-spacing:2px">LOGIN</button>
-    <div style="font-size:10px;color:#bbb;margin-top:16px;letter-spacing:1px">発行されたパスワードをお入れください</div>
+    <div style="font-size:10px;color:#bbb;margin-top:16px;letter-spacing:1px;text-align:center;max-width:320px">旧: パスワードのみ入力<br>新: メール + パスワード (移行済の方)</div>
   `;
   document.body.appendChild(ov);
+  const emailInput = ov.querySelector('#pt-email-input');
   const input = ov.querySelector('#pt-pass-input');
   const err = ov.querySelector('#pt-pass-err');
   const btn = ov.querySelector('#pt-pass-btn');
   input.focus();
   input.addEventListener('input', () => { err.textContent = ''; });
+  emailInput.addEventListener('input', () => { err.textContent = ''; });
   const submit = async () => {
     const pw = input.value.trim();
+    const emailVal = (emailInput.value || '').trim();
     if (!pw) return;
     btn.disabled = true; btn.textContent = 'ログイン中...';
     try {
-      // Phase 3: password 平文漏洩を防ぐため RPC 経由
+      // 新方式: メール入力があれば Supabase Auth を先に試す
+      if (emailVal) {
+        const authRes = await attemptLoginViaSupabaseAuth(emailVal, pw);
+        if (authRes && authRes.ok) {
+          sessionStorage.setItem('authenticated', 'true');
+          ov.remove();
+          setupEventListeners();
+          showApp();
+          return;
+        }
+        // 失敗しても旧方式で再試行 (並走期間)
+        console.warn('Supabase Auth partner login failed, falling back:', authRes?.error);
+      }
+      // 旧方式: Phase 3 RPC 経由 (password 平文漏洩対策)
       const { data, error: rpcErr } = await sb.rpc('login_by_password', { pw });
       if (rpcErr) console.warn('login_by_password RPC error', rpcErr);
       const matched = data && data[0];
       if (!matched) {
         try { sb.rpc('log_auth_event', { event_name: 'login_failed', detail_json: { method: 'partner' } }).then(()=>{}).catch(()=>{}); } catch(_){}
-        err.textContent = 'パスワードが違います';
+        err.textContent = emailVal ? 'メール/パスワードが違います' : 'パスワードが違います';
         input.value = '';
         input.focus();
         btn.disabled = false; btn.textContent = 'LOGIN';
@@ -7611,6 +7630,7 @@ function initPartnerLogin() {
   };
   btn.addEventListener('click', submit);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+  emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') input.focus(); });
 }
 
 // === 録音専用ページ (?view=rec) ===
@@ -8724,6 +8744,137 @@ function initParaExternal() {
   };
   btn.addEventListener('click', submit);
   input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Phase 4: 代理店 Auth 一括移行ツール (管理タブ → Auth移行)
+// ══════════════════════════════════════════════════════════════════════
+function genRandomPassword(len) {
+  // 紛らわしい文字 (0/O/1/l/I) を除外した可読パスワード生成
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$%';
+  let pw = '';
+  try {
+    const array = new Uint32Array(len);
+    crypto.getRandomValues(array);
+    for (let i = 0; i < len; i++) pw += chars[array[i] % chars.length];
+  } catch(_) {
+    for (let i = 0; i < len; i++) pw += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return pw;
+}
+
+async function renderAuthMigration() {
+  const container = document.getElementById('auth-migration-container');
+  if (!container) return;
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-sub)">読み込み中...</div>';
+
+  const { data, error } = await sb.rpc('admin_list_accounts_for_migration');
+  if (error) {
+    container.innerHTML = '<div style="padding:20px;color:#c00">エラー: ' + escapeHtml(error.message || String(error)) + '</div>';
+    return;
+  }
+  const rows = Array.isArray(data) ? data : [];
+  const total = rows.length;
+  const migrated = rows.filter(a => a.supabase_user_id).length;
+
+  const tableRows = rows.map(a => {
+    const state = a.supabase_user_id
+      ? `<span style="color:#059669">✅ ${a.migrated_at ? new Date(a.migrated_at).toLocaleDateString() : ''}</span>`
+      : '<span style="color:#d97706">⏳ 未</span>';
+    const action = a.supabase_user_id
+      ? `<button class="btn btn-outline btn-pw-reset" data-id="${a.id}" data-name="${escapeHtml(a.name || '')}" style="padding:4px 10px;font-size:11px">PW再発行</button>`
+      : `<button class="btn btn-dark btn-migrate" data-id="${a.id}" data-name="${escapeHtml(a.name || '')}" style="padding:4px 10px;font-size:11px">Auth化</button>`;
+    return `<tr>
+      <td>${a.id}</td>
+      <td>${escapeHtml(a.name || '')}</td>
+      <td>${escapeHtml(a.account_type || '')}</td>
+      <td>${escapeHtml(a.agency || '')}</td>
+      <td>${escapeHtml(a.email || '-')}</td>
+      <td>${state}</td>
+      <td>${action}</td>
+    </tr>`;
+  }).join('');
+
+  const finalizeNotice = (migrated === total && total > 0) ? `
+    <div class="card" style="padding:16px;background:#dcfce7;border:1px solid #86efac;margin-top:16px">
+      <strong>🎉 全代理店の移行完了!</strong>
+      <p style="margin-top:8px;font-size:13px;color:var(--text-sub)">最終引き締めSQL (旧 password 列削除等) を実行できます。Supabase Dashboard → SQL Editor で以下を実行してください。</p>
+      <a href="https://github.com/seishokai/clinic-analysis/blob/master/migrations/auth_phase5_finalize.sql" target="_blank" rel="noopener" class="btn btn-outline" style="margin-top:8px">auth_phase5_finalize.sql を開く</a>
+    </div>` : '';
+
+  container.innerHTML = `
+    <div class="card" style="margin-bottom:16px;padding:16px">
+      <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+        <div><strong>進捗: ${migrated} / ${total} 移行済</strong></div>
+        <button class="btn btn-outline" id="auth-mig-reload" style="padding:4px 10px;font-size:11px">🔄 再読み込み</button>
+      </div>
+      <div style="overflow-x:auto">
+        <table class="data-table">
+          <thead><tr><th>ID</th><th>名前</th><th>種類</th><th>代理店</th><th>メール</th><th>状態</th><th>操作</th></tr></thead>
+          <tbody>${tableRows}</tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">
+        ※ Auth化後のメアド/パスワードはアラートで表示 + クリップボードにコピーされます。必ず控えて代理店に連絡してください (再発行は可能ですが元のPWは復元できません)。
+      </div>
+    </div>
+    ${finalizeNotice}`;
+
+  container.querySelector('#auth-mig-reload')?.addEventListener('click', () => renderAuthMigration());
+
+  container.querySelectorAll('.btn-migrate').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const name = btn.dataset.name || '';
+      const defaultEmail = `partner-${id}@seishokai.local`;
+      const email = prompt(`${name} のメアドを入力 (確定後は変更困難)`, defaultEmail);
+      if (!email) return;
+      const password = genRandomPassword(16);
+      if (!confirm(`${name} を以下で Auth 化します:\n\nメール: ${email}\nパスワード: ${password}\n\n※このパスワードは必ずコピーしてください (代理店連絡用)。\n\n実行しますか?`)) return;
+      btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = '処理中...';
+      const { data: res, error: err } = await sb.rpc('admin_migrate_account_to_auth', {
+        target_account_id: Number(id),
+        new_email: email,
+        new_password: password
+      });
+      if (err || !res || !res.ok) {
+        alert('エラー: ' + (err?.message || res?.error || '不明'));
+        btn.disabled = false;
+        btn.textContent = origText;
+        return;
+      }
+      const credentials = `メアド: ${email}\nパスワード: ${password}\n(${name})`;
+      try { await navigator.clipboard.writeText(credentials); } catch(_) {}
+      alert(`✅ 移行完了!\n\n${credentials}\n\n(クリップボードにコピー済み)`);
+      renderAuthMigration();
+    });
+  });
+
+  container.querySelectorAll('.btn-pw-reset').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = btn.dataset.id;
+      const name = btn.dataset.name || '';
+      const password = genRandomPassword(16);
+      if (!confirm(`${name} のパスワードを再発行します:\n\n新パスワード: ${password}\n\n実行しますか?`)) return;
+      btn.disabled = true;
+      const origText = btn.textContent;
+      btn.textContent = '処理中...';
+      const { data: res, error: err } = await sb.rpc('admin_reset_account_password', {
+        target_account_id: Number(id),
+        new_password: password
+      });
+      btn.disabled = false;
+      btn.textContent = origText;
+      if (err || !res || !res.ok) {
+        alert('エラー: ' + (err?.message || res?.error || '不明'));
+        return;
+      }
+      try { await navigator.clipboard.writeText(`${name}: ${password}`); } catch(_) {}
+      alert(`✅ 新パスワード: ${password}\n(クリップボードにコピー済み)`);
+    });
+  });
 }
 
 // ══ 印刷用ヘルパー (ブラウザの印刷→PDF保存) ══
