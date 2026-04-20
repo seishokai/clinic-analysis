@@ -1830,6 +1830,13 @@ function switchView(view) {
   const titles = {tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
   try { sessionStorage.setItem('lastView', view); } catch(_){}
+  // 管理タブ切替時: 権限管理を自動で表示
+  if (view === 'admin') {
+    const activeAdmSub = document.querySelector('#view-admin .sub-nav-btn.active')?.dataset.sub || 'adm-auth-migration';
+    if (activeAdmSub === 'adm-auth-migration') {
+      setTimeout(() => { if (typeof renderAuthMigration === 'function') renderAuthMigration(); }, 50);
+    }
+  }
   // 来院タブ切替時にアクティブなサブの再描画
   if (view === 'kaiin') {
     const activeSub = document.querySelector('#kaiin-sub-nav .sub-nav-btn.active')?.dataset.sub || 'kaiin-bf';

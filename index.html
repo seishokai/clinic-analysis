@@ -885,12 +885,12 @@
     <!-- ==================== 管理 ==================== -->
     <main id="view-admin" class="view" hidden>
       <div class="sub-nav">
-        <button class="sub-nav-btn active" data-sub="adm-account">アカウント発行</button>
-        <button class="sub-nav-btn" data-sub="adm-list">発行済み一覧</button>
+        <button class="sub-nav-btn active" data-sub="adm-auth-migration">権限管理</button>
         <button class="sub-nav-btn" data-sub="adm-rates">プロモ別インセ率</button>
         <button class="sub-nav-btn" data-sub="adm-history">変更履歴・復元</button>
         <button class="sub-nav-btn" data-sub="para-manage">パラ管理</button>
-        <button class="sub-nav-btn" data-sub="adm-auth-migration">権限管理</button>
+        <button class="sub-nav-btn" data-sub="adm-account" hidden>アカウント発行(旧)</button>
+        <button class="sub-nav-btn" data-sub="adm-list" hidden>発行済み一覧(旧)</button>
       </div>
       <div id="sub-adm-auth-migration" hidden>
         <div class="page-header"><h2>権限管理</h2><p class="page-desc">admin / staff_promo / agency のロール別に、社員・代理店アカウントを発行・編集・削除します</p></div>
@@ -916,8 +916,8 @@
           <div>パスワード: <code style="background:#fff;padding:2px 6px;border-radius:3px;user-select:all">para</code></div>
         </div>
       </div>
-      <div id="sub-adm-account">
-      <div class="page-header"><h2>権限管理</h2><p class="page-desc">閲覧用アカウントの発行・管理</p></div>
+      <div id="sub-adm-account" hidden>
+      <div class="page-header"><h2>アカウント発行 (旧UI・使用停止)</h2><p class="page-desc">Supabase Auth 移行後は「権限管理」タブをお使いください</p></div>
       <div class="card" style="margin-bottom:20px"><div class="card-header">新規アカウント発行</div><div class="form-grid"><div class="form-group"><label class="form-label">アカウント名</label><input type="text" class="form-input" id="adm-name" placeholder="例: ヒカルさん用"></div><div class="form-group"><label class="form-label">代理店名（広告用）</label><input type="text" class="form-input" id="adm-agency" placeholder="例: LIZ（空欄=全て閲覧可）"></div><div class="form-group"><label class="form-label">権限</label><select class="form-select" id="adm-role"><option value="view">閲覧のみ</option><option value="edit">編集・閲覧</option></select></div><div class="form-group"><label class="form-label">閲覧タブ</label><div style="display:flex;flex-direction:column;gap:6px;margin-top:4px"><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-tc" value="tc"> TC</label><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-sales" value="sales"> 売上</label><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-bookings" value="bookings" checked> 予約</label><label style="font-size:13px;display:flex;align-items:center;gap:6px"><input type="checkbox" id="adm-perm-adbudget" value="adbudget"> 広告</label></div></div></div><div class="form-grid" style="grid-template-columns:2fr 1fr 2fr;gap:16px;margin-top:16px"><div class="form-group"><label class="form-label">プロモ制限 <button type="button" class="adm-toggle-all" data-target="adm-promos" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label><select class="form-select" id="adm-promos" multiple style="min-height:320px;font-size:12px"></select></div><div class="form-group"><label class="form-label">施術制限 <button type="button" class="adm-toggle-all" data-target="adm-services" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label><select class="form-select" id="adm-services" multiple style="min-height:320px;font-size:12px"></select></div><div class="form-group"><label class="form-label">店舗制限 <button type="button" class="adm-toggle-all" data-target="adm-facilities" style="font-size:9px;background:var(--bg);border:1px solid var(--border);border-radius:4px;padding:1px 6px;cursor:pointer;margin-left:4px">全選択</button></label><select class="form-select" id="adm-facilities" multiple style="min-height:320px;font-size:12px"></select></div></div><div class="form-actions"><button class="btn btn-dark" id="adm-create">発行</button></div></div>
       </div>
       <div id="sub-adm-list" hidden>
@@ -1078,7 +1078,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=235"></script>
+  <script src="app.js?v=236"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
