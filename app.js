@@ -839,9 +839,10 @@ function setupEventListeners() {
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
   document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
   document.getElementById('login-email')?.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('password')?.focus(); });
-  // #20 パスワード表示トグル
+  // #20 パスワード表示トグル (input.type を切替: Firefox/Android 対応)
   document.getElementById('pw-toggle').addEventListener('change', e => {
-    document.getElementById('password').style['-webkit-text-security'] = e.target.checked ? 'none' : 'disc';
+    const pw = document.getElementById('password');
+    if (pw) pw.type = e.target.checked ? 'text' : 'password';
   });
   document.getElementById('logout-btn').addEventListener('click', logout);
   document.getElementById('logout-btn-mobile').addEventListener('click', logout);
@@ -1789,15 +1790,7 @@ function showApp() {
     loadClinics();
     return;
   }
-  // 管理者(予約管理): 売上タブを非表示
-  if (userRole === 'admin') {
-    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
-      if (b.dataset.view === 'sales') b.style.display = 'none';
-    });
-    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
-      if (b.dataset.view === 'sales') b.style.display = 'none';
-    });
-  }
+  // (admin は全タブ見える - applyRoleUI() が既にリセット済み、追加操作不要)
   if (userRole === 'promo') {
     document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
       b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
