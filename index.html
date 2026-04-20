@@ -5,6 +5,20 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
   <link rel="stylesheet" href="styles.css?v=106">
+  <script>
+    // ?view=para / ?view=rec / ?view=partner: メインアプリのフラッシュを防止
+    (function(){
+      try {
+        var v = new URLSearchParams(location.search).get('view');
+        if (v === 'para' || v === 'rec' || v === 'partner') {
+          var s = document.createElement('style');
+          s.id = '__pre-hide-main';
+          s.textContent = '#app,#login-screen{display:none!important}body{background:#fff}';
+          document.head.appendChild(s);
+        }
+      } catch(_){}
+    })();
+  </script>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     .modal[hidden]{display:none!important}
@@ -1063,7 +1077,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=212"></script>
+  <script src="app.js?v=213"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
