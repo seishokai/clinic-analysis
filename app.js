@@ -738,103 +738,39 @@ async function restoreSupabaseAuthIfAny() {
 
 function setupEventListeners() {
   async function attemptLogin() {
+    const emailEl = document.getElementById('login-email');
+    const email = emailEl ? emailEl.value.trim() : '';
     const pw = document.getElementById('password').value;
+    const errEl = document.getElementById('login-error');
     const loginBtn = document.getElementById('login-btn');
+    if (!email || !pw) {
+      if (errEl) { errEl.textContent = 'メールとパスワードを入力してください'; errEl.hidden = false; }
+      return;
+    }
+    if (errEl) { errEl.hidden = true; errEl.textContent = ''; }
     loginBtn.textContent = 'ログイン中...';
     loginBtn.disabled = true;
 
-    const finish = () => {
-      document.getElementById('password').value = '';
-      loginBtn.textContent = 'ログイン';
-      loginBtn.disabled = false;
-    };
-
-    // 1) DB の accounts テーブルを優先チェック
-    // Phase 3: password 平文漏洩を防ぐため、SECURITY DEFINER RPC 経由で検索
     try {
-      const { data: rpcResult, error: rpcErr } = await sb.rpc('login_by_password', { pw });
-      if (rpcErr) console.warn('login_by_password RPC error', rpcErr);
-      const matched = rpcResult && rpcResult[0];
-      if (matched) {
-        sessionStorage.setItem('authenticated', 'true');
-        const type = matched.account_type || 'custom';
-        if (type === 'admin') {
-          sessionStorage.setItem('role', 'admin');
-          userRole = 'admin'; promoFilter = '';
-        } else if (type === 'sales') {
-          sessionStorage.setItem('role', 'sales');
-          userRole = 'sales'; promoFilter = '';
-        } else if (type === 'tc') {
-          sessionStorage.setItem('role', 'tc');
-          userRole = 'tc'; promoFilter = '';
-        } else if (type === 'promo') {
-          const pf = (matched.promos && matched.promos[0]) || '';
-          sessionStorage.setItem('role', 'promo');
-          sessionStorage.setItem('promoFilter', pf);
-          userRole = 'promo'; promoFilter = pf;
-        } else {
-          // custom
-          sessionStorage.setItem('role', 'custom');
-          sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions || []));
-          sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
-          sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
-          sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
-          sessionStorage.setItem('customEditRole', matched.role || 'view');
-          sessionStorage.setItem('customAgency', matched.agency || '');
-          sessionStorage.setItem('customName', matched.name || '');
-          userRole = 'custom';
-        }
-        // 監査ログ (Phase 3): 成功
-        try { sb.rpc('log_auth_event', { event_name: 'login_success', detail_json: { method: 'password', account_id: matched.id } }).then(()=>{}).catch(()=>{}); } catch(_){}
-        finish();
-        showApp();
+      const res = await attemptLoginViaSupabaseAuth(email, pw);
+      if (!res.ok) {
+        if (errEl) { errEl.textContent = res.error || 'ログインに失敗しました'; errEl.hidden = false; }
+        try { sb.rpc('log_auth_event', { event_name: 'login_failed', detail_json: { method: 'email' } }).then(()=>{}).catch(()=>{}); } catch(_){}
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'ログイン';
         return;
       }
-    } catch(e) { console.warn('DB login check failed, falling back to hardcoded', e); }
-
-    // 認証失敗 (ハードコードフォールバックは削除済)
-    // 監査ログ (Phase 3): 失敗
-    try { sb.rpc('log_auth_event', { event_name: 'login_failed', detail_json: { method: 'password' } }).then(()=>{}).catch(()=>{}); } catch(_){}
-    document.getElementById('login-error').hidden = false;
-    finish();
+      sessionStorage.setItem('authenticated', 'true');
+      showApp();
+    } catch (e) {
+      if (errEl) { errEl.textContent = (e && e.message) || 'ログインに失敗しました'; errEl.hidden = false; }
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'ログイン';
+    } finally {
+      document.getElementById('password').value = '';
+    }
   }
   document.getElementById('login-btn').addEventListener('click', attemptLogin);
-  // --- Supabase Auth 並走モード UI (Phase 1) ---
-  const emailToggle = document.getElementById('show-email-login');
-  const emailSection = document.getElementById('email-login-section');
-  if (emailToggle && emailSection) {
-    emailToggle.addEventListener('click', (e) => {
-      e.preventDefault();
-      emailSection.style.display = (emailSection.style.display === 'none' || !emailSection.style.display) ? 'block' : 'none';
-    });
-  }
-  const authLoginBtn = document.getElementById('auth-login-btn');
-  if (authLoginBtn) {
-    const runAuthLogin = async () => {
-      const email = (document.getElementById('auth-email').value || '').trim();
-      const pw = document.getElementById('auth-password').value || '';
-      const errEl = document.getElementById('auth-login-err');
-      errEl.hidden = true; errEl.textContent = '';
-      if (!email || !pw) { errEl.textContent = 'メールとパスワードを入力してください'; errEl.hidden = false; return; }
-      authLoginBtn.disabled = true;
-      const origLabel = authLoginBtn.textContent;
-      authLoginBtn.textContent = 'ログイン中...';
-      const res = await attemptLoginViaSupabaseAuth(email, pw);
-      authLoginBtn.disabled = false;
-      authLoginBtn.textContent = origLabel;
-      if (!res.ok) {
-        errEl.textContent = res.error || 'ログインに失敗しました';
-        errEl.hidden = false;
-        document.getElementById('auth-password').value = '';
-        return;
-      }
-      document.getElementById('auth-password').value = '';
-      showApp();
-    };
-    authLoginBtn.addEventListener('click', runAuthLogin);
-    const pwInp = document.getElementById('auth-password');
-    if (pwInp) pwInp.addEventListener('keydown', e => { if (e.key === 'Enter') runAuthLogin(); });
-  }
   // 予約管理ログイン
   const bkLoginBtn = document.getElementById('login-btn-booking');
   if (bkLoginBtn) {
@@ -854,6 +790,7 @@ function setupEventListeners() {
     });
   }
   document.getElementById('password').addEventListener('keydown', e => { if (e.key === 'Enter') attemptLogin(); });
+  document.getElementById('login-email')?.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('password')?.focus(); });
   // #20 パスワード表示トグル
   document.getElementById('pw-toggle').addEventListener('change', e => {
     document.getElementById('password').style['-webkit-text-security'] = e.target.checked ? 'none' : 'disc';
@@ -7552,85 +7489,26 @@ function stopRecording() {
 }
 
 // === パートナー専用ログイン (?view=partner) ===
+// パートナー用ログインは廃止。メインのメール+パスワードログインへ誘導
 function initPartnerLogin() {
-  // 通常のログイン画面を非表示
-  const loginScreen = document.getElementById('login-screen');
-  if (loginScreen) loginScreen.style.display = 'none';
-  // 専用オーバーレイ
-  const ov = document.createElement('div');
-  ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:inherit;padding:20px';
-  ov.innerHTML = `
-    <div style="font-size:13px;font-weight:700;letter-spacing:3px;color:#111;margin-bottom:8px">SEISHOKAI PARTNERS</div>
-    <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase">Sign In</div>
-    <input id="pt-email-input" type="email" autocomplete="username" placeholder="メール (新方式の方のみ)"
-      style="width:280px;text-align:center;font-size:14px;padding:12px;border:2px solid #ddd;border-radius:8px;outline:none;font-family:inherit">
-    <input id="pt-pass-input" type="password" autocomplete="current-password" placeholder="パスワード"
-      style="width:280px;text-align:center;font-size:16px;letter-spacing:2px;padding:14px;border:2px solid #111;border-radius:8px;outline:none;font-family:inherit">
-    <div id="pt-pass-err" style="font-size:11px;color:#c00;min-height:14px"></div>
-    <button id="pt-pass-btn" style="border:2px solid #111;background:#111;color:#fff;padding:10px 40px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit;letter-spacing:2px">LOGIN</button>
-    <div style="font-size:10px;color:#bbb;margin-top:16px;letter-spacing:1px;text-align:center;max-width:320px">旧: パスワードのみ入力<br>新: メール + パスワード (移行済の方)</div>
-  `;
-  document.body.appendChild(ov);
-  const emailInput = ov.querySelector('#pt-email-input');
-  const input = ov.querySelector('#pt-pass-input');
-  const err = ov.querySelector('#pt-pass-err');
-  const btn = ov.querySelector('#pt-pass-btn');
-  input.focus();
-  input.addEventListener('input', () => { err.textContent = ''; });
-  emailInput.addEventListener('input', () => { err.textContent = ''; });
-  const submit = async () => {
-    const pw = input.value.trim();
-    const emailVal = (emailInput.value || '').trim();
-    if (!pw) return;
-    btn.disabled = true; btn.textContent = 'ログイン中...';
-    try {
-      // 新方式: メール入力があれば Supabase Auth を先に試す
-      if (emailVal) {
-        const authRes = await attemptLoginViaSupabaseAuth(emailVal, pw);
-        if (authRes && authRes.ok) {
-          sessionStorage.setItem('authenticated', 'true');
-          ov.remove();
-          setupEventListeners();
-          showApp();
-          return;
-        }
-        // 失敗しても旧方式で再試行 (並走期間)
-        console.warn('Supabase Auth partner login failed, falling back:', authRes?.error);
-      }
-      // 旧方式: Phase 3 RPC 経由 (password 平文漏洩対策)
-      const { data, error: rpcErr } = await sb.rpc('login_by_password', { pw });
-      if (rpcErr) console.warn('login_by_password RPC error', rpcErr);
-      const matched = data && data[0];
-      if (!matched) {
-        try { sb.rpc('log_auth_event', { event_name: 'login_failed', detail_json: { method: 'partner' } }).then(()=>{}).catch(()=>{}); } catch(_){}
-        err.textContent = emailVal ? 'メール/パスワードが違います' : 'パスワードが違います';
-        input.value = '';
-        input.focus();
-        btn.disabled = false; btn.textContent = 'LOGIN';
-        return;
-      }
-      try { sb.rpc('log_auth_event', { event_name: 'login_success', detail_json: { method: 'partner', account_id: matched.id } }).then(()=>{}).catch(()=>{}); } catch(_){}
-      sessionStorage.setItem('authenticated', 'true');
-      sessionStorage.setItem('role', 'custom');
-      sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
-      sessionStorage.setItem('customPromos', JSON.stringify(matched.promos || []));
-      sessionStorage.setItem('customServices', JSON.stringify(matched.services || []));
-      sessionStorage.setItem('customFacilities', JSON.stringify(matched.facilities || []));
-      sessionStorage.setItem('customEditRole', matched.role || 'view');
-      sessionStorage.setItem('customAgency', matched.agency || '');
-      sessionStorage.setItem('customName', matched.name || '');
-      userRole = 'custom';
-      ov.remove();
-      setupEventListeners();
-      showApp();
-    } catch(e) {
-      err.textContent = 'エラー: ' + (e.message || '');
-      btn.disabled = false; btn.textContent = 'LOGIN';
-    }
-  };
-  btn.addEventListener('click', submit);
-  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
-  emailInput.addEventListener('keydown', e => { if (e.key === 'Enter') input.focus(); });
+  try {
+    const u = new URL(location.href);
+    u.searchParams.delete('view');
+    // 廃止メッセージを表示してからメインに戻す
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:inherit;padding:20px;text-align:center';
+    ov.innerHTML = `
+      <div style="font-size:13px;font-weight:700;letter-spacing:3px;color:#111">SEISHOKAI PARTNERS</div>
+      <div style="font-size:14px;color:#333;max-width:360px;line-height:1.7">このアクセス方法は廃止されました。<br>管理者にご連絡ください。</div>
+      <button id="pt-back-btn" style="border:2px solid #111;background:#111;color:#fff;padding:10px 32px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit;letter-spacing:2px">メインへ</button>
+    `;
+    document.body.appendChild(ov);
+    ov.querySelector('#pt-back-btn').addEventListener('click', () => {
+      location.replace(u.toString());
+    });
+  } catch (e) {
+    console.warn('initPartnerLogin redirect failed', e);
+  }
 }
 
 // === 録音専用ページ (?view=rec) ===
