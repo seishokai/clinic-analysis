@@ -893,7 +893,7 @@
         <button class="sub-nav-btn" data-sub="adm-list" hidden>発行済み一覧(旧)</button>
       </div>
       <div id="sub-adm-auth-migration" hidden>
-        <div class="page-header"><h2>権限管理</h2><p class="page-desc">admin / staff_promo / agency のロール別に、社員・代理店アカウントを発行・編集・削除します</p></div>
+        <div class="page-header"><h2>権限管理</h2><p class="page-desc">admin / staff_promo / agency のロール別に、社員・代理店アカウントを発行・編集・削除します。<strong>Cloudflare Worker デプロイ済みなら 1クリックで発行可能</strong> (未デプロイ時は手動モードに自動フォールバック)</p></div>
         <div id="auth-migration-container"><div style="padding:20px;text-align:center;color:var(--text-sub)">読み込み中...</div></div>
       </div>
       <div id="sub-para-manage" hidden>
@@ -1078,7 +1078,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=237"></script>
+  <script src="app.js?v=238"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

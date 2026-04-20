@@ -1,0 +1,16 @@
+# wrangler CLI でデプロイする場合の設定例。
+# 普通は Cloudflare Dashboard で Quick edit + Secrets 設定するだけで OK。
+# (SETUP.md 参照)
+#
+# CLI 経由でやりたい場合:
+#   npm i -g wrangler
+#   wrangler login
+#   wrangler deploy
+#   wrangler secret put SUPABASE_URL
+#   wrangler secret put SUPABASE_ANON_KEY
+#   wrangler secret put SUPABASE_SERVICE_ROLE_KEY
+#   wrangler secret put ALLOWED_ORIGIN
+
+name = "seishokai-auth-admin"
+main = "worker.js"
+compatibility_date = "2024-01-01"

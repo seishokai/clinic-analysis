@@ -197,6 +197,45 @@ UI 上、staff_promo 未満は金額 input と削除ボタンを非表示にす�
 
 ---
 
+## Phase 7: 1クリック発行 Cloudflare Worker (`worker/auth-admin/`)
+
+### 背景
+Phase 6 までで UUID リンク型の発行 UI ができたが、admin は
+「Supabase Dashboard で Auth user 作成 → UUID コピー → フォーム貼付」の
+3ステップを踏む必要があった。これを **1クリック** に短縮する。
+
+### 方針
+- Supabase の `service_role` キーは全権限なのでフロントに出せない
+- 新規 Cloudflare Worker `seishokai-auth-admin` を追加し、
+  service_role キーは Worker 環境変数 (Encrypted Secret) のみに保存
+- フロントは admin ログイン済みの JWT を付けて Worker を呼ぶ
+- Worker は `is_auth_admin()` RPC で admin を再検証してから Auth Admin API を実行
+- 既存の `seishokai-ai-proxy` Worker は **一切触らない** (完全分離)
+
+### デプロイ手順
+`worker/auth-admin/SETUP.md` を参照 (Cloudflare Dashboard で約5分)。
+必要 Secrets:
+- `SUPABASE_URL`
+- `SUPABASE_ANON_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY` ⚠️ 秘匿
+- `ALLOWED_ORIGIN` (例: `https://seishokai.github.io`)
+
+### アプリ側の動作 (v238)
+- 管理 → 権限管理 に「🟢 Worker稼働中」/「🟡 Worker未デプロイ」バッジ表示
+- Worker 稼働中:
+  - 新規発行フォームは UUID 不要、名前・ロール等のみ
+  - パスワードは自動生成、発行後にアラート + クリップボードコピー
+  - PW再発行ボタン / 削除ボタンも Worker 経由 (Auth user も同時処理)
+- Worker 未デプロイ時:
+  - 自動的に旧UI (手動UUID入力式) にフォールバック、業務は止まらない
+
+### エンドポイント
+- `POST /auth-admin/create`
+- `POST /auth-admin/reset-password`
+- `POST /auth-admin/delete`
+
+---
+
 ## ロールバック
 
 Phase 1 の SQL は加算のみ (ALTER ADD, CREATE)。どうしても巻き戻したい場合:
