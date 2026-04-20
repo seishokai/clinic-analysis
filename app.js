@@ -3352,8 +3352,8 @@ function renderBookings() {
       <option ${d.contractService==='ｲﾝﾌﾟﾗﾝﾄ'?'selected':''}>ｲﾝﾌﾟﾗﾝﾄ</option>
     </select>` : (d.contractService || '-')}</td>
     <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="contractAmount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:90px;text-align:right;font-variant-numeric:tabular-nums;${d.status==='成約'&&!Number(d.contractAmount)?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':''}">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
-    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.paymentMonth || '-')}</td>
-    <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
+    <td>${isAdmin ? (() => { const v = d.paymentMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" data-iso="${v}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${lbl}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${v}" style="display:none">`; })() : (d.paymentMonth || '-')}</td>
+    <td>${isAdmin ? (() => { const v = d.incentiveMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" data-iso="${v}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${lbl}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${v}" style="display:none">`; })() : (d.incentiveMonth || '-')}</td>
     <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:80px;text-align:right;font-variant-numeric:tabular-nums">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
     <td style="text-align:center;white-space:nowrap">${(() => {
       const paid = d.incentivePaid === true;
@@ -3438,6 +3438,29 @@ function renderBookings() {
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
         renderBookings();
       });
+    });
+
+    // 入金月/インセ月 (カレンダーピッカー)
+    tbody.querySelectorAll('.bk-month-btn').forEach(btn => {
+      const hidden = btn.parentElement.querySelector('.bk-month-hidden');
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!hidden) return;
+        if (typeof hidden.showPicker === 'function') {
+          try { hidden.showPicker(); return; } catch(_) {}
+        }
+        hidden.focus();
+        hidden.click();
+      });
+      if (hidden) {
+        hidden.addEventListener('change', () => {
+          const v = hidden.value || '';
+          btn.dataset.iso = v;
+          btn.textContent = v ? v.substring(2).replace('-','/') : 'YY/MM';
+          btn.style.color = v ? '' : 'var(--text-muted)';
+          // bk-field-input 共通ハンドラで保存される
+        });
+      }
     });
 
     // 次回予定 (カレンダーピッカー)
