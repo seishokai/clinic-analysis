@@ -3110,10 +3110,12 @@ function renderBookings() {
     <td style="text-align:center;white-space:nowrap">${(() => {
       const paid = d.incentivePaid === true;
       const dateStr = d.paidAt ? (() => { const dt = new Date(d.paidAt); return isNaN(dt) ? '' : `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}`; })() : '';
+      const byStr = d.paidBy ? ` by ${d.paidBy}` : '';
       const badge = paid
-        ? `<span style="display:inline-block;padding:2px 8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;font-size:10px;font-weight:600">✓ 支払済</span>${dateStr?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${dateStr}</div>`:''}`
-        : `<span style="display:inline-block;padding:2px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:10px;font-size:10px;font-weight:600">未払</span>`;
-      return `<span class="bk-incpaid-toggle" data-name="${d.name}" data-apply="${d.applyDate}" data-paid="${paid?1:0}" style="cursor:pointer;display:inline-block" title="クリックで支払状態を切替">${badge}</span>`;
+        ? `<span style="display:inline-block;padding:2px 8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;font-size:10px;font-weight:600">🔒 請求済</span>${dateStr?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${dateStr}${byStr}</div>`:''}`
+        : `<span style="display:inline-block;padding:2px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:10px;font-size:10px;font-weight:600">未請求</span>`;
+      const tip = paid ? '請求済みは管理者のみ解除可能' : 'クリックで請求済みにする';
+      return `<span class="bk-incpaid-toggle" data-name="${d.name}" data-apply="${d.applyDate}" data-paid="${paid?1:0}" style="cursor:pointer;display:inline-block" title="${tip}">${badge}</span>`;
     })()}</td>
     <td>${isAdmin ? `<button class="bk-del-btn" data-name="${d.name}" data-apply="${d.applyDate}" title="この予約を削除" style="font-size:10px;padding:2px 6px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>` : ''}</td>
   </tr>`}).join('') || '<tr><td colspan="18" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
@@ -3346,16 +3348,26 @@ function renderBookings() {
     });
   }
 
-  // インセ支払トグル (admin/partner両方で操作可)
+  // 請求トグル (admin/partner両方で操作可。請求済→未請求は admin のみ)
   tbody.querySelectorAll('.bk-incpaid-toggle').forEach(el => {
     el.addEventListener('click', async () => {
       const name = el.dataset.name;
       const applyDate = el.dataset.apply;
       const curPaid = el.dataset.paid === '1';
+      const role = sessionStorage.getItem('role') || userRole || 'admin';
+      const isAdminUser = (role === 'admin');
+      // 請求済 → 未請求 はパートナー禁止
+      if (curPaid && !isAdminUser) {
+        alert('請求済みの解除は管理者のみが可能です。\n変更が必要な場合は管理者にご連絡ください。');
+        return;
+      }
+      // 解除時は admin でも確認
+      if (curPaid && isAdminUser) {
+        if (!confirm(`${name} の請求済みを解除しますか？\n※パートナー側にも反映されます`)) return;
+      }
       const newPaid = !curPaid;
       const nowIso = new Date().toISOString();
       const paidAt = newPaid ? nowIso : null;
-      const role = sessionStorage.getItem('role') || userRole || 'admin';
       const paidBy = role === 'custom'
         ? (sessionStorage.getItem('customName') || 'partner')
         : (role === 'admin' ? 'admin' : role);
@@ -3385,11 +3397,11 @@ function renderBookings() {
       try {
         const payload = { name, apply_date: applyDate, incentive_paid: newPaid, paid_at: paidAt, paid_by: newPaid ? paidBy : null };
         const res = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
-        if (res && res.ok === false) showToast('⚠ 支払状態保存に失敗。再送信します', true);
-        else showToast(newPaid ? '支払済に変更しました' : '未払に戻しました');
+        if (res && res.ok === false) showToast('⚠ 請求状態保存に失敗。再送信します', true);
+        else showToast(newPaid ? '請求済みに変更しました' : '未請求に戻しました');
       } catch(e) {
         console.warn('incentive_paid save failed', e);
-        showToast('⚠ 支払状態保存でエラー', true);
+        showToast('⚠ 請求状態保存でエラー', true);
       }
       renderBookings();
     });
