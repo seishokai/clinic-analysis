@@ -6,11 +6,11 @@
   <title>清翔会</title>
   <link rel="stylesheet" href="styles.css?v=106">
   <script>
-    // ?view=para / ?view=rec / ?view=partner: メインアプリのフラッシュを防止
+    // ?view=para: メインアプリのフラッシュを防止 (para は完全に独自UIで置換するため)
     (function(){
       try {
         var v = new URLSearchParams(location.search).get('view');
-        if (v === 'para' || v === 'rec' || v === 'partner') {
+        if (v === 'para') {
           var s = document.createElement('style');
           s.id = '__pre-hide-main';
           s.textContent = '#app,#login-screen{display:none!important}body{background:#fff}';
@@ -1077,7 +1077,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=213"></script>
+  <script src="app.js?v=214"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
