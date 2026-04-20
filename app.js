@@ -7806,10 +7806,12 @@ function updateParaTotals() {
 
 async function renderPara() {
   const yearEl = document.getElementById('para-year');
-  if (!yearEl) return;
-  if (!yearEl.value) yearEl.value = currentYear();
+  if (!yearEl) { console.warn('para-year element not found'); return; }
+  if (!yearEl.value) yearEl.value = String(currentYear());
   initParaControls();
-  const year = Number(yearEl.value);
+  const year = Number(yearEl.value) || currentYear();
+  yearEl.value = String(year);
+  console.log('renderPara year=', year);
   const thead = document.getElementById('para-thead');
   const tbody = document.getElementById('para-tbody');
   const tfoot = document.getElementById('para-tfoot');
@@ -7930,6 +7932,10 @@ function initParaControls() {
   yearEl.dataset.bound = '1';
   if (!yearEl.value) yearEl.value = currentYear();
   yearEl.addEventListener('change', () => renderPara());
+  const prevBtn = document.getElementById('para-year-prev');
+  const nextBtn = document.getElementById('para-year-next');
+  if (prevBtn) prevBtn.addEventListener('click', () => { yearEl.value = Number(yearEl.value || currentYear()) - 1; renderPara(); });
+  if (nextBtn) nextBtn.addEventListener('click', () => { yearEl.value = Number(yearEl.value || currentYear()) + 1; renderPara(); });
   const csvBtn = document.getElementById('para-csv');
   if (csvBtn) csvBtn.addEventListener('click', () => {
     const year = Number(yearEl.value);
@@ -7977,7 +7983,9 @@ function initParaExternal() {
         <div class="card" style="margin-bottom:16px;padding:16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <label style="font-size:12px;font-weight:600">対象年</label>
-            <input type="number" id="para-year" min="2020" max="2099" step="1" style="width:100px;padding:6px 10px;font-size:13px;border:1px solid #ccc;border-radius:4px">
+            <button id="para-year-prev" style="padding:6px 10px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer" title="前年">◀</button>
+            <input type="number" id="para-year" min="2020" max="2099" step="1" style="width:90px;padding:6px 10px;font-size:13px;text-align:center;border:1px solid #ccc;border-radius:4px">
+            <button id="para-year-next" style="padding:6px 10px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer" title="翌年">▶</button>
             <button id="para-csv" style="padding:6px 14px;font-size:12px;border:1px solid #ccc;border-radius:4px;background:#fff;cursor:pointer">CSVエクスポート</button>
             <div style="flex:1"></div>
             <div style="font-size:13px;color:#666">年間合計: <strong id="para-total" style="color:#111;font-size:15px">0</strong> g</div>

@@ -886,7 +886,9 @@
         <div class="card" style="margin-bottom:16px">
           <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
             <label class="form-label" style="margin:0">対象年</label>
-            <input type="number" class="form-input" id="para-year" min="2020" max="2099" step="1" style="width:100px;padding:6px 10px;font-size:13px">
+            <button class="btn btn-outline" id="para-year-prev" style="padding:6px 10px;font-size:12px" title="前年">◀</button>
+            <input type="number" class="form-input" id="para-year" min="2020" max="2099" step="1" style="width:90px;padding:6px 10px;font-size:13px;text-align:center">
+            <button class="btn btn-outline" id="para-year-next" style="padding:6px 10px;font-size:12px" title="翌年">▶</button>
             <button class="btn btn-outline" id="para-csv" style="padding:6px 14px;font-size:12px">CSVエクスポート</button>
             <div style="flex:1"></div>
             <div style="font-size:13px;color:var(--text-sub)">年間合計: <strong id="para-total" style="color:var(--text);font-size:15px">0</strong> g</div>
@@ -1061,7 +1063,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=210"></script>
+  <script src="app.js?v=211"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
