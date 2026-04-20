@@ -5293,12 +5293,19 @@ function drawKaiinRows(treatment, rows, container) {
       return statusSet.has(s);
     });
   }
-  // ソート
+  // ソート (来院日 = bookDate を使う。parseDateでISO化して比較)
   const statusOrder = (s) => { const i = statuses.findIndex(x => x.value === s); return i < 0 ? 999 : i; };
-  if (sortBy === 'date-asc') filtered.sort((a,b) => (a.applyDate||'').localeCompare(b.applyDate||''));
-  else if (sortBy === 'status') filtered.sort((a,b) => statusOrder(getSt(a)) - statusOrder(getSt(b)) || (b.applyDate||'').localeCompare(a.applyDate||''));
+  const bookKey = (d) => {
+    const pd = parseDate(d.bookDate);
+    if (pd && !isNaN(pd)) return pd.getTime();
+    // fallback: applyDate
+    const pa = parseDate(d.applyDate);
+    return pa && !isNaN(pa) ? pa.getTime() : 0;
+  };
+  if (sortBy === 'date-asc') filtered.sort((a,b) => bookKey(a) - bookKey(b));
+  else if (sortBy === 'status') filtered.sort((a,b) => statusOrder(getSt(a)) - statusOrder(getSt(b)) || bookKey(b) - bookKey(a));
   else if (sortBy === 'name') filtered.sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
-  else filtered.sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
+  else filtered.sort((a,b) => bookKey(b) - bookKey(a));
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
   const esc = s => String(s||'').replace(/"/g,'&quot;');
   container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
