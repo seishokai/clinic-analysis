@@ -155,7 +155,7 @@ function setupRealtime() {
   realtimeChannels.forEach(ch => { try { sb.removeChannel(ch); } catch(_){} });
   realtimeChannels = [];
 
-  const tables = ['booking_status','manual_bookings','self_recordings','bf_history','accounts','promo_rates'];
+  const tables = ['booking_status','manual_bookings','self_recordings','bf_history','accounts','promo_rates','para_records'];
   tables.forEach(tbl => {
     const ch = sb.channel('rt-' + tbl)
       .on('postgres_changes', { event: '*', schema: 'public', table: tbl }, (payload) => {
@@ -232,6 +232,8 @@ function handleRealtimeChange(table, payload) {
     debouncedRefresh('accounts', () => { if (typeof renderAccounts === 'function') renderAccounts(); });
   } else if (table === 'promo_rates') {
     debouncedRefresh('promo', () => { if (typeof renderPromoRates === 'function') renderPromoRates(); });
+  } else if (table === 'para_records') {
+    debouncedRefresh('para', () => { if (typeof renderPara === 'function') renderPara(); });
   }
 
   // 他ユーザー編集通知（控えめに）
@@ -382,6 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
   // パートナー専用ログイン画面 (?view=partner)
   if (params.get('view') === 'partner') {
     initPartnerLogin();
+    return;
+  }
+  // パラ管理 外注用ログイン (?view=para)
+  if (params.get('view') === 'para') {
+    initParaExternal();
     return;
   }
   if (params.get('view') === 'tc') {
@@ -626,6 +633,7 @@ function setupEventListeners() {
       if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
       if (sub === 'recordings') renderRecordings();
       if (sub === 'adm-history') { renderChangeLog(); renderBackupsList(); }
+      if (sub === 'para-manage') { if (typeof renderPara === 'function') renderPara(); }
       // 来院タブのサブ
       if (sub && sub.startsWith('kaiin-')) {
         const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
@@ -7706,4 +7714,222 @@ function renderReviews() {
       <td>${d.count}</td><td>${diffStr}</td><td>${d.rating.toFixed(1)}</td>
     </tr>`;
   }).join('') || '<tr><td colspan="4" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+}
+
+// =========================================
+// パラ管理 (歯科金属スクラップ回収)
+// =========================================
+const PARA_PASSCODE = 'para2026';
+const PARA_CLINICS = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
+let paraRecordsCache = {}; // key: year_month+'|'+clinic_name → record
+
+function currentYearMonth() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+}
+
+async function loadParaRecords(ym) {
+  try {
+    const { data, error } = await sb.from('para_records').select('*').eq('year_month', ym);
+    if (error) throw error;
+    const map = {};
+    (data || []).forEach(r => { map[r.year_month + '|' + r.clinic_name] = r; });
+    paraRecordsCache = map;
+    return data || [];
+  } catch(e) {
+    console.warn('loadParaRecords failed', e);
+    showToast && showToast('データ読込失敗: ' + (e.message || e));
+    return [];
+  }
+}
+
+async function saveParaRecord(clinic, patch) {
+  const monthEl = document.getElementById('para-month');
+  const ym = (monthEl && monthEl.value) || currentYearMonth();
+  const payload = { year_month: ym, clinic_name: clinic, ...patch };
+  // 空欄は null に正規化
+  if (payload.collected_date === '') payload.collected_date = null;
+  if (payload.grams === '' || payload.grams == null) payload.grams = null;
+  else payload.grams = Number(payload.grams);
+  if (payload.memo === undefined) payload.memo = null;
+  const res = await safeSave({ type:'upsert', table:'para_records', payload, options:{ onConflict:'year_month,clinic_name' } });
+  if (res.ok) {
+    paraRecordsCache[ym + '|' + clinic] = { ...(paraRecordsCache[ym + '|' + clinic] || {}), ...payload };
+    updateParaTotal();
+    showToast && showToast('保存しました');
+  } else {
+    showToast && showToast('保存失敗 (キューに登録)');
+  }
+}
+
+function updateParaTotal() {
+  const tbody = document.getElementById('para-tbody');
+  if (!tbody) return;
+  let total = 0;
+  tbody.querySelectorAll('input.para-grams').forEach(inp => {
+    const v = Number(inp.value);
+    if (!isNaN(v)) total += v;
+  });
+  const el = document.getElementById('para-total');
+  if (el) el.textContent = (Math.round(total * 100) / 100).toLocaleString();
+}
+
+async function renderPara() {
+  const monthEl = document.getElementById('para-month');
+  if (!monthEl) return;
+  if (!monthEl.value) monthEl.value = currentYearMonth();
+  initParaControls();
+  const ym = monthEl.value;
+  const tbody = document.getElementById('para-tbody');
+  tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;color:var(--text-muted)">読込中...</td></tr>`;
+  await loadParaRecords(ym);
+  tbody.innerHTML = PARA_CLINICS.map(c => {
+    const r = paraRecordsCache[ym + '|' + c] || {};
+    const date = r.collected_date || '';
+    const grams = r.grams != null ? r.grams : '';
+    const memo = r.memo || '';
+    return `<tr data-clinic="${c}">
+      <td style="font-weight:600">${c}</td>
+      <td><input type="date" class="form-input para-date" value="${date}" style="padding:4px 6px;font-size:12px"></td>
+      <td><input type="number" step="0.01" class="form-input para-grams" value="${grams}" style="padding:4px 6px;font-size:12px;text-align:right" placeholder="0"></td>
+      <td><input type="text" class="form-input para-memo" value="${memo.replace(/"/g,'&quot;')}" style="padding:4px 6px;font-size:12px" placeholder="メモ"></td>
+      <td><button class="btn btn-dark para-save" style="padding:4px 12px;font-size:11px">保存</button></td>
+    </tr>`;
+  }).join('');
+  // リスナー
+  tbody.querySelectorAll('input.para-grams').forEach(inp => inp.addEventListener('input', updateParaTotal));
+  tbody.querySelectorAll('tr').forEach(tr => {
+    const clinic = tr.dataset.clinic;
+    tr.querySelector('.para-save').addEventListener('click', () => {
+      const date = tr.querySelector('.para-date').value;
+      const grams = tr.querySelector('.para-grams').value;
+      const memo = tr.querySelector('.para-memo').value;
+      saveParaRecord(clinic, { collected_date: date, grams, memo });
+    });
+  });
+  updateParaTotal();
+  // 外注URL表示
+  const urlEl = document.getElementById('para-ext-url');
+  if (urlEl) urlEl.textContent = location.origin + location.pathname + '?view=para';
+}
+
+function initParaControls() {
+  const monthEl = document.getElementById('para-month');
+  if (!monthEl || monthEl.dataset.bound) return;
+  monthEl.dataset.bound = '1';
+  if (!monthEl.value) monthEl.value = currentYearMonth();
+  monthEl.addEventListener('change', () => renderPara());
+  const copyBtn = document.getElementById('para-copy-prev');
+  if (copyBtn) copyBtn.addEventListener('click', async () => {
+    const ym = monthEl.value;
+    if (!ym) return;
+    const [y, m] = ym.split('-').map(Number);
+    const prevDate = new Date(y, m - 2, 1);
+    const prevYm = `${prevDate.getFullYear()}-${String(prevDate.getMonth()+1).padStart(2,'0')}`;
+    if (!confirm(`${prevYm} のデータを ${ym} にコピーしますか？（既存の入力は上書きされます）`)) return;
+    try {
+      const { data } = await sb.from('para_records').select('*').eq('year_month', prevYm);
+      if (!data || !data.length) { showToast && showToast('前月データがありません'); return; }
+      for (const r of data) {
+        await safeSave({ type:'upsert', table:'para_records',
+          payload: { year_month: ym, clinic_name: r.clinic_name, collected_date: null, grams: r.grams, memo: r.memo },
+          options: { onConflict:'year_month,clinic_name' } });
+      }
+      await renderPara();
+      showToast && showToast('前月データをコピーしました');
+    } catch(e) { console.warn(e); showToast && showToast('コピー失敗: ' + (e.message || e)); }
+  });
+  const csvBtn = document.getElementById('para-csv');
+  if (csvBtn) csvBtn.addEventListener('click', () => {
+    const ym = monthEl.value;
+    const rows = [['医院','回収日','回収グラム','メモ']];
+    PARA_CLINICS.forEach(c => {
+      const r = paraRecordsCache[ym + '|' + c] || {};
+      rows.push([c, r.collected_date || '', r.grams != null ? r.grams : '', (r.memo || '').replace(/\n/g,' ')]);
+    });
+    const csv = rows.map(row => row.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\ufeff' + csv], { type:'text/csv;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `para_${ym}.csv`;
+    a.click();
+  });
+}
+
+// 外注アクセス (?view=para) — ヘッダー他タブ全非表示で UI のみ表示
+function initParaExternal() {
+  const loginScreen = document.getElementById('login-screen');
+  if (loginScreen) loginScreen.style.display = 'none';
+
+  const showUI = () => {
+    // 通常 app を隠し、独自コンテナを用意
+    const app = document.getElementById('app');
+    if (app) app.hidden = true;
+    let wrap = document.getElementById('para-ext-wrap');
+    if (!wrap) {
+      wrap = document.createElement('div');
+      wrap.id = 'para-ext-wrap';
+      wrap.style.cssText = 'max-width:900px;margin:0 auto;padding:20px;font-family:inherit';
+      wrap.innerHTML = `
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;padding-bottom:12px;border-bottom:2px solid #111">
+          <div style="font-size:14px;font-weight:800;letter-spacing:2px">SEISHOKAI / パラ管理 (外注)</div>
+        </div>
+        <div class="card" style="margin-bottom:16px;padding:16px;border:1px solid #e0e0e0;border-radius:8px;background:#fff">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <label style="font-size:12px;font-weight:600">対象月</label>
+            <input type="month" id="para-month" style="padding:6px 10px;font-size:13px;border:1px solid #ccc;border-radius:4px">
+            <div style="flex:1"></div>
+            <div style="font-size:13px;color:#666">合計: <strong id="para-total" style="color:#111;font-size:15px">0</strong> g</div>
+          </div>
+          <div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:13px" class="data-table">
+            <thead><tr style="background:#f5f5f5">
+              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">医院</th>
+              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">回収日</th>
+              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">回収グラム</th>
+              <th style="padding:8px;text-align:left;border-bottom:1px solid #ddd">メモ</th>
+              <th style="padding:8px;border-bottom:1px solid #ddd"></th>
+            </tr></thead>
+            <tbody id="para-tbody"></tbody>
+          </table></div>
+        </div>
+        <div style="font-size:11px;color:#999">※ 保存はリアルタイムで医院側と同期されます</div>
+      `;
+      document.body.appendChild(wrap);
+    }
+    // CSVボタンは非表示 (外注モードでは入力専用)
+    try { setupRealtime(); } catch(_){}
+    renderPara();
+  };
+
+  // 既にセッション済みなら直行
+  if (sessionStorage.getItem('paraExtPassed') === 'true') { showUI(); return; }
+
+  const ov = document.createElement('div');
+  ov.style.cssText = 'position:fixed;inset:0;background:#fff;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:16px;font-family:inherit;padding:20px';
+  ov.innerHTML = `
+    <div style="font-size:13px;font-weight:700;letter-spacing:3px;color:#111;margin-bottom:8px">SEISHOKAI / パラ管理</div>
+    <div style="font-size:11px;color:#999;letter-spacing:1.5px;text-transform:uppercase">Enter Password</div>
+    <input id="para-pass-input" type="password" autocomplete="off"
+      style="width:280px;text-align:center;font-size:16px;letter-spacing:2px;padding:14px;border:2px solid #111;border-radius:8px;outline:none;font-family:inherit">
+    <div id="para-pass-err" style="font-size:11px;color:#c00;min-height:14px"></div>
+    <button id="para-pass-btn" style="border:2px solid #111;background:#111;color:#fff;padding:10px 40px;font-size:13px;font-weight:700;border-radius:6px;cursor:pointer;font-family:inherit;letter-spacing:2px">LOGIN</button>
+  `;
+  document.body.appendChild(ov);
+  const input = ov.querySelector('#para-pass-input');
+  const err = ov.querySelector('#para-pass-err');
+  const btn = ov.querySelector('#para-pass-btn');
+  input.focus();
+  const submit = () => {
+    if (input.value === PARA_PASSCODE) {
+      sessionStorage.setItem('paraExtPassed', 'true');
+      ov.remove();
+      showUI();
+    } else {
+      err.textContent = 'パスワードが違います';
+      input.value = '';
+      input.focus();
+    }
+  };
+  btn.addEventListener('click', submit);
+  input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
 }

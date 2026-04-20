@@ -877,6 +877,22 @@
         <button class="sub-nav-btn" data-sub="adm-list">発行済み一覧</button>
         <button class="sub-nav-btn" data-sub="adm-rates">プロモ別インセ率</button>
         <button class="sub-nav-btn" data-sub="adm-history">変更履歴・復元</button>
+        <button class="sub-nav-btn" data-sub="para-manage">パラ管理</button>
+      </div>
+      <div id="sub-para-manage" hidden>
+        <div class="page-header"><h2>パラ管理</h2><p class="page-desc">歯科金属スクラップ回収管理 (月次)</p></div>
+        <div class="card" style="margin-bottom:16px">
+          <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px">
+            <label class="form-label" style="margin:0">対象月</label>
+            <input type="month" class="form-input" id="para-month" style="width:auto;padding:6px 10px;font-size:13px">
+            <button class="btn btn-outline" id="para-copy-prev" style="padding:6px 14px;font-size:12px">前月コピー</button>
+            <button class="btn btn-outline" id="para-csv" style="padding:6px 14px;font-size:12px">CSVエクスポート</button>
+            <div style="flex:1"></div>
+            <div style="font-size:13px;color:var(--text-sub)">合計: <strong id="para-total" style="color:var(--text);font-size:15px">0</strong> g</div>
+          </div>
+          <div class="data-table-wrap"><table class="data-table"><thead><tr><th style="width:140px">医院</th><th style="width:160px">回収日</th><th style="width:140px">回収グラム</th><th>メモ</th><th style="width:100px"></th></tr></thead><tbody id="para-tbody"></tbody></table></div>
+        </div>
+        <div style="font-size:11px;color:var(--text-muted)">外注先用URL: <code id="para-ext-url" style="background:var(--bg);padding:2px 6px;border-radius:3px;user-select:all"></code> <span style="margin-left:6px">(パスワード: <code>para2026</code>)</span></div>
       </div>
       <div id="sub-adm-account">
       <div class="page-header"><h2>権限管理</h2><p class="page-desc">閲覧用アカウントの発行・管理</p></div>
@@ -1040,7 +1056,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=207"></script>
+  <script src="app.js?v=208"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
