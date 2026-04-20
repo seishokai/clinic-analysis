@@ -21,6 +21,7 @@
 |   3   | `auth_phase3.sql`   | password 漏洩対策 + Storage private化 + 監査ログ    | **SQLを先に実行** → app v227 |
 |   4   | `auth_phase4.sql`   | 代理店 Auth 一括移行ツール用 RPC                     | app v228 と同時           |
 |   5   | `auth_phase5_finalize.sql` | 旧 password 列削除 + anon 経路完全閉鎖        | **全員移行後**にユーザ手動実行 |
+|   6   | `auth_phase6_roles.sql` | 10名規模のロールシステム (admin/staff_promo/agency) | **SQLを先に実行** → app v230 |
 
 ---
 
@@ -153,6 +154,46 @@ SELECT proname FROM pg_proc WHERE proname='login_by_password';                --
 
 ### 失敗時
 ロールバック可能 (BEGIN/COMMIT 内)。途中で COMMIT 前にエラーが出れば自動 ROLLBACK。
+
+---
+
+## Phase 6: 10名規模の権限システム (`auth_phase6_roles.sql`)
+
+### 背景
+Supabase Auth 移行完了後、admin 1名のみ登録されている状態。
+これから **admin 3名 / staff_promo 3-4名 / agency 3社** を追加するためのベース。
+
+### ロール設計
+| role          | 想定 | 予約一覧 | 来院閲覧 | ステータス/メモ/請求 | 金額編集 | 削除 |
+|:--------------|:-----|:--------:|:--------:|:--------------------:|:--------:|:----:|
+| `admin`       | 3名  | 全件     | 全件     | ◯                     | ◯        | ◯    |
+| `staff_promo` | 3-4名 | 担当 | 担当 | ◯ | ✗ | ✗ |
+| `agency`      | 3社  | 自社プロモ | ✗ | 請求フラグのみ | ✗ | ✗ |
+
+`allowed_promos` は `TEXT[]` で LIKE パターンを保持 (例: `{hikaru_%, liz_%}`)。
+`%` 単体 = 全プロモ許可 (admin 相当の絞り込み回避)。
+
+### 実行内容
+1. `accounts` に `role` / `allowed_promos` カラム追加
+2. `current_user_role()` / `current_user_allowed_promos()` / `promo_matches_user()` ヘルパ関数
+3. `booking_status` / `manual_bookings` の RLS を role + promo ベースに差し替え
+4. `self_recordings` / `para_records` は admin only に
+5. `admin_list_accounts_for_migration()` を拡張 (role / allowed_promos を返す)
+6. `admin_create_account_with_role()` 新規 RPC (UUID リンク型)
+7. `admin_update_account()` / `admin_delete_account()` 新規 RPC
+
+### 実行順序 (重要)
+1. **SQL を先に実行** (Supabase Dashboard → SQL Editor)
+2. その後で app.js v230 をデプロイ
+3. ブラウザで `管理 → 権限管理` タブを開き、一覧に ロール列 が出ることを確認
+4. 新規アカウント発行は:
+   - Supabase Dashboard で Auth user を作成 (メール+パスワード+Auto Confirm)
+   - UUID をコピー
+   - 権限管理タブの「新規アカウント発行」フォームで情報入力 → 発行
+
+### agency の請求フラグのみ編集可 について
+RLS で列レベル制御は複雑化するため、当面はアプリ層 (app.js) でガード。
+UI 上、staff_promo 未満は金額 input と削除ボタンを非表示にする。
 
 ---
 

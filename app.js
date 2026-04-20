@@ -555,8 +555,14 @@ function getApplyDateStr(d) {
 // === Config ===
 // マスターPW/プロモPWはDB移行済 (accounts.account_type) - ハードコード削除済
 const PROMO_PASSWORDS = {}; // 互換用の空オブジェクト (古いコードが参照しないよう)
-let userRole = 'admin'; // 'admin' or 'promo'
+let userRole = 'admin'; // 'admin' or 'promo' (旧互換)
 let promoFilter = ''; // プロモ別ログイン時のフィルター
+
+// Phase 6: 新ロールシステム (admin / staff_promo / agency)
+// userRole は旧 UI ロジックが多数参照するためそのまま残し、
+// currentRole は新しい権限判定専用。ログイン時に accounts.role から取得。
+let currentRole = null;
+let currentAllowedPromos = [];
 const FACILITIES = ['全体','エスカ','アール','ウィズ','ルミナス','茶屋','アサノ','知立','小牧','八事','岩田','大森','京都','銀座','訪問'];
 
 // === State ===
@@ -647,6 +653,8 @@ document.addEventListener('DOMContentLoaded', () => {
   if (sessionStorage.getItem('authenticated') === 'true') {
     userRole = sessionStorage.getItem('role') || 'admin';
     promoFilter = sessionStorage.getItem('promoFilter') || '';
+    currentRole = sessionStorage.getItem('currentRole') || (userRole === 'admin' ? 'admin' : 'agency');
+    try { currentAllowedPromos = JSON.parse(sessionStorage.getItem('currentAllowedPromos') || '[]'); } catch(_) { currentAllowedPromos = []; }
     showApp();
   }
   setupEventListeners();
@@ -663,6 +671,8 @@ async function logout() {
   sessionStorage.clear();
   userRole = 'admin';
   promoFilter = '';
+  currentRole = null;
+  currentAllowedPromos = [];
   document.getElementById('app').hidden = true;
   document.getElementById('login-screen').hidden = false;
   document.getElementById('login-screen').style.display = '';
@@ -677,11 +687,61 @@ async function logout() {
   if (userBadge) userBadge.remove();
 }
 
+// === Phase 6: ロール別権限ヘルパー ===
+// currentRole は accounts.role ('admin' | 'staff_promo' | 'agency') を格納。
+// 既存の userRole ('admin' | 'promo' | 'sales' | 'tc' | 'custom') とは別軸で
+// 「新しい10名体制」の権限チェックに使う。
+function isAdminRole()       { return currentRole === 'admin'; }
+function isStaffPromoRole()  { return currentRole === 'staff_promo'; }
+function isAgencyRole()      { return currentRole === 'agency'; }
+function canEditContent()    { return currentRole === 'admin' || currentRole === 'staff_promo'; }
+function canEditAmount()     { return currentRole === 'admin'; }
+function canDeleteRecord()   { return currentRole === 'admin'; }
+
+// ログイン時/セッション復元時にサーバから最新権限を取得
+async function loadCurrentUserPermissions() {
+  try {
+    const { data, error } = await sb.rpc('get_my_account');
+    if (error || !data) return false;
+    currentRole = data.role || data.account_type || 'agency';
+    currentAllowedPromos = Array.isArray(data.allowed_promos) ? data.allowed_promos : [];
+    sessionStorage.setItem('currentRole', currentRole);
+    sessionStorage.setItem('currentAllowedPromos', JSON.stringify(currentAllowedPromos));
+    return true;
+  } catch (e) {
+    console.warn('loadCurrentUserPermissions failed', e);
+    return false;
+  }
+}
+
+// ロールに応じてナビゲーション/編集 UI を制御
+function applyRoleUI() {
+  const admin = isAdminRole();
+  const staff = isStaffPromoRole();
+  const agency = isAgencyRole();
+  // 新 UI ガード: body に data 属性を付けて CSS 側で制御可能にする
+  document.body.dataset.role = currentRole || '';
+  // admin 以外は管理タブ / TC / 広告タブを非表示
+  document.querySelectorAll('.desktop-nav .nav-btn, .bottom-nav-btn').forEach(b => {
+    const v = b.dataset.view;
+    if (!v) return;
+    if (admin) return; // admin は全部見える
+    if (v === 'admin' || v === 'tc' || v === 'adbudget' || v === 'sales') {
+      b.style.display = 'none';
+    }
+    if (agency && v === 'kaiin') b.style.display = 'none';
+  });
+}
 // === Supabase Auth 並走モード (Phase 1) ===
 // 既存 attemptLogin() と並行して動作する新ログイン経路。
 // 旧ログインは無変更、DB スキーマもデータ変更なし (migrations/auth_phase1.sql 参照)。
 function _applyAccountProfileToSession(profile) {
   sessionStorage.setItem('authenticated', 'true');
+  // Phase 6: 新ロール (admin / staff_promo / agency)
+  currentRole = profile.role || profile.account_type || 'agency';
+  currentAllowedPromos = Array.isArray(profile.allowed_promos) ? profile.allowed_promos : [];
+  sessionStorage.setItem('currentRole', currentRole);
+  sessionStorage.setItem('currentAllowedPromos', JSON.stringify(currentAllowedPromos));
   const type = profile.account_type || 'custom';
   sessionStorage.setItem('role', type);
   sessionStorage.setItem('authMode', 'supabase'); // 識別用 (旧ログインと区別)
@@ -1680,6 +1740,9 @@ function showApp() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
+
+  // Phase 6: ロール別 UI ガード (ナビ非表示 + 編集禁止ビット)
+  try { applyRoleUI(); } catch(e) { console.warn('applyRoleUI failed', e); }
 
   // A1: リアルタイム同期を開始
   try { setupRealtime(); } catch(e) { console.warn('realtime setup failed', e); }
@@ -8641,6 +8704,20 @@ function genRandomPassword(len) {
   return pw;
 }
 
+// Phase 6: 権限管理 UI (admin / staff_promo / agency)
+// 一覧 + 編集 + 削除 + 新規発行 (UUID リンク型) を提供
+const ROLE_LABELS = {
+  admin: 'admin (全権)',
+  staff_promo: 'staff_promo (担当プロモ)',
+  agency: 'agency (代理店・自社プロモのみ)'
+};
+
+function _roleBadge(role) {
+  const color = role === 'admin' ? '#7c3aed' : role === 'staff_promo' ? '#0369a1' : '#d97706';
+  const bg    = role === 'admin' ? '#ede9fe' : role === 'staff_promo' ? '#e0f2fe' : '#fef3c7';
+  return `<span style="background:${bg};color:${color};padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600">${escapeHtml(role || '-')}</span>`;
+}
+
 async function renderAuthMigration() {
   const container = document.getElementById('auth-migration-container');
   if (!container) return;
@@ -8653,105 +8730,216 @@ async function renderAuthMigration() {
   }
   const rows = Array.isArray(data) ? data : [];
   const total = rows.length;
-  const migrated = rows.filter(a => a.supabase_user_id).length;
+  const adminCount = rows.filter(a => a.role === 'admin').length;
+  const staffCount = rows.filter(a => a.role === 'staff_promo').length;
+  const agencyCount = rows.filter(a => a.role === 'agency').length;
 
   const tableRows = rows.map(a => {
-    const state = a.supabase_user_id
-      ? `<span style="color:#059669">✅ ${a.migrated_at ? new Date(a.migrated_at).toLocaleDateString() : ''}</span>`
-      : '<span style="color:#d97706">⏳ 未</span>';
-    const action = a.supabase_user_id
-      ? `<button class="btn btn-outline btn-pw-reset" data-id="${a.id}" data-name="${escapeHtml(a.name || '')}" style="padding:4px 10px;font-size:11px">PW再発行</button>`
-      : `<button class="btn btn-dark btn-migrate" data-id="${a.id}" data-name="${escapeHtml(a.name || '')}" style="padding:4px 10px;font-size:11px">Auth化</button>`;
+    const promos = Array.isArray(a.allowed_promos) ? a.allowed_promos : [];
+    const promoStr = promos.length ? promos.map(p => `<code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:10px;margin-right:3px">${escapeHtml(p)}</code>`).join('') : '<span style="color:var(--text-muted);font-size:11px">-</span>';
+    const linked = a.supabase_user_id
+      ? `<span style="color:#059669;font-size:11px">🔗 ${a.migrated_at ? new Date(a.migrated_at).toLocaleDateString() : '済'}</span>`
+      : '<span style="color:#d97706;font-size:11px">未連携</span>';
+    const deleteBtn = a.role === 'admin'
+      ? '<span style="font-size:10px;color:var(--text-muted)">保護</span>'
+      : `<button class="btn btn-outline btn-acct-delete" data-id="${a.id}" data-name="${escapeHtml(a.name || '')}" style="padding:3px 8px;font-size:10px;color:#c00;border-color:#fecaca">🗑 削除</button>`;
     return `<tr>
       <td>${a.id}</td>
       <td>${escapeHtml(a.name || '')}</td>
-      <td>${escapeHtml(a.account_type || '')}</td>
+      <td>${_roleBadge(a.role)}</td>
       <td>${escapeHtml(a.agency || '')}</td>
-      <td>${escapeHtml(a.email || '-')}</td>
-      <td>${state}</td>
-      <td>${action}</td>
+      <td style="font-size:11px">${escapeHtml(a.email || '-')}</td>
+      <td>${promoStr}</td>
+      <td>${linked}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-acct-edit" data-id="${a.id}"
+          data-name="${escapeHtml(a.name || '')}"
+          data-role="${escapeHtml(a.role || '')}"
+          data-agency="${escapeHtml(a.agency || '')}"
+          data-promos="${escapeHtml(JSON.stringify(promos))}"
+          style="padding:3px 8px;font-size:10px">✏ 編集</button>
+        ${deleteBtn}
+      </td>
     </tr>`;
   }).join('');
-
-  const finalizeNotice = (migrated === total && total > 0) ? `
-    <div class="card" style="padding:16px;background:#dcfce7;border:1px solid #86efac;margin-top:16px">
-      <strong>🎉 全代理店の移行完了!</strong>
-      <p style="margin-top:8px;font-size:13px;color:var(--text-sub)">最終引き締めSQL (旧 password 列削除等) を実行できます。Supabase Dashboard → SQL Editor で以下を実行してください。</p>
-      <a href="https://github.com/seishokai/clinic-analysis/blob/master/migrations/auth_phase5_finalize.sql" target="_blank" rel="noopener" class="btn btn-outline" style="margin-top:8px">auth_phase5_finalize.sql を開く</a>
-    </div>` : '';
 
   container.innerHTML = `
     <div class="card" style="margin-bottom:16px;padding:16px">
       <div style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-        <div><strong>進捗: ${migrated} / ${total} 移行済</strong></div>
+        <div style="font-size:13px">
+          合計 <strong>${total}</strong> 名
+          &nbsp;｜&nbsp; admin: <strong>${adminCount}</strong>
+          &nbsp;｜&nbsp; staff_promo: <strong>${staffCount}</strong>
+          &nbsp;｜&nbsp; agency: <strong>${agencyCount}</strong>
+        </div>
         <button class="btn btn-outline" id="auth-mig-reload" style="padding:4px 10px;font-size:11px">🔄 再読み込み</button>
       </div>
       <div style="overflow-x:auto">
         <table class="data-table">
-          <thead><tr><th>ID</th><th>名前</th><th>種類</th><th>代理店</th><th>メール</th><th>状態</th><th>操作</th></tr></thead>
+          <thead><tr>
+            <th>ID</th><th>名前</th><th>ロール</th><th>代理店</th><th>メール</th><th>担当プロモ</th><th>Auth</th><th>操作</th>
+          </tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
       </div>
       <div style="margin-top:10px;font-size:11px;color:var(--text-muted)">
-        ※ Auth化後のメアド/パスワードはアラートで表示 + クリップボードにコピーされます。必ず控えて代理店に連絡してください (再発行は可能ですが元のPWは復元できません)。
+        ※ admin アカウントは UI から削除できません (Supabase Dashboard → Authentication → Users で auth user を消すと accounts から連鎖)。
       </div>
     </div>
-    ${finalizeNotice}`;
+
+    <div class="card" style="padding:16px">
+      <h3 style="margin-top:0;margin-bottom:8px">➕ 新規アカウント発行</h3>
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:12px;line-height:1.6">
+        <strong>手順</strong><br>
+        1) <a href="https://supabase.com/dashboard/project/ndlfqrvoejwgqfdtghmg/auth/users" target="_blank" rel="noopener" style="color:#2563eb;text-decoration:underline">Supabase Dashboard → Authentication → Users</a> を開く<br>
+        2) <strong>Add user</strong> → メールとパスワードを入力 → <strong>Auto Confirm User: ON</strong> で作成<br>
+        3) 作成されたユーザの行をクリックすると UUID が表示される。それをコピー<br>
+        4) ↓ このフォームに情報を入力して「発行する」を押す<br>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin-bottom:10px">
+        <div>
+          <label class="form-label" style="font-size:11px">名前</label>
+          <input type="text" class="form-input" id="new-acct-name" placeholder="例: 小池 隆史" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px">メール</label>
+          <input type="email" class="form-input" id="new-acct-email" placeholder="例: taro@example.com" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px">Auth UUID (Dashboardでコピー)</label>
+          <input type="text" class="form-input" id="new-acct-uuid" placeholder="00000000-0000-0000-0000-000000000000" style="font-size:11px;padding:6px 10px;font-family:monospace">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px">ロール</label>
+          <select class="form-select" id="new-acct-role" style="font-size:13px;padding:6px 10px">
+            <option value="agency">agency (代理店)</option>
+            <option value="staff_promo">staff_promo (社員プロモ)</option>
+            <option value="admin">admin (全権)</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px">代理店名 (任意)</label>
+          <input type="text" class="form-input" id="new-acct-agency" placeholder="例: ヒカル" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px">担当プロモ (カンマ区切り、LIKE 可 / % で全許可)</label>
+          <input type="text" class="form-input" id="new-acct-promos" placeholder="例: hikaru_%, liz_%" style="font-size:13px;padding:6px 10px">
+        </div>
+      </div>
+      <button class="btn btn-dark" id="new-acct-submit" style="padding:8px 20px;font-size:13px">発行する</button>
+      <div id="new-acct-msg" style="margin-top:10px;font-size:12px"></div>
+    </div>
+  `;
 
   container.querySelector('#auth-mig-reload')?.addEventListener('click', () => renderAuthMigration());
 
-  container.querySelectorAll('.btn-migrate').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const name = btn.dataset.name || '';
-      const defaultEmail = `partner-${id}@seishokai.local`;
-      const email = prompt(`${name} のメアドを入力 (確定後は変更困難)`, defaultEmail);
-      if (!email) return;
-      const password = genRandomPassword(16);
-      if (!confirm(`${name} を以下で Auth 化します:\n\nメール: ${email}\nパスワード: ${password}\n\n※このパスワードは必ずコピーしてください (代理店連絡用)。\n\n実行しますか?`)) return;
-      btn.disabled = true;
-      const origText = btn.textContent;
-      btn.textContent = '処理中...';
-      const { data: res, error: err } = await sb.rpc('admin_migrate_account_to_auth', {
-        target_account_id: Number(id),
-        new_email: email,
-        new_password: password
-      });
-      if (err || !res || !res.ok) {
-        alert('エラー: ' + (err?.message || res?.error || '不明'));
-        btn.disabled = false;
-        btn.textContent = origText;
+  // 編集ボタン
+  container.querySelectorAll('.btn-acct-edit').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.id);
+      const name = btn.dataset.name;
+      const curRole = btn.dataset.role || 'agency';
+      const curAgency = btn.dataset.agency || '';
+      let curPromos = [];
+      try { curPromos = JSON.parse(btn.dataset.promos || '[]'); } catch(_) {}
+      const newRole = prompt(
+        `${name} のロールを変更:\n\n` +
+        `  admin / staff_promo / agency  のいずれかを入力\n\n現在: ${curRole}`,
+        curRole
+      );
+      if (!newRole) return;
+      if (!['admin','staff_promo','agency'].includes(newRole)) {
+        alert('ロールは admin / staff_promo / agency のいずれかにしてください');
         return;
       }
-      const credentials = `メアド: ${email}\nパスワード: ${password}\n(${name})`;
-      try { await navigator.clipboard.writeText(credentials); } catch(_) {}
-      alert(`✅ 移行完了!\n\n${credentials}\n\n(クリップボードにコピー済み)`);
+      const newPromosStr = prompt(
+        `${name} の担当プロモをカンマ区切りで入力\n(LIKE パターン可、% は全許可)\n\n現在: ${curPromos.join(', ') || '(なし)'}`,
+        curPromos.join(', ')
+      );
+      if (newPromosStr === null) return;
+      const newPromos = newPromosStr.split(',').map(s => s.trim()).filter(Boolean);
+      const newAgency = prompt(`${name} の代理店名:`, curAgency);
+      if (newAgency === null) return;
+      sb.rpc('admin_update_account', {
+        p_account_id: id,
+        p_role: newRole,
+        p_allowed_promos: newPromos,
+        p_agency: newAgency
+      }).then(({ data, error }) => {
+        if (error || !data?.ok) {
+          alert('エラー: ' + (error?.message || data?.error || '不明'));
+          return;
+        }
+        alert('✅ 更新しました');
+        renderAuthMigration();
+      });
+    });
+  });
+
+  // 削除ボタン
+  container.querySelectorAll('.btn-acct-delete').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = Number(btn.dataset.id);
+      const name = btn.dataset.name || '';
+      if (!confirm(`${name} (ID=${id}) を削除します。よろしいですか?\n\n※ auth.users 側は別途 Supabase Dashboard で削除してください。`)) return;
+      const { data, error } = await sb.rpc('admin_delete_account', { p_account_id: id });
+      if (error || !data?.ok) {
+        alert('エラー: ' + (error?.message || data?.error || '不明'));
+        return;
+      }
+      alert('✅ 削除しました\n\n' + (data.note || '') + '\n\n忘れずに Supabase Dashboard → Authentication → Users から auth user を削除してください。');
       renderAuthMigration();
     });
   });
 
-  container.querySelectorAll('.btn-pw-reset').forEach(btn => {
-    btn.addEventListener('click', async () => {
-      const id = btn.dataset.id;
-      const name = btn.dataset.name || '';
-      const password = genRandomPassword(16);
-      if (!confirm(`${name} のパスワードを再発行します:\n\n新パスワード: ${password}\n\n実行しますか?`)) return;
-      btn.disabled = true;
-      const origText = btn.textContent;
-      btn.textContent = '処理中...';
-      const { data: res, error: err } = await sb.rpc('admin_reset_account_password', {
-        target_account_id: Number(id),
-        new_password: password
-      });
-      btn.disabled = false;
-      btn.textContent = origText;
-      if (err || !res || !res.ok) {
-        alert('エラー: ' + (err?.message || res?.error || '不明'));
-        return;
-      }
-      try { await navigator.clipboard.writeText(`${name}: ${password}`); } catch(_) {}
-      alert(`✅ 新パスワード: ${password}\n(クリップボードにコピー済み)`);
+  // 新規発行
+  container.querySelector('#new-acct-submit')?.addEventListener('click', async () => {
+    const btn = container.querySelector('#new-acct-submit');
+    const msg = container.querySelector('#new-acct-msg');
+    const name   = container.querySelector('#new-acct-name').value.trim();
+    const email  = container.querySelector('#new-acct-email').value.trim();
+    const uuid   = container.querySelector('#new-acct-uuid').value.trim();
+    const role   = container.querySelector('#new-acct-role').value;
+    const agency = container.querySelector('#new-acct-agency').value.trim();
+    const promosRaw = container.querySelector('#new-acct-promos').value;
+    const promos = promosRaw.split(',').map(s => s.trim()).filter(Boolean);
+
+    msg.textContent = '';
+    msg.style.color = '';
+    if (!name || !email || !uuid) {
+      msg.textContent = '名前・メール・UUID は必須です';
+      msg.style.color = '#c00';
+      return;
+    }
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid)) {
+      msg.textContent = 'UUID の形式が不正です (00000000-0000-0000-0000-000000000000 形式)';
+      msg.style.color = '#c00';
+      return;
+    }
+    btn.disabled = true;
+    const origText = btn.textContent;
+    btn.textContent = '発行中...';
+    const { data, error } = await sb.rpc('admin_create_account_with_role', {
+      p_user_uuid: uuid,
+      p_email: email,
+      p_name: name,
+      p_role: role,
+      p_agency: agency,
+      p_allowed_promos: promos
     });
+    btn.disabled = false;
+    btn.textContent = origText;
+    if (error || !data?.ok) {
+      msg.textContent = 'エラー: ' + (error?.message || data?.error || '不明');
+      msg.style.color = '#c00';
+      return;
+    }
+    msg.textContent = '✅ 発行しました';
+    msg.style.color = '#059669';
+    // フォームクリア
+    ['new-acct-name','new-acct-email','new-acct-uuid','new-acct-agency','new-acct-promos']
+      .forEach(idv => { const el = container.querySelector('#' + idv); if (el) el.value = ''; });
+    setTimeout(() => renderAuthMigration(), 600);
   });
 }
 
