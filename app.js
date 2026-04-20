@@ -184,7 +184,7 @@ function setupRealtime() {
       }).subscribe();
     realtimeChannels.push(ch);
   });
-  console.log('[Realtime] Subscribed:', tables);
+  console.debug('[Realtime] Subscribed:', tables);
 }
 
 // 再描画デバウンス
@@ -639,10 +639,13 @@ document.addEventListener('DOMContentLoaded', () => {
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     return;
   }
-  // Supabase Auth セッション復元 (並走期間 / Phase 1)
-  // 既存 sessionStorage チェックの前に非同期で走らせ、見つかれば復元する
+  // Supabase Auth セッション復元 (Phase 6: 一本化済み)
+  // 既存認証済みなら UI は下の同期ブロックで即時復元し、Supabase 側は裏で同期のみ
+  // 未認証なら Supabase セッションから復元 → あれば showApp へ
   (async () => {
-    if (sessionStorage.getItem('authenticated') !== 'true') {
+    if (sessionStorage.getItem('authenticated') === 'true') {
+      restoreSupabaseAuthIfAny().catch(() => {});
+    } else {
       const restored = await restoreSupabaseAuthIfAny();
       if (restored) {
         setupEventListeners();
@@ -662,12 +665,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // === Auth ===
 async function logout() {
-  // Supabase Auth 並走モードでログインしていたら signOut
-  try {
-    if (sessionStorage.getItem('authMode') === 'supabase' && sb && sb.auth) {
-      await sb.auth.signOut();
-    }
-  } catch (_) { /* ignore */ }
+  // Supabase Auth signOut (authMode に関わらず実行: クッキー/トークンの取り残し防止)
+  try { if (sb && sb.auth) await sb.auth.signOut(); } catch (_) { /* ignore */ }
+  // setInterval リーク対策
+  if (_qInterval) { clearInterval(_qInterval); _qInterval = null; }
   sessionStorage.clear();
   userRole = 'admin';
   promoFilter = '';
@@ -676,6 +677,7 @@ async function logout() {
   document.getElementById('app').hidden = true;
   document.getElementById('login-screen').hidden = false;
   document.getElementById('login-screen').style.display = '';
+  const em = document.getElementById('login-email'); if (em) em.value = '';
   document.getElementById('password').value = '';
   document.getElementById('login-error').hidden = true;
   // ナビ・ヘッダーリセット
@@ -738,9 +740,8 @@ function applyRoleUI() {
     if (agency && v === 'kaiin') b.style.display = 'none';
   });
 }
-// === Supabase Auth 並走モード (Phase 1) ===
-// 既存 attemptLogin() と並行して動作する新ログイン経路。
-// 旧ログインは無変更、DB スキーマもデータ変更なし (migrations/auth_phase1.sql 参照)。
+// === Supabase Auth ログイン (Phase 6: 一本化済み) ===
+// (並走期間は終了し旧ログインは撤去済み。migrations/auth_phase1.sql 参照)
 function _applyAccountProfileToSession(profile) {
   sessionStorage.setItem('authenticated', 'true');
   // Phase 6: 新ロール (admin / staff_promo / agency)
@@ -1765,64 +1766,11 @@ function showApp() {
     if (bkSubNav) bkSubNav.style.display = 'none';
   }
 
-  // プロモユーザーの場合、予約タブのみ表示
+  // userRole / promoFilter は下位処理 (フィルタリング等) で参照するため必ずセット
   userRole = sessionStorage.getItem('role') || 'admin';
   promoFilter = sessionStorage.getItem('promoFilter') || '';
-  if (userRole === 'sales') {
-    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
-      b.style.display = b.dataset.view === 'sales' ? '' : 'none';
-    });
-    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
-      b.style.display = b.dataset.view === 'sales' ? '' : 'none';
-    });
-    switchView('sales');
-    return;
-  }
-  if (userRole === 'tc') {
-    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
-      b.style.display = b.dataset.view === 'tc' ? '' : 'none';
-    });
-    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
-      b.style.display = b.dataset.view === 'tc' ? '' : 'none';
-    });
-    switchView('tc');
-    seedConsultationData();
-    loadClinics();
-    return;
-  }
-  // (admin は全タブ見える - applyRoleUI() が既にリセット済み、追加操作不要)
-  if (userRole === 'promo') {
-    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
-      b.style.display = b.dataset.view === 'bookings' ? '' : 'none';
-    });
-    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
-      b.style.display = ['bookings','settings'].includes(b.dataset.view) ? '' : 'none';
-    });
-    document.getElementById('tc-filters') && (document.getElementById('tc-filters').style.display = 'none');
-    switchView('bookings');
-    loadBookings();
-    return;
-  }
-
-  if (userRole === 'custom') {
-    const perms = JSON.parse(sessionStorage.getItem('customPerms') || '[]');
-    const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
-    promoFilter = cPromos.length ? cPromos[0] : '';
-    document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => {
-      b.style.display = perms.includes(b.dataset.view) ? '' : 'none';
-    });
-    document.querySelectorAll('.bottom-nav-btn').forEach(b => {
-      b.style.display = perms.includes(b.dataset.view) || b.dataset.view === 'settings' ? '' : 'none';
-    });
-    const tcFilters = document.getElementById('tc-filters');
-    if (tcFilters && !perms.includes('tc')) tcFilters.style.display = 'none';
-    switchView(perms[0] || 'bookings');
-    if (perms.includes('bookings')) loadBookings();
-    if (perms.includes('tc')) { seedConsultationData(); loadClinics(); }
-    if (perms.includes('sales')) { seedSalesData(); renderSales(); }
-    if (perms.includes('adbudget')) renderAdBudgets();
-    return;
-  }
+  // (旧 userRole ('sales' / 'tc' / 'promo' / 'custom') 別の分岐は Phase 6 で廃止。
+  //  ナビの表示/非表示は applyRoleUI() 側で currentRole ('admin'/'staff_promo'/'agency') に基づき制御する)
 
   seedSalesData();
   seedConsultationData();
@@ -1844,17 +1792,12 @@ function showApp() {
 function restoreLastView() {
   try {
     const lastView = sessionStorage.getItem('lastView');
-    // ロールごとに許可されたビューしか復元しない
+    // ロールごとに許可されたビューしか復元しない (Phase 6: currentRole ベース)
     const isAllowed = (v) => {
-      if (userRole === 'admin') return ['bookings','tc','adbudget','admin','sales'].includes(v);
-      if (userRole === 'sales') return v === 'sales';
-      if (userRole === 'tc') return v === 'tc';
-      if (userRole === 'promo') return v === 'bookings';
-      if (userRole === 'custom') {
-        const perms = JSON.parse(sessionStorage.getItem('customPerms') || '[]');
-        return perms.includes(v);
-      }
-      return false;
+      if (isAdminRole()) return ['bookings','kaiin','tc','adbudget','admin','sales'].includes(v);
+      if (isStaffPromoRole()) return ['bookings','kaiin'].includes(v);
+      if (isAgencyRole()) return v === 'bookings';
+      return v === 'bookings';
     };
     if (lastView && isAllowed(lastView)) {
       switchView(lastView);
@@ -2659,7 +2602,7 @@ async function migrateToSupabase() {
       }
     }
     localStorage.setItem('migrated-to-supabase', 'true');
-    console.log('Migration to Supabase complete');
+    console.debug('Migration to Supabase complete');
     renderAccounts();
   } catch (e) {
     console.error('Migration error:', e);
@@ -3016,7 +2959,7 @@ async function loadBookings() {
       });
       if (recalcCount > 0) {
         saveData('bk-extra', bkEx2);
-        console.log(`インセを${recalcCount}件自動計算しました`);
+        console.debug(`インセを${recalcCount}件自動計算しました`);
       }
     } catch(e) { console.warn('promo rate auto-calc skipped', e); }
 
@@ -3435,7 +3378,7 @@ function renderBookings() {
     return bd ? bd < today : false;
   };
 
-  const isAdmin = userRole === 'admin' || (userRole === 'custom' && sessionStorage.getItem('customEditRole') === 'edit');
+  const isAdmin = canEditContent();
   const displayLimit = window._bkDisplayLimit || 200;
   // 重複検出 (正規化名+医院 で2件以上あるもの)
   const dupCounts = {};
@@ -5073,7 +5016,7 @@ async function syncStatusToBFStatus(bfRows) {
     })());
   });
   if (tasks.length) {
-    console.log(`[BF Sync] 状態→BFステータス 一括連動: ${tasks.length}件`);
+    console.debug(`[BF Sync] 状態→BFステータス 一括連動: ${tasks.length}件`);
     await Promise.allSettled(tasks);
   }
 }
@@ -6191,7 +6134,7 @@ function openBFHistoryModal(name, applyDate) {
 
 function renderBFBookings(allBFData) {
   let data = allBFData || [];
-  const isAdmin = userRole === 'admin' || (userRole === 'custom' && sessionStorage.getItem('customEditRole') === 'edit');
+  const isAdmin = canEditContent();
 
   // フィルター
   const search = (document.getElementById('bf-bk-search')?.value || '').trim().toLowerCase();
@@ -7062,7 +7005,7 @@ async function cleanOldBackups() {
     });
     if (old.length) {
       await sb.storage.from('backups').remove(old.map(f => f.name));
-      console.log(`[Backup] Cleaned ${old.length} old backups`);
+      console.debug(`[Backup] Cleaned ${old.length} old backups`);
     }
   } catch(e) { console.warn('cleanOldBackups', e); }
 }
@@ -7072,7 +7015,7 @@ async function maybeAutoBackup() {
   if (Date.now() - last < BACKUP_INTERVAL_MS) return;
   // 管理者のみが作成 (重複防止)
   if (userRole !== 'admin') return;
-  console.log('[Backup] Running daily backup...');
+  console.debug('[Backup] Running daily backup...');
   await createBackup(false);
 }
 
@@ -8437,7 +8380,7 @@ async function renderPara() {
   initParaControls();
   const year = Number(yearEl.value) || currentYear();
   yearEl.value = String(year);
-  console.log('renderPara year=', year);
+  console.debug('renderPara year=', year);
   const thead = document.getElementById('para-thead');
   const tbody = document.getElementById('para-tbody');
   const tfoot = document.getElementById('para-tfoot');
