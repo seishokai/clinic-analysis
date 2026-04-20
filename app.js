@@ -191,6 +191,9 @@ function handleRealtimeChange(table, payload) {
         if (row.contract_service !== undefined) d.contractService = row.contract_service;
         if (row.payment_month !== undefined) d.paymentMonth = row.payment_month;
         if (row.incentive_month !== undefined) d.incentiveMonth = row.incentive_month;
+        if (row.incentive_paid !== undefined) d.incentivePaid = row.incentive_paid;
+        if (row.paid_at !== undefined) d.paidAt = row.paid_at;
+        if (row.paid_by !== undefined) d.paidBy = row.paid_by;
         if (row.book_date !== undefined && row.book_date) d.bookDate = row.book_date;
         if (row.memo !== undefined) d._memo = row.memo;
         if (row.bf_memo !== undefined && !d._memo) d._memo = row.bf_memo;
@@ -2596,6 +2599,9 @@ async function loadBookings() {
             if (dbRow.contract_amount) d.contractAmount = dbRow.contract_amount;
             if (dbRow.payment_month) d.paymentMonth = dbRow.payment_month;
             if (dbRow.incentive_month) d.incentiveMonth = dbRow.incentive_month;
+            if (dbRow.incentive_paid !== undefined) d.incentivePaid = dbRow.incentive_paid;
+            if (dbRow.paid_at !== undefined) d.paidAt = dbRow.paid_at;
+            if (dbRow.paid_by !== undefined) d.paidBy = dbRow.paid_by;
             if (dbRow.memo) d._memo = dbRow.memo;
             else if (dbRow.bf_memo) d._memo = dbRow.bf_memo;
             if (dbRow.book_date) d.bookDate = dbRow.book_date;
@@ -2628,6 +2634,11 @@ async function loadBookings() {
         if (ex.editedEmail) d.email = ex.editedEmail;
         if (ex.editedSource) d.source = ex.editedSource;
         if (ex.editedStatus) d.status = ex.editedStatus;
+        if (ex.editedIncentivePaid !== undefined) {
+          d.incentivePaid = ex.editedIncentivePaid;
+          if (ex.editedPaidAt !== undefined) d.paidAt = ex.editedPaidAt;
+          if (ex.editedPaidBy !== undefined) d.paidBy = ex.editedPaidBy;
+        }
         // 名前はキーになっているので最後に反映
         if (ex.editedName) d.name = ex.editedName;
       });
@@ -3096,11 +3107,19 @@ function renderBookings() {
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="paymentMonth" value="${d.paymentMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.paymentMonth || '-')}</td>
     <td>${isAdmin ? `<input type="month" class="form-input bk-field-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveMonth" value="${d.incentiveMonth||''}" style="font-size:10px;padding:2px 4px;width:100px">` : (d.incentiveMonth || '-')}</td>
     <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${d.name}" data-apply="${d.applyDate}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:80px;text-align:right;font-variant-numeric:tabular-nums">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
+    <td style="text-align:center;white-space:nowrap">${(() => {
+      const paid = d.incentivePaid === true;
+      const dateStr = d.paidAt ? (() => { const dt = new Date(d.paidAt); return isNaN(dt) ? '' : `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}`; })() : '';
+      const badge = paid
+        ? `<span style="display:inline-block;padding:2px 8px;background:#dcfce7;color:#15803d;border:1px solid #86efac;border-radius:10px;font-size:10px;font-weight:600">✓ 支払済</span>${dateStr?`<div style="font-size:9px;color:#6b7280;margin-top:1px">${dateStr}</div>`:''}`
+        : `<span style="display:inline-block;padding:2px 8px;background:#fee2e2;color:#b91c1c;border:1px solid #fca5a5;border-radius:10px;font-size:10px;font-weight:600">未払</span>`;
+      return `<span class="bk-incpaid-toggle" data-name="${d.name}" data-apply="${d.applyDate}" data-paid="${paid?1:0}" style="cursor:pointer;display:inline-block" title="クリックで支払状態を切替">${badge}</span>`;
+    })()}</td>
     <td>${isAdmin ? `<button class="bk-del-btn" data-name="${d.name}" data-apply="${d.applyDate}" title="この予約を削除" style="font-size:10px;padding:2px 6px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>` : ''}</td>
-  </tr>`}).join('') || '<tr><td colspan="17" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  </tr>`}).join('') || '<tr><td colspan="18" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > displayLimit) {
-    tbody.innerHTML += `<tr><td colspan="17" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
+    tbody.innerHTML += `<tr><td colspan="18" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
   }
 
   // ステータス変更イベント
@@ -3326,6 +3345,55 @@ function renderBookings() {
       });
     });
   }
+
+  // インセ支払トグル (admin/partner両方で操作可)
+  tbody.querySelectorAll('.bk-incpaid-toggle').forEach(el => {
+    el.addEventListener('click', async () => {
+      const name = el.dataset.name;
+      const applyDate = el.dataset.apply;
+      const curPaid = el.dataset.paid === '1';
+      const newPaid = !curPaid;
+      const nowIso = new Date().toISOString();
+      const paidAt = newPaid ? nowIso : null;
+      const role = sessionStorage.getItem('role') || userRole || 'admin';
+      const paidBy = role === 'custom'
+        ? (sessionStorage.getItem('customName') || 'partner')
+        : (role === 'admin' ? 'admin' : role);
+      // bookingsData に反映
+      const row = bookingsData.find(b => b.name === name && b.applyDate === applyDate);
+      if (row) {
+        row.incentivePaid = newPaid;
+        row.paidAt = paidAt;
+        row.paidBy = newPaid ? paidBy : null;
+      }
+      // bfLifecycleCache も反映
+      const key = name + '|' + applyDate;
+      if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
+      bfLifecycleCache[key].incentive_paid = newPaid;
+      bfLifecycleCache[key].paid_at = paidAt;
+      bfLifecycleCache[key].paid_by = newPaid ? paidBy : null;
+      // localStorage bk-extra にも記録 (オフライン対応)
+      try {
+        const bkEx = loadData('bk-extra', {});
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].editedIncentivePaid = newPaid;
+        bkEx[key].editedPaidAt = paidAt;
+        bkEx[key].editedPaidBy = newPaid ? paidBy : null;
+        saveData('bk-extra', bkEx);
+      } catch(_){}
+      // DB保存 (partnerでも動くよう customEditRole に依存しない)
+      try {
+        const payload = { name, apply_date: applyDate, incentive_paid: newPaid, paid_at: paidAt, paid_by: newPaid ? paidBy : null };
+        const res = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+        if (res && res.ok === false) showToast('⚠ 支払状態保存に失敗。再送信します', true);
+        else showToast(newPaid ? '支払済に変更しました' : '未払に戻しました');
+      } catch(e) {
+        console.warn('incentive_paid save failed', e);
+        showToast('⚠ 支払状態保存でエラー', true);
+      }
+      renderBookings();
+    });
+  });
 }
 
 // === Row Edit Modal ===
@@ -4096,13 +4164,20 @@ async function loadBFLifecycleData() {
     // ※ DBにカラム未追加の環境では select が失敗する場合があるのでフォールバック付き
     let data;
     try {
-      const r1 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, updated_at');
+      const r1 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, incentive_paid, paid_at, paid_by, updated_at');
       data = r1.data;
       if (r1.error) throw r1.error;
     } catch(eCol) {
-      console.warn('edited_* columns missing, falling back', eCol);
-      const r2 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, updated_at');
-      data = r2.data;
+      console.warn('edited_*/incentive_paid columns missing, falling back', eCol);
+      try {
+        const r2 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, updated_at');
+        data = r2.data;
+        if (r2.error) throw r2.error;
+      } catch(eCol2) {
+        console.warn('edited_* columns missing, falling back further', eCol2);
+        const r3 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, updated_at');
+        data = r3.data;
+      }
     }
     bfLifecycleCache = {};
     (data || []).forEach(r => {
