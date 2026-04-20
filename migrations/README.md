@@ -18,7 +18,8 @@
 |:-----:|:--------------------|:---------------------------------------------------|:-------------------------|
 |   1   | `auth_phase1.sql`   | accounts 拡張 + RLS(許容) + RPC + 監査ログ          | **今すぐ** (データ安全)   |
 |   2   | `auth_phase2.sql`   | 初期 admin ユーザ作成と既存レコードのリンク         | Phase 1 と同時 / 直後可  |
-|   3   | 未作成               | RLS 引き締め、他ユーザ移行、旧 password 廃止        | 別計画 (後日)            |
+|   3   | `auth_phase3.sql`   | password 漏洩対策 + Storage private化 + 監査ログ    | **SQLを先に実行** → app v227 |
+|   4   | 未作成               | 全ユーザ移行完了後の anon 経路の完全閉鎖             | 別計画 (後日)            |
 
 ---
 
@@ -64,12 +65,45 @@
 
 ---
 
-## Phase 3 (予定): 引き締め
+## Phase 3: パスワード漏洩対策 + Storage private化 (`auth_phase3.sql`)
 
-- 全ユーザを Supabase Auth に移行
+### 実行内容
+1. `public.login_by_password(pw)` RPC 作成 (SECURITY DEFINER、password 列を返さない)
+2. `public.is_auth_admin()` ヘルパ関数 (RLS recursion 対策)
+3. `public.log_auth_event(event, detail)` RPC (監査ログ追記)
+4. `accounts` の RLS を引き締め:
+   - anon は SELECT 不可 (→ 直接クエリで password を抜けない)
+   - authenticated は自分のレコードのみ SELECT
+   - Auth 済み admin は全件 SELECT/書き込み可
+   - INSERT/UPDATE/DELETE は anon も一時許容 (Phase 4 で閉じる)
+5. Storage `recordings` バケットを `public = false` に変更、RLS を設定
+   (authenticated/anon とも SELECT/INSERT 可能 → signed URL 経由で再生)
+
+### 実行順序 (重要)
+1. **必ず SQL を先に実行する** (Supabase Dashboard → SQL Editor)
+2. その後で app.js v227 を本番デプロイ
+   - app.js v227 は `sb.rpc('login_by_password')` に変更済みのため、
+     SQL を実行していない環境では **旧ログインが全滅する**
+3. 実行後、ブラウザで:
+   - 旧パスワードログインが通ること
+   - 新 Supabase Auth ログインも通ること
+   - 直接 `sb.from('accounts').select('*')` で password が返らないこと
+
+### 既知の注意
+- 代理店 UI (パートナーログイン) も同じ `login_by_password` RPC 経由に変更済み
+- 録音再生は `getSignedRecordingUrl()` で署名URL (1時間有効) に変換
+  - 失敗時は旧 public URL fallback (互換維持)
+- `accounts_mod_anon_transitional` ポリシーは **Phase 4 で必ず削除する**
+
+---
+
+## Phase 4 (予定): anon 経路の完全閉鎖
+
+- 全ユーザを Supabase Auth に移行完了後
 - `accounts.password` 列を廃止
-- RLS ポリシーを `supabase_user_id` / `account_type` ベースに書き換え
-- 旧 `attemptLogin()` 関数をアプリから削除
+- anon 系 transitional ポリシーを全削除
+- `login_by_password` / `recordings_anon_*` を DROP
+- 旧 `attemptLogin()` / `initPartnerLogin()` を app から削除
 
 別計画として、動作が安定してから実施する。
 

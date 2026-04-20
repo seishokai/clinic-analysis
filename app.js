@@ -714,6 +714,7 @@ async function attemptLoginViaSupabaseAuth(email, password) {
       return { ok: false, error: 'プロファイルが見つかりません (accounts 未リンク)' };
     }
     _applyAccountProfileToSession(profile);
+    try { sb.rpc('log_auth_event', { event_name: 'login_success', detail_json: { method: 'supabase_auth', account_id: profile.id } }).then(()=>{}).catch(()=>{}); } catch(_){}
     return { ok: true, profile };
   } catch (e) {
     return { ok: false, error: (e && e.message) || '予期せぬエラー' };
@@ -749,9 +750,11 @@ function setupEventListeners() {
     };
 
     // 1) DB の accounts テーブルを優先チェック
+    // Phase 3: password 平文漏洩を防ぐため、SECURITY DEFINER RPC 経由で検索
     try {
-      const { data: dbAccounts } = await sb.from('accounts').select('*').eq('password', pw);
-      const matched = dbAccounts && dbAccounts[0];
+      const { data: rpcResult, error: rpcErr } = await sb.rpc('login_by_password', { pw });
+      if (rpcErr) console.warn('login_by_password RPC error', rpcErr);
+      const matched = rpcResult && rpcResult[0];
       if (matched) {
         sessionStorage.setItem('authenticated', 'true');
         const type = matched.account_type || 'custom';
@@ -781,6 +784,8 @@ function setupEventListeners() {
           sessionStorage.setItem('customName', matched.name || '');
           userRole = 'custom';
         }
+        // 監査ログ (Phase 3): 成功
+        try { sb.rpc('log_auth_event', { event_name: 'login_success', detail_json: { method: 'password', account_id: matched.id } }).then(()=>{}).catch(()=>{}); } catch(_){}
         finish();
         showApp();
         return;
@@ -788,6 +793,8 @@ function setupEventListeners() {
     } catch(e) { console.warn('DB login check failed, falling back to hardcoded', e); }
 
     // 認証失敗 (ハードコードフォールバックは削除済)
+    // 監査ログ (Phase 3): 失敗
+    try { sb.rpc('log_auth_event', { event_name: 'login_failed', detail_json: { method: 'password' } }).then(()=>{}).catch(()=>{}); } catch(_){}
     document.getElementById('login-error').hidden = false;
     finish();
   }
@@ -7396,6 +7403,24 @@ async function fetchRecordings() {
   return recordingsCache;
 }
 
+// Phase 3: Storage private化に伴う署名URL生成
+// 保存されている url は旧 public URL の可能性があるため、path を抽出して
+// createSignedUrl を呼ぶ。失敗時は元 URL を fallback として返す (互換維持)。
+async function getSignedRecordingUrl(storagePath) {
+  if (!storagePath) return null;
+  let path = storagePath;
+  if (path.startsWith('http')) {
+    const m = path.match(/\/recordings\/(.+?)(?:\?.*)?$/);
+    if (m) path = m[1];
+    else return storagePath; // 形式不明、そのまま返す
+  }
+  try {
+    const { data, error } = await sb.storage.from('recordings').createSignedUrl(path, 3600);
+    if (error) { console.warn('signed url err', error); return storagePath; }
+    return data.signedUrl || storagePath;
+  } catch(e) { console.warn('signed url exception', e); return storagePath; }
+}
+
 async function uploadRecordingBlob(blob) {
   const ext = blob.type.includes('webm') ? 'webm' : blob.type.includes('mp4') ? 'm4a' : blob.type.includes('wav') ? 'wav' : 'webm';
   const fileName = `${Date.now()}_${Math.random().toString(36).slice(2,8)}.${ext}`;
@@ -7553,15 +7578,19 @@ function initPartnerLogin() {
     if (!pw) return;
     btn.disabled = true; btn.textContent = 'ログイン中...';
     try {
-      const { data } = await sb.from('accounts').select('*').eq('password', pw);
+      // Phase 3: password 平文漏洩を防ぐため RPC 経由
+      const { data, error: rpcErr } = await sb.rpc('login_by_password', { pw });
+      if (rpcErr) console.warn('login_by_password RPC error', rpcErr);
       const matched = data && data[0];
       if (!matched) {
+        try { sb.rpc('log_auth_event', { event_name: 'login_failed', detail_json: { method: 'partner' } }).then(()=>{}).catch(()=>{}); } catch(_){}
         err.textContent = 'パスワードが違います';
         input.value = '';
         input.focus();
         btn.disabled = false; btn.textContent = 'LOGIN';
         return;
       }
+      try { sb.rpc('log_auth_event', { event_name: 'login_success', detail_json: { method: 'partner', account_id: matched.id } }).then(()=>{}).catch(()=>{}); } catch(_){}
       sessionStorage.setItem('authenticated', 'true');
       sessionStorage.setItem('role', 'custom');
       sessionStorage.setItem('customPerms', JSON.stringify(matched.permissions));
@@ -7734,9 +7763,11 @@ async function initStandaloneRecorder() {
   });
 }
 
-function openRecordingDetail(id) {
+async function openRecordingDetail(id) {
   const r = recordingsCache.find(x => x.id === id);
   if (!r) return;
+  // Phase 3: 署名URLに変換 (失敗時は元URL fallback)
+  const playUrl = r.url ? (await getSignedRecordingUrl(r.url)) : null;
   const body = document.getElementById('rec-detail-body');
   body.innerHTML = `
     <h3 style="font-size:16px;font-weight:700;margin-bottom:12px">${esc(r.patient || '（患者名なし）')} 様 / ${esc(r.facility)}</h3>
@@ -7746,7 +7777,7 @@ function openRecordingDetail(id) {
       <div><span style="font-size:11px;color:var(--text-sub)">金額</span><div style="font-size:16px;font-weight:700">¥${fmt(r.amount)}</div></div>
       ${r.aiScore!=null?`<div><span style="font-size:11px;color:var(--text-sub)">AI評価</span><div style="font-size:16px;font-weight:700">${r.aiScore}/100</div></div>`:''}
     </div>
-    ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><audio controls src="${esc(r.url)}" style="width:100%;margin-bottom:4px"></audio><a href="${esc(r.url)}" target="_blank" style="font-size:11px;color:#0066cc;word-break:break-all">別タブで開く</a></div>` : ''}
+    ${r.url ? `<div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">録音</div><audio controls src="${esc(playUrl || r.url)}" style="width:100%;margin-bottom:4px"></audio><a href="${esc(playUrl || r.url)}" target="_blank" style="font-size:11px;color:#0066cc;word-break:break-all">別タブで開く</a></div>` : ''}
     <div style="margin-bottom:16px"><div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:4px">要点・メモ</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(r.notes || '(なし)')}</div></div>
     ${r.aiTranscript ? `<details style="margin-bottom:12px"><summary style="font-size:11px;font-weight:600;color:var(--text-sub);cursor:pointer">📝 文字起こし (展開)</summary><div style="font-size:12px;line-height:1.7;white-space:pre-wrap;padding:10px;background:var(--bg);border-radius:4px;max-height:300px;overflow-y:auto;margin-top:6px">${esc(r.aiTranscript)}</div></details>` : ''}
     ${r.aiAdvice ? `<div style="margin-bottom:16px;padding:14px;background:#fff8e1;border-left:3px solid #f9a825;border-radius:4px"><div style="font-size:11px;font-weight:600;color:#b8860b;margin-bottom:8px">🤖 AI フィードバック</div><div style="font-size:13px;line-height:1.7;white-space:pre-wrap">${esc(r.aiAdvice)}</div></div>` : ''}
@@ -8013,10 +8044,12 @@ async function analyzeRecording(id) {
     if (!transcript && r.url) {
       status.textContent = '音声を文字起こし中...';
       try {
+        // Phase 3: Storage が private 化されたため署名URLで proxy に渡す
+        const signedUrl = await getSignedRecordingUrl(r.url);
         const wRes = await fetch(AI_PROXY_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcribeUrl: r.url, language: 'ja' })
+          body: JSON.stringify({ transcribeUrl: signedUrl || r.url, language: 'ja' })
         });
         if (wRes.ok) {
           const wData = await wRes.json();
