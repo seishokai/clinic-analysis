@@ -636,7 +636,10 @@ body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* 隠しピッカー用 input は完全非表示 */
   .data-table td .bk-next-date-hidden,
   .data-table td .kaiin-next-date-hidden,
-  .data-table td .bk-month-hidden {
+  .data-table td .kaiin-bookdate-hidden,
+  .data-table td .bk-month-hidden,
+  input[type="date"][style*="opacity:0"],
+  input[type="month"][style*="opacity:0"] {
     display: none !important;
   }
   /* select のドロップダウン矢印 (SVG background) を消す */
