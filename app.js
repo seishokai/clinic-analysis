@@ -3029,7 +3029,7 @@ function populateBookingFilters() {
 function ensureBkMultiSelects() {
   if (window._bkDD) return;
   const triggerRedraw = () => { if (typeof renderBookings === 'function') renderBookings(); };
-  const statusList = ['要対応','未対応','確認済','来院済','成約','キャンセル','除外'];
+  const statusList = ['要対応','未対応','予約連絡待ち','確認済','来院済','成約','キャンセル','除外'];
   const dd = {
     tool: createMultiSelectDropdown({ label:'ツール', options:[], selected:new Set(), onChange:triggerRedraw }),
     facility: createMultiSelectDropdown({ label:'医院', options:[], selected:new Set(), onChange:triggerRedraw }),
@@ -3230,6 +3230,7 @@ function renderBookings() {
     if (s === '来院済') return '<span class="badge badge-warning">来院済</span>';
     if (s === '成約') return '<span class="badge badge-success">成約</span>';
     if (s === '確認済') return '<span class="badge badge-default" style="border-color:#6366f1;color:#6366f1">確認済</span>';
+    if (s === '予約連絡待ち') return '<span class="badge badge-default" style="border-color:#a855f7;color:#7c3aed;background:#f5f3ff">予約連絡待ち</span>';
     return `<span class="badge badge-default">${s}</span>`;
   };
 
@@ -3311,14 +3312,30 @@ function renderBookings() {
         <option value="">${d.status==='未対応'?'未対応':(d.status==='確認済'?'確認済':(d.status==='キャンセル'?'キャンセル':'未設定'))}</option>
         ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select>`;
-    })() : `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
+    })() : `<select class="form-select bk-status-select" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
+      <option ${d.status==='予約連絡待ち'?'selected':''}>予約連絡待ち</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
       <option ${d.status==='成約'?'selected':''}>成約</option>
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
       <option ${d.status==='除外'?'selected':''}>除外</option>
     </select>`) : statusBadge(isBFBooking(d) ? (getBFInfo(d.name, d.applyDate)?.bf_status || d.status) : d.status)}</td>
+    <td style="text-align:center">${(() => {
+      const key = d.name + '|' + d.applyDate;
+      const info = bfLifecycleCache[key] || {};
+      const iso = info.bf_next_date || '';
+      const mmdd = iso ? iso.substring(5).replace('-','/') : '';
+      if (!isAdmin) return iso ? `<span style="font-size:10px">${mmdd}</span>` : '<span style="color:var(--text-muted)">-</span>';
+      const label = mmdd || '年/月/日';
+      const style = iso
+        ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
+        : 'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e';
+      return `<span style="display:inline-flex;gap:2px;align-items:center;position:relative">
+        <button type="button" class="bk-next-date-btn" data-name="${d.name}" data-apply="${d.applyDate}" data-iso="${iso}" style="font-size:10px;padding:3px 6px;width:70px;text-align:center;border-radius:4px;cursor:pointer;${style}">${label}</button>
+        <input type="date" class="bk-next-date-hidden" data-name="${d.name}" data-apply="${d.applyDate}" value="${iso}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
+      </span>`;
+    })()}</td>
     <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:center" class="bk-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(d._memo||findAnyMemo(d.name)||'').replace(/"/g,'&quot;')}">${(() => {
       const memo = d._memo || findAnyMemo(d.name);
       if (!isAdmin) return memo ? '📝 ' + memo : '-';
@@ -3349,10 +3366,10 @@ function renderBookings() {
       return `<span class="bk-incpaid-toggle" data-name="${d.name}" data-apply="${d.applyDate}" data-paid="${paid?1:0}" style="cursor:pointer;display:inline-block" title="${tip}">${badge}</span>`;
     })()}</td>
     <td>${isAdmin ? `<button class="bk-del-btn" data-name="${d.name}" data-apply="${d.applyDate}" title="この予約を削除" style="font-size:10px;padding:2px 6px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>` : ''}</td>
-  </tr>`}).join('') || '<tr><td colspan="18" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  </tr>`}).join('') || '<tr><td colspan="19" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > displayLimit) {
-    tbody.innerHTML += `<tr><td colspan="18" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
+    tbody.innerHTML += `<tr><td colspan="19" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
   }
 
   // ステータス変更イベント
@@ -3421,6 +3438,36 @@ function renderBookings() {
         fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate, status: newStatus }) }).catch(() => {});
         renderBookings();
       });
+    });
+
+    // 次回予定 (カレンダーピッカー)
+    tbody.querySelectorAll('.bk-next-date-btn').forEach(btn => {
+      const hidden = btn.parentElement.querySelector('.bk-next-date-hidden');
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (!hidden) return;
+        if (typeof hidden.showPicker === 'function') {
+          try { hidden.showPicker(); return; } catch(_) {}
+        }
+        hidden.focus();
+        hidden.click();
+      });
+      if (hidden) {
+        hidden.addEventListener('change', async () => {
+          const iso = hidden.value || null;
+          const name = btn.dataset.name;
+          const applyDate = btn.dataset.apply;
+          const ok = await saveBFLifecycleField(name, applyDate, 'bf_next_date', iso);
+          if (ok) {
+            btn.dataset.iso = iso || '';
+            btn.textContent = iso ? iso.substring(5).replace('-','/') : '年/月/日';
+            btn.style.background = iso ? '#dcfce7' : '#fef3c7';
+            btn.style.borderColor = iso ? '#16a34a' : '#f59e0b';
+            btn.style.color = iso ? '#15803d' : '#92400e';
+            setTimeout(() => renderBookings(), 300);
+          }
+        });
+      }
     });
 
     // 削除ボタン (予約一覧)
@@ -5001,6 +5048,7 @@ function getTreatmentCategory(d) {
 const TREATMENT_STATUSES = {
   'BF': BF_STATUSES, // 既存15段階
   '矯正': [
+    { value: '予約連絡待ち', color: '#a855f7' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: '光学印象', color: '#3b82f6' },
@@ -5010,6 +5058,7 @@ const TREATMENT_STATUSES = {
     { value: 'キャンセル', color: '#dc2626' }
   ],
   'インプラント': [
+    { value: '予約連絡待ち', color: '#a855f7' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: 'CT/診断', color: '#3b82f6' },
@@ -5021,6 +5070,7 @@ const TREATMENT_STATUSES = {
     { value: 'キャンセル', color: '#dc2626' }
   ],
   'デフォルト': [
+    { value: '予約連絡待ち', color: '#a855f7' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: '治療中', color: '#1d4ed8' },
@@ -5136,11 +5186,11 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
             <th style="width:85px">CS医院</th>
             <th style="width:85px">相談</th>
             <th style="width:130px">ステータス</th>
+            <th style="width:75px">次回予定</th>
             ${treatment === 'BF' ? '<th style="width:75px">セット医院</th>' : ''}
             <th style="width:85px">売上</th>
             ${treatment === 'BF' ? '<th style="width:70px">交通費</th>' : ''}
             <th>メモ</th>
-            <th style="width:55px">次回予定</th>
           </tr></thead>
           <tbody class="kaiin-tbody"></tbody>
         </table>
@@ -5376,8 +5426,11 @@ function drawKaiinRows(treatment, rows, container) {
     })();
     // 来院日 MM/DD 表示
     const bookMMDD = bookDateISO ? bookDateISO.substring(5).replace('-','/') : '';
+    const bookDateBtnStyle = bookDateISO
+      ? 'background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600'
+      : 'background:#fff;border:1px solid var(--border);color:var(--text-muted)';
     return `<tr>
-      <td><input type="text" class="kaiin-bookdate-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${bookDateISO}" value="${bookMMDD}" placeholder="M/D" maxlength="5" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border:1px solid var(--border);border-radius:4px;text-align:center"></td>
+      <td style="position:relative"><button type="button" class="kaiin-bookdate-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${bookDateISO}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;cursor:pointer;${bookDateBtnStyle}">${bookMMDD||'年/月/日'}</button><input type="date" class="kaiin-bookdate-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${bookDateISO}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"></td>
       <td><input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'"></td>
       <td style="text-align:left">${promoBadge}</td>
       <td><button type="button" class="kaiin-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 6px;width:100%;text-align:center;background:transparent;border:none;cursor:pointer;color:var(--text)">${csFacDisplay}</button></td>
@@ -5388,37 +5441,40 @@ function drawKaiinRows(treatment, rows, container) {
         <option value="">未設定</option>
         ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
       </select></td>
+      <td style="position:relative"><button type="button" class="kaiin-next-date-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${nextDate}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;cursor:pointer;${nextDateStyle}">${nextDate?nextDate.substring(5).replace('-','/'):'年/月/日'}</button><input type="date" class="kaiin-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${nextDate}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"></td>
       ${treatment === 'BF' ? `<td><select class="kaiin-setfac-sel kaiin-plain-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:none;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center;color:${setFac?'var(--text)':'var(--text-muted)'}">
         ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''} value="${f}">${f||'—'}</option>`).join('')}
       </select></td>` : ''}
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
       ${treatment === 'BF' ? `<td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>` : ''}
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? (memo.length>22?memo.substring(0,22)+'…':memo).replace(/\n/g,' ') : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
-      <td><input type="text" class="kaiin-next-date-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${nextDate}" value="${nextDate?nextDate.substring(5).replace('-','/'):''}" placeholder="M/D" maxlength="5" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;${nextDateStyle}"></td>
     </tr>`;
   }).join('') || `<tr><td colspan="${treatment==='BF'?11:9}" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>`;
 
-  // 次回予定日 MM/DD 入力 → ISO に変換して保存
-  container.querySelectorAll('.kaiin-next-date-mmdd').forEach(inp => {
-    inp.addEventListener('change', async () => {
-      const v = inp.value.trim();
-      let iso = null;
-      const m = v.match(/^(\d{1,2})[\/\-\.](\d{1,2})$/);
-      if (m) {
-        iso = `${new Date().getFullYear()}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
-      } else if (v) {
-        inp.value = inp.dataset.iso ? inp.dataset.iso.substring(5).replace('-','/') : '';
-        return;
+  // 次回予定: カレンダー (button + hidden date picker)
+  container.querySelectorAll('.kaiin-next-date-mmdd').forEach(btn => {
+    const hidden = btn.parentElement?.querySelector('.kaiin-next-date-hidden');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!hidden) return;
+      if (typeof hidden.showPicker === 'function') {
+        try { hidden.showPicker(); return; } catch(_) {}
       }
-      inp.dataset.iso = iso || '';
-      inp.value = iso ? iso.substring(5).replace('-','/') : '';
-      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'bf_next_date', iso);
-      if (ok) {
-        inp.style.borderColor = '#0a0';
-        setTimeout(() => drawKaiinRows(treatment, rows, container), 300);
-      }
+      hidden.focus();
+      hidden.click();
     });
-    inp.addEventListener('click', e => e.stopPropagation());
+    if (hidden) {
+      hidden.addEventListener('change', async () => {
+        const iso = hidden.value || null;
+        btn.dataset.iso = iso || '';
+        btn.textContent = iso ? iso.substring(5).replace('-','/') : '年/月/日';
+        const ok = await saveBFLifecycleField(btn.dataset.name, btn.dataset.apply, 'bf_next_date', iso);
+        if (ok) {
+          btn.style.outline = '2px solid #16a34a';
+          setTimeout(() => { btn.style.outline = ''; drawKaiinRows(treatment, rows, container); }, 300);
+        }
+      });
+    }
   });
 
   // 来院日/名前/相談 → bk-extra に永続化 + Supabase booking_status にも同期
@@ -5454,26 +5510,30 @@ function drawKaiinRows(treatment, rows, container) {
       return true;
     } catch(e) { console.warn('bk-extra save error', e); return false; }
   };
-  // 来院日 MM/DD 入力 → ISO に変換して保存
-  container.querySelectorAll('.kaiin-bookdate-mmdd').forEach(inp => {
-    inp.addEventListener('change', () => {
-      const v = inp.value.trim();
-      let iso = '';
-      const m = v.match(/^(\d{1,2})[\/\-\.](\d{1,2})$/);
-      if (m) {
-        iso = `${new Date().getFullYear()}-${String(m[1]).padStart(2,'0')}-${String(m[2]).padStart(2,'0')}`;
-      } else if (!v) {
-        iso = '';
-      } else {
-        inp.value = inp.dataset.iso ? inp.dataset.iso.substring(5).replace('-','/') : '';
-        return;
+  // 来院日: カレンダー (button + hidden date picker)
+  container.querySelectorAll('.kaiin-bookdate-mmdd').forEach(btn => {
+    const hidden = btn.parentElement?.querySelector('.kaiin-bookdate-hidden');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!hidden) return;
+      if (typeof hidden.showPicker === 'function') {
+        try { hidden.showPicker(); return; } catch(_) {}
       }
-      inp.dataset.iso = iso;
-      inp.value = iso ? iso.substring(5).replace('-','/') : '';
-      const ok = saveBkExtraField(inp.dataset.name, inp.dataset.apply, 'editedBookDate', iso);
-      if (ok) { inp.style.borderColor = '#0a0'; setTimeout(() => { inp.style.borderColor = ''; }, 1000); }
+      hidden.focus();
+      hidden.click();
     });
-    inp.addEventListener('click', e => e.stopPropagation());
+    if (hidden) {
+      hidden.addEventListener('change', () => {
+        const iso = hidden.value || '';
+        btn.dataset.iso = iso;
+        btn.textContent = iso ? iso.substring(5).replace('-','/') : '年/月/日';
+        const ok = saveBkExtraField(btn.dataset.name, btn.dataset.apply, 'editedBookDate', iso);
+        if (ok) {
+          btn.style.outline = '2px solid #16a34a';
+          setTimeout(() => { btn.style.outline = ''; }, 1000);
+        }
+      });
+    }
   });
   // 名前
   container.querySelectorAll('.kaiin-name').forEach(inp => {
