@@ -245,24 +245,25 @@
       </div>
       <!-- ポータルメニュー -->
       <div id="portal-menu" class="portal-cols" style="margin-bottom:20px">
-        <!-- 営業系 -->
+        <!-- 営業系: 1ボタンで展開 -->
         <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
-          <h3>営業系</h3>
-          <button onclick="var s=document.getElementById('training-sub');s.style.display=(s.style.display==='flex'?'none':'flex')" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト</button>
-          <div id="training-sub" style="display:none;flex-direction:column;gap:6px;padding-left:16px">
-            <a href="https://owojchhi.gensparkspace.com/index.html" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">動画研修</a>
-            <a href="qa.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">Q&amp;A研修</a>
-            <a href="ortho.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス</a>
-            <a href="ortho2.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス2</a>
+          <button id="portal-sales-btn" onclick="var s=document.getElementById('sales-panel');s.style.display=(s.style.display==='flex'?'none':'flex');if(s.style.display==='flex'){var m=document.getElementById('login-section');if(m)m.style.display='none'}" style="width:100%;padding:18px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">営業</button>
+          <div id="sales-panel" style="display:none;flex-direction:column;gap:8px;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
+            <button onclick="var s=document.getElementById('training-sub');s.style.display=(s.style.display==='flex'?'none':'flex')" style="width:100%;padding:12px;border:1px solid var(--border);background:white;color:var(--text);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">研修サイト ▾</button>
+            <div id="training-sub" style="display:none;flex-direction:column;gap:6px;padding-left:12px">
+              <a href="https://owojchhi.gensparkspace.com/index.html" target="_blank" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;transition:all 0.2s" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">動画研修</a>
+              <a href="qa.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">Q&amp;A研修</a>
+              <a href="ortho.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス</a>
+              <a href="ortho2.html" style="padding:10px 14px;border:1px solid var(--border);background:var(--bg);color:var(--text);border-radius:8px;font-size:13px;font-weight:500;text-decoration:none;text-align:center;cursor:pointer;transition:all 0.2s;display:block" onmouseover="this.style.background='#e5e7eb'" onmouseout="this.style.background='var(--bg)'">矯正アドバンス2</a>
+            </div>
+            <a href="https://seishokai.github.io/shift/" target="_blank" style="width:100%;padding:12px;border:1px solid var(--border);background:white;color:var(--text);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">ドクターシフト</a>
+            <a href="reviews.html" style="width:100%;padding:12px;border:1px solid var(--border);background:white;color:var(--text);border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">口コミ</a>
           </div>
-          <a href="https://seishokai.github.io/shift/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">ドクターシフト</a>
-          <a href="reviews.html" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">口コミ</a>
         </div>
 
-        <!-- 管理系 -->
+        <!-- 管理系: 1ボタンで展開、ログイン後は権限別画面へ -->
         <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
-          <h3>管理系</h3>
-          <button id="portal-manage-btn" onclick="var s=document.getElementById('login-section');s.style.display=(s.style.display==='block'?'none':'block');if(s.style.display==='block'){setTimeout(function(){document.getElementById('login-email').focus()},50)}" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:#1a1a1a;color:white;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s" onmouseover="this.style.background='#000'" onmouseout="this.style.background='#1a1a1a'">管理</button>
+          <button id="portal-manage-btn" onclick="var s=document.getElementById('login-section');s.style.display=(s.style.display==='block'?'none':'block');var sp=document.getElementById('sales-panel');if(sp)sp.style.display='none';if(s.style.display==='block'){setTimeout(function(){document.getElementById('login-email').focus()},50)}" style="width:100%;padding:18px;border:2px solid #1a1a1a;background:#1a1a1a;color:white;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#000'" onmouseout="this.style.background='#1a1a1a'">管理</button>
           <div id="login-section" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
             <div id="login-form">
               <div class="input-group">
@@ -276,13 +277,13 @@
               <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
               <button type="button" class="btn-primary" id="login-btn">ログイン</button>
               <p id="login-error" class="error-msg" hidden>メールまたはパスワードが正しくありません</p>
-              <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center">入力した権限に応じた画面が表示されます</p>
+              <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center">権限に応じた画面が表示されます</p>
+              <div style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:6px">
+                <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="padding:9px 12px;border:1px solid var(--border);background:white;color:var(--text-sub);border-radius:6px;font-size:12px;text-decoration:none;text-align:center;display:block">労務管理（ピノキオ）↗</a>
+                <a href="?view=para" style="padding:9px 12px;border:1px solid var(--border);background:white;color:var(--text-sub);border-radius:6px;font-size:12px;text-decoration:none;text-align:center;display:block">パラ管理 (外注用)</a>
+              </div>
             </div>
           </div>
-
-          <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">労務管理（ピノキオ）</a>
-
-          <a href="?view=para" style="width:100%;padding:14px;border:1px solid var(--border);background:white;color:var(--text);border-radius:10px;font-size:15px;font-weight:600;cursor:pointer;text-decoration:none;text-align:center;display:block;transition:all 0.2s;box-sizing:border-box" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='white'">パラ管理</a>
         </div>
       </div>
     </div>
@@ -1077,7 +1078,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=231"></script>
+  <script src="app.js?v=232"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
