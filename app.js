@@ -9077,6 +9077,11 @@ async function renderAuthMigration() {
     const deleteBtn = a.role === 'admin'
       ? '<span style="font-size:10px;color:var(--text-muted)">保護</span>'
       : `<button class="btn btn-outline btn-acct-delete" data-id="${a.id}" data-uid="${escapeHtml(a.supabase_user_id || '')}" data-name="${escapeHtml(a.name || '')}" style="padding:3px 8px;font-size:10px;color:#c00;border-color:#fecaca">🗑 削除</button>`;
+    // 共有URL (admin以外)
+    const LOGIN_URL = 'https://seishokai.github.io/clinic-analysis/?login';
+    const shareCell = (a.role === 'admin')
+      ? '<span style="font-size:10px;color:var(--text-muted)">-</span>'
+      : `<button class="btn btn-outline btn-acct-share" data-email="${escapeHtml(a.email||'')}" data-url="${LOGIN_URL}" style="padding:3px 8px;font-size:10px;white-space:nowrap" title="ログインURL＋メールをコピー">🔗 URLコピー</button>`;
     return `<tr>
       <td>${a.id}</td>
       <td>${escapeHtml(a.name || '')}</td>
@@ -9086,6 +9091,7 @@ async function renderAuthMigration() {
       <td>${promoStr}</td>
       <td>${tabsStr}</td>
       <td>${linked}</td>
+      <td>${shareCell}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-acct-edit" data-id="${a.id}"
           data-name="${escapeHtml(a.name || '')}"
@@ -9229,7 +9235,7 @@ async function renderAuthMigration() {
       <div style="overflow-x:auto">
         <table class="data-table">
           <thead><tr>
-            <th>ID</th><th>名前</th><th>ロール</th><th>代理店</th><th>メール</th><th>担当プロモ</th><th>閲覧タブ</th><th>Auth</th><th>操作</th>
+            <th>ID</th><th>名前</th><th>ロール</th><th>代理店</th><th>メール</th><th>担当プロモ</th><th>閲覧タブ</th><th>Auth</th><th style="white-space:nowrap">共有URL</th><th>操作</th>
           </tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
@@ -9287,6 +9293,20 @@ async function renderAuthMigration() {
     roleSelect.addEventListener('change', applyRolePreset);
     applyRolePreset(); // 初回
   }
+
+  // 共有URLコピー
+  container.querySelectorAll('.btn-acct-share').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const url = btn.dataset.url || '';
+      const email = btn.dataset.email || '';
+      const text = `ログインURL: ${url}\nメール: ${email}\nパスワード: (管理者に問い合わせ / PW再発行ボタンで再生成)`;
+      const ok = await _copyToClipboard(text);
+      const orig = btn.innerHTML;
+      btn.innerHTML = ok ? '✅ コピー済' : '⚠️ 失敗';
+      btn.disabled = true;
+      setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 1400);
+    });
+  });
 
   // 編集ボタン → モーダルで プロモ複数選択 + タブ別閲覧権限 を編集
   container.querySelectorAll('.btn-acct-edit').forEach(btn => {
@@ -9419,7 +9439,8 @@ async function renderAuthMigration() {
       return;
     }
 
-    const info = `メール: ${r.email}\nパスワード: ${r.password}\nロール: ${role}` + (agency ? `\n代理店: ${agency}` : '');
+    const loginUrl = (role === 'admin') ? 'https://seishokai.github.io/clinic-analysis/' : 'https://seishokai.github.io/clinic-analysis/?login';
+    const info = `ログインURL: ${loginUrl}\nメール: ${r.email}\nパスワード: ${r.password}\nロール: ${role}` + (agency ? `\n代理店: ${agency}` : '');
     await _copyToClipboard(info);
     msg.innerHTML = '✅ 発行しました (認証情報をクリップボードにコピー済み)';
     msg.style.color = '#059669';
