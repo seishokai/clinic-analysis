@@ -733,8 +733,8 @@ function canDeleteRecord()   { return currentRole === 'admin'; }
 // admin: 全部OK / staff_promo & agency: allowed_promos 配列とマッチ
 // 旧 promo (account_type='promo') は promoFilter を単体比較
 function _matchesAllowedPromo(source) {
-  if (!source) return true; // source未設定は常に表示 (既存挙動維持)
-  if (currentRole === 'admin') return true;
+  if (currentRole === 'admin') return true; // 管理者は source 空でも全表示
+  if (!source) return false; // staff_promo/agency: 流入元未設定の行は非表示(自分のものではない)
   // 新方式: currentAllowedPromos 配列
   if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
     // ワイルドカード '%' = 全許可
