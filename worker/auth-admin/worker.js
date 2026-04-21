@@ -116,11 +116,13 @@ export default {
       const newUid = createJson.id;
 
       // 2. accounts に紐付け
+      // 注意: RPC は内部で auth.uid() を参照して admin 判定するため、
+      // service_role ではなく呼び出し元 admin の JWT を渡す必要がある
       const linkRes = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/admin_create_account_with_role`, {
         method: 'POST',
         headers: {
           'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-          'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          'Authorization': `Bearer ${v.jwt}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
@@ -195,7 +197,7 @@ export default {
           method: 'POST',
           headers: {
             'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
-            'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+            'Authorization': `Bearer ${v.jwt}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ p_account_id: account_id }),

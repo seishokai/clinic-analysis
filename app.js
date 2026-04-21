@@ -8766,6 +8766,40 @@ async function _copyToClipboard(text) {
   } catch (_) { return false; }
 }
 
+// アカウント発行成功モーダル (テキスト選択可能・ワンクリックコピー)
+function _showCredModal(info) {
+  const existing = document.getElementById('_cred-modal');
+  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = '_cred-modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;padding:24px;max-width:520px;width:100%;box-shadow:0 10px 40px rgba(0,0,0,.3);">
+      <div style="font-size:18px;font-weight:700;margin-bottom:12px;color:#059669">✅ アカウント発行完了</div>
+      <textarea id="_cred-modal-ta" readonly style="width:100%;min-height:120px;font-family:monospace;font-size:13px;padding:12px;border:1px solid #d1d5db;border-radius:8px;resize:vertical;box-sizing:border-box;line-height:1.6;background:#f9fafb">${escapeHtml(info)}</textarea>
+      <div style="font-size:12px;color:#6b7280;margin-top:8px">※ 上のテキストは直接選択・コピー可能です。すでにクリップボードにもコピー済みです。</div>
+      <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+        <button id="_cred-modal-copy" style="padding:8px 16px;background:#4f46e5;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">📋 再コピー</button>
+        <button id="_cred-modal-close" style="padding:8px 16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;font-size:14px">閉じる</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  const ta = modal.querySelector('#_cred-modal-ta');
+  setTimeout(() => { ta.focus(); ta.select(); }, 50);
+  modal.querySelector('#_cred-modal-copy').addEventListener('click', async () => {
+    ta.select();
+    const ok = await _copyToClipboard(info);
+    const btn = modal.querySelector('#_cred-modal-copy');
+    btn.textContent = ok ? '✅ コピーしました' : '⚠️ 手動選択してください';
+    setTimeout(() => { btn.textContent = '📋 再コピー'; }, 1600);
+  });
+  const closeBtn = modal.querySelector('#_cred-modal-close');
+  const close = () => modal.remove();
+  closeBtn.addEventListener('click', close);
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  document.addEventListener('keydown', function esc(e){ if (e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
+}
+
 // Phase 8: タブ定義
 const AUTH_TAB_DEFS = [
   { key: 'bookings', label: '予約' },
@@ -9309,7 +9343,7 @@ async function renderAuthMigration() {
     await _copyToClipboard(info);
     msg.innerHTML = '✅ 発行しました (認証情報をクリップボードにコピー済み)';
     msg.style.color = '#059669';
-    alert(`✅ アカウント発行完了\n\n${info}\n\n(クリップボードにコピー済み。代理店に共有してください)`);
+    _showCredModal(info);
 
     // フォームクリア
     ['new-acct-name','new-acct-email','new-acct-agency']
