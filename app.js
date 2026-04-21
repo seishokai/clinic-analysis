@@ -757,6 +757,30 @@ function _matchesAllowedPromo(source) {
   }
   return true;
 }
+// 個人情報マスク (staff_promo/agency 向け)
+// 名前: 先頭2文字 + ※※...
+// 電話/メール: 全て ※
+function _isPII_MaskNeeded() { return currentRole !== 'admin'; }
+function maskName(name) {
+  if (!name) return name;
+  if (!_isPII_MaskNeeded()) return name;
+  const s = String(name);
+  if (s.length <= 2) return s; // 2文字以下はそのまま
+  const keep = s.slice(0, 2);
+  const rest = Math.max(1, s.length - 2);
+  return keep + '※'.repeat(rest);
+}
+function maskPhone(phone) {
+  if (!phone) return phone;
+  if (!_isPII_MaskNeeded()) return phone;
+  return '※※※※※※※※';
+}
+function maskEmail(email) {
+  if (!email) return email;
+  if (!_isPII_MaskNeeded()) return email;
+  return '※※※※※※※※';
+}
+
 // 共通: 現在のユーザーに見えるbookingsデータだけを返す
 function getFilteredBookingsData() {
   if (!_hasPromoRestriction()) return bookingsData;
@@ -2219,7 +2243,7 @@ function renderPatients() {
     return `<span class="badge ${cls}">${s}</span>`;
   };
   tbody.innerHTML = sorted.map(d => `<tr>
-    <td>${d.visitDate || '-'}</td><td>${d.name}</td><td>${d.purpose}</td><td>${d.source}</td>
+    <td>${d.visitDate || '-'}</td><td>${maskName(d.name)}</td><td>${d.purpose}</td><td>${d.source}</td>
     <td>${d.counselor || '-'}</td><td>${d.doctor || '-'}</td><td>${statusBadge(d.status)}</td>
     <td>${d.amount ? '¥' + fmt(d.amount) : '-'}</td>
   </tr>`).join('') || '<tr><td colspan="8" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
@@ -3502,11 +3526,11 @@ function renderBookings() {
     <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
       ${esc(fmtBookDate(d.bookDate))}</td>
     <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-row-edit" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="クリックで編集"`:''}>
-      ${esc(d.name)}</td>
+      ${esc(maskName(d.name))}</td>
     <td style="font-size:10px;white-space:nowrap">${esc(normSvc(d.service))}</td>
     <td style="font-size:10px;white-space:nowrap">${esc(normFac(d.facility))}</td>
-    <td style="font-size:10px;white-space:nowrap">${isAdmin ? esc(fmtPhone(d.phone)) : '***'}</td>
-    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? esc(d.email || '-') : '***'}</td>
+    <td style="font-size:10px;white-space:nowrap">${isAdmin ? esc(fmtPhone(d.phone)) : esc(maskPhone(d.phone) || '-')}</td>
+    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? esc(d.email || '-') : esc(maskEmail(d.email) || '-')}</td>
     <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${esc(d.source || '-')}</td>
     <td style="text-align:center">${isAdmin ? (isBFBooking(d) ? (() => {
       const info = getBFInfo(d.name, d.applyDate) || {};
@@ -4178,10 +4202,10 @@ function renderFacTab(facility) {
     return `<tr style="${rs}">
       <td style="font-size:10px">${d.applyDate ? d.applyDate.match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : '-' : '-'}</td>
       <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
-      <td style="font-size:11px;font-weight:500;cursor:pointer;text-decoration:underline dotted" class="fac-row-edit" data-name="${d.name}" data-apply="${d.applyDate}" title="クリックで編集">${d.name}</td>
+      <td style="font-size:11px;font-weight:500;cursor:pointer;text-decoration:underline dotted" class="fac-row-edit" data-name="${d.name}" data-apply="${d.applyDate}" title="クリックで編集">${maskName(d.name)}</td>
       <td style="font-size:10px">${normSvc(d.service)}</td>
-      <td style="font-size:10px">${d.phone||'-'}</td>
-      <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${d.email||'-'}</td>
+      <td style="font-size:10px">${maskPhone(d.phone)||'-'}</td>
+      <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis">${maskEmail(d.email)||'-'}</td>
       <td style="font-size:9px;color:var(--text-sub)">${(d.source||'-').slice(0,12)}</td>
       <td style="text-align:center">${statusBadge(d.status)}</td>
       <td style="font-size:10px;max-width:50px;overflow:hidden;text-overflow:ellipsis;cursor:pointer" class="fac-memo-cell" data-name="${d.name}" data-apply="${d.applyDate}" title="${(memo||'').replace(/"/g,'&quot;')}">${memo ? memo.slice(0,6)+(memo.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>'}</td>
@@ -4457,11 +4481,11 @@ function searchPatients() {
   document.getElementById('ps-tbody').innerHTML = sorted.slice(0, 100).map(d => `<tr>
     <td style="font-size:10px">${d.applyDate ? d.applyDate.match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : d.applyDate.slice(5) : '-'}</td>
     <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
-    <td style="font-size:11px;font-weight:500">${d.name}</td>
+    <td style="font-size:11px;font-weight:500">${maskName(d.name)}</td>
     <td style="font-size:10px">${normSvc(d.service)}</td>
     <td style="font-size:10px">${normFac(d.facility)}</td>
-    <td style="font-size:10px">${d.phone || '-'}</td>
-    <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${d.email || '-'}</td>
+    <td style="font-size:10px">${maskPhone(d.phone) || '-'}</td>
+    <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${maskEmail(d.email) || '-'}</td>
     <td style="font-size:9px;color:var(--text-sub)">${(d.source||'-').slice(0,15)}</td>
     <td>${statusBadge(d.status)}</td>
     <td style="font-size:9px"><span class="badge ${d.tool==='手動'?'badge-warning':'badge-default'}" style="font-size:8px">${d.tool||'DX'}</span></td>
@@ -5737,7 +5761,9 @@ function drawKaiinRows(treatment, rows, container) {
       : 'background:#fff;border:1px solid var(--border);color:var(--text-muted)';
     return `<tr>
       <td style="position:relative"><button type="button" class="kaiin-bookdate-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${bookDateISO}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;cursor:pointer;${bookDateBtnStyle}">${bookMMDD||'年/月/日'}</button><input type="date" class="kaiin-bookdate-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${bookDateISO}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"></td>
-      <td><input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'"></td>
+      <td>${_isPII_MaskNeeded()
+        ? `<span style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;display:inline-block">${esc(maskName(d.name))}</span>`
+        : `<input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'">`}</td>
       <td style="text-align:left">${promoBadge}</td>
       <td><button type="button" class="kaiin-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 6px;width:100%;text-align:center;background:transparent;border:none;cursor:pointer;color:var(--text)">${csFacDisplay}</button></td>
       <td><select class="kaiin-consult-sel kaiin-plain-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:none;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center">
@@ -5999,7 +6025,7 @@ function drawBFLifecycleTable(bfRows) {
       : `background:#fff;color:#111;border:1px solid var(--border);font-weight:500`;
     return `<tr>
       <td style="white-space:nowrap;font-size:10px">${(fmtBookDate(d.bookDate)||'').replace(/\s+\d{1,2}:\d{2}.*$/,'')}</td>
-      <td class="bf-lc-name-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-weight:500;text-align:left;cursor:pointer;text-decoration:underline dotted;text-decoration-color:#ccc" title="クリックで編集">${d.name}</td>
+      <td class="bf-lc-name-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-weight:500;text-align:left;cursor:pointer;text-decoration:underline dotted;text-decoration-color:#ccc" title="クリックで編集">${maskName(d.name)}</td>
       <td><button type="button" class="bf-lc-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-value="${esc(info.bf_cs_facility||csFac||'')}" style="font-size:10px;padding:3px 6px;width:100%;text-align:left;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;min-height:24px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${parseCsFac(info.bf_cs_facility||csFac||'').join(', ') || '<span style="color:var(--text-muted)">未選択</span>'}</button></td>
       <td><select class="bf-lc-csdr-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;background:#fff;border:1px solid var(--border);border-radius:4px">
         <option value="">未選択</option>
@@ -6337,10 +6363,10 @@ function renderBFBookings(allBFData) {
     <td style="font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
     <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
     <td style="font-size:11px;font-weight:500;text-align:left;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bf-bk-row-edit" data-name="${d.name}" data-apply="${d.applyDate}" title="クリックで編集"`:''}>
-      ${d.name}</td>
+      ${maskName(d.name)}</td>
     <td style="font-size:10px">${normFac(d.facility)}</td>
-    <td style="font-size:10px">${d.phone||'-'}</td>
-    <td style="font-size:10px;text-align:left;max-width:90px;overflow:hidden;text-overflow:ellipsis">${d.email||'-'}</td>
+    <td style="font-size:10px">${maskPhone(d.phone)||'-'}</td>
+    <td style="font-size:10px;text-align:left;max-width:90px;overflow:hidden;text-overflow:ellipsis">${maskEmail(d.email)||'-'}</td>
     <td style="font-size:9px;color:var(--text-muted);max-width:70px;overflow:hidden;text-overflow:ellipsis">${d.source||'-'}</td>
     <td style="text-align:center">${isAdmin ? `<select class="form-select bf-bk-status-sel" data-name="${d.name}" data-apply="${d.applyDate}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}"><option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option><option ${d.status==='確認済'?'selected':''}>確認済</option><option ${d.status==='来院済'?'selected':''}>来院済</option><option ${d.status==='成約'?'selected':''}>成約</option><option ${d.status==='キャンセル'?'selected':''}>キャンセル</option><option ${d.status==='除外'?'selected':''}>除外</option></select>` : (d.status||'未対応')}</td>
     <td style="font-size:10px;max-width:50px;overflow:hidden;text-overflow:ellipsis;cursor:pointer" class="bf-bk-memo" data-name="${d.name}" data-apply="${d.applyDate}" title="${(memo||'').replace(/"/g,'&quot;')}">${memo ? memo.slice(0,6)+(memo.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>'}</td>
