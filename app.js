@@ -893,6 +893,14 @@ async function attemptLoginViaSupabaseAuth(email, password) {
   }
 }
 
+// ?login / ?staff / ?agency URL 経由では admin ログインを禁止
+function _isRestrictedLoginUrl() {
+  try {
+    const p = new URLSearchParams(location.search);
+    return p.has('login') || p.has('staff') || p.has('agency') || p.get('view') === 'login';
+  } catch (_) { return false; }
+}
+
 async function restoreSupabaseAuthIfAny() {
   try {
     if (!sb || !sb.auth) return false;
@@ -900,6 +908,15 @@ async function restoreSupabaseAuthIfAny() {
     if (!session) return false;
     const { data: profile, error } = await sb.rpc('get_my_account');
     if (error || !profile) return false;
+    // 制限付きURL (?login) で admin 権限は自動ログインさせない
+    const effectiveRole = profile.role || profile.account_type || '';
+    if (_isRestrictedLoginUrl() && effectiveRole === 'admin') {
+      try { await sb.auth.signOut(); } catch(_){}
+      try {
+        Object.keys(sessionStorage).forEach(k => sessionStorage.removeItem(k));
+      } catch(_){}
+      return false;
+    }
     _applyAccountProfileToSession(profile);
     return true;
   } catch (e) {
@@ -928,6 +945,15 @@ function setupEventListeners() {
       if (!res.ok) {
         if (errEl) { errEl.textContent = res.error || 'ログインに失敗しました'; errEl.hidden = false; }
         try { sb.rpc('log_auth_event', { event_name: 'login_failed', detail_json: { method: 'email' } }).then(()=>{}).catch(()=>{}); } catch(_){}
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'ログイン';
+        return;
+      }
+      // ?login URL で admin ログインを拒否
+      if (_isRestrictedLoginUrl() && currentRole === 'admin') {
+        try { await sb.auth.signOut(); } catch(_){}
+        try { Object.keys(sessionStorage).forEach(k => sessionStorage.removeItem(k)); } catch(_){}
+        if (errEl) { errEl.textContent = '管理者はこのURLからログインできません。通常のトップページをご利用ください。'; errEl.hidden = false; }
         loginBtn.disabled = false;
         loginBtn.textContent = 'ログイン';
         return;
