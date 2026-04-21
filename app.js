@@ -8787,6 +8787,130 @@ function _setTabsOnCheckboxes(root, prefix, tabs) {
   });
 }
 
+// Phase 9: プロモ一覧からプレフィックスグループを抽出 (2件以上のものだけ)
+// 例: ['hikaru_a','hikaru_b','bin_x'] → { hikaru: 2, bin: 1 } → [['hikaru',2]]
+function _computePromoPrefixGroups(allPromos) {
+  const counts = Object.create(null);
+  (allPromos || []).forEach(s => {
+    if (!s || typeof s !== 'string') return;
+    const idx = s.indexOf('_');
+    if (idx <= 0) return;
+    const p = s.slice(0, idx);
+    counts[p] = (counts[p] || 0) + 1;
+  });
+  return Object.keys(counts)
+    .filter(p => counts[p] >= 2)
+    .sort()
+    .map(p => ({ prefix: p, count: counts[p] }));
+}
+
+// Phase 9: グループバー HTML (プレフィックスボタン + プレビュー行)
+function _renderPromoGroupBarHtml(groups, idPrefix) {
+  if (!groups || !groups.length) return '';
+  const btns = groups.map(g => (
+    `<button type="button" class="${idPrefix}-promo-group-btn" data-prefix="${escapeHtml(g.prefix)}"
+       style="font-size:11px;padding:3px 10px;border:1px solid var(--border);border-radius:12px;background:#fff;cursor:pointer;white-space:nowrap">
+       ${escapeHtml(g.prefix)}_* (${g.count}件)
+     </button>`
+  )).join('');
+  return `
+    <div style="margin:6px 0 8px 0;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+      <strong style="font-size:11px;color:var(--text-sub);margin-right:2px">グループ:</strong>
+      ${btns}
+      <span style="font-size:10px;color:var(--text-muted)">※ 押すと "prefix_%" パターンを追加 (新プロモも自動で含む)</span>
+    </div>
+    <div class="${idPrefix}-promo-preview" style="margin:4px 0 6px 0;font-size:11px;color:var(--text-sub);min-height:14px"></div>
+  `;
+}
+
+// Phase 9: グループボタン + チェックボックスのイベントを配線
+// activePatterns: Set<string> (例: {"hikaru_%"}) - 呼び出し側で保持する状態オブジェクト
+// listEl: チェックボックスを含むコンテナ (data-wildcard で % 全許可モード管理)
+function _wirePromoGroupBar(rootEl, idPrefix, listEl, activePatterns) {
+  const updatePreview = () => {
+    const preview = rootEl.querySelector(`.${idPrefix}-promo-preview`);
+    if (!preview) return;
+    const chks = Array.from(listEl.querySelectorAll(`.${idPrefix}-promo-chk:checked`))
+      .map(c => c.value)
+      .filter(v => {
+        // パターンでカバーされる個別値は個別表示から外す
+        for (const pat of activePatterns) {
+          if (pat.endsWith('_%') && v.startsWith(pat.slice(0, -1))) return false;
+        }
+        return true;
+      });
+    const parts = [];
+    if (activePatterns.size) parts.push([...activePatterns].map(p => `<code style="background:#dbeafe;color:#1e3a8a;padding:1px 4px;border-radius:3px">${escapeHtml(p)}</code>`).join(' '));
+    if (chks.length) parts.push(chks.length + '件の個別プロモ');
+    preview.innerHTML = parts.length ? ('選択中: ' + parts.join(' + ')) : '<span style="color:var(--text-muted)">未選択</span>';
+  };
+
+  // 既存の activePatterns に応じてグループボタンと個別チェックをハイライト
+  const applyPatternVisual = (prefix, on) => {
+    const btn = rootEl.querySelector(`.${idPrefix}-promo-group-btn[data-prefix="${CSS.escape(prefix)}"]`);
+    if (btn) {
+      btn.style.background = on ? '#dbeafe' : '#fff';
+      btn.style.borderColor = on ? '#3b82f6' : 'var(--border)';
+      btn.style.color = on ? '#1e3a8a' : '';
+      btn.style.fontWeight = on ? '600' : '';
+    }
+    // 対応する個別チェックもまとめて ON/OFF (視覚的に分かりやすく)
+    listEl.querySelectorAll(`.${idPrefix}-promo-chk`).forEach(chk => {
+      const v = chk.value || '';
+      if (v.startsWith(prefix + '_')) {
+        chk.checked = on ? true : chk.checked;
+      }
+    });
+  };
+
+  // 初期状態を復元: activePatterns に入っているプレフィックスのボタン/チェックを ON に
+  [...activePatterns].forEach(pat => {
+    if (pat.endsWith('_%')) {
+      const prefix = pat.slice(0, -2);
+      applyPatternVisual(prefix, true);
+    }
+  });
+
+  // グループボタンクリック: パターンの add/remove
+  rootEl.querySelectorAll(`.${idPrefix}-promo-group-btn`).forEach(btn => {
+    btn.addEventListener('click', () => {
+      const prefix = btn.dataset.prefix;
+      const pattern = prefix + '_%';
+      if (activePatterns.has(pattern)) {
+        activePatterns.delete(pattern);
+        applyPatternVisual(prefix, false);
+      } else {
+        activePatterns.add(pattern);
+        applyPatternVisual(prefix, true);
+      }
+      updatePreview();
+    });
+  });
+
+  // チェックボックス変更時もプレビュー更新
+  listEl.querySelectorAll(`.${idPrefix}-promo-chk`).forEach(chk => {
+    chk.addEventListener('change', updatePreview);
+  });
+
+  updatePreview();
+  return { updatePreview, applyPatternVisual };
+}
+
+// Phase 9: 保存値を整形 (パターン + 個別チェックをユニーク化、パターンでカバーされる個別値は除外)
+function _composePromoList(activePatterns, checkedValues) {
+  const result = new Set();
+  activePatterns.forEach(p => result.add(p));
+  (checkedValues || []).forEach(v => {
+    if (!v) return;
+    let covered = false;
+    for (const pat of activePatterns) {
+      if (pat.endsWith('_%') && v.startsWith(pat.slice(0, -1))) { covered = true; break; }
+    }
+    if (!covered) result.add(v);
+  });
+  return [...result];
+}
+
 async function renderAuthMigration() {
   const container = document.getElementById('auth-migration-container');
   if (!container) return;
@@ -8808,6 +8932,8 @@ async function renderAuthMigration() {
 
   // 既存のプロモ source 一覧 (新規発行フォームで使用)
   const allPromos = [...new Set((bookingsData || []).map(d => d && d.source).filter(Boolean))].sort();
+  const promoGroups = _computePromoPrefixGroups(allPromos);
+  const groupBarHtml = _renderPromoGroupBarHtml(promoGroups, 'new-acct');
 
   const tableRows = rows.map(a => {
     const promos = Array.isArray(a.allowed_promos) ? a.allowed_promos : [];
@@ -8881,6 +9007,7 @@ async function renderAuthMigration() {
             <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
             <span style="color:var(--text-muted);font-size:10px;margin-left:6px">※「全許可(%)」は現在・今後の全プロモを含む</span>
           </label>
+          ${groupBarHtml}
           <div id="new-acct-promos-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px">
             ${allPromos.length ? allPromos.map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap"><input type="checkbox" value="${escapeHtml(p)}" class="new-acct-promo-chk"> ${escapeHtml(p)}</label>`).join('') : '<span style="color:var(--text-muted);font-size:11px">プロモ候補がまだ読み込まれていません</span>'}
           </div>
@@ -8941,6 +9068,7 @@ async function renderAuthMigration() {
             <button type="button" id="new-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
             <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
           </label>
+          ${groupBarHtml}
           <div id="new-acct-promos-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px">
             ${allPromos.length ? allPromos.map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap"><input type="checkbox" value="${escapeHtml(p)}" class="new-acct-promo-chk"> ${escapeHtml(p)}</label>`).join('') : '<span style="color:var(--text-muted);font-size:11px">プロモ候補なし</span>'}
           </div>
@@ -8986,6 +9114,13 @@ async function renderAuthMigration() {
   `;
 
   container.querySelector('#auth-mig-reload')?.addEventListener('click', () => renderAuthMigration());
+
+  // Phase 9: グループバー配線 (パターン状態を保持する Set を関数ローカルに作る)
+  const newAcctPatterns = new Set();
+  const _newAcctListEl = container.querySelector('#new-acct-promos-list');
+  if (_newAcctListEl && promoGroups.length) {
+    _wirePromoGroupBar(container, 'new-acct', _newAcctListEl, newAcctPatterns);
+  }
 
   // 新規発行フォーム: プロモ全選択/全解除/全許可
   const promosListEl = container.querySelector('#new-acct-promos-list');
@@ -9102,7 +9237,8 @@ async function renderAuthMigration() {
     if (promosListEl2 && promosListEl2.dataset.wildcard === '1') {
       promos = ['%'];
     } else {
-      promos = Array.from(container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk:checked')).map(c => c.value);
+      const checked = Array.from(container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk:checked')).map(c => c.value);
+      promos = _composePromoList(newAcctPatterns, checked);
     }
     // 閲覧タブ
     const visible_tabs = _readTabsFromCheckboxes(container, 'new-acct-tab-chk');
@@ -9142,8 +9278,15 @@ async function renderAuthMigration() {
         setTimeout(() => renderAuthMigration(), 1200);
         return;
       }
-      msg.textContent = 'エラー: ' + (r.error || '不明');
+      // Phase 9: admin only など権限エラー時は debug 情報を表示 (原因切り分け用)
+      const dbgStr = r.debug ? ('\n\n[debug]\n' + JSON.stringify(r.debug, null, 2)) : '';
+      const detailStr = r.detail ? ('\n\n[detail]\n' + (typeof r.detail === 'string' ? r.detail : JSON.stringify(r.detail))) : '';
+      msg.innerHTML = 'エラー: ' + escapeHtml(r.error || '不明') + (r.debug ? ' <span style="color:var(--text-muted);font-size:10px">(詳細はコンソール/アラート参照)</span>' : '');
       msg.style.color = '#c00';
+      if (r.debug || r.detail) {
+        try { console.error('[auth-admin/create]', r); } catch(_) {}
+        alert('❌ ' + (r.error || '発行失敗') + dbgStr + detailStr);
+      }
       return;
     }
 
@@ -9158,6 +9301,7 @@ async function renderAuthMigration() {
       .forEach(idv => { const el = container.querySelector('#' + idv); if (el) el.value = ''; });
     container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk').forEach(c => { c.checked = false; });
     if (promosListEl2) { promosListEl2.dataset.wildcard = '0'; promosListEl2.style.outline = ''; }
+    newAcctPatterns.clear();
     setTimeout(() => renderAuthMigration(), 600);
   });
 
@@ -9175,7 +9319,8 @@ async function renderAuthMigration() {
     if (promosListElL && promosListElL.dataset.wildcard === '1') {
       promos = ['%'];
     } else {
-      promos = Array.from(container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk:checked')).map(c => c.value);
+      const checked = Array.from(container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk:checked')).map(c => c.value);
+      promos = _composePromoList(newAcctPatterns, checked);
     }
     const visible_tabs = _readTabsFromCheckboxes(container, 'new-acct-tab-chk');
 
@@ -9231,10 +9376,27 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
   wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
   const promosSet = new Set((curPromos || []).map(String));
   const wildcard = promosSet.has('%');
-  const promoChks = (allPromos || []).map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap"><input type="checkbox" value="${escapeHtml(p)}" class="edit-acct-promo-chk"${promosSet.has(p) ? ' checked' : ''}> ${escapeHtml(p)}</label>`).join('');
-  // allPromos に含まれないがユーザが持っているエントリ (LIKE パターンなど) も表示
-  const extraPromos = (curPromos || []).filter(p => p !== '%' && !(allPromos || []).includes(p));
+  // Phase 9: パターン (prefix_%) と 個別値を分離
+  const existingPatterns = new Set();
+  (curPromos || []).forEach(p => {
+    if (typeof p === 'string' && p.endsWith('_%') && p.length > 2) existingPatterns.add(p);
+  });
+  // 個別チェックボックス: パターンに該当するものも、既存保存値で match するものは ON にする (視覚的にまとめて含む表示)
+  const isCoveredByPattern = (v) => {
+    for (const pat of existingPatterns) {
+      if (v.startsWith(pat.slice(0, -1))) return true;
+    }
+    return false;
+  };
+  const promoChks = (allPromos || []).map(p => {
+    const checked = promosSet.has(p) || isCoveredByPattern(p);
+    return `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap"><input type="checkbox" value="${escapeHtml(p)}" class="edit-acct-promo-chk"${checked ? ' checked' : ''}> ${escapeHtml(p)}</label>`;
+  }).join('');
+  // allPromos に含まれない & パターンでもない カスタム値 (従来表示)
+  const extraPromos = (curPromos || []).filter(p => p !== '%' && !(p.endsWith && p.endsWith('_%')) && !(allPromos || []).includes(p));
   const extraChks = extraPromos.map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;background:#fef3c7;padding:2px 6px;border-radius:3px"><input type="checkbox" value="${escapeHtml(p)}" class="edit-acct-promo-chk" checked> ${escapeHtml(p)} <span style="color:#92400e;font-size:10px">(カスタム)</span></label>`).join('');
+  const editPromoGroups = _computePromoPrefixGroups(allPromos);
+  const editGroupBarHtml = _renderPromoGroupBarHtml(editPromoGroups, 'edit-acct');
 
   wrap.innerHTML = `
     <div style="background:#fff;border-radius:8px;padding:20px;max-width:720px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.25)">
@@ -9262,6 +9424,7 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
           <button type="button" id="edit-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
           <button type="button" id="edit-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
         </label>
+        ${editGroupBarHtml}
         <div id="edit-acct-promos-list" data-wildcard="${wildcard ? '1' : '0'}" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;${wildcard ? 'outline:2px solid #059669' : ''}">
           ${promoChks || '<span style="color:var(--text-muted);font-size:11px">プロモ候補なし</span>'}
           ${extraChks}
@@ -9289,6 +9452,11 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
   wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
 
   const listEl = wrap.querySelector('#edit-acct-promos-list');
+  // Phase 9: グループバー配線 (既存パターンを初期値として渡す)
+  const editAcctPatterns = new Set(existingPatterns);
+  if (listEl && editPromoGroups.length) {
+    _wirePromoGroupBar(wrap, 'edit-acct', listEl, editAcctPatterns);
+  }
   wrap.querySelector('#edit-acct-promos-all').addEventListener('click', () => {
     listEl.querySelectorAll('.edit-acct-promo-chk').forEach(c => { c.checked = true; });
   });
@@ -9326,7 +9494,8 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
     if (listEl.dataset.wildcard === '1') {
       newPromos = ['%'];
     } else {
-      newPromos = Array.from(wrap.querySelectorAll('.edit-acct-promo-chk:checked')).map(c => c.value);
+      const checked = Array.from(wrap.querySelectorAll('.edit-acct-promo-chk:checked')).map(c => c.value);
+      newPromos = _composePromoList(editAcctPatterns, checked);
     }
     const newTabs = _readTabsFromCheckboxes(wrap, 'edit-acct-tab-chk');
 

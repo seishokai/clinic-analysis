@@ -40,6 +40,7 @@ export default {
       const h = request.headers.get('Authorization');
       if (!h?.startsWith('Bearer ')) return { ok: false, error: 'auth header missing' };
       const jwt = h.slice(7);
+      let rBody = null;
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/is_auth_admin`, {
         method: 'POST',
         headers: {
@@ -49,16 +50,37 @@ export default {
         },
         body: '{}',
       });
-      if (!r.ok) return { ok: false, error: 'jwt verify failed: ' + r.status };
+      if (!r.ok) {
+        try { rBody = await r.text(); } catch (_) {}
+        return { ok: false, error: 'jwt verify failed: ' + r.status, detail: rBody };
+      }
       const isAdmin = await r.json();
-      if (isAdmin !== true) return { ok: false, error: 'admin only' };
+      if (isAdmin !== true) {
+        // デバッグ: debug_auth_state を呼んで原因を返す (Phase 9 hotfix)
+        let dbg = null;
+        try {
+          const dbgRes = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/debug_auth_state`, {
+            method: 'POST',
+            headers: {
+              'apikey': env.SUPABASE_ANON_KEY,
+              'Authorization': `Bearer ${jwt}`,
+              'Content-Type': 'application/json',
+            },
+            body: '{}',
+          });
+          dbg = dbgRes.ok ? await dbgRes.json() : { _status: dbgRes.status, _note: 'debug_auth_state RPC 未デプロイの可能性あり (migrations/auth_phase9_hotfix.sql を実行してください)' };
+        } catch (e) {
+          dbg = { _error: String(e && e.message || e) };
+        }
+        return { ok: false, error: 'admin only', debug: dbg, is_admin_raw: isAdmin };
+      }
       return { ok: true, jwt };
     };
 
     // POST /auth-admin/create
     if (url.pathname === '/auth-admin/create' && request.method === 'POST') {
       const v = await verifyAdmin();
-      if (!v.ok) return json({ ok: false, error: v.error }, 401);
+      if (!v.ok) return json({ ok: false, error: v.error, debug: v.debug, detail: v.detail, is_admin_raw: v.is_admin_raw }, 401);
 
       let body;
       try { body = await request.json(); } catch { return json({ ok: false, error: 'invalid json' }, 400); }
@@ -122,7 +144,7 @@ export default {
     // POST /auth-admin/reset-password
     if (url.pathname === '/auth-admin/reset-password' && request.method === 'POST') {
       const v = await verifyAdmin();
-      if (!v.ok) return json({ ok: false, error: v.error }, 401);
+      if (!v.ok) return json({ ok: false, error: v.error, debug: v.debug, detail: v.detail, is_admin_raw: v.is_admin_raw }, 401);
       const body = await request.json().catch(()=>({}));
       const { user_id, new_password } = body;
       if (!user_id || !new_password) return json({ ok: false, error: 'user_id and new_password required' }, 400);
@@ -143,7 +165,7 @@ export default {
     // POST /auth-admin/delete
     if (url.pathname === '/auth-admin/delete' && request.method === 'POST') {
       const v = await verifyAdmin();
-      if (!v.ok) return json({ ok: false, error: v.error }, 401);
+      if (!v.ok) return json({ ok: false, error: v.error, debug: v.debug, detail: v.detail, is_admin_raw: v.is_admin_raw }, 401);
       const body = await request.json().catch(()=>({}));
       const { user_id, account_id } = body;
       if (!user_id) return json({ ok: false, error: 'user_id required' }, 400);
