@@ -733,8 +733,8 @@ function canDeleteRecord()   { return currentRole === 'admin'; }
 // admin: 全部OK / staff_promo & agency: allowed_promos 配列とマッチ
 // 旧 promo (account_type='promo') は promoFilter を単体比較
 function _matchesAllowedPromo(source) {
-  if (currentRole === 'admin') return true; // 管理者は source 空でも全表示
-  if (!source) return false; // staff_promo/agency: 流入元未設定の行は非表示(自分のものではない)
+  if (currentRole === 'admin') return true;
+  if (!source) return true; // 流入元未設定は全員表示 (運用上共有が必要なため)
   // 新方式: currentAllowedPromos 配列
   if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
     // ワイルドカード '%' = 全許可
@@ -756,6 +756,11 @@ function _matchesAllowedPromo(source) {
     return String(source).trim() === String(promoFilter).trim();
   }
   return true;
+}
+// 共通: 現在のユーザーに見えるbookingsデータだけを返す
+function getFilteredBookingsData() {
+  if (!_hasPromoRestriction()) return bookingsData;
+  return (bookingsData || []).filter(d => _matchesAllowedPromo(d.source));
 }
 function _hasPromoRestriction() {
   if (currentRole === 'admin') return false;
@@ -991,7 +996,7 @@ function setupEventListeners() {
       if (sub === 'bk-search' && bookingsData.length > 0) {
         const psFac = document.getElementById('ps-facility');
         if (psFac && psFac.options.length <= 1) {
-          const facs = [...new Set(bookingsData.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
+          const facs = [...new Set(getFilteredBookingsData().map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
           psFac.innerHTML = '<option value="">全て</option>' + facs.map(f => `<option>${f}</option>`).join('');
         }
       }
@@ -1124,6 +1129,7 @@ function setupEventListeners() {
       const bkExtraBF = loadData('bk-extra', {});
       _bfAllData = bookingsData.filter(d => {
         if (d.status === '除外') return false;
+        if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
         if (normSvc(d.service) === 'BF') return true;
         const key = d.name + '|' + d.applyDate;
         const extra = bkExtraBF[key];
@@ -3188,13 +3194,13 @@ function populateBookingFilters() {
 
   // プロモ・カスタムユーザーはQuick行を非表示
   const quickEl = document.getElementById('bk-quick-promos');
-  if (quickEl && (userRole === 'promo' || userRole === 'custom')) {
+  if (quickEl && (userRole === 'promo' || userRole === 'custom' || _hasPromoRestriction())) {
     quickEl.style.display = 'none';
     return;
   }
   // クイックプロモボタン（上位5件）
   const promoCounts = {};
-  bookingsData.forEach(d => { if (d.source) { promoCounts[d.source] = (promoCounts[d.source]||0) + 1; } });
+  getFilteredBookingsData().forEach(d => { if (d.source) { promoCounts[d.source] = (promoCounts[d.source]||0) + 1; } });
   const top5 = Object.entries(promoCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
   if (quickEl) {
     quickEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px">Quick:</span>' + top5.map(([name]) =>
@@ -4115,6 +4121,8 @@ function renderFacTab(facility) {
   document.getElementById('fac-title').textContent = facility;
 
   let data = bookingsData.filter(d => d.status !== '除外' && normFac(d.facility) === facility);
+  // 権限フィルタ
+  if (_hasPromoRestriction()) data = data.filter(d => _matchesAllowedPromo(d.source));
 
   // フィルター
   const facPeriod = document.getElementById('fac-period')?.value || '';
@@ -4585,6 +4593,8 @@ function renderBF(period) {
   const bkExtraBF = loadData('bk-extra', {});
   let data = bookingsData.filter(d => {
     if (d.status === '除外') return false;
+    // 権限フィルタ
+    if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
     if (normSvc(d.service) === 'BF') return true;
     // 成約施術がBFの人も含める
     const key = d.name + '|' + d.applyDate;
@@ -6522,10 +6532,11 @@ function renderAnalysis() {
     });
   }
 
-  // フィルター選択肢を更新
-  if (anFac) { const facs = [...new Set(bookingsData.map(d => sFac(d.facility)).filter(Boolean))].sort(); const cur = anFac.value; anFac.innerHTML = '<option value="">全て</option>'+facs.map(f=>`<option ${f===cur?'selected':''}>${f}</option>`).join(''); }
-  if (anSvc) { const svcs = [...new Set(bookingsData.map(d => sSvc(d.service)).filter(Boolean))].sort(); const cur = anSvc.value; anSvc.innerHTML = '<option value="">全て</option>'+svcs.map(s=>`<option ${s===cur?'selected':''}>${s}</option>`).join(''); }
-  if (anPromo) { const pc = {}; bookingsData.forEach(d => { if (d.source) pc[d.source]=(pc[d.source]||0)+1; }); const ps = Object.entries(pc).sort((a,b)=>b[1]-a[1]); const cur = anPromo.value; anPromo.innerHTML = '<option value="">全て</option>'+ps.map(([p,c])=>`<option value="${p}" ${p===cur?'selected':''}>${p} (${c})</option>`).join(''); }
+  // フィルター選択肢を更新 (権限フィルタ済データから生成)
+  const _forOpts = getFilteredBookingsData();
+  if (anFac) { const facs = [...new Set(_forOpts.map(d => sFac(d.facility)).filter(Boolean))].sort(); const cur = anFac.value; anFac.innerHTML = '<option value="">全て</option>'+facs.map(f=>`<option ${f===cur?'selected':''}>${f}</option>`).join(''); }
+  if (anSvc) { const svcs = [...new Set(_forOpts.map(d => sSvc(d.service)).filter(Boolean))].sort(); const cur = anSvc.value; anSvc.innerHTML = '<option value="">全て</option>'+svcs.map(s=>`<option ${s===cur?'selected':''}>${s}</option>`).join(''); }
+  if (anPromo) { const pc = {}; _forOpts.forEach(d => { if (d.source) pc[d.source]=(pc[d.source]||0)+1; }); const ps = Object.entries(pc).sort((a,b)=>b[1]-a[1]); const cur = anPromo.value; anPromo.innerHTML = '<option value="">全て</option>'+ps.map(([p,c])=>`<option value="${p}" ${p===cur?'selected':''}>${p} (${c})</option>`).join(''); }
 
   // 統計
   const total = data.length;
@@ -6819,6 +6830,11 @@ function _oldRenderPromoDash() {
 }
 
 function showPromoDetail(promoName) {
+  // 権限チェック: 許可されたプロモ以外はアクセス不可
+  if (_hasPromoRestriction() && promoName !== '(なし)' && !_matchesAllowedPromo(promoName)) {
+    try { alert('このプロモの閲覧権限がありません'); } catch(_){}
+    return;
+  }
   const data = bookingsData.filter(d => (d.source || '(なし)') === promoName);
   const bkExtra = loadData('bk-extra', {});
   // shortFac for promo detail
