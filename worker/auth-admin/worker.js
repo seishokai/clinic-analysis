@@ -62,7 +62,7 @@ export default {
 
       let body;
       try { body = await request.json(); } catch { return json({ ok: false, error: 'invalid json' }, 400); }
-      const { email, password, name, role, agency, allowed_promos } = body || {};
+      const { email, password, name, role, agency, allowed_promos, visible_tabs } = body || {};
       if (!email || !password || !name || !role) return json({ ok: false, error: 'required fields missing' }, 400);
       if (!['admin','staff_promo','agency'].includes(role)) return json({ ok: false, error: 'invalid role' }, 400);
 
@@ -100,6 +100,7 @@ export default {
           p_role: role,
           p_agency: agency || '',
           p_allowed_promos: allowed_promos || [],
+          p_visible_tabs: visible_tabs || null,
         }),
       });
       const linkJson = await linkRes.json();

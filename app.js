@@ -587,6 +587,9 @@ let promoFilter = ''; // プロモ別ログイン時のフィルター
 // currentRole は新しい権限判定専用。ログイン時に accounts.role から取得。
 let currentRole = null;
 let currentAllowedPromos = [];
+// Phase 8: タブ別閲覧権限 (admin は無視、それ以外は DB の visible_tabs に従う)
+let currentVisibleTabs = null;
+const DEFAULT_VISIBLE_TABS = { bookings: true, kaiin: false, tc: false, sales: false, adbudget: false, admin: false };
 const FACILITIES = ['全体','エスカ','アール','ウィズ','ルミナス','茶屋','アサノ','知立','小牧','八事','岩田','大森','京都','銀座','訪問'];
 
 // === State ===
@@ -682,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
     promoFilter = sessionStorage.getItem('promoFilter') || '';
     currentRole = sessionStorage.getItem('currentRole') || (userRole === 'admin' ? 'admin' : 'agency');
     try { currentAllowedPromos = JSON.parse(sessionStorage.getItem('currentAllowedPromos') || '[]'); } catch(_) { currentAllowedPromos = []; }
+    try { currentVisibleTabs = JSON.parse(sessionStorage.getItem('currentVisibleTabs') || 'null'); } catch(_) { currentVisibleTabs = null; }
     showApp();
   }
   setupEventListeners();
@@ -698,6 +702,7 @@ async function logout() {
   promoFilter = '';
   currentRole = null;
   currentAllowedPromos = [];
+  currentVisibleTabs = null;
   document.getElementById('app').hidden = true;
   document.getElementById('login-screen').hidden = false;
   document.getElementById('login-screen').style.display = '';
@@ -731,8 +736,10 @@ async function loadCurrentUserPermissions() {
     if (error || !data) return false;
     currentRole = data.role || data.account_type || 'agency';
     currentAllowedPromos = Array.isArray(data.allowed_promos) ? data.allowed_promos : [];
+    currentVisibleTabs = (data.visible_tabs && typeof data.visible_tabs === 'object') ? data.visible_tabs : null;
     sessionStorage.setItem('currentRole', currentRole);
     sessionStorage.setItem('currentAllowedPromos', JSON.stringify(currentAllowedPromos));
+    sessionStorage.setItem('currentVisibleTabs', JSON.stringify(currentVisibleTabs));
     return true;
   } catch (e) {
     console.warn('loadCurrentUserPermissions failed', e);
@@ -741,27 +748,34 @@ async function loadCurrentUserPermissions() {
 }
 
 // ロールに応じてナビゲーション/編集 UI を制御
+// Phase 8: admin 以外は DB の accounts.visible_tabs に従ってタブを表示/非表示
 function applyRoleUI() {
   const admin = isAdminRole();
-  const staff = isStaffPromoRole();
-  const agency = isAgencyRole();
   // 新 UI ガード: body に data 属性を付けて CSS 側で制御可能にする
   document.body.dataset.role = currentRole || '';
-  // すべてのナビを一度リセットしてから、ロール別に隠す
-  // (以前 hide されたままにならないよう必ず display='' を先に設定)
+  // すべてのナビを一度リセット (以前 hide されたままにならないよう必ず display='' を先に設定)
   document.querySelectorAll('.desktop-nav .nav-btn, .bottom-nav-btn').forEach(b => {
     b.style.display = '';
   });
-  // admin は全タブ見える → これで終了
+  // admin は visible_tabs を無視して全タブ表示 (絶対条件)
   if (admin) return;
-  // staff_promo / agency / その他: 一部タブを非表示
+
+  // visible_tabs が取れていない場合はロール既定にフォールバック (既存互換)
+  const vt = (currentVisibleTabs && typeof currentVisibleTabs === 'object')
+    ? currentVisibleTabs
+    : (isAgencyRole()
+        ? { bookings: true, kaiin: false, tc: false, sales: false, adbudget: false, admin: false }
+        : { bookings: true, kaiin: true,  tc: false, sales: false, adbudget: false, admin: false });
+
   document.querySelectorAll('.desktop-nav .nav-btn, .bottom-nav-btn').forEach(b => {
     const v = b.dataset.view;
     if (!v) return;
-    if (v === 'admin' || v === 'tc' || v === 'adbudget' || v === 'sales') {
+    // visible_tabs に明示的に false がある場合は確実に非表示
+    if (vt[v] === false) { b.style.display = 'none'; return; }
+    // true でも false でもないキー (未定義) は、危険タブを安全側で非表示
+    if (vt[v] !== true && ['tc','sales','adbudget','admin'].includes(v)) {
       b.style.display = 'none';
     }
-    if (agency && v === 'kaiin') b.style.display = 'none';
   });
 }
 // === Supabase Auth ログイン (Phase 6: 一本化済み) ===
@@ -771,8 +785,10 @@ function _applyAccountProfileToSession(profile) {
   // Phase 6: 新ロール (admin / staff_promo / agency)
   currentRole = profile.role || profile.account_type || 'agency';
   currentAllowedPromos = Array.isArray(profile.allowed_promos) ? profile.allowed_promos : [];
+  currentVisibleTabs = (profile.visible_tabs && typeof profile.visible_tabs === 'object') ? profile.visible_tabs : null;
   sessionStorage.setItem('currentRole', currentRole);
   sessionStorage.setItem('currentAllowedPromos', JSON.stringify(currentAllowedPromos));
+  sessionStorage.setItem('currentVisibleTabs', JSON.stringify(currentVisibleTabs));
   const type = profile.account_type || 'custom';
   sessionStorage.setItem('role', type);
   sessionStorage.setItem('authMode', 'supabase'); // 識別用 (旧ログインと区別)
@@ -8735,6 +8751,42 @@ async function _copyToClipboard(text) {
   } catch (_) { return false; }
 }
 
+// Phase 8: タブ定義
+const AUTH_TAB_DEFS = [
+  { key: 'bookings', label: '予約' },
+  { key: 'kaiin',    label: '来院' },
+  { key: 'tc',       label: 'TC' },
+  { key: 'sales',    label: '売上' },
+  { key: 'adbudget', label: '広告' },
+  { key: 'admin',    label: '管理' },
+];
+function _defaultTabsForRole(role) {
+  if (role === 'admin')       return { bookings:true, kaiin:true,  tc:true,  sales:true,  adbudget:true,  admin:true  };
+  if (role === 'staff_promo') return { bookings:true, kaiin:true,  tc:false, sales:false, adbudget:false, admin:false };
+  return                             { bookings:true, kaiin:false, tc:false, sales:false, adbudget:false, admin:false };
+}
+function _tabsToBadges(vt) {
+  if (!vt || typeof vt !== 'object') return '<span style="color:var(--text-muted);font-size:11px">-</span>';
+  return AUTH_TAB_DEFS
+    .filter(t => vt[t.key] === true)
+    .map(t => `<code style="background:#eef2ff;color:#3730a3;padding:1px 5px;border-radius:3px;font-size:10px;margin-right:3px">${t.label}</code>`)
+    .join('') || '<span style="color:var(--text-muted);font-size:11px">なし</span>';
+}
+function _readTabsFromCheckboxes(root, prefix) {
+  const result = {};
+  AUTH_TAB_DEFS.forEach(t => {
+    const el = root.querySelector(`.${prefix}[data-tab="${t.key}"]`);
+    result[t.key] = !!(el && el.checked);
+  });
+  return result;
+}
+function _setTabsOnCheckboxes(root, prefix, tabs) {
+  AUTH_TAB_DEFS.forEach(t => {
+    const el = root.querySelector(`.${prefix}[data-tab="${t.key}"]`);
+    if (el) el.checked = !!(tabs && tabs[t.key]);
+  });
+}
+
 async function renderAuthMigration() {
   const container = document.getElementById('auth-migration-container');
   if (!container) return;
@@ -8754,9 +8806,13 @@ async function renderAuthMigration() {
   // Worker 稼働確認 (非同期で並行チェック、初期表示後に反映)
   const workerAvailable = await isAuthAdminWorkerAvailable();
 
+  // 既存のプロモ source 一覧 (新規発行フォームで使用)
+  const allPromos = [...new Set((bookingsData || []).map(d => d && d.source).filter(Boolean))].sort();
+
   const tableRows = rows.map(a => {
     const promos = Array.isArray(a.allowed_promos) ? a.allowed_promos : [];
     const promoStr = promos.length ? promos.map(p => `<code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:10px;margin-right:3px">${escapeHtml(p)}</code>`).join('') : '<span style="color:var(--text-muted);font-size:11px">-</span>';
+    const tabsStr = (a.role === 'admin') ? '<span style="color:#059669;font-size:10px">全表示</span>' : _tabsToBadges(a.visible_tabs);
     const linked = a.supabase_user_id
       ? `<span style="color:#059669;font-size:11px">🔗 ${a.migrated_at ? new Date(a.migrated_at).toLocaleDateString() : '済'}</span>`
       : '<span style="color:#d97706;font-size:11px">未連携</span>';
@@ -8773,6 +8829,7 @@ async function renderAuthMigration() {
       <td>${escapeHtml(a.agency || '')}</td>
       <td style="font-size:11px">${escapeHtml(a.email || '-')}</td>
       <td>${promoStr}</td>
+      <td>${tabsStr}</td>
       <td>${linked}</td>
       <td style="white-space:nowrap">
         <button class="btn btn-outline btn-acct-edit" data-id="${a.id}"
@@ -8780,6 +8837,7 @@ async function renderAuthMigration() {
           data-role="${escapeHtml(a.role || '')}"
           data-agency="${escapeHtml(a.agency || '')}"
           data-promos="${escapeHtml(JSON.stringify(promos))}"
+          data-tabs="${escapeHtml(JSON.stringify(a.visible_tabs || _defaultTabsForRole(a.role)))}"
           style="padding:3px 8px;font-size:10px;margin-right:3px">✏ 編集</button>
         ${resetBtn}
         ${deleteBtn}
@@ -8817,8 +8875,21 @@ async function renderAuthMigration() {
           <input type="text" class="form-input" id="new-acct-agency" placeholder="例: ヒカル" style="font-size:13px;padding:6px 10px">
         </div>
         <div style="grid-column:1/-1">
-          <label class="form-label" style="font-size:11px">担当プロモ (カンマ区切り、LIKE 可 / % で全許可)</label>
-          <input type="text" class="form-input" id="new-acct-promos" placeholder="例: hikaru_%, liz_%" style="font-size:13px;padding:6px 10px">
+          <label class="form-label" style="font-size:11px">担当プロモ
+            <button type="button" id="new-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px;margin-left:8px">全選択</button>
+            <button type="button" id="new-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
+            <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
+            <span style="color:var(--text-muted);font-size:10px;margin-left:6px">※「全許可(%)」は現在・今後の全プロモを含む</span>
+          </label>
+          <div id="new-acct-promos-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px">
+            ${allPromos.length ? allPromos.map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap"><input type="checkbox" value="${escapeHtml(p)}" class="new-acct-promo-chk"> ${escapeHtml(p)}</label>`).join('') : '<span style="color:var(--text-muted);font-size:11px">プロモ候補がまだ読み込まれていません</span>'}
+          </div>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label" style="font-size:11px">閲覧可能タブ <span style="color:var(--text-muted);font-size:10px">※ ロール変更で自動プリセット (admin は全タブ強制表示)</span></label>
+          <div id="new-acct-tabs-list" style="display:flex;gap:12px;flex-wrap:wrap;padding:8px;border:1px solid var(--border);border-radius:4px;background:#fff">
+            ${AUTH_TAB_DEFS.map(t => `<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="new-acct-tab-chk" data-tab="${t.key}"> ${t.label}</label>`).join('')}
+          </div>
         </div>
       </div>
       <button class="btn btn-dark" id="new-acct-submit" style="padding:8px 20px;font-size:13px">発行する</button>
@@ -8864,9 +8935,21 @@ async function renderAuthMigration() {
           <label class="form-label" style="font-size:11px">代理店名 (任意)</label>
           <input type="text" class="form-input" id="new-acct-agency" placeholder="例: ヒカル" style="font-size:13px;padding:6px 10px">
         </div>
-        <div>
-          <label class="form-label" style="font-size:11px">担当プロモ (カンマ区切り、LIKE 可 / % で全許可)</label>
-          <input type="text" class="form-input" id="new-acct-promos" placeholder="例: hikaru_%, liz_%" style="font-size:13px;padding:6px 10px">
+        <div style="grid-column:1/-1">
+          <label class="form-label" style="font-size:11px">担当プロモ
+            <button type="button" id="new-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px;margin-left:8px">全選択</button>
+            <button type="button" id="new-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
+            <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
+          </label>
+          <div id="new-acct-promos-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px">
+            ${allPromos.length ? allPromos.map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap"><input type="checkbox" value="${escapeHtml(p)}" class="new-acct-promo-chk"> ${escapeHtml(p)}</label>`).join('') : '<span style="color:var(--text-muted);font-size:11px">プロモ候補なし</span>'}
+          </div>
+        </div>
+        <div style="grid-column:1/-1">
+          <label class="form-label" style="font-size:11px">閲覧可能タブ</label>
+          <div id="new-acct-tabs-list" style="display:flex;gap:12px;flex-wrap:wrap;padding:8px;border:1px solid var(--border);border-radius:4px;background:#fff">
+            ${AUTH_TAB_DEFS.map(t => `<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="new-acct-tab-chk" data-tab="${t.key}"> ${t.label}</label>`).join('')}
+          </div>
         </div>
       </div>
       <button class="btn btn-dark" id="new-acct-submit-legacy" style="padding:8px 20px;font-size:13px">発行する</button>
@@ -8889,7 +8972,7 @@ async function renderAuthMigration() {
       <div style="overflow-x:auto">
         <table class="data-table">
           <thead><tr>
-            <th>ID</th><th>名前</th><th>ロール</th><th>代理店</th><th>メール</th><th>担当プロモ</th><th>Auth</th><th>操作</th>
+            <th>ID</th><th>名前</th><th>ロール</th><th>代理店</th><th>メール</th><th>担当プロモ</th><th>閲覧タブ</th><th>Auth</th><th>操作</th>
           </tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
@@ -8904,46 +8987,56 @@ async function renderAuthMigration() {
 
   container.querySelector('#auth-mig-reload')?.addEventListener('click', () => renderAuthMigration());
 
-  // 編集ボタン
+  // 新規発行フォーム: プロモ全選択/全解除/全許可
+  const promosListEl = container.querySelector('#new-acct-promos-list');
+  container.querySelector('#new-acct-promos-all')?.addEventListener('click', () => {
+    promosListEl?.querySelectorAll('.new-acct-promo-chk').forEach(c => { c.checked = true; });
+  });
+  container.querySelector('#new-acct-promos-none')?.addEventListener('click', () => {
+    promosListEl?.querySelectorAll('.new-acct-promo-chk').forEach(c => { c.checked = false; });
+  });
+  container.querySelector('#new-acct-promos-wildcard')?.addEventListener('click', () => {
+    // 「%」を特別チェックボックスとして表現する代わりに、data 属性に立てる
+    if (!promosListEl) return;
+    const on = promosListEl.dataset.wildcard !== '1';
+    promosListEl.dataset.wildcard = on ? '1' : '0';
+    promosListEl.style.outline = on ? '2px solid #059669' : '';
+    const note = container.querySelector('#new-acct-promos-wild-note');
+    if (note) note.remove();
+    if (on) {
+      const n = document.createElement('div');
+      n.id = 'new-acct-promos-wild-note';
+      n.style.cssText = 'margin-top:4px;font-size:11px;color:#059669;font-weight:600';
+      n.textContent = '★ 全プロモ許可 (%) を送信します。個別チェックは無視されます。';
+      promosListEl.after(n);
+    }
+  });
+
+  // 新規発行フォーム: ロール変更で visible_tabs 既定値を自動プリセット
+  const roleSelect = container.querySelector('#new-acct-role');
+  const applyRolePreset = () => {
+    const r = roleSelect?.value || 'agency';
+    const def = _defaultTabsForRole(r);
+    _setTabsOnCheckboxes(container, 'new-acct-tab-chk', def);
+  };
+  if (roleSelect) {
+    roleSelect.addEventListener('change', applyRolePreset);
+    applyRolePreset(); // 初回
+  }
+
+  // 編集ボタン → モーダルで プロモ複数選択 + タブ別閲覧権限 を編集
   container.querySelectorAll('.btn-acct-edit').forEach(btn => {
     btn.addEventListener('click', () => {
       const id = Number(btn.dataset.id);
-      const name = btn.dataset.name;
+      const name = btn.dataset.name || '';
       const curRole = btn.dataset.role || 'agency';
       const curAgency = btn.dataset.agency || '';
       let curPromos = [];
       try { curPromos = JSON.parse(btn.dataset.promos || '[]'); } catch(_) {}
-      const newRole = prompt(
-        `${name} のロールを変更:\n\n` +
-        `  admin / staff_promo / agency  のいずれかを入力\n\n現在: ${curRole}`,
-        curRole
-      );
-      if (!newRole) return;
-      if (!['admin','staff_promo','agency'].includes(newRole)) {
-        alert('ロールは admin / staff_promo / agency のいずれかにしてください');
-        return;
-      }
-      const newPromosStr = prompt(
-        `${name} の担当プロモをカンマ区切りで入力\n(LIKE パターン可、% は全許可)\n\n現在: ${curPromos.join(', ') || '(なし)'}`,
-        curPromos.join(', ')
-      );
-      if (newPromosStr === null) return;
-      const newPromos = newPromosStr.split(',').map(s => s.trim()).filter(Boolean);
-      const newAgency = prompt(`${name} の代理店名:`, curAgency);
-      if (newAgency === null) return;
-      sb.rpc('admin_update_account', {
-        p_account_id: id,
-        p_role: newRole,
-        p_allowed_promos: newPromos,
-        p_agency: newAgency
-      }).then(({ data, error }) => {
-        if (error || !data?.ok) {
-          alert('エラー: ' + (error?.message || data?.error || '不明'));
-          return;
-        }
-        alert('✅ 更新しました');
-        renderAuthMigration();
-      });
+      let curTabs = null;
+      try { curTabs = JSON.parse(btn.dataset.tabs || 'null'); } catch(_) {}
+      if (!curTabs || typeof curTabs !== 'object') curTabs = _defaultTabsForRole(curRole);
+      _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTabs, allPromos });
     });
   });
 
@@ -9003,8 +9096,16 @@ async function renderAuthMigration() {
     let   email  = container.querySelector('#new-acct-email').value.trim();
     const role   = container.querySelector('#new-acct-role').value;
     const agency = container.querySelector('#new-acct-agency').value.trim();
-    const promosRaw = container.querySelector('#new-acct-promos').value;
-    const promos = promosRaw.split(',').map(s => s.trim()).filter(Boolean);
+    // プロモ: チェックボックス選択値 (「全許可」モード時は ['%'])
+    const promosListEl2 = container.querySelector('#new-acct-promos-list');
+    let promos;
+    if (promosListEl2 && promosListEl2.dataset.wildcard === '1') {
+      promos = ['%'];
+    } else {
+      promos = Array.from(container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk:checked')).map(c => c.value);
+    }
+    // 閲覧タブ
+    const visible_tabs = _readTabsFromCheckboxes(container, 'new-acct-tab-chk');
 
     msg.textContent = '';
     msg.style.color = '';
@@ -9028,6 +9129,7 @@ async function renderAuthMigration() {
       email, password, name, role,
       agency: agency || '',
       allowed_promos: promos,
+      visible_tabs,
     });
     btn.disabled = false;
     btn.textContent = origText;
@@ -9052,8 +9154,10 @@ async function renderAuthMigration() {
     alert(`✅ アカウント発行完了\n\n${info}\n\n(クリップボードにコピー済み。代理店に共有してください)`);
 
     // フォームクリア
-    ['new-acct-name','new-acct-email','new-acct-agency','new-acct-promos']
+    ['new-acct-name','new-acct-email','new-acct-agency']
       .forEach(idv => { const el = container.querySelector('#' + idv); if (el) el.value = ''; });
+    container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk').forEach(c => { c.checked = false; });
+    if (promosListEl2) { promosListEl2.dataset.wildcard = '0'; promosListEl2.style.outline = ''; }
     setTimeout(() => renderAuthMigration(), 600);
   });
 
@@ -9066,8 +9170,14 @@ async function renderAuthMigration() {
     const uuid   = container.querySelector('#new-acct-uuid').value.trim();
     const role   = container.querySelector('#new-acct-role').value;
     const agency = container.querySelector('#new-acct-agency').value.trim();
-    const promosRaw = container.querySelector('#new-acct-promos').value;
-    const promos = promosRaw.split(',').map(s => s.trim()).filter(Boolean);
+    const promosListElL = container.querySelector('#new-acct-promos-list');
+    let promos;
+    if (promosListElL && promosListElL.dataset.wildcard === '1') {
+      promos = ['%'];
+    } else {
+      promos = Array.from(container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk:checked')).map(c => c.value);
+    }
+    const visible_tabs = _readTabsFromCheckboxes(container, 'new-acct-tab-chk');
 
     msg.textContent = '';
     msg.style.color = '';
@@ -9090,7 +9200,8 @@ async function renderAuthMigration() {
       p_name: name,
       p_role: role,
       p_agency: agency,
-      p_allowed_promos: promos
+      p_allowed_promos: promos,
+      p_visible_tabs: visible_tabs
     });
     btn.disabled = false;
     btn.textContent = origText;
@@ -9101,9 +9212,150 @@ async function renderAuthMigration() {
     }
     msg.textContent = '✅ 発行しました';
     msg.style.color = '#059669';
-    ['new-acct-name','new-acct-email','new-acct-uuid','new-acct-agency','new-acct-promos']
+    ['new-acct-name','new-acct-email','new-acct-uuid','new-acct-agency']
       .forEach(idv => { const el = container.querySelector('#' + idv); if (el) el.value = ''; });
+    container.querySelectorAll('#new-acct-promos-list .new-acct-promo-chk').forEach(c => { c.checked = false; });
+    if (promosListElL) { promosListElL.dataset.wildcard = '0'; promosListElL.style.outline = ''; }
     setTimeout(() => renderAuthMigration(), 600);
+  });
+}
+
+// Phase 8: アカウント編集モーダル (ロール / 代理店 / プロモ複数選択 / 閲覧タブ)
+function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTabs, allPromos }) {
+  // 既存モーダル削除
+  const old = document.getElementById('edit-acct-modal');
+  if (old) old.remove();
+
+  const wrap = document.createElement('div');
+  wrap.id = 'edit-acct-modal';
+  wrap.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  const promosSet = new Set((curPromos || []).map(String));
+  const wildcard = promosSet.has('%');
+  const promoChks = (allPromos || []).map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap"><input type="checkbox" value="${escapeHtml(p)}" class="edit-acct-promo-chk"${promosSet.has(p) ? ' checked' : ''}> ${escapeHtml(p)}</label>`).join('');
+  // allPromos に含まれないがユーザが持っているエントリ (LIKE パターンなど) も表示
+  const extraPromos = (curPromos || []).filter(p => p !== '%' && !(allPromos || []).includes(p));
+  const extraChks = extraPromos.map(p => `<label style="display:flex;align-items:center;gap:4px;font-size:12px;white-space:nowrap;background:#fef3c7;padding:2px 6px;border-radius:3px"><input type="checkbox" value="${escapeHtml(p)}" class="edit-acct-promo-chk" checked> ${escapeHtml(p)} <span style="color:#92400e;font-size:10px">(カスタム)</span></label>`).join('');
+
+  wrap.innerHTML = `
+    <div style="background:#fff;border-radius:8px;padding:20px;max-width:720px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 10px 40px rgba(0,0,0,0.25)">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <h3 style="margin:0;font-size:16px">✏ アカウント編集: ${escapeHtml(name)}</h3>
+        <button type="button" id="edit-acct-close" class="btn btn-outline" style="padding:4px 10px;font-size:12px">✕ 閉じる</button>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;margin-bottom:14px">
+        <div>
+          <label class="form-label" style="font-size:11px">ロール</label>
+          <select id="edit-acct-role" class="form-select" style="font-size:13px;padding:6px 10px">
+            <option value="agency"${curRole==='agency'?' selected':''}>agency (代理店)</option>
+            <option value="staff_promo"${curRole==='staff_promo'?' selected':''}>staff_promo (社員プロモ)</option>
+            <option value="admin"${curRole==='admin'?' selected':''}>admin (全権)</option>
+          </select>
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px">代理店名</label>
+          <input type="text" id="edit-acct-agency" class="form-input" value="${escapeHtml(curAgency || '')}" style="font-size:13px;padding:6px 10px">
+        </div>
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="form-label" style="font-size:11px">担当プロモ
+          <button type="button" id="edit-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px;margin-left:8px">全選択</button>
+          <button type="button" id="edit-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
+          <button type="button" id="edit-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
+        </label>
+        <div id="edit-acct-promos-list" data-wildcard="${wildcard ? '1' : '0'}" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;${wildcard ? 'outline:2px solid #059669' : ''}">
+          ${promoChks || '<span style="color:var(--text-muted);font-size:11px">プロモ候補なし</span>'}
+          ${extraChks}
+        </div>
+        ${wildcard ? '<div id="edit-acct-promos-wild-note" style="margin-top:4px;font-size:11px;color:#059669;font-weight:600">★ 全プロモ許可 (%) を送信します。個別チェックは無視されます。</div>' : ''}
+      </div>
+      <div style="margin-bottom:14px">
+        <label class="form-label" style="font-size:11px">閲覧可能タブ <span style="color:var(--text-muted);font-size:10px">※ admin は全タブ強制表示 (この設定は無視)</span></label>
+        <div id="edit-acct-tabs-list" style="display:flex;gap:12px;flex-wrap:wrap;padding:8px;border:1px solid var(--border);border-radius:4px;background:#fff">
+          ${AUTH_TAB_DEFS.map(t => `<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="edit-acct-tab-chk" data-tab="${t.key}"${curTabs && curTabs[t.key] ? ' checked' : ''}> ${t.label}</label>`).join('')}
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+        <button type="button" id="edit-acct-cancel" class="btn btn-outline" style="padding:6px 16px;font-size:13px">キャンセル</button>
+        <button type="button" id="edit-acct-save" class="btn btn-dark" style="padding:6px 16px;font-size:13px">保存</button>
+      </div>
+      <div id="edit-acct-msg" style="margin-top:10px;font-size:12px"></div>
+    </div>
+  `;
+  document.body.appendChild(wrap);
+
+  const close = () => { wrap.remove(); };
+  wrap.querySelector('#edit-acct-close').addEventListener('click', close);
+  wrap.querySelector('#edit-acct-cancel').addEventListener('click', close);
+  wrap.addEventListener('click', (e) => { if (e.target === wrap) close(); });
+
+  const listEl = wrap.querySelector('#edit-acct-promos-list');
+  wrap.querySelector('#edit-acct-promos-all').addEventListener('click', () => {
+    listEl.querySelectorAll('.edit-acct-promo-chk').forEach(c => { c.checked = true; });
+  });
+  wrap.querySelector('#edit-acct-promos-none').addEventListener('click', () => {
+    listEl.querySelectorAll('.edit-acct-promo-chk').forEach(c => { c.checked = false; });
+  });
+  wrap.querySelector('#edit-acct-promos-wildcard').addEventListener('click', () => {
+    const on = listEl.dataset.wildcard !== '1';
+    listEl.dataset.wildcard = on ? '1' : '0';
+    listEl.style.outline = on ? '2px solid #059669' : '';
+    const existing = wrap.querySelector('#edit-acct-promos-wild-note');
+    if (existing) existing.remove();
+    if (on) {
+      const n = document.createElement('div');
+      n.id = 'edit-acct-promos-wild-note';
+      n.style.cssText = 'margin-top:4px;font-size:11px;color:#059669;font-weight:600';
+      n.textContent = '★ 全プロモ許可 (%) を送信します。個別チェックは無視されます。';
+      listEl.after(n);
+    }
+  });
+
+  // ロール変更 → タブ既定値プリセット (確認ダイアログ)
+  wrap.querySelector('#edit-acct-role').addEventListener('change', (e) => {
+    const newR = e.target.value;
+    if (!confirm('ロールを「' + newR + '」に変更します。閲覧タブの既定値も適用しますか?\n(OK = 既定値にリセット / キャンセル = 現状維持)')) return;
+    _setTabsOnCheckboxes(wrap, 'edit-acct-tab-chk', _defaultTabsForRole(newR));
+  });
+
+  wrap.querySelector('#edit-acct-save').addEventListener('click', async () => {
+    const saveBtn = wrap.querySelector('#edit-acct-save');
+    const msg = wrap.querySelector('#edit-acct-msg');
+    const newRole = wrap.querySelector('#edit-acct-role').value;
+    const newAgency = wrap.querySelector('#edit-acct-agency').value.trim();
+    let newPromos;
+    if (listEl.dataset.wildcard === '1') {
+      newPromos = ['%'];
+    } else {
+      newPromos = Array.from(wrap.querySelectorAll('.edit-acct-promo-chk:checked')).map(c => c.value);
+    }
+    const newTabs = _readTabsFromCheckboxes(wrap, 'edit-acct-tab-chk');
+
+    saveBtn.disabled = true;
+    const orig = saveBtn.textContent;
+    saveBtn.textContent = '保存中...';
+    try {
+      const { data, error } = await sb.rpc('admin_update_account', {
+        p_account_id: id,
+        p_role: newRole,
+        p_allowed_promos: newPromos,
+        p_agency: newAgency,
+        p_visible_tabs: newTabs
+      });
+      if (error || !data?.ok) {
+        msg.textContent = 'エラー: ' + (error?.message || data?.error || '不明');
+        msg.style.color = '#c00';
+        saveBtn.disabled = false;
+        saveBtn.textContent = orig;
+        return;
+      }
+      close();
+      renderAuthMigration();
+    } catch (e) {
+      msg.textContent = 'エラー: ' + (e?.message || String(e));
+      msg.style.color = '#c00';
+      saveBtn.disabled = false;
+      saveBtn.textContent = orig;
+    }
   });
 }
 

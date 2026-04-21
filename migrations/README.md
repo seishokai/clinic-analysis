@@ -22,6 +22,7 @@
 |   4   | `auth_phase4.sql`   | 代理店 Auth 一括移行ツール用 RPC                     | app v228 と同時           |
 |   5   | `auth_phase5_finalize.sql` | 旧 password 列削除 + anon 経路完全閉鎖        | **全員移行後**にユーザ手動実行 |
 |   6   | `auth_phase6_roles.sql` | 10名規模のロールシステム (admin/staff_promo/agency) | **SQLを先に実行** → app v230 |
+|   8   | `auth_phase8_tabs.sql` | タブ別閲覧権限 (visible_tabs JSONB)                  | **SQLを先に実行** → Worker再デプロイ → app v239 |
 
 ---
 
@@ -233,6 +234,51 @@ Phase 6 までで UUID リンク型の発行 UI ができたが、admin は
 - `POST /auth-admin/create`
 - `POST /auth-admin/reset-password`
 - `POST /auth-admin/delete`
+
+---
+
+## Phase 8: タブ別閲覧権限 (`auth_phase8_tabs.sql`) — v239
+
+### 背景
+admin / staff_promo / agency の 3ロールだけでは粒度が荒く、
+同じ agency でも「予約は見せるが売上は見せない」「広告タブだけ許可」
+といった個別運用ができなかった。
+
+### 実行内容
+1. `accounts` に `visible_tabs JSONB` カラムを追加
+   - キー: `bookings` / `kaiin` / `tc` / `sales` / `adbudget` / `admin`
+   - 値: `true` / `false`
+2. 既存レコードのデフォルト値をロールに応じて投入 (admin=全ON / staff_promo=予約+来院 / agency=予約のみ)
+3. `admin_create_account_with_role` に `p_visible_tabs JSONB DEFAULT NULL` 引数を追加
+4. `admin_update_account` に `p_visible_tabs JSONB DEFAULT NULL` 引数を追加
+5. `admin_list_accounts_for_migration` 戻り値に `visible_tabs` 列を追加
+6. `get_my_account()` は `RETURNS accounts` なので ALTER TABLE だけで自動対応
+
+### アプリ側の動作 (v239)
+- `管理 → 権限管理` 画面:
+  - 新規発行フォームの「担当プロモ」をテキスト入力 → **チェックボックス複数選択** に変更
+    - 「全選択」「全解除」「全許可(%)」ボタン付き
+  - 「閲覧可能タブ」チェックボックス群を追加
+  - ロール変更時に既定タブを自動プリセット (確認ダイアログ経由)
+  - 編集は prompt() → **モーダル UI** に刷新
+  - 一覧に「閲覧タブ」列を追加しバッジで可視化
+- `applyRoleUI()`:
+  - admin は `visible_tabs` を **無視して全タブ強制表示** (絶対条件)
+  - admin 以外は `accounts.visible_tabs` に基づいて個別にタブを表示/非表示
+  - `visible_tabs` が未取得の場合はロール既定値 (既存互換) にフォールバック
+
+### 実行順序 (重要)
+1. **SQL を先に実行** (Supabase Dashboard → SQL Editor で `auth_phase8_tabs.sql`)
+2. `worker/auth-admin/worker.js` を Cloudflare Worker に再デプロイ
+   (新パラメータ `visible_tabs` を受け取り、Supabase RPC に渡すため)
+3. app.js v239 をデプロイ
+4. ブラウザで `管理 → 権限管理` を開き、一覧に「閲覧タブ」列が出ることを確認
+
+### 既存データ保護
+- `visible_tabs` は **追加カラムのみ**。既存列は無変更。
+- RPC 置換は旧シグネチャを `DROP FUNCTION IF EXISTS` で消してから新規作成。
+  既存データは一切削除・変更しない。
+- admin アカウントは SQL 実行時に `visible_tabs` が NULL なら全 true で埋める。
 
 ---
 
