@@ -729,6 +729,42 @@ function canEditContent()    { return currentRole === 'admin' || currentRole ===
 function canEditAmount()     { return currentRole === 'admin'; }
 function canDeleteRecord()   { return currentRole === 'admin'; }
 
+// 権限フィルタ: プロモ source が現在のユーザーに見えるか判定
+// admin: 全部OK / staff_promo & agency: allowed_promos 配列とマッチ
+// 旧 promo (account_type='promo') は promoFilter を単体比較
+function _matchesAllowedPromo(source) {
+  if (!source) return true; // source未設定は常に表示 (既存挙動維持)
+  if (currentRole === 'admin') return true;
+  // 新方式: currentAllowedPromos 配列
+  if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
+    // ワイルドカード '%' = 全許可
+    if (currentAllowedPromos.includes('%')) return true;
+    // prefix_% パターン (例: hikaru_%) と完全一致を両対応
+    const s = String(source).trim().toLowerCase();
+    return currentAllowedPromos.some(p => {
+      if (!p) return false;
+      const pat = String(p).trim().toLowerCase();
+      if (pat === '%' ) return true;
+      if (pat.endsWith('_%')) {
+        return s.startsWith(pat.slice(0, -1)); // "hikaru_" で始まるか
+      }
+      return s === pat;
+    });
+  }
+  // 旧方式フォールバック
+  if (userRole === 'promo' && promoFilter) {
+    return String(source).trim() === String(promoFilter).trim();
+  }
+  return true;
+}
+function _hasPromoRestriction() {
+  if (currentRole === 'admin') return false;
+  if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
+    return !currentAllowedPromos.includes('%');
+  }
+  return userRole === 'promo' && !!promoFilter;
+}
+
 // ログイン時/セッション復元時にサーバから最新権限を取得
 async function loadCurrentUserPermissions() {
   try {
@@ -3126,8 +3162,8 @@ function populateBookingFilters() {
     if (cPromos.length) filteredForOptions = filteredForOptions.filter(d => d.source && cPromos.includes(d.source));
     if (cServices.length) filteredForOptions = filteredForOptions.filter(d => d.service && cServices.includes(d.service));
     if (cFacilities.length) filteredForOptions = filteredForOptions.filter(d => d.facility && cFacilities.includes(d.facility));
-  } else if (userRole === 'promo' && promoFilter) {
-    filteredForOptions = filteredForOptions.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
+  } else if (_hasPromoRestriction()) {
+    filteredForOptions = filteredForOptions.filter(d => _matchesAllowedPromo(d.source));
   }
   const facilities = [...new Set(filteredForOptions.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
   const promos = [...new Set(filteredForOptions.map(d => d.source).filter(Boolean))].sort();
@@ -3225,9 +3261,9 @@ function renderBookings() {
   let filtered = bookingsData;
   if (searchVal) filtered = filtered.filter(d => d.name && d.name.toLowerCase().includes(searchVal));
   if (toolSet.size) filtered = filtered.filter(d => toolSet.has(d.tool));
-  // プロモユーザーの場合、自分のプロモのみ表示
-  if (userRole === 'promo' && promoFilter) {
-    filtered = filtered.filter(d => d.source && d.source.trim() === promoFilter.trim());
+  // プロモユーザーの場合、許可されたプロモのみ表示
+  if (_hasPromoRestriction()) {
+    filtered = filtered.filter(d => _matchesAllowedPromo(d.source));
     const pbtn = window._bkDD?.promo?.buttonElement;
     if (pbtn) pbtn.style.display = 'none';
   }
@@ -5325,6 +5361,8 @@ async function renderKaiinTab(treatment, containerId) {
     if (d.status === '除外') return false;
     const bd = parseDate(d.bookDate);
     if (bd && bd > todayEnd) return false;
+    // staff_promo / agency の権限フィルタ
+    if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
     return true;
   });
   if (treatment === 'BF') rows = dedupBFRows(rows);
@@ -6458,7 +6496,7 @@ function renderAnalysis() {
 
   let data = bookingsData.filter(d => d.status !== '除外');
   // 権限制限
-  if (userRole === 'promo' && promoFilter) data = data.filter(d => d.source && d.source === promoFilter);
+  if (_hasPromoRestriction()) data = data.filter(d => _matchesAllowedPromo(d.source));
   if (userRole === 'custom') {
     const cp = JSON.parse(sessionStorage.getItem('customPromos')||'[]');
     if (cp.length) data = data.filter(d => d.source && cp.includes(d.source));
@@ -6621,8 +6659,8 @@ function _oldRenderPromoDash() {
   const bkExtra = loadData('bk-extra', {});
   let dashData = bookingsData;
   // プロモ・カスタムユーザーの制限
-  if (userRole === 'promo' && promoFilter) {
-    dashData = dashData.filter(d => d.source && d.source.toLowerCase() === promoFilter.toLowerCase());
+  if (_hasPromoRestriction()) {
+    dashData = dashData.filter(d => _matchesAllowedPromo(d.source));
   }
   if (userRole === 'custom') {
     const cPromos = JSON.parse(sessionStorage.getItem('customPromos') || '[]');
