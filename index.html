@@ -245,6 +245,23 @@
       </div>
       <!-- ポータルメニュー -->
       <div id="portal-menu" class="portal-cols" style="margin-bottom:20px">
+        <script>
+          // ?login / ?staff / ?agency / ?view=login → ポータルスキップ (プロモ・代理店用直リン)
+          (function(){
+            try {
+              var p = new URLSearchParams(location.search);
+              if (p.has('login') || p.has('staff') || p.has('agency') || p.get('view')==='login') {
+                document.addEventListener('DOMContentLoaded', function(){
+                  var salesCol = document.querySelector('#portal-menu .portal-col:first-child');
+                  var ls = document.getElementById('login-section');
+                  if (salesCol) salesCol.style.display='none';
+                  if (ls) ls.style.display='block';
+                  setTimeout(function(){ var e=document.getElementById('login-email'); if(e) e.focus(); }, 80);
+                });
+              }
+            } catch(_){}
+          })();
+        </script>
         <!-- 営業系: 1ボタンで展開 -->
         <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
           <button id="portal-sales-btn" onclick="var s=document.getElementById('sales-panel');var m=document.getElementById('login-section');s.style.display=(s.style.display==='flex'?'none':'flex');if(m)m.style.display='none'" style="width:100%;padding:18px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">営業</button>
@@ -1078,7 +1095,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=242"></script>
+  <script src="app.js?v=243"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
