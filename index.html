@@ -252,10 +252,14 @@
               var p = new URLSearchParams(location.search);
               if (p.has('login') || p.has('staff') || p.has('agency') || p.get('view')==='login') {
                 document.addEventListener('DOMContentLoaded', function(){
-                  var salesCol = document.querySelector('#portal-menu .portal-col:first-child');
+                  var cols = document.querySelectorAll('#portal-menu .portal-col');
+                  if (cols && cols[0]) cols[0].style.display='none';
+                  var mgr = document.querySelector('#portal-menu .portal-col:nth-of-type(2)') || cols[1];
+                  if (mgr) mgr.style.gridColumn = '1 / -1'; // 管理列を全幅化
                   var ls = document.getElementById('login-section');
-                  if (salesCol) salesCol.style.display='none';
                   if (ls) ls.style.display='block';
+                  var pm = document.getElementById('portal-menu');
+                  if (pm) pm.style.gridTemplateColumns = '1fr';
                   setTimeout(function(){ var e=document.getElementById('login-email'); if(e) e.focus(); }, 80);
                 });
               }
