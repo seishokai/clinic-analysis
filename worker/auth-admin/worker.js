@@ -35,46 +35,54 @@ export default {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
-    // admin JWT 検証ヘルパー
+    // admin JWT 検証ヘルパー (service_role経由で堅牢に判定)
+    // 新Supabase の publishable key 形式で JWT ベース RPC が動かないケースに対応
     const verifyAdmin = async () => {
       const h = request.headers.get('Authorization');
       if (!h?.startsWith('Bearer ')) return { ok: false, error: 'auth header missing' };
       const jwt = h.slice(7);
-      let rBody = null;
-      const r = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/is_auth_admin`, {
-        method: 'POST',
+
+      // 1. JWT を Supabase Auth API で検証 + user 情報取得
+      const userRes = await fetch(`${env.SUPABASE_URL}/auth/v1/user`, {
+        method: 'GET',
         headers: {
           'apikey': env.SUPABASE_ANON_KEY,
           'Authorization': `Bearer ${jwt}`,
-          'Content-Type': 'application/json',
         },
-        body: '{}',
       });
-      if (!r.ok) {
-        try { rBody = await r.text(); } catch (_) {}
-        return { ok: false, error: 'jwt verify failed: ' + r.status, detail: rBody };
+      if (!userRes.ok) {
+        let body = null;
+        try { body = await userRes.text(); } catch(_){}
+        return { ok: false, error: 'JWT invalid: ' + userRes.status, detail: body };
       }
-      const isAdmin = await r.json();
-      if (isAdmin !== true) {
-        // デバッグ: debug_auth_state を呼んで原因を返す (Phase 9 hotfix)
-        let dbg = null;
-        try {
-          const dbgRes = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/debug_auth_state`, {
-            method: 'POST',
-            headers: {
-              'apikey': env.SUPABASE_ANON_KEY,
-              'Authorization': `Bearer ${jwt}`,
-              'Content-Type': 'application/json',
-            },
-            body: '{}',
-          });
-          dbg = dbgRes.ok ? await dbgRes.json() : { _status: dbgRes.status, _note: 'debug_auth_state RPC 未デプロイの可能性あり (migrations/auth_phase9_hotfix.sql を実行してください)' };
-        } catch (e) {
-          dbg = { _error: String(e && e.message || e) };
+      const user = await userRes.json();
+      if (!user?.id) return { ok: false, error: 'no user id in JWT' };
+
+      // 2. service_role で accounts を直接SELECTして admin 判定 (RLS 無視)
+      const accRes = await fetch(
+        `${env.SUPABASE_URL}/rest/v1/accounts?supabase_user_id=eq.${encodeURIComponent(user.id)}&select=id,name,account_type,role`,
+        {
+          method: 'GET',
+          headers: {
+            'apikey': env.SUPABASE_SERVICE_ROLE_KEY,
+            'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
+          },
         }
-        return { ok: false, error: 'admin only', debug: dbg, is_admin_raw: isAdmin };
+      );
+      if (!accRes.ok) {
+        let body = null;
+        try { body = await accRes.text(); } catch(_){}
+        return { ok: false, error: 'accounts query failed: ' + accRes.status, detail: body };
       }
-      return { ok: true, jwt };
+      const rows = await accRes.json();
+      if (!Array.isArray(rows) || rows.length === 0) {
+        return { ok: false, error: 'account not linked', user_id: user.id };
+      }
+      const acc = rows[0];
+      if (acc.account_type !== 'admin' && acc.role !== 'admin') {
+        return { ok: false, error: 'admin only', debug: { user_id: user.id, account: acc } };
+      }
+      return { ok: true, jwt, user, account: acc };
     };
 
     // POST /auth-admin/create
