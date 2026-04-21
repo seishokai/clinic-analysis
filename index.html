@@ -258,6 +258,21 @@
                   if (mgr) mgr.style.gridColumn = '1 / -1'; // 管理列を全幅化
                   var ls = document.getElementById('login-section');
                   if (ls) ls.style.display='block';
+                  // 「管理」見出しボタンも非表示(プロモ用は直接ログインのみ)
+                  var mb = document.getElementById('portal-manage-btn');
+                  if (mb) mb.style.display='none';
+                  // 労務管理・パラ管理リンクを隠す (プロモ・代理店には不要)
+                  if (ls) {
+                    ls.querySelectorAll('a').forEach(function(a){
+                      var h = a.getAttribute('href') || '';
+                      if (h.indexOf('pinocchio-navi') >= 0 || h.indexOf('view=para') >= 0) {
+                        a.style.display = 'none';
+                      }
+                    });
+                    // もし全リンクが隠れたら親のdividerも非表示
+                    var divider = ls.querySelector('div[style*="border-top"]');
+                    if (divider) divider.style.display = 'none';
+                  }
                   var pm = document.getElementById('portal-menu');
                   if (pm) pm.style.gridTemplateColumns = '1fr';
                   setTimeout(function(){ var e=document.getElementById('login-email'); if(e) e.focus(); }, 80);
