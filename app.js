@@ -2590,6 +2590,11 @@ function openClinicDetail(c) {
 // === Migrate localStorage to Supabase (one-time) ===
 async function migrateToSupabase() {
   if (localStorage.getItem('migrated-to-supabase')) return;
+  // Supabase Auth移行後はレガシーmigrationは不要。自動的に完了扱いに。
+  if (window.currentSupabaseUserId || window.currentRole) {
+    localStorage.setItem('migrated-to-supabase', 'true');
+    return;
+  }
   try {
     // Accounts
     const accounts = JSON.parse(localStorage.getItem('admin-accounts') || '[]');
@@ -2598,11 +2603,13 @@ async function migrateToSupabase() {
         // Check if already exists
         const { data: existing } = await sb.from('accounts').select('id').eq('password', a.password);
         if (!existing || !existing.length) {
-          await sb.from('accounts').insert({
-            name: a.name, password: a.password, role: a.role || 'view',
-            permissions: a.permissions || [], promos: a.promos || [],
-            services: a.services || [], facilities: a.facilities || []
-          }).catch(() => {});
+          try {
+            await sb.from('accounts').insert({
+              name: a.name, password: a.password, role: a.role || 'view',
+              permissions: a.permissions || [], promos: a.promos || [],
+              services: a.services || [], facilities: a.facilities || []
+            });
+          } catch(_){}
         }
       }
     }
@@ -2610,9 +2617,11 @@ async function migrateToSupabase() {
     const docs = JSON.parse(localStorage.getItem('documents-data') || '[]');
     if (docs.length) {
       for (const d of docs) {
-        await sb.from('documents').insert({
-          name: d.name, type: d.type, clinic: d.clinic || '', url: d.url
-        }).catch(() => {});
+        try {
+          await sb.from('documents').insert({
+            name: d.name, type: d.type, clinic: d.clinic || '', url: d.url
+          });
+        } catch(_){}
       }
     }
     // Booking extra (status, contract info)
@@ -2620,32 +2629,38 @@ async function migrateToSupabase() {
     for (const [key, val] of Object.entries(bkExtra)) {
       const [name, apply] = key.split('|');
       if (name && apply) {
-        await sb.from('booking_status').upsert({
-          name, apply_date: apply,
-          status: val.status || '',
-          contract_service: val.contractService || '',
-          contract_amount: Number(val.contractAmount) || 0,
-          payment_month: val.paymentMonth || '',
-          incentive_month: val.incentiveMonth || ''
-        }, { onConflict: 'name,apply_date' }).catch(() => {});
+        try {
+          await sb.from('booking_status').upsert({
+            name, apply_date: apply,
+            status: val.status || '',
+            contract_service: val.contractService || '',
+            contract_amount: Number(val.contractAmount) || 0,
+            payment_month: val.paymentMonth || '',
+            incentive_month: val.incentiveMonth || ''
+          }, { onConflict: 'name,apply_date' });
+        } catch(_){}
       }
     }
     // Reviews
     const reviews = JSON.parse(localStorage.getItem('reviews-data') || '[]');
     if (reviews.length) {
       for (const r of reviews) {
-        await sb.from('reviews').insert({
-          facility: r.facility, month: r.month, count: r.count, rating: r.rating
-        }).catch(() => {});
+        try {
+          await sb.from('reviews').insert({
+            facility: r.facility, month: r.month, count: r.count, rating: r.rating
+          });
+        } catch(_){}
       }
     }
     // Review comments
     const comments = JSON.parse(localStorage.getItem('reviews-comments') || '[]');
     if (comments.length) {
       for (const c of comments) {
-        await sb.from('review_comments').insert({
-          facility: c.facility, rating: c.rating, text: c.text, date: c.date || ''
-        }).catch(() => {});
+        try {
+          await sb.from('review_comments').insert({
+            facility: c.facility, rating: c.rating, text: c.text, date: c.date || ''
+          });
+        } catch(_){}
       }
     }
     localStorage.setItem('migrated-to-supabase', 'true');
