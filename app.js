@@ -4163,7 +4163,7 @@ function exportCSV() {
     ];
   });
   const bom = '\uFEFF';
-  const csv = bom + [headers.join(','), ...rows.map(r => r.map(c => '"'+(c||'').replace(/"/g,'""')+'"').join(','))].join('\n');
+  const csv = bom + [headers.join(','), ...rows.map(r => r.map(c => '"'+String(c==null?'':c).replace(/"/g,'""')+'"').join(','))].join('\n');
   const blob = new Blob([csv], {type:'text/csv;charset=utf-8'});
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
