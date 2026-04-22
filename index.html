@@ -615,7 +615,7 @@
         <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center">
           <select class="form-select" id="fac-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option><option value="fiscal">今期(7月〜)</option></select>
           <input type="month" class="form-input" id="fac-month" style="width:auto;padding:6px 8px;font-size:11px">
-          <select class="form-select" id="fac-status-filter" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="未対応">未対応</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select>
+          <select class="form-select" id="fac-status-filter" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="未対応">未対応</option><option value="予約連絡待ち">予約連絡待ち</option><option value="後追いLINE済み">後追いLINE済み</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select>
           <input type="text" class="form-input" id="fac-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px">
           <button class="btn btn-outline" id="fac-filter-reset" style="min-height:30px;padding:6px 10px;font-size:11px;border-radius:20px">全表示</button>
           <button class="btn btn-dark" id="fac-bulk-btn" style="min-height:30px;padding:6px 12px;font-size:11px;border-radius:20px;margin-left:auto">📋 一括貼付け</button>
@@ -1114,7 +1114,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=249"></script>
+  <script src="app.js?v=250"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

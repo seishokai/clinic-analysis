@@ -3281,7 +3281,7 @@ function populateBookingFilters() {
 function ensureBkMultiSelects() {
   if (window._bkDD) return;
   const triggerRedraw = () => { if (typeof renderBookings === 'function') renderBookings(); };
-  const statusList = ['要対応','未対応','予約連絡待ち','確認済','来院済','成約','キャンセル','除外'];
+  const statusList = ['要対応','未対応','予約連絡待ち','後追いLINE済み','確認済','来院済','成約','キャンセル','除外'];
   const dd = {
     tool: createMultiSelectDropdown({ label:'ツール', options:[], selected:new Set(), onChange:triggerRedraw }),
     facility: createMultiSelectDropdown({ label:'医院', options:[], selected:new Set(), onChange:triggerRedraw }),
@@ -3485,6 +3485,7 @@ function renderBookings() {
     if (s === '成約') return '<span class="badge badge-success">成約</span>';
     if (s === '確認済') return '<span class="badge badge-default" style="border-color:#6366f1;color:#6366f1">確認済</span>';
     if (s === '予約連絡待ち') return '<span class="badge badge-default" style="border-color:#a855f7;color:#7c3aed;background:#f5f3ff">予約連絡待ち</span>';
+    if (s === '後追いLINE済み') return '<span class="badge badge-default" style="border-color:#06b6d4;color:#0891b2;background:#ecfeff">後追いLINE済み</span>';
     return `<span class="badge badge-default">${esc(s)}</span>`;
   };
 
@@ -3567,9 +3568,10 @@ function renderBookings() {
         <option value="">${d.status==='未対応'?'未対応':(d.status==='確認済'?'確認済':(d.status==='キャンセル'?'キャンセル':'未設定'))}</option>
         ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${esc(s.value)}</option>`).join('')}
       </select>`;
-    })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
+    })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='後追いLINE済み'?'background:#ecfeff;color:#0891b2;border-color:#06b6d4':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
       <option ${d.status==='予約連絡待ち'?'selected':''}>予約連絡待ち</option>
+      <option ${d.status==='後追いLINE済み'?'selected':''}>後追いLINE済み</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
       <option ${d.status==='成約'?'selected':''}>成約</option>
@@ -4746,6 +4748,8 @@ function renderBF(period) {
 
 // === BF セット進捗 (lifecycle) ===
 const BF_STATUSES = [
+  { value: '予約連絡待ち', color: '#a855f7' },
+  { value: '後追いLINE済み', color: '#06b6d4' },
   { value: '離脱', color: '#9ca3af' },
   { value: '検討中', color: '#f59e0b' },
   { value: '成約', color: '#10b981' },
@@ -5376,6 +5380,7 @@ const TREATMENT_STATUSES = {
   'BF': BF_STATUSES, // 既存15段階
   '矯正': [
     { value: '予約連絡待ち', color: '#a855f7' },
+    { value: '後追いLINE済み', color: '#06b6d4' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: '光学印象', color: '#3b82f6' },
@@ -5386,6 +5391,7 @@ const TREATMENT_STATUSES = {
   ],
   'インプラント': [
     { value: '予約連絡待ち', color: '#a855f7' },
+    { value: '後追いLINE済み', color: '#06b6d4' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: 'CT/診断', color: '#3b82f6' },
@@ -5398,6 +5404,7 @@ const TREATMENT_STATUSES = {
   ],
   'デフォルト': [
     { value: '予約連絡待ち', color: '#a855f7' },
+    { value: '後追いLINE済み', color: '#06b6d4' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: '治療中', color: '#1d4ed8' },
