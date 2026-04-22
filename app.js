@@ -4137,17 +4137,25 @@ function saveMemoModal() {
 }
 
 function exportCSV() {
-  if (userRole !== 'admin') { showToast('管理者のみCSV出力可能です', true); return; }
+  // プロモユーザーでも自分の権限範囲のデータのみCSV出力可能に。
+  // 個人情報(名前・電話・メール)は画面表示と同様にマスク。
   const bkExtra = loadData('bk-extra', {});
   const memos = loadData('bk-memos', {});
   const headers = ['申込日','予約日','名前','相談','医院','電話番号','メール','流入元','ステータス','成約施術','成約金額','メモ','ツール'];
-  const rows = bookingsData.filter(d => d.status !== '除外').map(d => {
+  // 権限フィルタ適用
+  let source = bookingsData.filter(d => d.status !== '除外');
+  if (_hasPromoRestriction()) source = source.filter(d => _matchesAllowedPromo(d.source));
+  const rows = source.map(d => {
     const key = d.name+'|'+d.applyDate;
     const extra = bkExtra[key] || {};
+    // 非adminは個人情報マスク
+    const name = _isPII_MaskNeeded() ? maskName(d.name) : d.name;
+    const phoneRaw = d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '';
+    const phone = _isPII_MaskNeeded() ? (phoneRaw ? maskPhone(phoneRaw) : '') : phoneRaw;
+    const email = _isPII_MaskNeeded() ? (d.email ? maskEmail(d.email) : '') : (d.email || '');
     return [
-      d.applyDate, d.bookDate, d.name, normSvc(d.service), normFac(d.facility),
-      d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '',
-      d.email, d.source, d.status || '未対応',
+      d.applyDate, d.bookDate, name, normSvc(d.service), normFac(d.facility),
+      phone, email, d.source, d.status || '未対応',
       extra.contractService || d.contractService || '',
       extra.contractAmount || d.contractAmount || '',
       memos[key] || d._memo || '',
