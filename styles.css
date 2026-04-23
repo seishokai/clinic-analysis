@@ -566,6 +566,175 @@ body {
   .stats-row { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
   .sub-nav-btn { padding: 10px 10px !important; font-size: 12px !important; }
   .header h1 { font-size: 13px; }
+  .modal-content { padding: 12px !important; padding-top: 56px !important; }
+  .data-table th, .data-table td { font-size: 10px !important; padding: 6px 4px !important; }
+}
+
+/* ================================================== */
+/*  📱 モバイル UI 改善パック (v258) */
+/*  タップ可能領域を 44x44px 基準に統一、操作性向上   */
+/* ================================================== */
+@media (max-width: 768px) {
+  /* すべてのタップ可能要素に最小 44px を保証 (iOS/Material 推奨) */
+  .btn, .btn-primary, .btn-dark, .btn-outline,
+  .sub-nav-btn, .nav-btn {
+    min-height: 44px !important;
+  }
+  /* iOS入力ズーム防止をタブレット域にも拡張 */
+  input, select, textarea,
+  .form-input, .form-select {
+    font-size: 16px !important;
+  }
+  /* ヘッダー内アクションボタン */
+  .header .btn, .header button {
+    min-height: 40px !important;
+    padding: 8px 12px !important;
+  }
+}
+
+@media (max-width: 640px) {
+  /* モーダル閉じるボタン: 絶対配置で 44x44、コンテンツ上部に余裕 */
+  .modal-close {
+    position: absolute !important;
+    top: 8px !important;
+    right: 8px !important;
+    width: 44px !important;
+    height: 44px !important;
+    float: none !important;
+    z-index: 10 !important;
+    font-size: 22px !important;
+    border-radius: 50% !important;
+  }
+  .modal-content {
+    padding-top: 60px !important;
+    position: relative !important;
+  }
+  /* コピー等の小ボタン: モバイルではタップしやすく */
+  .copy-btn {
+    min-height: 36px !important;
+    padding: 8px 12px !important;
+    font-size: 11px !important;
+  }
+  /* 削除ボタン */
+  .resource-delete {
+    width: 44px !important;
+    height: 44px !important;
+    font-size: 18px !important;
+  }
+  /* ボトムナビの各ボタン: タップ幅保証 */
+  .bottom-nav-btn {
+    min-width: 44px !important;
+    min-height: 56px !important;
+  }
+  /* 横スクロール行: 右端にフェードで「まだスクロールできる」ヒント */
+  .bk-filters::after, .filter-row::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    width: 24px;
+    background: linear-gradient(to right, transparent, rgba(255,255,255,0.9));
+    pointer-events: none;
+    z-index: 2;
+  }
+  .bk-filters, .filter-row {
+    position: relative !important;
+  }
+  /* テーブル: フォントは読みやすく、カラム間の余白を詰める */
+  .data-table-wrap {
+    position: relative;
+  }
+  /* ヘッダータップ対象を明確に */
+  .header .btn-logout, .header #refresh-btn {
+    min-height: 40px !important;
+    min-width: 44px !important;
+  }
+  /* 詳細グリッド: dt/dd を横並びに戻す (情報密度UP) */
+  .detail-grid {
+    grid-template-columns: 90px 1fr !important;
+    gap: 6px 10px !important;
+  }
+  .detail-grid dt {
+    font-size: 11px !important;
+    color: var(--text-sub) !important;
+    align-self: center !important;
+  }
+  .detail-grid dd {
+    font-size: 13px !important;
+    align-self: center !important;
+  }
+  /* テーブル内のselect/input: タップで反応することを優先 */
+  .data-table select, .data-table input[type="text"],
+  .data-table input[type="date"], .data-table input[type="number"] {
+    min-height: 36px !important;
+    padding: 4px 6px !important;
+  }
+  /* プルリフレッシュヒント (後続で JS と連動) */
+  .pull-refresh-hint {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translate(-50%, -100%);
+    background: rgba(0,0,0,0.8);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 0 0 16px 16px;
+    font-size: 12px;
+    z-index: 9999;
+    transition: transform 0.2s ease;
+    pointer-events: none;
+  }
+  .pull-refresh-hint.show {
+    transform: translate(-50%, 0);
+  }
+
+  /* ================ v259 追加モバイル改善 ================ */
+  /* テーブルセル内のインライン font-size (10/11px 指定) を上書き */
+  .view-wide .data-table td, .view-wide .data-table th {
+    font-size: 12px !important;
+  }
+  .view-wide .data-table td *, .view-wide .data-table th * {
+    font-size: inherit !important;
+  }
+  /* テーブル内ボタン/select/input のタップ領域とフォント */
+  .view-wide .data-table td select,
+  .view-wide .data-table td button,
+  .view-wide .data-table td input:not([type="checkbox"]):not([type="radio"]) {
+    font-size: 13px !important;
+    min-height: 36px !important;
+    padding: 6px 8px !important;
+  }
+  /* 金額カラムの input だけは右揃えを維持 */
+  .view-wide .data-table td input[type="number"],
+  .view-wide .data-table td .kaiin-money,
+  .view-wide .data-table td .bk-edit-amount {
+    text-align: right !important;
+  }
+  /* テーブル横スクロール時の視認性UP */
+  .view-wide .data-table-wrap {
+    box-shadow: inset -12px 0 12px -12px rgba(0,0,0,0.12);
+  }
+  /* ヘッダー内のログアウト/更新ボタン */
+  .header .btn-logout, #refresh-btn, .btn-refresh {
+    font-size: 12px !important;
+  }
+}
+
+/* 380px 以下 (小型スマホ) 追加調整 */
+@media (max-width: 380px) {
+  .view-wide .data-table td, .view-wide .data-table th {
+    font-size: 11px !important;
+    padding: 6px 4px !important;
+  }
+  .view-wide .data-table td select,
+  .view-wide .data-table td input:not([type="checkbox"]) {
+    font-size: 12px !important;
+    min-height: 34px !important;
+  }
+  .header h1 { font-size: 13px !important; letter-spacing: 0.5px !important; }
+  /* ボタン類もタップしやすく */
+  .btn, .btn-primary, .btn-outline { font-size: 13px !important; }
 }
 
 /* モーダル スライドアップアニメーション (モバイル) */

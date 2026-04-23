@@ -666,6 +666,23 @@ document.addEventListener('DOMContentLoaded', () => {
     input.addEventListener('keydown', e => { if (e.key === 'Enter') submit(); });
     return;
   }
+  // ?login / ?staff 系 URL なら、ページ表示前にセッションを完全クリア (自動ログイン防止)
+  const _isRestrictedUrl = (() => {
+    try {
+      const p = new URLSearchParams(location.search);
+      return p.has('login') || p.has('staff') || p.has('agency') || p.get('view') === 'login';
+    } catch(_) { return false; }
+  })();
+  if (_isRestrictedUrl) {
+    try {
+      Object.keys(sessionStorage).forEach(k => sessionStorage.removeItem(k));
+      Object.keys(localStorage).forEach(k => {
+        if (k.includes('supabase') || k.startsWith('sb-')) localStorage.removeItem(k);
+      });
+    } catch(_) {}
+    try { if (sb && sb.auth) sb.auth.signOut().catch(()=>{}); } catch(_){}
+  }
+
   // Supabase Auth セッション復元 (Phase 6: 一本化済み)
   // 既存認証済みなら UI は下の同期ブロックで即時復元し、Supabase 側は裏で同期のみ
   // 未認証なら Supabase セッションから復元 → あれば showApp へ
@@ -680,7 +697,7 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   })();
-  if (sessionStorage.getItem('authenticated') === 'true') {
+  if (sessionStorage.getItem('authenticated') === 'true' && !_isRestrictedUrl) {
     userRole = sessionStorage.getItem('role') || 'admin';
     promoFilter = sessionStorage.getItem('promoFilter') || '';
     currentRole = sessionStorage.getItem('currentRole') || (userRole === 'admin' ? 'admin' : 'agency');
