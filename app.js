@@ -3309,7 +3309,7 @@ function populateBookingFilters() {
 function ensureBkMultiSelects() {
   if (window._bkDD) return;
   const triggerRedraw = () => { if (typeof renderBookings === 'function') renderBookings(); };
-  const statusList = ['要対応','未対応','予約連絡待ち','後追いLINE済み','確認済','来院済','成約','キャンセル','除外'];
+  const statusList = ['要対応','未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','成約','キャンセル','除外'];
   const dd = {
     tool: createMultiSelectDropdown({ label:'ツール', options:[], selected:new Set(), onChange:triggerRedraw }),
     facility: createMultiSelectDropdown({ label:'医院', options:[], selected:new Set(), onChange:triggerRedraw }),
@@ -3514,6 +3514,7 @@ function renderBookings() {
     if (s === '確認済') return '<span class="badge badge-default" style="border-color:#6366f1;color:#6366f1">確認済</span>';
     if (s === '予約連絡待ち') return '<span class="badge badge-default" style="border-color:#a855f7;color:#7c3aed;background:#f5f3ff">予約連絡待ち</span>';
     if (s === '後追いLINE済み') return '<span class="badge badge-default" style="border-color:#06b6d4;color:#0891b2;background:#ecfeff">後追いLINE済み</span>';
+    if (s === '予約変更') return '<span class="badge badge-default" style="border-color:#f59e0b;color:#b45309;background:#fef3c7">予約変更</span>';
     return `<span class="badge badge-default">${esc(s)}</span>`;
   };
 
@@ -3596,11 +3597,12 @@ function renderBookings() {
         <option value="">${d.status==='未対応'?'未対応':(d.status==='確認済'?'確認済':(d.status==='キャンセル'?'キャンセル':'未設定'))}</option>
         ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${esc(s.value)}</option>`).join('')}
       </select>`;
-    })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='後追いLINE済み'?'background:#ecfeff;color:#0891b2;border-color:#06b6d4':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
+    })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='後追いLINE済み'?'background:#ecfeff;color:#0891b2;border-color:#06b6d4':d.status==='予約変更'?'background:#fef3c7;color:#b45309;border-color:#f59e0b':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
       <option ${d.status==='予約連絡待ち'?'selected':''}>予約連絡待ち</option>
       <option ${d.status==='後追いLINE済み'?'selected':''}>後追いLINE済み</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
+      <option ${d.status==='予約変更'?'selected':''}>予約変更</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
       <option ${d.status==='成約'?'selected':''}>成約</option>
       ${isImplantBooking(d) ? `
@@ -4793,7 +4795,7 @@ function renderBF(period) {
 // === BF セット進捗 (lifecycle) ===
 // インプラント用拡張ステータス (予約と来院で共通)
 const IMPLANT_STATUSES_ORDERED = [
-  '未対応','予約連絡待ち','後追いLINE済み','確認済','来院済','成約',
+  '未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','成約',
   'CT/診断','手術予定','治癒期間','印象','セット','完了',
   'キャンセル','除外'
 ];
@@ -4815,6 +4817,7 @@ function isImplantBooking(d) {
 const BF_STATUSES = [
   { value: '予約連絡待ち', color: '#a855f7' },
   { value: '後追いLINE済み', color: '#06b6d4' },
+  { value: '予約変更', color: '#f59e0b' },
   { value: '離脱', color: '#9ca3af' },
   { value: '検討中', color: '#f59e0b' },
   { value: '成約', color: '#10b981' },
@@ -5446,6 +5449,7 @@ const TREATMENT_STATUSES = {
   '矯正': [
     { value: '予約連絡待ち', color: '#a855f7' },
     { value: '後追いLINE済み', color: '#06b6d4' },
+    { value: '予約変更', color: '#f59e0b' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: '光学印象', color: '#3b82f6' },
@@ -5459,6 +5463,7 @@ const TREATMENT_STATUSES = {
     { value: '予約連絡待ち', color: '#a855f7' },
     { value: '後追いLINE済み', color: '#06b6d4' },
     { value: '確認済', color: '#6366f1' },
+    { value: '予約変更', color: '#f59e0b' },
     { value: '来院済', color: '#1d4ed8' },
     { value: '成約', color: '#10b981' },
     { value: 'CT/診断', color: '#3b82f6' },
@@ -5473,6 +5478,7 @@ const TREATMENT_STATUSES = {
   'デフォルト': [
     { value: '予約連絡待ち', color: '#a855f7' },
     { value: '後追いLINE済み', color: '#06b6d4' },
+    { value: '予約変更', color: '#f59e0b' },
     { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
     { value: '治療中', color: '#1d4ed8' },
@@ -5571,6 +5577,15 @@ async function renderKaiinTab(treatment, containerId) {
     if (d.status === '除外') return false;
     const bd = parseDate(d.bookDate);
     if (bd && bd > todayEnd) return false;
+    // 予約変更で次回予定(未来)が入っているものは来院管理から除外 (予約管理のみで追跡)
+    if (d.status === '予約変更') {
+      const info = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
+      const nextIso = info && info.bf_next_date;
+      if (nextIso) {
+        const nd = parseDate(nextIso.replace(/-/g, '/'));
+        if (nd && nd > todayEnd) return false;
+      }
+    }
     // staff_promo / agency の権限フィルタ
     if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
     return true;
@@ -5978,10 +5993,35 @@ function drawKaiinRows(treatment, rows, container) {
         btn.dataset.iso = iso || '';
         btn.textContent = iso ? iso.substring(5).replace('-','/') : '年/月/日';
         const ok = await saveBFLifecycleField(btn.dataset.name, btn.dataset.apply, 'bf_next_date', iso);
-        if (ok) {
-          btn.style.outline = '2px solid #16a34a';
-          setTimeout(() => { btn.style.outline = ''; drawKaiinRows(treatment, rows, container); }, 300);
+        if (!ok) return;
+        // 「予約変更」状態で次回予定を設定した場合は、予約日をそこに移動して予約管理に移す
+        const name = btn.dataset.name, apply = btn.dataset.apply;
+        const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
+        if (iso && match && (match.status === '予約変更')) {
+          const nd = parseDate(iso.replace(/-/g, '/'));
+          const today = new Date(); today.setHours(0,0,0,0);
+          if (nd && nd > today) {
+            try {
+              await safeSave({
+                type: 'upsert',
+                table: 'booking_status',
+                payload: { name, apply_date: apply, book_date: iso, status: '予約変更' },
+                options: { onConflict: 'name,apply_date' }
+              });
+              match.bookDate = iso.replace(/-/g, '/');
+              try {
+                const bkEx = loadData('bk-extra', {});
+                const key = name + '|' + apply;
+                if (!bkEx[key]) bkEx[key] = {};
+                bkEx[key].editedBookDate = iso.replace(/-/g, '/');
+                saveData('bk-extra', bkEx);
+              } catch(_){}
+              showToast('予約日を ' + iso.substring(5).replace('-','/') + ' に移動しました (予約管理で確認)');
+            } catch (e) { console.warn('予約日更新失敗', e); }
+          }
         }
+        btn.style.outline = '2px solid #16a34a';
+        setTimeout(() => { btn.style.outline = ''; drawKaiinRows(treatment, rows, container); }, 300);
       });
     }
   });
@@ -6128,7 +6168,44 @@ function drawKaiinRows(treatment, rows, container) {
       }
       // 非インプラント: 従来通り bf_status に保存
       const ok = await saveBFLifecycleField(name, apply, 'bf_status', newVal);
-      if (ok) { sel.style.borderColor = '#0a0'; setTimeout(() => { sel.style.borderColor = ''; }, 1000); drawKaiinRows(treatment, rows, container); }
+      if (!ok) return;
+      // 「予約変更」かつ次回予定(未来)が入っていれば、予約日を次回予定に置き換え → 予約管理のみで表示
+      if (newVal === '予約変更') {
+        const info = bfLifecycleCache[name + '|' + apply] || {};
+        const nextIso = info.bf_next_date;
+        if (nextIso) {
+          const nd = parseDate(nextIso.replace(/-/g, '/'));
+          const today = new Date(); today.setHours(0,0,0,0);
+          if (nd && nd > today) {
+            // 予約日を次回予定に更新
+            try {
+              await safeSave({
+                type: 'upsert',
+                table: 'booking_status',
+                payload: { name, apply_date: apply, book_date: nextIso, status: '予約変更' },
+                options: { onConflict: 'name,apply_date' }
+              });
+              // ローカル bookingsData も更新
+              const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
+              if (match) { match.bookDate = nextIso.replace(/-/g, '/'); match.status = '予約変更'; }
+              // bk-extra にも反映
+              try {
+                const bkEx = loadData('bk-extra', {});
+                const key = name + '|' + apply;
+                if (!bkEx[key]) bkEx[key] = {};
+                bkEx[key].editedStatus = '予約変更';
+                bkEx[key].editedBookDate = nextIso.replace(/-/g, '/');
+                saveData('bk-extra', bkEx);
+              } catch(_){}
+              showToast('予約日を ' + (nextIso.substring(5).replace('-','/')) + ' に移動しました (予約管理で確認)');
+            } catch (e) { console.warn('予約日更新失敗', e); }
+          }
+        } else {
+          showToast('※ 次回予定日を入力すると予約管理に自動移動します');
+        }
+      }
+      sel.style.borderColor = '#0a0'; setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+      drawKaiinRows(treatment, rows, container);
     });
   });
   // メモセル → 予約一覧のメモモーダルを再利用
