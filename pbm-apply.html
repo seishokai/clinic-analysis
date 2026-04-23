@@ -235,10 +235,7 @@
 
   defaultApplicant.addEventListener('input', () => {
     defaultApplicantLabel.textContent = defaultApplicant.value.trim() || '(未設定)';
-    // 空の申請者名セルを一括更新
-    document.querySelectorAll('.cell-applicant').forEach(inp => {
-      if (!inp.value.trim()) inp.value = defaultApplicant.value.trim();
-    });
+    // 送信時に空セルへ補完するだけ。ここでは行に書き込まない。
   });
 
   pwSubmit.addEventListener('click', () => {
@@ -262,8 +259,8 @@
     tr.dataset.rowNo = rowCounter;
     tr.innerHTML = `
       <td class="rowno">${rowCounter}</td>
-      <td><input type="date" class="cell-applied-date" value="${data.applied_date || todayISO()}"></td>
-      <td><input type="text" class="cell-applicant" placeholder="申請者名" value="${(data.applicant_name || defaultApplicant.value || '').replace(/"/g,'&quot;')}"></td>
+      <td><input type="date" class="cell-applied-date" value="${data.applied_date||''}"></td>
+      <td><input type="text" class="cell-applicant" placeholder="(空の場合は上の申請者名を使用)" value="${(data.applicant_name||'').replace(/"/g,'&quot;')}"></td>
       <td><input type="text" class="cell-patient" placeholder="患者名" value="${(data.patient_name||'').replace(/"/g,'&quot;')}"></td>
       <td>
         <select class="cell-clinic">
@@ -348,21 +345,26 @@
   });
 
   btnSubmitAll.addEventListener('click', async () => {
+    const defaultName = defaultApplicant.value.trim();
     const rows = Array.from(gridTbody.querySelectorAll('tr'))
-      .map(tr => ({
-        applicant_name: tr.querySelector('.cell-applicant').value.trim(),
-        patient_name: tr.querySelector('.cell-patient').value.trim(),
-        clinic_name: tr.querySelector('.cell-clinic').value.trim(),
-        contract_date: tr.querySelector('.cell-contract-date').value || null,
-        settlement_amount: Number(tr.querySelector('.cell-amount').value) || null,
-        payment_due_date: tr.querySelector('.cell-payment-date').value || null,
-        doctor_name: tr.querySelector('.cell-doctor').value.trim() || null,
-        notes: tr.querySelector('.cell-notes').value.trim() || ''
-      }))
-      .filter(r => r.patient_name); // 患者名が入ってる行のみ
+      .map(tr => {
+        const rowApplicant = tr.querySelector('.cell-applicant').value.trim();
+        return {
+          // 行の申請者名が空なら上部「申請者名」フィールドで補完
+          applicant_name: rowApplicant || defaultName,
+          patient_name: tr.querySelector('.cell-patient').value.trim(),
+          clinic_name: tr.querySelector('.cell-clinic').value.trim(),
+          contract_date: tr.querySelector('.cell-contract-date').value || null,
+          settlement_amount: Number(tr.querySelector('.cell-amount').value) || null,
+          payment_due_date: tr.querySelector('.cell-payment-date').value || null,
+          doctor_name: tr.querySelector('.cell-doctor').value.trim() || null,
+          notes: tr.querySelector('.cell-notes').value.trim() || ''
+        };
+      })
+      .filter(r => r.patient_name); // 患者名が入ってる行のみ送信対象
 
     if (!rows.length) {
-      showToast('入力されている行がありません（患者名が必要）', 'err');
+      showToast('入力されている行がありません (患者名が必要です)', 'err');
       return;
     }
 
@@ -373,7 +375,7 @@
       if (!r.clinic_name) bad.push((i+1) + '行目: 医院名');
     });
     if (bad.length) {
-      showToast('必須未入力: ' + bad.slice(0, 3).join(', '), 'err');
+      showToast('必須未入力: ' + bad.slice(0, 3).join(' / '), 'err');
       return;
     }
 
