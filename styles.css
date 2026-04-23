@@ -555,8 +555,36 @@ body {
   .login-card { padding: 32px 20px; border-radius: 16px; }
   /* マルチセレクトのドロップダウンを大きく */
   .multi-select-dropdown { width: calc(100vw - 24px) !important; max-width: none !important; }
-  /* Sticky first column for tables (name) */
+  /* Sticky name column for 予約タブ (name は 3番目) */
   .view-wide .data-table.compact td:nth-child(3), .view-wide .data-table.compact th:nth-child(3) { position: sticky; left: 0; background: #fff; z-index: 5; box-shadow: 2px 0 4px rgba(0,0,0,0.04); }
+  /* 来院タブのテーブル: 1列目(来院日) + 2列目(名前) を両方 sticky に */
+  .kaiin-table-wrap .data-table.compact td:nth-child(3),
+  .kaiin-table-wrap .data-table.compact th:nth-child(3) {
+    position: static !important;
+    box-shadow: none !important;
+  }
+  .kaiin-table-wrap .data-table.compact td:nth-child(1),
+  .kaiin-table-wrap .data-table.compact th:nth-child(1) {
+    position: sticky !important;
+    left: 0 !important;
+    background: #fff !important;
+    z-index: 6 !important;
+    min-width: 55px;
+  }
+  .kaiin-table-wrap .data-table.compact td:nth-child(2),
+  .kaiin-table-wrap .data-table.compact th:nth-child(2) {
+    position: sticky !important;
+    left: 55px !important;
+    background: #fff !important;
+    z-index: 5 !important;
+    box-shadow: 2px 0 6px rgba(0,0,0,0.08) !important;
+    max-width: 100px;
+  }
+  /* 偶数行の背景色も引き継ぎ */
+  .kaiin-table-wrap .data-table.compact tbody tr:nth-child(even) td:nth-child(1),
+  .kaiin-table-wrap .data-table.compact tbody tr:nth-child(even) td:nth-child(2) {
+    background: #fafafa !important;
+  }
   /* トースト: 上に表示（大きくて見やすく） */
   .toast { bottom: calc(80px + var(--safe-b)) !important; max-width: 85vw; font-size: 14px !important; padding: 12px 16px !important; border-radius: 12px !important; }
   /* 入力欄フォーカス時ズーム防止 (iOS) */
