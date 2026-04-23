@@ -913,19 +913,22 @@ function _isRestrictedLoginUrl() {
 async function restoreSupabaseAuthIfAny() {
   try {
     if (!sb || !sb.auth) return false;
+    // ?login / ?staff / ?agency URL では常にログイン画面を表示 (自動ログインしない)
+    // キャッシュに残っているセッションは明示的にサインアウトして完全クリア
+    if (_isRestrictedLoginUrl()) {
+      try { await sb.auth.signOut(); } catch(_){}
+      try {
+        Object.keys(sessionStorage).forEach(k => sessionStorage.removeItem(k));
+        Object.keys(localStorage).forEach(k => {
+          if (k.includes('supabase') || k.startsWith('sb-')) localStorage.removeItem(k);
+        });
+      } catch(_){}
+      return false;
+    }
     const { data: { session } } = await sb.auth.getSession();
     if (!session) return false;
     const { data: profile, error } = await sb.rpc('get_my_account');
     if (error || !profile) return false;
-    // 制限付きURL (?login) で admin 権限は自動ログインさせない
-    const effectiveRole = profile.role || profile.account_type || '';
-    if (_isRestrictedLoginUrl() && effectiveRole === 'admin') {
-      try { await sb.auth.signOut(); } catch(_){}
-      try {
-        Object.keys(sessionStorage).forEach(k => sessionStorage.removeItem(k));
-      } catch(_){}
-      return false;
-    }
     _applyAccountProfileToSession(profile);
     return true;
   } catch (e) {
