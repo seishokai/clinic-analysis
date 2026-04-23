@@ -1073,9 +1073,13 @@ function setupEventListeners() {
       if (sub === 'adm-auth-migration') { if (typeof renderAuthMigration === 'function') renderAuthMigration(); }
       // 来院タブのサブ
       if (sub && sub.startsWith('kaiin-')) {
-        const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
-        const t = map[sub];
-        if (t) renderKaiinTab(t, sub.replace('kaiin-','kaiin-') + '-content');
+        if (sub === 'kaiin-all') {
+          if (typeof renderKaiinAll === 'function') renderKaiinAll('kaiin-all-content');
+        } else {
+          const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
+          const t = map[sub];
+          if (t) renderKaiinTab(t, sub.replace('kaiin-','kaiin-') + '-content');
+        }
       }
     });
   });
@@ -1971,10 +1975,14 @@ function switchView(view) {
   }
   // 来院タブ切替時にアクティブなサブの再描画
   if (view === 'kaiin') {
-    const activeSub = document.querySelector('#kaiin-sub-nav .sub-nav-btn.active')?.dataset.sub || 'kaiin-bf';
-    const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
-    const t = map[activeSub];
-    if (t) setTimeout(() => renderKaiinTab(t, activeSub + '-content'), 50);
+    const activeSub = document.querySelector('#kaiin-sub-nav .sub-nav-btn.active')?.dataset.sub || 'kaiin-all';
+    if (activeSub === 'kaiin-all') {
+      setTimeout(() => { if (typeof renderKaiinAll === 'function') renderKaiinAll('kaiin-all-content'); }, 50);
+    } else {
+      const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
+      const t = map[activeSub];
+      if (t) setTimeout(() => renderKaiinTab(t, activeSub + '-content'), 50);
+    }
   }
 }
 
@@ -5422,6 +5430,81 @@ const TREATMENT_STATUSES = {
 };
 function getStatusesForTreatment(treatment) {
   return TREATMENT_STATUSES[treatment] || TREATMENT_STATUSES['デフォルト'];
+}
+
+// 来院タブ「一覧」レンダラー (全治療タイプまとめて表示)
+async function renderKaiinAll(containerId) {
+  const el = document.getElementById(containerId);
+  if (!el) return;
+  const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
+  // 全治療タイプの来院対象行を集計
+  const allRows = (bookingsData || []).filter(d => {
+    if (d.status === '除外') return false;
+    const bd = parseDate(d.bookDate);
+    if (bd && bd > todayEnd) return false;
+    if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
+    return true;
+  });
+  // 治療タイプ別カウント
+  const byCat = {};
+  allRows.forEach(d => {
+    const cat = getTreatmentCategory(d) || 'その他';
+    if (!byCat[cat]) byCat[cat] = { count: 0, contracted: 0, contractAmt: 0 };
+    byCat[cat].count++;
+    if (d.status === '成約') {
+      byCat[cat].contracted++;
+      byCat[cat].contractAmt += Number(d.contractAmount || 0);
+    }
+  });
+  const catOrder = ['BF','矯正','インプラント','ラブリエ','自費補綴','自費根治','ホワイトニング','リップアート','ティースジュエリー','その他'];
+  const subNavMap = {'BF':'kaiin-bf','矯正':'kaiin-kyosei','インプラント':'kaiin-implant','ラブリエ':'kaiin-labrie','自費補綴':'kaiin-hotetsu','自費根治':'kaiin-konchi','ホワイトニング':'kaiin-whitening','リップアート':'kaiin-lipart','ティースジュエリー':'kaiin-jewelry','その他':'kaiin-other'};
+  const catCards = catOrder
+    .filter(c => byCat[c])
+    .map(c => {
+      const info = byCat[c];
+      const rate = info.count ? Math.round(info.contracted / info.count * 100) : 0;
+      const targetSub = subNavMap[c];
+      return `<div class="kaiin-all-card" data-target="${targetSub}" style="border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;background:#fff;transition:all .15s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#6366f1'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'">
+        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">${c}</div>
+        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+          <div><span style="font-size:22px;font-weight:700;color:#111">${info.count}</span><span style="font-size:11px;color:var(--text-sub);margin-left:3px">件</span></div>
+          <div style="font-size:11px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:600">${info.contracted}</span></div>
+          <div style="font-size:11px;color:var(--text-sub)">率 <span style="color:${rate>=30?'#059669':'#d97706'};font-weight:600">${rate}%</span></div>
+          <div style="font-size:11px;color:var(--text-sub)">¥${fmt(info.contractAmt)}</div>
+        </div>
+      </div>`;
+    }).join('');
+  const totalCount = allRows.length;
+  const totalContracted = allRows.filter(d => d.status==='成約').length;
+  const totalAmt = allRows.filter(d => d.status==='成約').reduce((s,d)=>s+Number(d.contractAmount||0),0);
+  const totalRate = totalCount ? Math.round(totalContracted / totalCount * 100) : 0;
+
+  el.innerHTML = `
+    <div style="margin-bottom:14px;padding:14px;background:linear-gradient(135deg,#f9fafb 0%,#f3f4f6 100%);border-radius:10px;border:1px solid var(--border)">
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">全治療合計</div>
+      <div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
+        <div><span style="font-size:28px;font-weight:700;color:#111">${totalCount}</span><span style="font-size:12px;color:var(--text-sub);margin-left:3px">件</span></div>
+        <div><span style="font-size:12px;color:var(--text-sub)">成約</span> <span style="font-size:18px;font-weight:700;color:#059669">${totalContracted}</span></div>
+        <div><span style="font-size:12px;color:var(--text-sub)">成約率</span> <span style="font-size:18px;font-weight:700;color:${totalRate>=30?'#059669':'#d97706'}">${totalRate}%</span></div>
+        <div><span style="font-size:12px;color:var(--text-sub)">成約金額</span> <span style="font-size:18px;font-weight:700;color:#111">¥${fmt(totalAmt)}</span></div>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px">
+      ${catCards}
+    </div>
+    <div style="font-size:11px;color:var(--text-sub);text-align:center;padding:10px">
+      ↑ 治療タイプをクリックで詳細一覧へ
+    </div>`;
+
+  // カードクリック → 該当サブタブへ遷移
+  el.querySelectorAll('.kaiin-all-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const target = card.dataset.target;
+      if (target) {
+        document.querySelector(`#kaiin-sub-nav .sub-nav-btn[data-sub="${target}"]`)?.click();
+      }
+    });
+  });
 }
 
 // 来院タブの共通レンダラー (治療種別で絞り込み)
