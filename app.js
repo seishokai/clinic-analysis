@@ -1913,6 +1913,9 @@ function showApp() {
   try { processQueue(true); } catch(_){}
   // Layer 3: 日次自動バックアップ (admin のみ、24h経過時)
   setTimeout(() => { try { maybeAutoBackup(); } catch(_){} }, 5000);
+  // v261: ヘッダーバッジ + プルリフレッシュ 初期化 (1度だけ)
+  try { setupHeaderBadge(); } catch(_){}
+  try { setupPullRefresh(); } catch(_){}
 
   // ヘッダーのロール表示
   const header = document.querySelector('.header');
@@ -1994,6 +1997,106 @@ function restoreLastView() {
 }
 
 // === Navigation ===
+// === v261 ヘッダー通知バッジ (要対応件数常時表示) ===
+let _badgeUpdateTimer = null;
+function setupHeaderBadge() {
+  const badge = document.getElementById('header-badge');
+  if (!badge) return;
+  // クリックで予約タブの要対応フィルタへ
+  badge.addEventListener('click', () => {
+    try { switchView('bookings'); } catch(_){}
+    setTimeout(() => {
+      // 要対応フィルタを自動セット
+      const sel = document.querySelector('#bk-quick');
+      if (sel) { sel.value = 'pending'; sel.dispatchEvent(new Event('change')); }
+      // 数値カードの「要対応」ハイライトをクリック
+      const card = document.querySelector('[data-st="pending"]');
+      if (card && !card.classList.contains('active')) card.click();
+    }, 200);
+  });
+  updateHeaderBadge();
+  // bookingsData 変更を検知して更新 (polling 1秒)
+  clearInterval(_badgeUpdateTimer);
+  _badgeUpdateTimer = setInterval(updateHeaderBadge, 3000);
+}
+function updateHeaderBadge() {
+  const badge = document.getElementById('header-badge');
+  if (!badge || !Array.isArray(bookingsData)) return;
+  const source = getFilteredBookingsData ? getFilteredBookingsData() : bookingsData;
+  // 要対応: status が 未対応 or 空 で かつ 未来予約
+  const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+  let pending = 0;
+  source.forEach(d => {
+    if (d.status === '除外' || d.status === 'キャンセル') return;
+    if (!d.status || d.status === '未対応') pending++;
+  });
+  if (pending <= 0) {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.style.display = 'inline-flex';
+  badge.textContent = '⚠️ 要対応 ' + pending + '件';
+  badge.classList.toggle('urgent', pending >= 20);
+}
+
+// === v261 プルリフレッシュ (モバイルのみ) ===
+let _pullRefreshActive = false;
+function setupPullRefresh() {
+  if (_pullRefreshActive) return;
+  _pullRefreshActive = true;
+  // インジケータ作成
+  let indicator = document.getElementById('pull-refresh-indicator');
+  if (!indicator) {
+    indicator = document.createElement('div');
+    indicator.id = 'pull-refresh-indicator';
+    indicator.className = 'pull-refresh-indicator';
+    indicator.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"/></svg><span id="pull-refresh-text">下に引っ張って更新</span>';
+    document.body.appendChild(indicator);
+  }
+  let startY = 0, pulling = false, distance = 0;
+  const THRESHOLD = 70;
+  const scrollEl = document.scrollingElement || document.documentElement;
+  document.addEventListener('touchstart', (e) => {
+    if (scrollEl.scrollTop > 0) { pulling = false; return; }
+    if (document.body.classList.contains('pr-loading')) return;
+    startY = e.touches[0].clientY;
+    pulling = true;
+  }, { passive: true });
+  document.addEventListener('touchmove', (e) => {
+    if (!pulling) return;
+    distance = e.touches[0].clientY - startY;
+    if (distance < 0) { pulling = false; return; }
+    if (distance > 10) {
+      indicator.style.transform = `translate(-50%, ${Math.min(distance - 20, 30)}px)`;
+      indicator.classList.add('show');
+      const txt = indicator.querySelector('#pull-refresh-text');
+      if (txt) txt.textContent = distance > THRESHOLD ? '離すと更新' : '下に引っ張って更新';
+    }
+  }, { passive: true });
+  document.addEventListener('touchend', async () => {
+    if (!pulling) return;
+    pulling = false;
+    const shouldRefresh = distance > THRESHOLD;
+    if (shouldRefresh) {
+      indicator.classList.add('loading');
+      const txt = indicator.querySelector('#pull-refresh-text');
+      if (txt) txt.textContent = '更新中...';
+      document.body.classList.add('pr-loading');
+      try {
+        // 更新ボタンと同じ処理
+        const btn = document.getElementById('refresh-btn');
+        if (btn) btn.click();
+        await new Promise(r => setTimeout(r, 800));
+      } catch(_){}
+      indicator.classList.remove('loading');
+      document.body.classList.remove('pr-loading');
+    }
+    indicator.classList.remove('show');
+    indicator.style.transform = '';
+    distance = 0;
+  }, { passive: true });
+}
+
 function switchView(view) {
   currentView = view;
   document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -4161,10 +4264,44 @@ function openMemoModal(name, apply, tdEl) {
   }
   _memoTarget = { name, apply, key, tdEl };
   document.getElementById('memo-modal-title').textContent = name + ' のメモ';
-  document.getElementById('memo-modal-text').value = current;
+  const ta = document.getElementById('memo-modal-text');
+  ta.value = current;
+  // v261: テンプレートボタンを描画
+  _renderMemoTemplates(ta);
   document.getElementById('memo-modal').hidden = false;
   document.body.style.overflow = 'hidden';
-  setTimeout(() => document.getElementById('memo-modal-text').focus(), 100);
+  setTimeout(() => ta.focus(), 100);
+}
+
+// メモテンプレート (よく使う定型文)
+const MEMO_TEMPLATES = [
+  { label: '📞 連絡取れず', text: '連絡取れず、再架電予定' },
+  { label: '✅ 来院確認済', text: '来院確認済み' },
+  { label: '📅 予約変更', text: '予約変更希望あり、次回日程調整中' },
+  { label: '💭 検討中', text: '検討中とのこと。1週間後に再連絡' },
+  { label: '❌ キャンセル希望', text: 'キャンセル希望あり、理由: ' },
+  { label: '💰 見積もり送付', text: '見積もりメール送付済み' },
+  { label: '🔁 再予約', text: '再予約手配済み' },
+];
+function _renderMemoTemplates(textarea) {
+  const wrap = document.getElementById('memo-templates');
+  if (!wrap) return;
+  wrap.innerHTML = MEMO_TEMPLATES.map((t, i) =>
+    `<button type="button" class="memo-tpl-btn" data-idx="${i}" style="padding:5px 10px;border:1px solid #d4d4d8;background:#f9fafb;border-radius:14px;font-size:11px;cursor:pointer;color:#3a3a3a;white-space:nowrap;transition:all 0.15s" onmouseover="this.style.background='#fef3c7';this.style.borderColor='#f59e0b'" onmouseout="this.style.background='#f9fafb';this.style.borderColor='#d4d4d8'">${t.label}</button>`
+  ).join('');
+  wrap.querySelectorAll('.memo-tpl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const tpl = MEMO_TEMPLATES[Number(btn.dataset.idx)];
+      if (!tpl) return;
+      const cur = textarea.value.trim();
+      const today = new Date().toLocaleDateString('ja-JP', {month:'2-digit',day:'2-digit'});
+      const newLine = `[${today}] ${tpl.text}`;
+      textarea.value = cur ? cur + '\n' + newLine : newLine;
+      textarea.focus();
+      // 末尾にカーソル
+      textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+    });
+  });
 }
 function closeMemoModal() {
   document.getElementById('memo-modal').hidden = true;

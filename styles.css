@@ -750,6 +750,72 @@ body {
   }
 }
 
+/* === v261 ヘッダー通知バッジ === */
+.header-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 5px 12px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+  border: 1px solid #f59e0b;
+  transition: transform 0.15s, box-shadow 0.15s;
+  user-select: none;
+  white-space: nowrap;
+}
+.header-badge:hover { transform: translateY(-1px); box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25); }
+.header-badge:active { transform: translateY(0); }
+.header-badge.urgent {
+  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
+  color: #b91c1c;
+  border-color: #dc2626;
+  animation: badgePulse 2s infinite;
+}
+@keyframes badgePulse { 0%,100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.4); } 50% { box-shadow: 0 0 0 6px rgba(220, 38, 38, 0); } }
+@media (max-width: 640px) {
+  .header-badge { font-size: 11px; padding: 4px 8px; }
+}
+
+/* === v261 スケルトンローダー === */
+.skeleton {
+  background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeletonPulse 1.5s ease-in-out infinite;
+  border-radius: 6px;
+  color: transparent !important;
+  pointer-events: none;
+}
+@keyframes skeletonPulse { 0% { background-position: 200% 0 } 100% { background-position: -200% 0 } }
+.skeleton-row { height: 36px; margin-bottom: 6px; }
+.skeleton-card { height: 64px; margin-bottom: 8px; border-radius: 10px; }
+
+/* === v261 プルリフレッシュ === */
+.pull-refresh-indicator {
+  position: fixed;
+  top: 52px;
+  left: 50%;
+  transform: translate(-50%, -100%);
+  background: #fff;
+  color: #1d4ed8;
+  padding: 8px 18px;
+  border-radius: 0 0 14px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
+  z-index: 9999;
+  transition: transform 0.2s ease;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.pull-refresh-indicator.show { transform: translate(-50%, 0); }
+.pull-refresh-indicator.loading svg { animation: spin 0.8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
 /* 380px 以下 (小型スマホ) 追加調整 */
 @media (max-width: 380px) {
   .view-wide .data-table td, .view-wide .data-table th {
