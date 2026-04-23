@@ -134,8 +134,23 @@ html,body{background:#fff;font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;fo
     </div>
   </div>
 
-  <!-- ═══════════ 申請フォーム ═══════════ -->
-  <div id="pbm-apply-section" style="margin:1.5rem 1.2rem 0;padding:1.4rem 1.2rem;background:linear-gradient(135deg,#fff8e1 0%,#ffffff 100%);border:2px solid #d4a010;border-radius:18px">
+  <!-- ═══════════ 申請ボタン (詳細ページへ) ═══════════ -->
+  <div style="margin:1.8rem 1.2rem 0;padding:1.6rem 1.2rem;background:linear-gradient(135deg,#fff8e1 0%,#ffffff 100%);border:2px solid #d4a010;border-radius:18px;text-align:center">
+    <div style="display:inline-block;background:#d4a010;color:#fff;font-size:0.7rem;font-weight:700;letter-spacing:3px;padding:4px 16px;border-radius:20px;margin-bottom:0.8rem">APPLICATION</div>
+    <h2 style="font-size:1.25rem;font-weight:700;color:#1a1a1a;margin:0 0 0.4rem">📝 インセンティブ申請</h2>
+    <p style="font-size:0.8rem;color:#666;margin:0 0 1.2rem;line-height:1.7">
+      契約・決済が完了したら<br>申請フォームから申請してください
+    </p>
+    <a href="pbm-apply.html" style="display:inline-block;padding:14px 32px;background:#1a1a1a;color:#fff;text-decoration:none;border-radius:12px;font-size:15px;font-weight:700;letter-spacing:1px;box-shadow:0 4px 10px rgba(26,26,26,0.2);transition:transform 0.15s">
+      📊 申請フォームを開く →
+    </a>
+    <div style="font-size:0.68rem;color:#999;margin-top:0.9rem">
+      共通パスワードで入室できます。エクセル式の一括入力が可能です。
+    </div>
+  </div>
+
+  <!-- (以下の単一フォームは pbm-apply.html に移行済み、非表示化) -->
+  <div id="pbm-apply-section" style="display:none">
     <div style="text-align:center;margin-bottom:1rem">
       <div style="display:inline-block;background:#d4a010;color:#fff;font-size:0.7rem;font-weight:700;letter-spacing:3px;padding:4px 16px;border-radius:20px">APPLICATION</div>
       <h2 style="font-size:1.3rem;font-weight:700;color:#1a1a1a;margin:0.6rem 0 0.2rem">📝 インセンティブ申請</h2>

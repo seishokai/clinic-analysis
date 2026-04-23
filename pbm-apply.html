@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PBM インセンティブ申請</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{font-family:'Noto Sans JP',sans-serif;color:#1a1a1a;background:#f8f8f8;font-size:14px;-webkit-text-size-adjust:100%}
+  .wrap{max-width:1400px;margin:0 auto;padding:20px 16px 60px}
+  .header{display:flex;align-items:center;gap:12px;margin-bottom:18px;flex-wrap:wrap}
+  .header h1{font-size:20px;font-weight:900;letter-spacing:1px;color:#1a1a1a;flex:1;min-width:200px}
+  .header h1 em{font-style:normal;color:#d4a010}
+  .back-link{padding:7px 14px;border:1px solid #d1d5db;border-radius:8px;text-decoration:none;color:#555;font-size:12px;font-weight:600;background:#fff;transition:all .15s}
+  .back-link:hover{background:#f0f0f0}
+  .badge-period{display:inline-block;background:#fef3c7;color:#b45309;padding:4px 12px;border-radius:16px;font-size:11px;font-weight:700;letter-spacing:0.5px}
+
+  /* パスワードゲート */
+  .pw-gate{max-width:400px;margin:60px auto;background:#fff;border:2px solid #d4a010;border-radius:16px;padding:30px 24px;text-align:center;box-shadow:0 4px 12px rgba(0,0,0,0.06)}
+  .pw-gate h2{font-size:18px;font-weight:700;margin-bottom:8px;color:#1a1a1a}
+  .pw-gate p{font-size:13px;color:#888;margin-bottom:18px;line-height:1.7}
+  .pw-gate input{width:100%;padding:12px 14px;font-size:16px;border:1.5px solid #e0e0e0;border-radius:10px;text-align:center;margin-bottom:10px;outline:none}
+  .pw-gate input:focus{border-color:#d4a010}
+  .pw-gate button{width:100%;padding:12px;font-size:14px;font-weight:700;color:#fff;background:#1a1a1a;border:none;border-radius:10px;cursor:pointer;letter-spacing:1px}
+  .pw-gate .err{display:none;color:#b91c1c;font-size:12px;margin-top:10px;font-weight:600}
+
+  /* ツールバー */
+  .toolbar{display:flex;gap:10px;align-items:center;margin-bottom:12px;flex-wrap:wrap;background:#fff;padding:12px 14px;border-radius:10px;border:1px solid #e5e7eb}
+  .toolbar label{font-size:12px;color:#555;display:flex;align-items:center;gap:6px}
+  .toolbar label strong{color:#1a1a1a;font-weight:700}
+  .toolbar input{padding:6px 10px;font-size:13px;border:1px solid #d1d5db;border-radius:6px}
+  .btn{padding:8px 16px;font-size:13px;font-weight:600;border:1px solid #d1d5db;background:#fff;border-radius:8px;cursor:pointer;transition:all .15s;color:#1a1a1a}
+  .btn:hover{background:#f9fafb;border-color:#9ca3af}
+  .btn-primary{background:#1a1a1a;color:#fff;border-color:#1a1a1a}
+  .btn-primary:hover{background:#000}
+  .btn-gold{background:linear-gradient(135deg,#d4a010 0%,#b07800 100%);color:#fff;border:none}
+  .btn-gold:hover{background:linear-gradient(135deg,#b07800 0%,#a06800 100%)}
+  .btn-danger{color:#b91c1c;border-color:#fca5a5;background:#fff}
+
+  /* テーブル */
+  .grid-wrap{background:#fff;border:1px solid #e5e7eb;border-radius:10px;overflow:auto;-webkit-overflow-scrolling:touch;max-height:70vh}
+  table.grid{border-collapse:collapse;width:100%;min-width:1300px;font-size:12px}
+  table.grid thead th{position:sticky;top:0;background:#fff8e1;color:#5a4a10;font-weight:700;font-size:11px;padding:10px 8px;border-bottom:2px solid #d4a010;text-align:center;white-space:nowrap;z-index:10}
+  table.grid tbody td{border-bottom:1px solid #f0f0f0;border-right:1px solid #f5f5f5;padding:0;background:#fff}
+  table.grid tbody tr:nth-child(even) td{background:#fafafa}
+  table.grid tbody tr:hover td{background:#fffbea}
+  table.grid input, table.grid select, table.grid textarea{width:100%;border:none;padding:7px 8px;font-size:12px;font-family:inherit;background:transparent;outline:none;box-sizing:border-box}
+  table.grid input:focus, table.grid select:focus{background:#fffbea;box-shadow:inset 0 0 0 2px #d4a010;border-radius:3px}
+  table.grid td.num input{text-align:right;font-variant-numeric:tabular-nums}
+  table.grid td.rowno{text-align:center;color:#888;font-size:11px;font-weight:600;width:36px;background:#f8f8f8;user-select:none}
+  table.grid td.reward{background:#f9fafb;color:#b07800;font-weight:700;text-align:right;padding:7px 8px;font-size:11px;font-variant-numeric:tabular-nums}
+  table.grid td.act{text-align:center;width:40px}
+  table.grid td.act button{background:none;border:none;color:#b91c1c;cursor:pointer;font-size:14px;padding:4px}
+  table.grid td.act button:hover{background:#fee2e2;border-radius:4px}
+  /* 必須カラムのヒント */
+  col.req{background:rgba(212,160,16,0.03)}
+
+  /* 履歴 */
+  .history{margin-top:24px;background:#fff;border:1px solid #e5e7eb;border-radius:10px;padding:14px 16px}
+  .history h2{font-size:13px;font-weight:700;margin-bottom:10px;color:#1a1a1a}
+  .history-item{padding:8px 12px;border:1px solid #f0f0f0;border-radius:8px;display:flex;justify-content:space-between;gap:10px;align-items:center;font-size:12px;margin-bottom:6px;background:#fafafa}
+  .history-item .main{flex:1;min-width:0}
+  .history-item .name{font-weight:600;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .history-item .meta{font-size:10px;color:#888;margin-top:2px}
+  .history-item .tag{padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;background:#dcfce7;color:#15803d;white-space:nowrap}
+
+  /* トースト */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:12px 22px;border-radius:10px;font-size:13px;font-weight:600;box-shadow:0 4px 16px rgba(0,0,0,0.2);z-index:1000;display:none;max-width:90vw}
+  .toast.ok{background:#059669}
+  .toast.err{background:#b91c1c}
+
+  /* サマリー */
+  .summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:12px}
+  .summary .pill{padding:6px 12px;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:16px;color:#555}
+  .summary .pill strong{color:#1a1a1a;font-weight:700;margin-left:4px}
+  .summary .pill.gold{background:#fff8e1;border-color:#d4a010;color:#b07800}
+  .summary .pill.gold strong{color:#b07800}
+
+  @media (max-width:640px){
+    .wrap{padding:12px 8px 60px}
+    .header h1{font-size:16px}
+    table.grid{font-size:11px;min-width:1200px}
+    .grid-wrap{max-height:65vh}
+    .toolbar{padding:10px}
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <div class="header">
+    <a href="pbm.html" class="back-link">← 戻る</a>
+    <h1>📝 PBM <em>インセンティブ申請</em></h1>
+    <span class="badge-period">2025/4/25 〜 5/31 契約分</span>
+  </div>
+
+  <!-- パスワードゲート -->
+  <div id="pw-gate" class="pw-gate">
+    <h2>🔒 共通パスワード</h2>
+    <p>申請フォームを表示するには<br>社内共通パスワードを入力してください</p>
+    <input type="password" id="pw-input" placeholder="パスワード" autocomplete="off">
+    <button id="pw-submit">ロック解除</button>
+    <div class="err" id="pw-error">パスワードが違います</div>
+  </div>
+
+  <!-- メインコンテンツ (ロック解除後) -->
+  <div id="main" style="display:none">
+    <!-- ツールバー -->
+    <div class="toolbar">
+      <label>申請者名 <strong id="default-applicant-label">(未設定)</strong></label>
+      <input type="text" id="default-applicant" placeholder="例: 小池 隆史" style="min-width:140px">
+      <button class="btn" id="btn-add-row">＋ 行を追加</button>
+      <button class="btn btn-danger" id="btn-clear-empty">空行をクリア</button>
+      <div style="flex:1"></div>
+      <button class="btn btn-gold" id="btn-submit-all">📤 入力した行を一括申請</button>
+    </div>
+
+    <!-- Excelグリッド -->
+    <div class="grid-wrap">
+      <table class="grid" id="grid">
+        <colgroup>
+          <col style="width:36px">
+          <col style="width:100px">
+          <col style="width:120px" class="req">
+          <col style="width:140px" class="req">
+          <col style="width:120px" class="req">
+          <col style="width:110px">
+          <col style="width:110px">
+          <col style="width:110px">
+          <col style="width:110px">
+          <col style="width:180px">
+          <col style="width:90px">
+          <col style="width:90px">
+          <col style="width:40px">
+        </colgroup>
+        <thead>
+          <tr>
+            <th>No.</th>
+            <th>申請日</th>
+            <th>申請者名<span style="color:#d33">*</span></th>
+            <th>患者名<span style="color:#d33">*</span></th>
+            <th>医院名<span style="color:#d33">*</span></th>
+            <th>契約日</th>
+            <th>決済金額(円)</th>
+            <th>入金予定日</th>
+            <th>担当Dr</th>
+            <th>備考</th>
+            <th style="color:#b07800">医院還元</th>
+            <th style="color:#b07800">Dr還元</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="grid-tbody"></tbody>
+      </table>
+    </div>
+
+    <!-- サマリー -->
+    <div class="summary">
+      <span class="pill">入力行数 <strong id="sum-rows">0</strong></span>
+      <span class="pill gold">医院還元合計 <strong id="sum-clinic">¥0</strong></span>
+      <span class="pill gold">Dr還元合計 <strong id="sum-doctor">¥0</strong></span>
+      <span class="pill">合計還元 <strong id="sum-total">¥0</strong></span>
+    </div>
+
+    <!-- 履歴 -->
+    <div class="history" id="history" style="display:none">
+      <h2>📋 このブラウザの申請履歴 (直近20件)</h2>
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  const SHARED_PW = 'Seishokai1';
+  const UNLOCK_KEY = 'pbm_pw_ok';
+  const HIST_KEY = 'pbm_local_history';
+  const APPLICANT_KEY = 'pbm_last_applicant';
+
+  const CLINICS = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都','その他'];
+
+  const pwGate = document.getElementById('pw-gate');
+  const pwInput = document.getElementById('pw-input');
+  const pwSubmit = document.getElementById('pw-submit');
+  const pwError = document.getElementById('pw-error');
+  const main = document.getElementById('main');
+  const gridTbody = document.getElementById('grid-tbody');
+  const defaultApplicant = document.getElementById('default-applicant');
+  const defaultApplicantLabel = document.getElementById('default-applicant-label');
+  const btnAddRow = document.getElementById('btn-add-row');
+  const btnClearEmpty = document.getElementById('btn-clear-empty');
+  const btnSubmitAll = document.getElementById('btn-submit-all');
+  const toast = document.getElementById('toast');
+  const sumRows = document.getElementById('sum-rows');
+  const sumClinic = document.getElementById('sum-clinic');
+  const sumDoctor = document.getElementById('sum-doctor');
+  const sumTotal = document.getElementById('sum-total');
+  const historyEl = document.getElementById('history');
+  const historyList = document.getElementById('history-list');
+
+  let rowCounter = 0;
+  const fmtJPY = n => '¥' + (n||0).toLocaleString('ja-JP');
+  const todayISO = () => {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  };
+
+  function showToast(msg, kind='ok') {
+    toast.textContent = msg;
+    toast.className = 'toast ' + (kind === 'err' ? 'err' : 'ok');
+    toast.style.display = 'block';
+    setTimeout(() => { toast.style.display = 'none'; }, 3000);
+  }
+
+  function unlock(){
+    pwGate.style.display = 'none';
+    main.style.display = 'block';
+    try {
+      const last = localStorage.getItem(APPLICANT_KEY);
+      if (last && !defaultApplicant.value) defaultApplicant.value = last;
+      defaultApplicantLabel.textContent = last || '(未設定)';
+    } catch(_){}
+    // 初期5行
+    for (let i = 0; i < 5; i++) addRow();
+    updateSummary();
+    renderHistory();
+  }
+
+  defaultApplicant.addEventListener('input', () => {
+    defaultApplicantLabel.textContent = defaultApplicant.value.trim() || '(未設定)';
+    // 空の申請者名セルを一括更新
+    document.querySelectorAll('.cell-applicant').forEach(inp => {
+      if (!inp.value.trim()) inp.value = defaultApplicant.value.trim();
+    });
+  });
+
+  pwSubmit.addEventListener('click', () => {
+    if (pwInput.value.trim() === SHARED_PW) {
+      pwError.style.display = 'none';
+      try { sessionStorage.setItem(UNLOCK_KEY, '1'); } catch(_){}
+      unlock();
+    } else {
+      pwError.style.display = 'block';
+      pwInput.focus();
+      pwInput.select();
+    }
+  });
+  pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); pwSubmit.click(); } });
+  try { if (sessionStorage.getItem(UNLOCK_KEY) === '1') unlock(); } catch(_){}
+
+  function addRow(data) {
+    data = data || {};
+    rowCounter++;
+    const tr = document.createElement('tr');
+    tr.dataset.rowNo = rowCounter;
+    tr.innerHTML = `
+      <td class="rowno">${rowCounter}</td>
+      <td><input type="date" class="cell-applied-date" value="${data.applied_date || todayISO()}"></td>
+      <td><input type="text" class="cell-applicant" placeholder="申請者名" value="${(data.applicant_name || defaultApplicant.value || '').replace(/"/g,'&quot;')}"></td>
+      <td><input type="text" class="cell-patient" placeholder="患者名" value="${(data.patient_name||'').replace(/"/g,'&quot;')}"></td>
+      <td>
+        <select class="cell-clinic">
+          <option value="">選択</option>
+          ${CLINICS.map(c => `<option ${data.clinic_name===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </td>
+      <td><input type="date" class="cell-contract-date" value="${data.contract_date||''}"></td>
+      <td class="num"><input type="number" class="cell-amount" placeholder="0" value="${data.settlement_amount||''}"></td>
+      <td><input type="date" class="cell-payment-date" value="${data.payment_due_date||''}"></td>
+      <td><input type="text" class="cell-doctor" placeholder="担当Dr" value="${(data.doctor_name||'').replace(/"/g,'&quot;')}"></td>
+      <td><input type="text" class="cell-notes" placeholder="備考" value="${(data.notes||'').replace(/"/g,'&quot;')}"></td>
+      <td class="reward cell-clinic-reward">-</td>
+      <td class="reward cell-doctor-reward">-</td>
+      <td class="act"><button title="この行を削除" class="btn-remove">✕</button></td>
+    `;
+    gridTbody.appendChild(tr);
+    tr.querySelector('.btn-remove').addEventListener('click', () => {
+      tr.remove();
+      renumber();
+      updateSummary();
+    });
+    // 患者名入力で還元額自動表示
+    tr.querySelectorAll('input,select').forEach(el => {
+      el.addEventListener('input', () => {
+        updateRewardCells(tr);
+        updateSummary();
+      });
+      el.addEventListener('change', () => {
+        updateRewardCells(tr);
+        updateSummary();
+      });
+    });
+    updateRewardCells(tr);
+  }
+
+  function updateRewardCells(tr) {
+    const patient = tr.querySelector('.cell-patient').value.trim();
+    const cClinic = tr.querySelector('.cell-clinic-reward');
+    const cDoctor = tr.querySelector('.cell-doctor-reward');
+    if (patient) {
+      cClinic.textContent = '¥15,000';
+      cDoctor.textContent = '¥5,000';
+      cClinic.style.color = '#b07800';
+      cDoctor.style.color = '#b07800';
+    } else {
+      cClinic.textContent = '-';
+      cDoctor.textContent = '-';
+      cClinic.style.color = '#ccc';
+      cDoctor.style.color = '#ccc';
+    }
+  }
+
+  function renumber() {
+    let i = 0;
+    gridTbody.querySelectorAll('tr').forEach(tr => {
+      i++;
+      tr.querySelector('.rowno').textContent = i;
+      tr.dataset.rowNo = i;
+    });
+    rowCounter = i;
+  }
+
+  function updateSummary() {
+    let cnt = 0;
+    gridTbody.querySelectorAll('tr').forEach(tr => {
+      if (tr.querySelector('.cell-patient').value.trim()) cnt++;
+    });
+    sumRows.textContent = cnt;
+    sumClinic.textContent = fmtJPY(cnt * 15000);
+    sumDoctor.textContent = fmtJPY(cnt * 5000);
+    sumTotal.textContent = fmtJPY(cnt * 20000);
+  }
+
+  btnAddRow.addEventListener('click', () => { addRow(); });
+  btnClearEmpty.addEventListener('click', () => {
+    gridTbody.querySelectorAll('tr').forEach(tr => {
+      if (!tr.querySelector('.cell-patient').value.trim()) tr.remove();
+    });
+    renumber();
+    updateSummary();
+  });
+
+  btnSubmitAll.addEventListener('click', async () => {
+    const rows = Array.from(gridTbody.querySelectorAll('tr'))
+      .map(tr => ({
+        applicant_name: tr.querySelector('.cell-applicant').value.trim(),
+        patient_name: tr.querySelector('.cell-patient').value.trim(),
+        clinic_name: tr.querySelector('.cell-clinic').value.trim(),
+        contract_date: tr.querySelector('.cell-contract-date').value || null,
+        settlement_amount: Number(tr.querySelector('.cell-amount').value) || null,
+        payment_due_date: tr.querySelector('.cell-payment-date').value || null,
+        doctor_name: tr.querySelector('.cell-doctor').value.trim() || null,
+        notes: tr.querySelector('.cell-notes').value.trim() || ''
+      }))
+      .filter(r => r.patient_name); // 患者名が入ってる行のみ
+
+    if (!rows.length) {
+      showToast('入力されている行がありません（患者名が必要）', 'err');
+      return;
+    }
+
+    // バリデーション
+    const bad = [];
+    rows.forEach((r, i) => {
+      if (!r.applicant_name) bad.push((i+1) + '行目: 申請者名');
+      if (!r.clinic_name) bad.push((i+1) + '行目: 医院名');
+    });
+    if (bad.length) {
+      showToast('必須未入力: ' + bad.slice(0, 3).join(', '), 'err');
+      return;
+    }
+
+    if (!confirm(rows.length + '件を申請します。よろしいですか？')) return;
+
+    btnSubmitAll.disabled = true;
+    btnSubmitAll.textContent = '送信中... (0/' + rows.length + ')';
+
+    let okCount = 0, failCount = 0;
+    const successIds = [];
+    for (let i = 0; i < rows.length; i++) {
+      btnSubmitAll.textContent = `送信中... (${i+1}/${rows.length})`;
+      try {
+        const { data, error } = await sb.rpc('submit_pbm_application_public', {
+          p_password: SHARED_PW,
+          p_applicant_name: rows[i].applicant_name,
+          p_patient_name: rows[i].patient_name,
+          p_clinic_name: rows[i].clinic_name,
+          p_contract_date: rows[i].contract_date,
+          p_settlement_amount: rows[i].settlement_amount,
+          p_payment_due_date: rows[i].payment_due_date,
+          p_doctor_name: rows[i].doctor_name,
+          p_notes: rows[i].notes
+        });
+        if (error) throw error;
+        if (!data?.ok) throw new Error(data?.error || 'fail');
+        okCount++;
+        successIds.push(data.id);
+        addLocalHistory({
+          id: data.id,
+          applied_at: new Date().toISOString(),
+          applicant_name: rows[i].applicant_name,
+          patient_name: rows[i].patient_name,
+          clinic_name: rows[i].clinic_name,
+          doctor_name: rows[i].doctor_name
+        });
+      } catch (e) {
+        console.error('行' + (i+1) + 'エラー:', e);
+        failCount++;
+      }
+    }
+
+    btnSubmitAll.disabled = false;
+    btnSubmitAll.textContent = '📤 入力した行を一括申請';
+
+    if (okCount > 0) {
+      // 申請者名を保存
+      try { localStorage.setItem(APPLICANT_KEY, defaultApplicant.value.trim()); } catch(_){}
+      // 成功した行をグリッドから削除
+      Array.from(gridTbody.querySelectorAll('tr')).forEach(tr => {
+        if (tr.querySelector('.cell-patient').value.trim()) tr.remove();
+      });
+      renumber();
+      // 5行未満なら追加
+      while (gridTbody.querySelectorAll('tr').length < 5) addRow();
+      updateSummary();
+      renderHistory();
+      if (failCount === 0) {
+        showToast('✅ ' + okCount + '件すべて申請完了しました', 'ok');
+      } else {
+        showToast('⚠️ ' + okCount + '件成功 / ' + failCount + '件失敗', 'err');
+      }
+    } else {
+      showToast('❌ 全件失敗しました。ネットワークを確認してください', 'err');
+    }
+  });
+
+  function addLocalHistory(rec) {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(_){ list = []; }
+    list.unshift(rec);
+    try { localStorage.setItem(HIST_KEY, JSON.stringify(list.slice(0, 50))); } catch(_){}
+  }
+
+  function renderHistory() {
+    let list = [];
+    try { list = JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch(_){}
+    if (!list.length) { historyEl.style.display = 'none'; return; }
+    historyEl.style.display = 'block';
+    historyList.innerHTML = list.slice(0, 20).map(r => {
+      const dt = r.applied_at ? new Date(r.applied_at).toLocaleString('ja-JP', {month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'}) : '';
+      return `<div class="history-item">
+        <div class="main">
+          <div class="name">${(r.patient_name||'').replace(/</g,'&lt;')} ／ ${(r.clinic_name||'').replace(/</g,'&lt;')}</div>
+          <div class="meta">${dt} ${r.applicant_name ? '／ 申請:'+r.applicant_name.replace(/</g,'&lt;') : ''} ${r.doctor_name ? '／ Dr:'+r.doctor_name.replace(/</g,'&lt;') : ''}</div>
+        </div>
+        <span class="tag">送信済 #${r.id}</span>
+      </div>`;
+    }).join('');
+  }
+})();
+</script>
+</body>
+</html>
