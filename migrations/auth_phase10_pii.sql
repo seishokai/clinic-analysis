@@ -5,8 +5,18 @@
 -- 1. accounts テーブルに can_view_pii フラグを追加
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS can_view_pii BOOLEAN DEFAULT FALSE;
 
--- 2. get_my_account RPC を更新して can_view_pii も返す
-CREATE OR REPLACE FUNCTION get_my_account()
+-- 2. 既存の関数を削除 (返り値の型変更のため)
+DROP FUNCTION IF EXISTS get_my_account();
+DROP FUNCTION IF EXISTS admin_list_accounts_for_mig();
+DROP FUNCTION IF EXISTS admin_update_account_role(INTEGER, TEXT, TEXT, JSONB, JSONB);
+DROP FUNCTION IF EXISTS admin_update_account_role(INTEGER, TEXT, TEXT, JSONB, JSONB, BOOLEAN);
+DROP FUNCTION IF EXISTS admin_update_account(INTEGER, TEXT, TEXT, JSONB, JSONB);
+DROP FUNCTION IF EXISTS admin_update_account(INTEGER, TEXT, TEXT, JSONB, JSONB, BOOLEAN);
+DROP FUNCTION IF EXISTS admin_create_account_with_role(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB);
+DROP FUNCTION IF EXISTS admin_create_account_with_role(UUID, TEXT, TEXT, TEXT, TEXT, JSONB, JSONB, BOOLEAN);
+
+-- 3. get_my_account RPC を作成 (can_view_pii も返す)
+CREATE FUNCTION get_my_account()
 RETURNS jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -41,8 +51,8 @@ BEGIN
 END;
 $$;
 
--- 3. admin_list_accounts_for_mig RPC も更新 (管理画面用)
-CREATE OR REPLACE FUNCTION admin_list_accounts_for_mig()
+-- 4. admin_list_accounts_for_mig RPC を作成 (管理画面用)
+CREATE FUNCTION admin_list_accounts_for_mig()
 RETURNS SETOF jsonb
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -73,8 +83,8 @@ BEGIN
 END;
 $$;
 
--- 4. admin_update_account_role に can_view_pii パラメータ追加
-CREATE OR REPLACE FUNCTION admin_update_account_role(
+-- 5. admin_update_account RPC を作成 (編集用)
+CREATE FUNCTION admin_update_account(
   p_account_id INTEGER,
   p_role TEXT,
   p_agency TEXT DEFAULT NULL,
@@ -102,8 +112,8 @@ BEGIN
 END;
 $$;
 
--- 5. admin_create_account_with_role に can_view_pii 追加 (新規発行用)
-CREATE OR REPLACE FUNCTION admin_create_account_with_role(
+-- 6. admin_create_account_with_role RPC を作成 (新規発行用)
+CREATE FUNCTION admin_create_account_with_role(
   p_user_uuid UUID,
   p_email TEXT,
   p_name TEXT,
@@ -137,8 +147,8 @@ BEGIN
 END;
 $$;
 
--- 6. 丸田 アカウントに can_view_pii = TRUE を設定
+-- 7. 丸田 アカウントに can_view_pii = TRUE を設定
 UPDATE accounts SET can_view_pii = TRUE WHERE name LIKE '%丸田%';
 
--- 7. スキーマキャッシュをリロード
+-- 8. スキーマキャッシュをリロード
 NOTIFY pgrst, 'reload schema';
