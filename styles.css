@@ -527,10 +527,11 @@ body {
   .view-wide .data-table.compact th { font-size: 10px; background: #fafafa; position: sticky; top: 0; z-index: 10; }
   .stat-card { padding: 10px 12px !important; border-radius: 12px !important; }
   .stat-label { font-size: 10px !important; color: var(--text-sub); }
-  /* ボトムナビ: タップしやすくする + 見やすく */
+  /* ボトムナビ: タップしやすくする + 見やすく (6項目対応) */
   .bottom-nav { height: calc(62px + var(--safe-b)) !important; background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,0.06); z-index: 150; }
-  .bottom-nav-btn { font-size: 10px !important; padding: 6px 0 !important; gap: 2px; }
-  .bottom-nav-btn svg { width: 22px !important; height: 22px !important; }
+  .bottom-nav-btn { font-size: 10px !important; padding: 6px 2px !important; gap: 2px; flex: 1; min-width: 0; }
+  .bottom-nav-btn svg { width: 20px !important; height: 20px !important; }
+  .bottom-nav-btn span { white-space: nowrap; font-size: 9.5px !important; }
   .bottom-nav-btn.active { color: #1d4ed8; font-weight: 600; }
   .bottom-nav-btn.active svg { stroke: #1d4ed8; }
   /* サブナビのタブを指で押しやすく */
