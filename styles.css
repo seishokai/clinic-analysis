@@ -509,42 +509,69 @@ body {
   :root { --bottom-h: calc(60px + env(safe-area-inset-bottom, 0px)); }
   .desktop-nav, .btn-logout { display: none; }
   .bottom-nav { display: flex; }
-  .header { padding: 0 16px; height: 48px; }
-  .header h1 { font-size: 14px; }
-  .sub-nav { padding: 0 16px; }
-  .view { padding: 16px; padding-bottom: calc(16px + var(--bottom-h)); }
-  .page-header h2 { font-size: 16px; }
+  .header { padding: 0 12px; height: 52px; position: sticky; top: 0; z-index: 100; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+  .header h1 { font-size: 15px; letter-spacing: 1px; }
+  .sub-nav { padding: 0 12px; position: sticky; top: 52px; z-index: 90; background: #fff; box-shadow: 0 2px 6px rgba(0,0,0,0.04); -webkit-overflow-scrolling: touch; overflow-x: auto; scrollbar-width: none; }
+  .sub-nav::-webkit-scrollbar { display: none; }
+  .view { padding: 12px; padding-bottom: calc(12px + var(--bottom-h)); }
+  .page-header h2 { font-size: 17px; margin: 8px 0 12px; }
   .clinic-grid { grid-template-columns: 1fr; }
-  .stats-row { grid-template-columns: repeat(2, 1fr); }
-  .stat-num { font-size: 22px; }
+  .stats-row { grid-template-columns: repeat(2, 1fr) !important; gap: 8px !important; }
+  .stat-num { font-size: 24px !important; font-weight: 700; }
   .form-grid { grid-template-columns: 1fr; }
-  .modal-content { width: 100%; max-width: 100%; max-height: 100%; height: 100%; border-radius: 0; padding: 16px; }
+  .modal-content { width: 100%; max-width: 100%; max-height: 92vh; border-radius: 16px 16px 0 0; padding: 16px; position: fixed; bottom: 0; left: 0; right: 0; top: auto; animation: slideUpMobile 0.22s ease-out; }
   .view-wide { padding: 4px; }
-  .view-wide .data-table-wrap { -webkit-overflow-scrolling: touch; overflow-x: auto; }
-  .view-wide .data-table.compact { font-size: 10px; table-layout: auto; min-width: 800px; }
-  .view-wide .data-table.compact td, .view-wide .data-table.compact th { padding: 4px 4px; white-space: nowrap; }
-  .view-wide .data-table.compact th { font-size: 10px; }
-  .stats-row { grid-template-columns: repeat(auto-fill, minmax(90px, 1fr)) !important; gap: 6px !important; }
-  .stat-card { padding: 8px 10px !important; }
-  .stat-num { font-size: 18px !important; }
-  .stat-label { font-size: 9px !important; }
-  .bottom-nav { height: calc(50px + var(--safe-b)) !important; }
-  .bottom-nav-btn { font-size: 9px !important; }
-  .bottom-nav-btn svg { width: 18px !important; height: 18px !important; }
-  .sub-nav { padding: 0 8px !important; }
-  .sub-nav-btn { font-size: 12px !important; padding: 8px 12px !important; }
-  .form-grid { grid-template-columns: 1fr 1fr !important; gap: 8px !important; }
+  .view-wide .data-table-wrap { -webkit-overflow-scrolling: touch; overflow-x: auto; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .view-wide .data-table.compact { font-size: 11px; table-layout: auto; min-width: 800px; }
+  .view-wide .data-table.compact td, .view-wide .data-table.compact th { padding: 8px 6px; white-space: nowrap; }
+  .view-wide .data-table.compact th { font-size: 10px; background: #fafafa; position: sticky; top: 0; z-index: 10; }
+  .stat-card { padding: 10px 12px !important; border-radius: 12px !important; }
+  .stat-label { font-size: 10px !important; color: var(--text-sub); }
+  /* ボトムナビ: タップしやすくする + 見やすく */
+  .bottom-nav { height: calc(62px + var(--safe-b)) !important; background: #fff; box-shadow: 0 -2px 8px rgba(0,0,0,0.06); z-index: 150; }
+  .bottom-nav-btn { font-size: 10px !important; padding: 6px 0 !important; gap: 2px; }
+  .bottom-nav-btn svg { width: 22px !important; height: 22px !important; }
+  .bottom-nav-btn.active { color: #1d4ed8; font-weight: 600; }
+  .bottom-nav-btn.active svg { stroke: #1d4ed8; }
+  /* サブナビのタブを指で押しやすく */
+  .sub-nav-btn { font-size: 13px !important; padding: 10px 14px !important; min-height: 40px; }
+  .sub-nav-btn.active { font-weight: 700; }
+  /* フォーム入力: タップ領域を大きく */
+  .form-input, .form-select { font-size: 16px !important; min-height: 44px !important; padding: 10px 12px !important; border-radius: 10px !important; }
+  .form-label { font-size: 11px !important; font-weight: 600; margin-bottom: 4px; }
+  /* ボタン: 押しやすい最小サイズ */
+  .btn, button.btn-primary, button.btn-outline, button.btn-dark { min-height: 44px !important; font-size: 14px !important; border-radius: 10px !important; }
+  /* フィルタ行: 横スクロール */
+  .filter-row, .bk-filters, .kaiin-filter-top { overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap !important; }
+  .filter-row::-webkit-scrollbar, .bk-filters::-webkit-scrollbar { display: none; }
+  .form-grid { grid-template-columns: 1fr !important; gap: 10px !important; }
   .bar-label { width: 100px !important; font-size: 11px !important; }
   .bar-track { max-width: 150px !important; }
   .bar-value { font-size: 10px !important; min-width: 60px !important; }
   .detail-grid { grid-template-columns: 1fr; }
   .detail-grid dt { margin-top: 8px; font-size: 10px; }
   .detail-grid dd { padding: 6px 10px; background: var(--bg); border-radius: 6px; }
-  .login-card { padding: 32px 24px; }
+  .login-card { padding: 32px 20px; border-radius: 16px; }
+  /* マルチセレクトのドロップダウンを大きく */
+  .multi-select-dropdown { width: calc(100vw - 24px) !important; max-width: none !important; }
+  /* Sticky first column for tables (name) */
+  .view-wide .data-table.compact td:nth-child(3), .view-wide .data-table.compact th:nth-child(3) { position: sticky; left: 0; background: #fff; z-index: 5; box-shadow: 2px 0 4px rgba(0,0,0,0.04); }
+  /* トースト: 上に表示（大きくて見やすく） */
+  .toast { bottom: calc(80px + var(--safe-b)) !important; max-width: 85vw; font-size: 14px !important; padding: 12px 16px !important; border-radius: 12px !important; }
+  /* 入力欄フォーカス時ズーム防止 (iOS) */
+  input, select, textarea { font-size: 16px !important; }
 }
 @media (max-width: 380px) {
-  .stat-num { font-size: 20px; }
-  .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .stat-num { font-size: 20px !important; }
+  .stats-row { grid-template-columns: 1fr 1fr !important; gap: 6px !important; }
+  .sub-nav-btn { padding: 10px 10px !important; font-size: 12px !important; }
+  .header h1 { font-size: 13px; }
+}
+
+/* モーダル スライドアップアニメーション (モバイル) */
+@keyframes slideUpMobile {
+  from { transform: translateY(100%); opacity: 0.8; }
+  to { transform: translateY(0); opacity: 1; }
 }
 
 /* 成約なのに商材/金額が未入力のアラート */

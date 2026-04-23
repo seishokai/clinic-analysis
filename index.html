@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=110">
+  <link rel="stylesheet" href="styles.css?v=111">
   <script>
     // ?view=para: メインアプリのフラッシュを防止 (para は完全に独自UIで置換するため)
     (function(){
@@ -15,6 +15,26 @@
           s.id = '__pre-hide-main';
           s.textContent = '#app,#login-screen{display:none!important}body{background:#fff}';
           document.head.appendChild(s);
+        }
+      } catch(_){}
+    })();
+    // ?login / ?staff / ?agency: キャッシュされたセッションを即時クリア (自動ログイン防止)
+    // スクリプト読込前に localStorage の supabase-auth-token を削除することで
+    // sb.auth.getSession() が session 無し状態で初期化される
+    (function(){
+      try {
+        var p = new URLSearchParams(location.search);
+        var isLoginMode = p.has('login') || p.has('staff') || p.has('agency') || p.get('view')==='login';
+        if (isLoginMode) {
+          Object.keys(localStorage).forEach(function(k){
+            if (k.indexOf('supabase') >= 0 || k.indexOf('sb-') === 0 || k.indexOf('auth-token') >= 0) {
+              localStorage.removeItem(k);
+            }
+          });
+          Object.keys(sessionStorage).forEach(function(k){ sessionStorage.removeItem(k); });
+          // 認証フラグも明示的にクリア
+          sessionStorage.removeItem('authenticated');
+          sessionStorage.removeItem('currentRole');
         }
       } catch(_){}
     })();
@@ -1116,7 +1136,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=257"></script>
+  <script src="app.js?v=258"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
