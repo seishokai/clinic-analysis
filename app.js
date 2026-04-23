@@ -1080,6 +1080,9 @@ function setupEventListeners() {
         try { sessionStorage.setItem('lastSub:' + el.id, sub); } catch(_){}
       }
       // タブ切替時にデータ更新
+      if (sub === 'bk-home') {
+        if (typeof renderHomeDashboard === 'function') renderHomeDashboard();
+      }
       if (sub === 'bk-search' && bookingsData.length > 0) {
         const psFac = document.getElementById('ps-facility');
         if (psFac && psFac.options.length <= 1) {
@@ -1916,6 +1919,9 @@ function showApp() {
   // v261: ヘッダーバッジ + プルリフレッシュ 初期化 (1度だけ)
   try { setupHeaderBadge(); } catch(_){}
   try { setupPullRefresh(); } catch(_){}
+  // v261: データ読込後にホームダッシュボード描画
+  setTimeout(() => { try { renderHomeDashboard(); } catch(_){} }, 800);
+  setTimeout(() => { try { renderHomeDashboard(); } catch(_){} }, 2500);
 
   // ヘッダーのロール表示
   const header = document.querySelector('.header');
@@ -1997,6 +2003,194 @@ function restoreLastView() {
 }
 
 // === Navigation ===
+// === v261 ホームダッシュボード ===
+function renderHomeDashboard() {
+  const el = document.getElementById('home-dashboard-content');
+  if (!el) return;
+  const data = Array.isArray(bookingsData) ? (getFilteredBookingsData ? getFilteredBookingsData() : bookingsData) : [];
+  if (!data.length) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-sub)">データがありません</div>';
+    return;
+  }
+
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+  const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+  const tomorrowEnd = new Date(todayEnd.getTime() + 24*3600*1000);
+  const weekEnd = new Date(todayEnd.getTime() + 6*24*3600*1000);
+  const thisMonth = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}`;
+  const active = data.filter(d => d.status !== '除外');
+
+  // 今日の予約
+  const today = active.filter(d => {
+    const bd = parseDate(d.bookDate);
+    return bd && bd >= todayStart && bd <= todayEnd;
+  });
+  const tomorrow = active.filter(d => {
+    const bd = parseDate(d.bookDate);
+    return bd && bd > todayEnd && bd <= tomorrowEnd;
+  });
+  const thisWeek = active.filter(d => {
+    const bd = parseDate(d.bookDate);
+    return bd && bd >= todayStart && bd <= weekEnd;
+  });
+
+  // 要対応 (status 未設定・未対応)
+  const pending = active.filter(d => !d.status || d.status === '未対応').length;
+  const confirmed = active.filter(d => d.status === '確認済' || d.status === '来院済' || d.status === '成約').length;
+  const todayPending = today.filter(d => !d.status || d.status === '未対応').length;
+
+  // 今日の予約 時間順
+  const todaySorted = today.slice().sort((a,b) => (a.bookDate||'').localeCompare(b.bookDate||''));
+
+  // 今月の成約件数・金額
+  const thisMonthContracted = active.filter(d => {
+    if (d.status !== '成約') return false;
+    const bd = d.bookDate || '';
+    return bd.startsWith(thisMonth);
+  });
+  const thisMonthAmount = thisMonthContracted.reduce((s, d) => s + Number(d.contractAmount || 0), 0);
+
+  // キャンセル (今週)
+  const weekCancel = active.filter(d => {
+    if (d.status !== 'キャンセル') return false;
+    const bd = parseDate(d.bookDate);
+    return bd && bd >= todayStart && bd <= weekEnd;
+  }).length;
+
+  const fmtYen = n => '¥' + (n || 0).toLocaleString('ja-JP');
+  const greeting = (() => {
+    const h = now.getHours();
+    if (h < 5) return 'おつかれさまです';
+    if (h < 11) return 'おはようございます';
+    if (h < 18) return 'こんにちは';
+    return 'おつかれさまです';
+  })();
+  const name = (window.currentUserName || sessionStorage.getItem('customName') || (typeof currentRole !== 'undefined' ? currentRole : '') || '').toString();
+
+  el.innerHTML = `
+    <div style="margin-bottom:14px">
+      <div style="font-size:13px;color:var(--text-sub);margin-bottom:4px">${greeting}${name ? '、' + escapeHtml(name) + ' さん' : ''}</div>
+      <div style="font-size:18px;font-weight:700;color:#1a1a1a">今日は ${now.getMonth()+1}月${now.getDate()}日 (${'日月火水木金土'[now.getDay()]})</div>
+    </div>
+
+    <!-- 大きなアラート (要対応が多い) -->
+    ${todayPending > 0 ? `
+      <div class="home-alert" data-action="today-pending" style="margin-bottom:14px;padding:14px 16px;background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border:2px solid #dc2626;border-radius:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-size:12px;color:#991b1b;font-weight:700;letter-spacing:0.5px;margin-bottom:2px">⚠️ 今日の未対応予約</div>
+          <div style="font-size:24px;color:#991b1b;font-weight:900">${todayPending} <span style="font-size:13px;font-weight:600">件</span></div>
+        </div>
+        <div style="font-size:11px;color:#991b1b;font-weight:600">タップで確認 →</div>
+      </div>
+    ` : ''}
+
+    <!-- メインメトリクス -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
+      <div class="home-card" data-action="today" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s">
+        <div style="font-size:10px;color:var(--text-sub);font-weight:600;letter-spacing:0.5px">📅 今日</div>
+        <div style="font-size:22px;font-weight:800;color:#1d4ed8;margin-top:4px">${today.length}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      </div>
+      <div class="home-card" data-action="tomorrow" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s">
+        <div style="font-size:10px;color:var(--text-sub);font-weight:600;letter-spacing:0.5px">🗓 明日</div>
+        <div style="font-size:22px;font-weight:800;color:#7c3aed;margin-top:4px">${tomorrow.length}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      </div>
+      <div class="home-card" data-action="week" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s">
+        <div style="font-size:10px;color:var(--text-sub);font-weight:600;letter-spacing:0.5px">📆 今週</div>
+        <div style="font-size:22px;font-weight:800;color:#059669;margin-top:4px">${thisWeek.length}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      </div>
+      <div class="home-card" data-action="pending" style="background:#fff;border:1px solid #f59e0b;border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s;background:#fffbeb">
+        <div style="font-size:10px;color:#92400e;font-weight:600;letter-spacing:0.5px">⏳ 要対応</div>
+        <div style="font-size:22px;font-weight:800;color:#b45309;margin-top:4px">${pending}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      </div>
+    </div>
+
+    <!-- 今月の実績 -->
+    <div style="background:linear-gradient(135deg,#ecfeff 0%,#dbeafe 100%);border:1px solid #06b6d4;border-radius:12px;padding:12px 14px;margin-bottom:14px">
+      <div style="font-size:11px;color:#0891b2;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">📊 今月の実績</div>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline">
+        <div><span style="font-size:22px;font-weight:800;color:#0e7490">${thisMonthContracted.length}</span><span style="font-size:11px;color:#0891b2;margin-left:3px">件成約</span></div>
+        <div><span style="font-size:20px;font-weight:700;color:#0e7490">${fmtYen(thisMonthAmount)}</span></div>
+        ${weekCancel > 0 ? `<div style="margin-left:auto"><span style="font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</span></div>` : ''}
+      </div>
+    </div>
+
+    ${todaySorted.length > 0 ? `
+      <!-- 今日の予約リスト -->
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <div style="font-size:13px;font-weight:700;color:#1a1a1a">🕐 今日の予約 (${todaySorted.length}件)</div>
+          <button class="home-link-btn" data-action="today" style="font-size:11px;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:600">詳細 →</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px">
+          ${todaySorted.slice(0, 8).map(d => {
+            const bd = d.bookDate || '';
+            const tm = bd.match(/(\d{1,2}):(\d{2})/);
+            const tstr = tm ? `${tm[1]}:${tm[2]}` : '--:--';
+            const st = d.status || '未対応';
+            const stC = st === '成約' ? '#059669' : st === '来院済' ? '#1d4ed8' : st === 'キャンセル' ? '#dc2626' : st === '確認済' ? '#7c3aed' : (!d.status || st === '未対応') ? '#dc2626' : '#555';
+            const stBg = st === '成約' ? '#dcfce7' : st === '来院済' ? '#dbeafe' : st === 'キャンセル' ? '#fee2e2' : st === '確認済' ? '#f3e8ff' : (!d.status || st === '未対応') ? '#fee2e2' : '#f3f4f6';
+            const nm = _isPII_MaskNeeded && _isPII_MaskNeeded() ? maskName(d.name) : d.name;
+            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fafafa;border-radius:8px">
+              <div style="font-size:13px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;min-width:50px">${tstr}</div>
+              <div style="flex:1;font-size:13px;color:#1a1a1a;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(nm || '')}</div>
+              <div style="font-size:10px;color:var(--text-sub);white-space:nowrap">${escapeHtml(normFac(d.facility)||'')}</div>
+              <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${stBg};color:${stC};white-space:nowrap">${st}</span>
+            </div>`;
+          }).join('')}
+          ${todaySorted.length > 8 ? `<div style="text-align:center;font-size:11px;color:var(--text-sub);padding:4px">他 ${todaySorted.length - 8} 件...</div>` : ''}
+        </div>
+      </div>
+    ` : `
+      <div style="text-align:center;padding:30px;color:var(--text-sub);font-size:13px;background:#fafafa;border-radius:12px;margin-bottom:12px">
+        📭 今日の予約はありません
+      </div>
+    `}
+
+    <!-- ショートカット -->
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      <button class="home-shortcut" data-view="bookings" data-sub="bk-list" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">📋 予約一覧へ</button>
+      <button class="home-shortcut" data-view="kaiin" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">🏥 来院管理へ</button>
+      <button class="home-shortcut" data-view="tc" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">💬 TCへ</button>
+      <button class="home-shortcut" data-view="sales" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">💰 売上へ</button>
+    </div>
+  `;
+
+  // インタラクション
+  el.querySelectorAll('.home-card, .home-alert').forEach(c => {
+    c.addEventListener('click', () => {
+      const action = c.dataset.action;
+      switchBookingSub('bk-list');
+      setTimeout(() => {
+        if (action === 'today' || action === 'today-pending') {
+          document.getElementById('bk-today-btn')?.click();
+        } else if (action === 'pending') {
+          const card = document.querySelector('[data-st="pending"]');
+          if (card) card.click();
+        }
+      }, 100);
+    });
+  });
+  el.querySelectorAll('.home-shortcut').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const v = btn.dataset.view;
+      const s = btn.dataset.sub;
+      try { switchView(v); } catch(_){}
+      if (s) setTimeout(() => switchBookingSub(s), 120);
+    });
+  });
+  el.querySelectorAll('.home-link-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      switchBookingSub('bk-list');
+      setTimeout(() => document.getElementById('bk-today-btn')?.click(), 100);
+    });
+  });
+}
+function switchBookingSub(subId) {
+  const btn = document.querySelector(`#bk-sub-nav .sub-nav-btn[data-sub="${subId}"]`);
+  if (btn) btn.click();
+}
+
 // === v261 ヘッダー通知バッジ (要対応件数常時表示) ===
 let _badgeUpdateTimer = null;
 function setupHeaderBadge() {

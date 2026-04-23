@@ -529,7 +529,8 @@
     <!-- ==================== 予約管理 ==================== -->
     <main id="view-bookings" class="view view-wide">
       <div class="sub-nav" id="bk-sub-nav">
-        <button class="sub-nav-btn active" data-sub="bk-list">予約一覧</button>
+        <button class="sub-nav-btn active" data-sub="bk-home" style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);color:#1d4ed8;font-weight:700">🏠 ホーム</button>
+        <button class="sub-nav-btn" data-sub="bk-list">予約一覧</button>
         <button class="sub-nav-btn" data-sub="bk-search">患者検索</button>
         <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
         <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
@@ -547,7 +548,10 @@
         <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="大森">大森</button>
         <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="京都">京都</button>
       </div>
-      <div id="sub-bk-list">
+      <div id="sub-bk-home" style="padding:12px">
+        <div id="home-dashboard-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
+      </div>
+      <div id="sub-bk-list" hidden>
         <div class="stats-row" id="bk-stats" style="gap:6px;margin-bottom:8px"><div class="stat-card"><span class="stat-label">読み込み中...</span></div></div>
         <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
           <button class="btn" id="bk-overdue-btn" style="min-height:34px;padding:6px 16px;font-size:12px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px;transition:all 0.2s">進捗</button>
@@ -1144,7 +1148,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=261"></script>
+  <script src="app.js?v=262"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
