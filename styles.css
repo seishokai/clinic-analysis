@@ -766,6 +766,69 @@ body {
   .btn, .btn-primary, .btn-outline { font-size: 13px !important; }
 }
 
+/* ================================================== */
+/*  📱 v260 モバイル総点検: 見やすさ/使いやすさ/スピード */
+/* ================================================== */
+@media (max-width: 768px) {
+  /* フィルター行を画面上部に sticky 化 (表と同時スクロール衝突の解消) */
+  .bk-filters, .kaiin-filter-top, .filter-row {
+    position: sticky !important;
+    top: 52px !important;  /* ヘッダーの下 */
+    z-index: 40 !important;
+    background: #fff !important;
+    padding: 8px 10px !important;
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  /* サブナビも sticky (タブと filter 両方見える) */
+  .sub-nav {
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 45 !important;
+    background: #fff !important;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+    padding: 4px 8px !important;
+  }
+  /* 数値カード (stat-card) の並びを 3列 → 2列 に縮小 */
+  .stats-row { grid-template-columns: repeat(2, 1fr) !important; gap: 6px !important; }
+  .stat-card { padding: 8px 10px !important; border-radius: 10px !important; }
+  .stat-num { font-size: 18px !important; }
+  .stat-label { font-size: 10px !important; }
+  /* セレクト/ドロップダウンのラベル見やすく */
+  .multi-select-trigger { min-height: 38px !important; font-size: 13px !important; padding: 6px 10px !important; }
+  /* アクションボタン群のギャップ */
+  .action-btns, .header-actions { gap: 6px !important; }
+  /* モーダルの閉じボタンをさらに大きく */
+  .modal-close {
+    width: 48px !important;
+    height: 48px !important;
+    font-size: 24px !important;
+    background: rgba(0,0,0,0.05) !important;
+  }
+  /* カード/セクションの角丸を柔らかく */
+  .card, .kaiin-all-card, .reward-card { border-radius: 14px !important; }
+
+  /* タブ切替時のちらつき軽減 (軽量アニメ) */
+  .view { animation: fadeIn 0.12s ease-out; }
+  @keyframes fadeIn { from { opacity: 0.7 } to { opacity: 1 } }
+
+  /* 長いツールバーを省略表示 (ブロック内で横スクロールさせる) */
+  .page-header { padding: 8px 10px !important; min-height: auto !important; flex-wrap: wrap !important; }
+  .page-header h2 { font-size: 15px !important; margin: 0 0 4px !important; }
+  /* ステータスバッジを小さく、視認性保つ */
+  .badge { padding: 3px 8px !important; font-size: 10px !important; font-weight: 600 !important; }
+
+  /* 入力欄の読み込み中のちらつき抑制 */
+  .data-table tbody tr { contain: layout style; }
+
+  /* モバイルで非優先な列を縮小 (売上・交通費等は折り畳み風) */
+  .kaiin-table-wrap .data-table.compact td:nth-child(n+7),
+  .kaiin-table-wrap .data-table.compact th:nth-child(n+7) {
+    min-width: auto !important;
+  }
+}
+
 /* モーダル スライドアップアニメーション (モバイル) */
 @keyframes slideUpMobile {
   from { transform: translateY(100%); opacity: 0.8; }
