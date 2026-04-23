@@ -685,6 +685,7 @@ document.addEventListener('DOMContentLoaded', () => {
     promoFilter = sessionStorage.getItem('promoFilter') || '';
     currentRole = sessionStorage.getItem('currentRole') || (userRole === 'admin' ? 'admin' : 'agency');
     try { currentAllowedPromos = JSON.parse(sessionStorage.getItem('currentAllowedPromos') || '[]'); } catch(_) { currentAllowedPromos = []; }
+    try { window.currentCanViewPII = sessionStorage.getItem('currentCanViewPII') === '1'; } catch(_) { window.currentCanViewPII = false; }
     try { currentVisibleTabs = JSON.parse(sessionStorage.getItem('currentVisibleTabs') || 'null'); } catch(_) { currentVisibleTabs = null; }
     showApp();
   }
@@ -760,7 +761,12 @@ function _matchesAllowedPromo(source) {
 // 個人情報マスク (staff_promo/agency 向け)
 // 名前: 先頭2文字 + ※※...
 // 電話/メール: 全て ※
-function _isPII_MaskNeeded() { return currentRole !== 'admin'; }
+function _isPII_MaskNeeded() {
+  if (currentRole === 'admin') return false;
+  // can_view_pii フラグで個別許可 (電話追跡担当など)
+  if (window.currentCanViewPII === true) return false;
+  return true;
+}
 function maskName(name) {
   if (!name) return name;
   if (!_isPII_MaskNeeded()) return name;
@@ -854,6 +860,9 @@ function _applyAccountProfileToSession(profile) {
   sessionStorage.setItem('currentRole', currentRole);
   sessionStorage.setItem('currentAllowedPromos', JSON.stringify(currentAllowedPromos));
   sessionStorage.setItem('currentVisibleTabs', JSON.stringify(currentVisibleTabs));
+  // PII閲覧許可フラグ (電話追跡担当など)
+  window.currentCanViewPII = (profile.can_view_pii === true);
+  sessionStorage.setItem('currentCanViewPII', window.currentCanViewPII ? '1' : '0');
   const type = profile.account_type || 'custom';
   sessionStorage.setItem('role', type);
   sessionStorage.setItem('authMode', 'supabase'); // 識別用 (旧ログインと区別)
@@ -3431,12 +3440,12 @@ function renderBookings() {
   const total = active.length;
   const cancelled = active.filter(d => d.status === 'キャンセル').length;
   const pending = active.filter(d => !d.status || d.status === '未対応').length;
-  const visited = active.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const visited = active.filter(d => isVisitedStatus(d.status)).length;
   const contracted = active.filter(d => d.status === '成約').length;
   // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
   const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
   const pastBookings = active.filter(d => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; });
-  const pastVisited = pastBookings.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status)).length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
   // 成約金額集計（フィルター済みデータから）
@@ -3583,6 +3592,14 @@ function renderBookings() {
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
       <option ${d.status==='成約'?'selected':''}>成約</option>
+      ${isImplantBooking(d) ? `
+        <option ${d.status==='CT/診断'?'selected':''}>CT/診断</option>
+        <option ${d.status==='手術予定'?'selected':''}>手術予定</option>
+        <option ${d.status==='治癒期間'?'selected':''}>治癒期間</option>
+        <option ${d.status==='印象'?'selected':''}>印象</option>
+        <option ${d.status==='セット'?'selected':''}>セット</option>
+        <option ${d.status==='完了'?'selected':''}>完了</option>
+      ` : ''}
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
       <option ${d.status==='除外'?'selected':''}>除外</option>
     </select>`) : statusBadge(isBFBooking(d) ? (getBFInfo(d.name, d.applyDate)?.bf_status || d.status) : d.status)}</td>
@@ -4207,11 +4224,11 @@ function renderFacTab(facility) {
 
   const total = data.length;
   const cancelled = data.filter(d => d.status === 'キャンセル').length;
-  const visited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const visited = data.filter(d => isVisitedStatus(d.status)).length;
   const contracted = data.filter(d => d.status === '成約').length;
   const todayR = new Date(); todayR.setHours(0,0,0,0);
   const past = data.filter(d => { const m = (d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayR; });
-  const pastV = past.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const pastV = past.filter(d => isVisitedStatus(d.status)).length;
   const vr = past.length > 0 ? Math.round(pastV/past.length*100) : 0;
 
   // #19 要対応カウント
@@ -4685,11 +4702,11 @@ function renderBF(period) {
 
   const total = data.length;
   const cancelled = data.filter(d => d.status === 'キャンセル').length;
-  const visited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const visited = data.filter(d => isVisitedStatus(d.status)).length;
   const contracted = data.filter(d => d.status === '成約').length;
   const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
   const pastBk = data.filter(d => { const m = (d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayForRate; });
-  const pastVisited = pastBk.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const pastVisited = pastBk.filter(d => isVisitedStatus(d.status)).length;
   const vr = pastBk.length > 0 ? Math.round(pastVisited/pastBk.length*100) : 0;
   const cr = visited > 0 ? pct(contracted, visited) : 0;
 
@@ -4703,7 +4720,7 @@ function renderBF(period) {
   `;
 
   // 医院別
-  const facG = {}; data.forEach(d => { const f = normFac(d.facility); if (!facG[f]) facG[f]={t:0,v:0,c:0}; facG[f].t++; if(d.status==='来院済'||d.status==='成約') facG[f].v++; if(d.status==='成約') facG[f].c++; });
+  const facG = {}; data.forEach(d => { const f = normFac(d.facility); if (!facG[f]) facG[f]={t:0,v:0,c:0}; facG[f].t++; if(isVisitedStatus(d.status)) facG[f].v++; if(d.status==='成約') facG[f].c++; });
   document.getElementById('bf-facility-chart').innerHTML = Object.entries(facG).sort((a,b)=>b[1].t-a[1].t).map(([name,v]) =>
     `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(v.t/total*100),3)}%"><span>${Math.round(v.t/total*100)}%</span></div></div><div class="bar-value" style="min-width:100px;font-size:10px">${v.t}件 来院${v.v} 成約${v.c}</div></div>`
   ).join('') || '<p style="color:var(--text-muted)">データなし</p>';
@@ -4763,6 +4780,27 @@ function renderBF(period) {
 }
 
 // === BF セット進捗 (lifecycle) ===
+// インプラント用拡張ステータス (予約と来院で共通)
+const IMPLANT_STATUSES_ORDERED = [
+  '未対応','予約連絡待ち','後追いLINE済み','確認済','来院済','成約',
+  'CT/診断','手術予定','治癒期間','印象','セット','完了',
+  'キャンセル','除外'
+];
+// 治療ステージ (来院済+αとして扱う) - インプラント用
+const IMPLANT_TREATMENT_STAGES = ['CT/診断','手術予定','治癒期間','印象','セット','完了'];
+// 来院済としてカウントするステータス (インプラントの治療ステージも含む)
+function isVisitedStatus(s) {
+  return s === '来院済' || s === '成約' || IMPLANT_TREATMENT_STAGES.includes(s);
+}
+// 成約済としてカウントするステータス (成約 + 治療継続ステージ)
+function isContractedStatus(s) {
+  return s === '成約' || IMPLANT_TREATMENT_STAGES.includes(s);
+}
+// インプラントか判定
+function isImplantBooking(d) {
+  try { return getTreatmentCategory(d) === 'インプラント'; } catch(_) { return false; }
+}
+
 const BF_STATUSES = [
   { value: '予約連絡待ち', color: '#a855f7' },
   { value: '後追いLINE済み', color: '#06b6d4' },
@@ -5406,9 +5444,11 @@ const TREATMENT_STATUSES = {
     { value: 'キャンセル', color: '#dc2626' }
   ],
   'インプラント': [
+    { value: '未対応', color: '#9ca3af' },
     { value: '予約連絡待ち', color: '#a855f7' },
     { value: '後追いLINE済み', color: '#06b6d4' },
-    { value: '検討中', color: '#f59e0b' },
+    { value: '確認済', color: '#6366f1' },
+    { value: '来院済', color: '#1d4ed8' },
     { value: '成約', color: '#10b981' },
     { value: 'CT/診断', color: '#3b82f6' },
     { value: '手術予定', color: '#2563eb' },
@@ -5416,7 +5456,8 @@ const TREATMENT_STATUSES = {
     { value: '印象', color: '#0891b2' },
     { value: 'セット', color: '#0e7490' },
     { value: '完了', color: '#059669' },
-    { value: 'キャンセル', color: '#dc2626' }
+    { value: 'キャンセル', color: '#dc2626' },
+    { value: '除外', color: '#6b7280' }
   ],
   'デフォルト': [
     { value: '予約連絡待ち', color: '#a855f7' },
@@ -5825,7 +5866,8 @@ function drawKaiinRows(treatment, rows, container) {
   })();
   container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
     const info = getBFInfo(d.name, d.applyDate) || {};
-    const st = info.bf_status || '';
+    // インプラントは予約タブと完全統合: d.status を使用 (既存ステータスを維持)
+    const st = (treatment === 'インプラント') ? (d.status || '') : (info.bf_status || '');
     const stColor = statuses.find(s => s.value === st)?.color || '';
     const stStyle = st ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700` : '';
     const memo = d._memo || findAnyMemo(d.name);
@@ -6046,7 +6088,35 @@ function drawKaiinRows(treatment, rows, container) {
   // ステータス変更: 統一してsaveBFLifecycleField経由で保存 (bf_statusを再利用)
   container.querySelectorAll('.kaiin-status-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
-      const ok = await saveBFLifecycleField(sel.dataset.name, sel.dataset.apply, 'bf_status', sel.value || null);
+      const name = sel.dataset.name;
+      const apply = sel.dataset.apply;
+      const newVal = sel.value || null;
+      // インプラント: 予約タブと統合 → booking_status.status に保存 + bookingsData 更新
+      if (treatment === 'インプラント') {
+        try {
+          const payload = { name, apply_date: apply, status: newVal || '' };
+          const res = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+          if (res && res.ok === false) throw new Error(res.error || 'save failed');
+          // ローカルの bookingsData も更新して 予約タブとの整合性を保つ
+          const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
+          if (match) match.status = newVal || '';
+          // bk-extra にも反映 (予約タブの編集履歴と同じ仕組み)
+          try {
+            const bkEx = loadData('bk-extra', {});
+            const key = name + '|' + apply;
+            if (!bkEx[key]) bkEx[key] = {};
+            bkEx[key].editedStatus = newVal || '';
+            saveData('bk-extra', bkEx);
+          } catch(_){}
+          sel.style.borderColor = '#0a0'; setTimeout(() => { sel.style.borderColor = ''; }, 1000);
+          drawKaiinRows(treatment, rows, container);
+        } catch (e) {
+          showToast('保存エラー: ' + (e?.message || e), true);
+        }
+        return;
+      }
+      // 非インプラント: 従来通り bf_status に保存
+      const ok = await saveBFLifecycleField(name, apply, 'bf_status', newVal);
       if (ok) { sel.style.borderColor = '#0a0'; setTimeout(() => { sel.style.borderColor = ''; }, 1000); drawKaiinRows(treatment, rows, container); }
     });
   });
@@ -6449,11 +6519,11 @@ function renderBFBookings(allBFData) {
   const active = data.filter(d => d.status !== '除外');
   const total = active.length;
   const cancelled = active.filter(d => d.status === 'キャンセル').length;
-  const visited = active.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const visited = active.filter(d => isVisitedStatus(d.status)).length;
   const contracted = active.filter(d => d.status === '成約').length;
   const todayR = new Date(); todayR.setHours(0,0,0,0);
   const past = active.filter(d => { const m=(d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayR; });
-  const pastV = past.filter(d => d.status==='来院済'||d.status==='成約').length;
+  const pastV = past.filter(d => isVisitedStatus(d.status)).length;
   const visitRate = past.length > 0 ? Math.round(pastV/past.length*100) : 0;
   const overdue = active.filter(d => (!d.status||d.status==='未対応') && d.bookDate && (() => { const m=(d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m && new Date(parseInt(m[1]),parseInt(m[2])-1,parseInt(m[3])) < todayR; })()).length;
 
@@ -6691,7 +6761,7 @@ function renderAnalysis() {
   // 統計
   const total = data.length;
   const cancelled = data.filter(d => d.status==='キャンセル').length;
-  const visited = data.filter(d => d.status==='来院済'||d.status==='成約').length;
+  const visited = data.filter(d => isVisitedStatus(d.status)).length;
   const contracted = data.filter(d => d.status==='成約').length;
   const bkExtra = loadData('bk-extra',{});
   let amt = 0; data.forEach(d => { const k=d.name+'|'+d.applyDate; if (bkExtra[k]&&bkExtra[k].contractAmount) amt+=Number(bkExtra[k].contractAmount); });
@@ -6718,7 +6788,7 @@ function renderAnalysis() {
     const fCancelled = data.filter(d => d.status === 'キャンセル').length;
     const fActive = fTotal - fCancelled;
     const fConfirmed = data.filter(d => ['確認済','来院済','成約'].includes(d.status)).length;
-    const fVisited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+    const fVisited = data.filter(d => isVisitedStatus(d.status)).length;
     const fContracted = data.filter(d => d.status === '成約').length;
 
     const steps = [
@@ -6781,7 +6851,7 @@ function renderAnalysis() {
     if (!groups[k]) groups[k] = {total:0,cancelled:0,visited:0,contracted:0,amount:0};
     groups[k].total++;
     if (d.status==='キャンセル') groups[k].cancelled++;
-    if (d.status==='来院済'||d.status==='成約') groups[k].visited++;
+    if (isVisitedStatus(d.status)) groups[k].visited++;
     if (d.status==='成約') groups[k].contracted++;
     const ek = d.name+'|'+d.applyDate; if (bkExtra[ek]&&bkExtra[ek].contractAmount) groups[k].amount+=Number(bkExtra[ek].contractAmount);
   });
@@ -6837,7 +6907,7 @@ function _oldRenderPromoDash() {
     if (!promoGroups[p]) promoGroups[p] = { total: 0, cancelled: 0, visited: 0, contracted: 0, amount: 0 };
     promoGroups[p].total++;
     if (d.status === 'キャンセル') promoGroups[p].cancelled++;
-    if (d.status === '来院済' || d.status === '成約') promoGroups[p].visited++;
+    if (isVisitedStatus(d.status)) promoGroups[p].visited++;
     if (d.status === '成約') promoGroups[p].contracted++;
   });
   // 金額集計
@@ -6921,7 +6991,7 @@ function _oldRenderPromoDash() {
     if (!facDetail[f]) facDetail[f] = { total: 0, cancelled: 0, visited: 0, contracted: 0 };
     facDetail[f].total++;
     if (d.status === 'キャンセル') facDetail[f].cancelled++;
-    if (d.status === '来院済' || d.status === '成約') facDetail[f].visited++;
+    if (isVisitedStatus(d.status)) facDetail[f].visited++;
     if (d.status === '成約') facDetail[f].contracted++;
     const s = sSvc2(d.service); svcChart[s] = (svcChart[s]||0) + 1;
   });
@@ -6945,7 +7015,7 @@ function _oldRenderPromoDash() {
     if (!svcDetail[s]) svcDetail[s] = { total: 0, cancelled: 0, visited: 0, contracted: 0 };
     svcDetail[s].total++;
     if (d.status === 'キャンセル') svcDetail[s].cancelled++;
-    if (d.status === '来院済' || d.status === '成約') svcDetail[s].visited++;
+    if (isVisitedStatus(d.status)) svcDetail[s].visited++;
     if (d.status === '成約') svcDetail[s].contracted++;
   });
   const svcEl2 = document.getElementById('promo-service-chart');
@@ -7018,7 +7088,7 @@ function showPromoDetail(promoName) {
 
   const total = data.length;
   const cancelled = data.filter(d => d.status === 'キャンセル').length;
-  const visited = data.filter(d => d.status === '来院済' || d.status === '成約').length;
+  const visited = data.filter(d => isVisitedStatus(d.status)).length;
   const contracted = data.filter(d => d.status === '成約').length;
   let totalAmt = 0;
   data.forEach(d => {
@@ -9640,7 +9710,7 @@ async function renderAuthMigration() {
 }
 
 // Phase 8: アカウント編集モーダル (ロール / 代理店 / プロモ複数選択 / 閲覧タブ)
-function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTabs, allPromos }) {
+function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTabs, curCanViewPII, allPromos }) {
   // 既存モーダル削除
   const old = document.getElementById('edit-acct-modal');
   if (old) old.remove();
@@ -9711,6 +9781,13 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
           ${AUTH_TAB_DEFS.map(t => `<label style="display:flex;align-items:center;gap:4px;font-size:12px"><input type="checkbox" class="edit-acct-tab-chk" data-tab="${t.key}"${curTabs && curTabs[t.key] ? ' checked' : ''}> ${t.label}</label>`).join('')}
         </div>
       </div>
+      <div style="margin-bottom:14px;padding:10px;border:1px dashed #f59e0b;border-radius:6px;background:#fffbeb">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="edit-acct-pii" ${curCanViewPII ? 'checked' : ''} style="width:16px;height:16px">
+          <span><strong>🔓 個人情報 (名前・電話・メール) を平文で閲覧可</strong><br>
+          <span style="color:var(--text-sub);font-size:11px">電話追跡・顧客対応担当者など、業務上必要な場合のみ ON にしてください。admin は常に閲覧可。</span></span>
+        </label>
+      </div>
       <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
         <button type="button" id="edit-acct-cancel" class="btn btn-outline" style="padding:6px 16px;font-size:13px">キャンセル</button>
         <button type="button" id="edit-acct-save" class="btn btn-dark" style="padding:6px 16px;font-size:13px">保存</button>
@@ -9772,6 +9849,7 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
       newPromos = _composePromoList(editAcctPatterns, checked);
     }
     const newTabs = _readTabsFromCheckboxes(wrap, 'edit-acct-tab-chk');
+    const newCanViewPII = wrap.querySelector('#edit-acct-pii')?.checked || false;
 
     saveBtn.disabled = true;
     const orig = saveBtn.textContent;
@@ -9782,7 +9860,8 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
         p_role: newRole,
         p_allowed_promos: newPromos,
         p_agency: newAgency,
-        p_visible_tabs: newTabs
+        p_visible_tabs: newTabs,
+        p_can_view_pii: newCanViewPII
       });
       if (error || !data?.ok) {
         msg.textContent = 'エラー: ' + (error?.message || data?.error || '不明');
