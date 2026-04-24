@@ -530,6 +530,7 @@
     <main id="view-bookings" class="view view-wide">
       <div class="sub-nav" id="bk-sub-nav">
         <button class="sub-nav-btn active" data-sub="bk-home" style="background:linear-gradient(135deg,#eff6ff 0%,#dbeafe 100%);color:#1d4ed8;font-weight:700">🏠 ホーム</button>
+        <button class="sub-nav-btn" data-sub="bk-phone" style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);color:#b45309;font-weight:700">📞 電話前確認</button>
         <button class="sub-nav-btn" data-sub="bk-list">予約一覧</button>
         <button class="sub-nav-btn" data-sub="bk-search">患者検索</button>
         <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
@@ -550,6 +551,9 @@
       </div>
       <div id="sub-bk-home" style="padding:12px">
         <div id="home-dashboard-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
+      </div>
+      <div id="sub-bk-phone" hidden style="padding:12px">
+        <div id="phone-check-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
       </div>
       <div id="sub-bk-list" hidden>
         <div class="stats-row" id="bk-stats" style="gap:6px;margin-bottom:8px"><div class="stat-card"><span class="stat-label">読み込み中...</span></div></div>
@@ -1148,7 +1152,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=262"></script>
+  <script src="app.js?v=263"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

@@ -1083,6 +1083,9 @@ function setupEventListeners() {
       if (sub === 'bk-home') {
         if (typeof renderHomeDashboard === 'function') renderHomeDashboard();
       }
+      if (sub === 'bk-phone') {
+        if (typeof renderPhoneCheck === 'function') renderPhoneCheck();
+      }
       if (sub === 'bk-search' && bookingsData.length > 0) {
         const psFac = document.getElementById('ps-facility');
         if (psFac && psFac.options.length <= 1) {
@@ -2149,10 +2152,10 @@ function renderHomeDashboard() {
 
     <!-- ショートカット -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
+      <button class="home-shortcut" data-view="bookings" data-sub="bk-phone" style="padding:14px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1.5px solid #f59e0b;border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:700;color:#b45309">📞 電話前確認へ</button>
       <button class="home-shortcut" data-view="bookings" data-sub="bk-list" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">📋 予約一覧へ</button>
       <button class="home-shortcut" data-view="kaiin" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">🏥 来院管理へ</button>
       <button class="home-shortcut" data-view="tc" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">💬 TCへ</button>
-      <button class="home-shortcut" data-view="sales" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">💰 売上へ</button>
     </div>
   `;
 
@@ -2189,6 +2192,204 @@ function renderHomeDashboard() {
 function switchBookingSub(subId) {
   const btn = document.querySelector(`#bk-sub-nav .sub-nav-btn[data-sub="${subId}"]`);
   if (btn) btn.click();
+}
+
+// === v262 電話前確認タブ ===
+let _phoneCheckState = {
+  period: 'today_tomorrow',  // today / tomorrow / today_tomorrow
+  facility: '',
+  showCalled: false,  // 確認済も表示するか
+};
+
+function renderPhoneCheck() {
+  const el = document.getElementById('phone-check-content');
+  if (!el) return;
+
+  const data = Array.isArray(bookingsData) ? (getFilteredBookingsData ? getFilteredBookingsData() : bookingsData) : [];
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+  const todayEnd = new Date(now); todayEnd.setHours(23,59,59,999);
+  const tomorrowStart = new Date(todayEnd.getTime() + 1);
+  const tomorrowEnd = new Date(todayEnd.getTime() + 24*3600*1000);
+
+  // フィルタ条件
+  const isInPeriod = (bd) => {
+    if (!bd) return false;
+    if (_phoneCheckState.period === 'today') return bd >= todayStart && bd <= todayEnd;
+    if (_phoneCheckState.period === 'tomorrow') return bd >= tomorrowStart && bd <= tomorrowEnd;
+    return bd >= todayStart && bd <= tomorrowEnd;
+  };
+
+  let rows = data.filter(d => {
+    if (d.status === '除外' || d.status === 'キャンセル') return false;
+    const bd = parseDate(d.bookDate);
+    if (!isInPeriod(bd)) return false;
+    if (_phoneCheckState.facility && normFac(d.facility) !== _phoneCheckState.facility) return false;
+    if (!_phoneCheckState.showCalled && (d.status === '確認済' || d.status === '来院済' || d.status === '成約')) return false;
+    return true;
+  });
+
+  // 時刻順ソート
+  rows.sort((a,b) => (a.bookDate || '').localeCompare(b.bookDate || ''));
+
+  // 医院リスト作成
+  const allFacs = [...new Set(data.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
+  const stats = {
+    total: rows.length,
+    pending: rows.filter(d => !d.status || d.status === '未対応').length,
+    yoyaku: rows.filter(d => d.status === '予約連絡待ち').length,
+    line: rows.filter(d => d.status === '後追いLINE済み').length,
+  };
+
+  const canViewPII = !_isPII_MaskNeeded();
+  const memos = loadData('bk-memos', {});
+
+  el.innerHTML = `
+    <!-- ヘッダー -->
+    <div style="margin-bottom:12px">
+      <h2 style="font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px">📞 電話前確認</h2>
+      <p style="font-size:11px;color:var(--text-sub);margin:0">今日・明日の予約を優先度順に整理。電話後はステータス・メモを即更新。</p>
+    </div>
+
+    <!-- 統計バッジ -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="padding:6px 12px;background:#fef3c7;color:#b45309;border-radius:14px;font-size:11px;font-weight:700">対象 ${stats.total}件</div>
+      <div style="padding:6px 12px;background:#fee2e2;color:#dc2626;border-radius:14px;font-size:11px;font-weight:700">未対応 ${stats.pending}件</div>
+      <div style="padding:6px 12px;background:#f5f3ff;color:#7c3aed;border-radius:14px;font-size:11px;font-weight:700">連絡待ち ${stats.yoyaku}件</div>
+      <div style="padding:6px 12px;background:#ecfeff;color:#0891b2;border-radius:14px;font-size:11px;font-weight:700">LINE送信済 ${stats.line}件</div>
+    </div>
+
+    <!-- フィルタ -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:10px;align-items:center">
+      <div style="display:inline-flex;background:#f3f4f6;border-radius:8px;padding:2px">
+        <button type="button" class="phone-period-btn" data-period="today" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='today'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='today'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600">今日</button>
+        <button type="button" class="phone-period-btn" data-period="tomorrow" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='tomorrow'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='tomorrow'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600">明日</button>
+        <button type="button" class="phone-period-btn" data-period="today_tomorrow" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='today_tomorrow'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='today_tomorrow'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600">両方</button>
+      </div>
+      <select id="phone-fac-filter" style="padding:7px 10px;font-size:12px;border:1px solid var(--border);border-radius:8px;min-width:120px">
+        <option value="">全医院</option>
+        ${allFacs.map(f => `<option value="${escapeHtml(f)}" ${_phoneCheckState.facility===f?'selected':''}>${escapeHtml(f)}</option>`).join('')}
+      </select>
+      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#555;cursor:pointer">
+        <input type="checkbox" id="phone-show-called" ${_phoneCheckState.showCalled?'checked':''}>
+        確認済も表示
+      </label>
+    </div>
+
+    <!-- リスト -->
+    ${rows.length === 0 ? `
+      <div style="text-align:center;padding:50px 20px;background:#f9fafb;border-radius:12px;color:var(--text-sub)">
+        <div style="font-size:40px;margin-bottom:10px">📞✨</div>
+        <div style="font-size:14px;font-weight:600;color:#1a1a1a">対象の予約はありません</div>
+        <div style="font-size:11px;margin-top:4px">すべて確認済、またはフィルタ条件を確認してください</div>
+      </div>
+    ` : `
+      <div id="phone-list" style="display:flex;flex-direction:column;gap:8px">
+        ${rows.map(d => _renderPhoneCheckRow(d, canViewPII, memos)).join('')}
+      </div>
+    `}
+  `;
+
+  // イベントバインド
+  el.querySelectorAll('.phone-period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _phoneCheckState.period = btn.dataset.period;
+      renderPhoneCheck();
+    });
+  });
+  el.querySelector('#phone-fac-filter')?.addEventListener('change', e => {
+    _phoneCheckState.facility = e.target.value;
+    renderPhoneCheck();
+  });
+  el.querySelector('#phone-show-called')?.addEventListener('change', e => {
+    _phoneCheckState.showCalled = e.target.checked;
+    renderPhoneCheck();
+  });
+
+  _bindPhoneCheckRowEvents(el);
+}
+
+function _renderPhoneCheckRow(d, canViewPII, memos) {
+  const key = d.name + '|' + d.applyDate;
+  const memo = memos[key] || d._memo || '';
+  const bd = d.bookDate || '';
+  const tm = bd.match(/(\d{1,2}):(\d{2})/);
+  const tstr = tm ? `${tm[1]}:${tm[2]}` : '--:--';
+  const dateM = bd.match(/(\d{1,2})\D+(\d{1,2})/);
+  const dstr = dateM ? `${dateM[1]}/${dateM[2]}` : '';
+  const st = d.status || '未対応';
+  const stC = st === '後追いLINE済み' ? '#0891b2' : st === '予約連絡待ち' ? '#7c3aed' : st === '確認済' ? '#6366f1' : '#dc2626';
+  const stBg = st === '後追いLINE済み' ? '#ecfeff' : st === '予約連絡待ち' ? '#f5f3ff' : st === '確認済' ? '#eef2ff' : '#fee2e2';
+  const name = canViewPII ? d.name : maskName(d.name);
+  const phone = canViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
+  const fac = normFac(d.facility);
+  return `<div class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:12px;transition:all 0.15s">
+    <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
+      <div style="flex-shrink:0;text-align:center;background:#f3f4f6;border-radius:8px;padding:6px 10px;min-width:60px">
+        <div style="font-size:10px;color:var(--text-sub);font-weight:600">${dstr}</div>
+        <div style="font-size:16px;font-weight:800;color:#1d4ed8;font-variant-numeric:tabular-nums">${tstr}</div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:15px;font-weight:700;color:#1a1a1a">${escapeHtml(name || '')}</div>
+        <div style="font-size:11px;color:var(--text-sub);margin-top:2px">
+          ${escapeHtml(fac)} / ${escapeHtml(normSvc(d.service) || '-')}
+          ${d.source ? ` / <span style="color:#6b7280">${escapeHtml(d.source)}</span>` : ''}
+        </div>
+        ${canViewPII && phone ? `<a href="tel:${phone.replace(/[^0-9]/g,'')}" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:5px 10px;background:#dcfce7;color:#15803d;border-radius:14px;font-size:13px;font-weight:700;text-decoration:none"><span>📞</span>${escapeHtml(phone)}</a>` : canViewPII ? '<div style="font-size:11px;color:#9ca3af;margin-top:4px">電話番号未登録</div>' : '<div style="font-size:11px;color:#9ca3af;margin-top:4px">電話番号 ※非公開</div>'}
+      </div>
+      <span style="padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;background:${stBg};color:${stC};white-space:nowrap">${st}</span>
+    </div>
+    <!-- クイックアクション -->
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
+      <button class="phone-status-btn" data-st="確認済" style="padding:7px 12px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">✅ 確認済</button>
+      <button class="phone-status-btn" data-st="後追いLINE済み" style="padding:7px 12px;background:#ecfeff;color:#0891b2;border:1px solid #67e8f9;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">💬 LINE済</button>
+      <button class="phone-status-btn" data-st="予約連絡待ち" style="padding:7px 12px;background:#f5f3ff;color:#7c3aed;border:1px solid #d8b4fe;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">⏳ 連絡待ち</button>
+      <button class="phone-memo-btn" style="padding:7px 12px;background:#fff8e1;color:#b45309;border:1px solid #fcd34d;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">📝 メモ</button>
+    </div>
+    ${memo ? `<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px;font-size:12px;color:#5a4a10;line-height:1.6;white-space:pre-wrap">${escapeHtml(memo)}</div>` : ''}
+  </div>`;
+}
+
+function _bindPhoneCheckRowEvents(el) {
+  el.querySelectorAll('.phone-row').forEach(row => {
+    const name = row.dataset.name;
+    const apply = row.dataset.apply;
+    row.querySelectorAll('.phone-status-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const newStatus = btn.dataset.st;
+        btn.disabled = true; btn.textContent = '...';
+        try {
+          const payload = { name, apply_date: apply, status: newStatus };
+          await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+          const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
+          if (match) match.status = newStatus;
+          try {
+            const bkEx = loadData('bk-extra', {});
+            const key = name + '|' + apply;
+            if (!bkEx[key]) bkEx[key] = {};
+            bkEx[key].editedStatus = newStatus;
+            saveData('bk-extra', bkEx);
+          } catch(_){}
+          showToast(`${name}: ${newStatus}に更新`);
+          renderPhoneCheck();
+          updateHeaderBadge();
+        } catch(e) {
+          showToast('保存エラー: ' + e.message, true);
+          btn.disabled = false;
+        }
+      });
+    });
+    row.querySelector('.phone-memo-btn')?.addEventListener('click', () => {
+      openMemoModal(name, apply, null);
+      // メモ保存後に再描画
+      const check = setInterval(() => {
+        if (document.getElementById('memo-modal').hidden) {
+          clearInterval(check);
+          renderPhoneCheck();
+        }
+      }, 300);
+    });
+  });
 }
 
 // === v261 ヘッダー通知バッジ (要対応件数常時表示) ===
