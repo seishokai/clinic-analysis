@@ -489,6 +489,28 @@
     box-shadow: var(--shadow-md);
     border: 1px solid var(--line-soft);
   }
+  /* 写真版 (BENEFIT 02 / 03) */
+  .benefit-photo {
+    position: relative; padding: 0;
+    overflow: hidden; aspect-ratio: 4 / 5;
+    border: 1px solid var(--line-soft);
+  }
+  .benefit-photo-img {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
+  }
+  .benefit-photo-overlay {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    padding: 26px 24px 24px;
+    background: linear-gradient(180deg, transparent 0%, rgba(31, 26, 28, 0.78) 60%, rgba(31, 26, 28, 0.92) 100%);
+    color: #fff;
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+  }
+  .benefit-photo-overlay .b-stat-label {
+    color: #fff; font-size: 13px;
+    text-shadow: 0 1px 4px rgba(0,0,0,0.3);
+  }
   .b-stat-big {
     font-family: var(--en); font-weight: 800;
     font-size: 88px; color: var(--rose-deep);
@@ -1366,13 +1388,15 @@
             「痛みが心配で矯正に踏み出せなかった」という方にこそ、選んでいただきたい装置です。
           </p>
         </div>
-        <div class="benefit-stat">
-          <div class="b-stat-big">−</div>
-          <div class="b-stat-label">矯正痛の軽減</div>
-          <div class="b-compare">
-            <div class="b-comp-item"><div class="b-comp-l">締め付け感</div><div class="b-comp-v">軽減</div></div>
-            <div class="b-arrow">／</div>
-            <div class="b-comp-item"><div class="b-comp-l">炎症</div><div class="b-comp-v">抑制</div></div>
+        <div class="benefit-stat benefit-photo">
+          <img src="comfort-smile.jpg" alt="痛みから解放され笑顔の女性" class="benefit-photo-img">
+          <div class="benefit-photo-overlay">
+            <div class="b-stat-label" style="margin:0 0 14px">矯正痛の軽減</div>
+            <div class="b-compare" style="border-top:1px dashed rgba(255,255,255,0.35)">
+              <div class="b-comp-item"><div class="b-comp-l" style="color:rgba(255,255,255,0.7)">締め付け感</div><div class="b-comp-v" style="color:#fff">軽減</div></div>
+              <div class="b-arrow" style="color:#fff">／</div>
+              <div class="b-comp-item"><div class="b-comp-l" style="color:rgba(255,255,255,0.7)">炎症</div><div class="b-comp-v" style="color:#fff">抑制</div></div>
+            </div>
           </div>
         </div>
       </article>
@@ -1388,13 +1412,15 @@
             お忙しい方にこそ、結果として通院回数や追加費用を抑えられる安心の選択肢です。
           </p>
         </div>
-        <div class="benefit-stat">
-          <div class="b-stat-big">◎</div>
-          <div class="b-stat-label">計画通りの移動</div>
-          <div class="b-compare">
-            <div class="b-comp-item"><div class="b-comp-l">アンフィット</div><div class="b-comp-v">減少</div></div>
-            <div class="b-arrow">／</div>
-            <div class="b-comp-item"><div class="b-comp-l">通院回数</div><div class="b-comp-v">最小化</div></div>
+        <div class="benefit-stat benefit-photo">
+          <img src="reliability-smile.jpg" alt="計画通りの治療で安心した笑顔の女性" class="benefit-photo-img">
+          <div class="benefit-photo-overlay">
+            <div class="b-stat-label" style="margin:0 0 14px">計画通りの移動</div>
+            <div class="b-compare" style="border-top:1px dashed rgba(255,255,255,0.35)">
+              <div class="b-comp-item"><div class="b-comp-l" style="color:rgba(255,255,255,0.7)">アンフィット</div><div class="b-comp-v" style="color:#fff">減少</div></div>
+              <div class="b-arrow" style="color:#fff">／</div>
+              <div class="b-comp-item"><div class="b-comp-l" style="color:rgba(255,255,255,0.7)">通院回数</div><div class="b-comp-v" style="color:#fff">最小化</div></div>
+            </div>
           </div>
         </div>
       </article>
