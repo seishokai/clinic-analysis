@@ -1138,6 +1138,14 @@ function setupEventListeners() {
     document.body.style.overflow = '';
   });
 
+  // === v264 キーボードショートカット ===
+  // Ctrl/Cmd+K: 検索 / Alt+1〜6 (Ctrl+1〜6 はブラウザに奪われる場合あり): タブ切替 / ?: ヘルプ
+  setupKeyboardShortcuts();
+
+  // === v264 スワイプアクション (モバイル) ===
+  // 左→確認済 / 右→メモ
+  setupBookingSwipeActions();
+
   // Sales
   document.getElementById('sales-save').addEventListener('click', saveSalesEntry);
 
@@ -2519,6 +2527,356 @@ function switchView(view) {
       if (t) setTimeout(() => renderKaiinTab(t, activeSub + '-content'), 50);
     }
   }
+}
+
+// === v264 キーボードショートカット ===
+function setupKeyboardShortcuts() {
+  const VIEWS = ['bookings', 'kaiin', 'tc', 'sales', 'adbudget', 'admin'];
+  const VIEW_LABELS = { bookings:'予約', kaiin:'来院', tc:'TC', sales:'売上', adbudget:'広告', admin:'管理' };
+  const SEARCH_TARGETS = {
+    bookings: ['bk-search', 'ps-name', 'fac-search', 'bf-lc-search'],
+    kaiin: ['fac-search', 'bk-search'],
+    tc: [],
+    sales: [],
+    adbudget: [],
+    admin: ['qa-search']
+  };
+
+  function isVisible(el) {
+    if (!el) return false;
+    const r = el.getBoundingClientRect();
+    if (r.width === 0 && r.height === 0) return false;
+    for (let p = el; p; p = p.parentElement) {
+      if (p.hidden) return false;
+      const cs = getComputedStyle(p);
+      if (cs.display === 'none' || cs.visibility === 'hidden') return false;
+    }
+    return true;
+  }
+
+  function focusSearchOnCurrentView() {
+    const view = currentView || 'bookings';
+    const ids = SEARCH_TARGETS[view] || [];
+    for (const id of ids) {
+      const el = document.getElementById(id);
+      if (el && isVisible(el)) { el.focus(); el.select?.(); return true; }
+    }
+    // フォールバック: 表示中の検索っぽい input
+    const inputs = document.querySelectorAll('input[type="text"], input[type="search"]');
+    for (const el of inputs) {
+      if (!isVisible(el)) continue;
+      const hint = (el.placeholder || '') + ' ' + (el.id || '');
+      if (/検索|search|名前|キーワード/i.test(hint)) { el.focus(); el.select?.(); return true; }
+    }
+    return false;
+  }
+
+  function showShortcutToast(text) {
+    let t = document.getElementById('kbd-toast');
+    if (!t) {
+      t = document.createElement('div');
+      t.id = 'kbd-toast';
+      t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:rgba(17,17,17,.92);color:#fff;padding:10px 18px;border-radius:24px;font-size:13px;font-weight:600;z-index:99999;pointer-events:none;opacity:0;transition:opacity .18s;box-shadow:0 4px 16px rgba(0,0,0,.3)';
+      document.body.appendChild(t);
+    }
+    t.textContent = text;
+    t.style.opacity = '1';
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.style.opacity = '0'; }, 1100);
+  }
+
+  function showShortcutHelp() {
+    const existing = document.getElementById('kbd-help-modal');
+    if (existing) { existing.remove(); return; }
+    const m = document.createElement('div');
+    m.id = 'kbd-help-modal';
+    m.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99998;display:flex;align-items:center;justify-content:center;padding:16px';
+    const kbd = 'background:#f3f4f6;padding:3px 8px;border-radius:5px;font-family:ui-monospace,monospace;font-size:11px;border:1px solid #e5e7eb;color:#111';
+    const row = (label, k) => `<tr><td style="padding:7px 0;color:#444">${label}</td><td style="text-align:right"><kbd style="${kbd}">${k}</kbd></td></tr>`;
+    m.innerHTML = `
+      <div style="background:#fff;border-radius:14px;padding:22px;max-width:380px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:inherit">
+        <div style="font-size:16px;font-weight:700;margin-bottom:12px">⌨️ キーボードショートカット</div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse">
+          ${row('検索ボックスにフォーカス', 'Ctrl+K')}
+          ${row('予約タブ', 'Alt+1')}
+          ${row('来院タブ', 'Alt+2')}
+          ${row('TCタブ', 'Alt+3')}
+          ${row('売上タブ', 'Alt+4')}
+          ${row('広告タブ', 'Alt+5')}
+          ${row('管理タブ', 'Alt+6')}
+          ${row('モーダルを閉じる', 'Esc')}
+          ${row('このヘルプ', '?')}
+        </table>
+        <div style="margin-top:10px;font-size:11px;color:#999;line-height:1.5">※ Mac は Ctrl の代わりに Cmd キー<br>※ Ctrl+1〜6 はブラウザのタブ切替と競合するため Alt 推奨</div>
+        <button id="kbd-help-close" style="width:100%;margin-top:14px;padding:10px;background:#111;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">閉じる</button>
+      </div>`;
+    m.addEventListener('click', (ev) => { if (ev.target === m) m.remove(); });
+    m.querySelector('#kbd-help-close').addEventListener('click', () => m.remove());
+    document.body.appendChild(m);
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const isMod = e.ctrlKey || e.metaKey;
+    const inEditable = e.target?.matches?.('input, textarea, select, [contenteditable="true"]');
+
+    // Ctrl/Cmd+K: 検索フォーカス（テキスト入力中でも有効）
+    if (isMod && !e.shiftKey && !e.altKey && (e.key === 'k' || e.key === 'K')) {
+      e.preventDefault();
+      const ok = focusSearchOnCurrentView();
+      if (!ok) showShortcutToast('このタブには検索ボックスがありません');
+      return;
+    }
+
+    // ?: ヘルプ（テキスト入力中は除く）
+    if (!inEditable && !isMod && !e.altKey && e.key === '?') {
+      e.preventDefault();
+      showShortcutHelp();
+      return;
+    }
+
+    // Alt+1〜6 / Ctrl+1〜6: タブ切替（テキスト入力中は除く）
+    if ((e.altKey || isMod) && /^[1-6]$/.test(e.key) && !inEditable) {
+      e.preventDefault();
+      const v = VIEWS[parseInt(e.key, 10) - 1];
+      if (v) {
+        switchView(v);
+        showShortcutToast('▶ ' + VIEW_LABELS[v]);
+      }
+    }
+  });
+}
+
+// === v264 スワイプアクション (モバイル) ===
+// 左スワイプ → 確認済に変更 / 右スワイプ → メモ編集
+function setupBookingSwipeActions() {
+  const tbody = document.getElementById('bk-tbody');
+  if (!tbody) return;
+  // タッチ非対応(マウス主体)はスキップ
+  if (!matchMedia('(pointer: coarse)').matches) return;
+  if (tbody._swipeWired) return;
+  tbody._swipeWired = true;
+
+  let active = null;
+
+  tbody.addEventListener('touchstart', (e) => {
+    if (e.touches.length !== 1) return;
+    const tr = e.target.closest('tr[data-bk-name]');
+    if (!tr) return;
+    // インタラクティブ要素(チェックボックス/ボタン/セレクト等)タップ時はスワイプとして扱わない
+    if (e.target.closest('input,select,button,a')) return;
+    active = {
+      tr,
+      startX: e.touches[0].clientX,
+      startY: e.touches[0].clientY,
+      startT: Date.now(),
+      moved: false
+    };
+  }, { passive: true });
+
+  tbody.addEventListener('touchmove', (e) => {
+    if (!active || e.touches.length !== 1) return;
+    const dx = e.touches[0].clientX - active.startX;
+    const dy = e.touches[0].clientY - active.startY;
+    if (Math.abs(dx) > 8 || Math.abs(dy) > 8) active.moved = true;
+    // 横方向 dominant ならビジュアルフィードバック
+    if (Math.abs(dx) > 16 && Math.abs(dx) > Math.abs(dy) * 1.4) {
+      active.tr.style.transform = `translateX(${dx * 0.35}px)`;
+      active.tr.style.transition = 'none';
+      active.tr.style.background = dx > 0
+        ? 'linear-gradient(to right, #fef3c7 0%, transparent 60%)'
+        : 'linear-gradient(to left, #dcfce7 0%, transparent 60%)';
+    }
+  }, { passive: true });
+
+  tbody.addEventListener('touchend', (e) => {
+    if (!active) return;
+    const a = active; active = null;
+    a.tr.style.transition = 'transform .25s ease, background .25s ease';
+    a.tr.style.transform = '';
+    a.tr.style.background = '';
+    if (!a.moved) return;
+    const ev = e.changedTouches[0];
+    const dx = ev.clientX - a.startX;
+    const dy = ev.clientY - a.startY;
+    const dt = Date.now() - a.startT;
+    if (dt > 700) return;
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    const name = a.tr.dataset.bkName;
+    const apply = a.tr.dataset.bkApply;
+    if (dx > 0) {
+      // 右 → メモ
+      const cell = a.tr.querySelector('.bk-memo-cell');
+      if (typeof openMemoModal === 'function') openMemoModal(name, apply, cell || null);
+    } else {
+      // 左 → 確認済 (クイック)
+      quickSetBookingStatus(name, apply, '確認済');
+    }
+  }, { passive: true });
+
+  tbody.addEventListener('touchcancel', () => {
+    if (!active) return;
+    active.tr.style.transition = 'transform .25s, background .25s';
+    active.tr.style.transform = '';
+    active.tr.style.background = '';
+    active = null;
+  }, { passive: true });
+}
+
+async function quickSetBookingStatus(name, apply, newStatus) {
+  const match = bookingsData.find(d => d.name === name && d.applyDate === apply);
+  if (!match) return;
+  const oldStatus = match.status;
+  if (oldStatus === newStatus) { showToast(`${name} は既に「${newStatus}」`); return; }
+  match.status = newStatus;
+  const bkEx = loadData('bk-extra', {});
+  const key = name + '|' + apply;
+  if (!bkEx[key]) bkEx[key] = {};
+  bkEx[key].editedStatus = newStatus;
+  saveData('bk-extra', bkEx);
+  try {
+    await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate: apply, status: newStatus }) }).catch(() => {});
+    showToast(`✅ ${name} → ${newStatus}`);
+  } catch (e) {
+    match.status = oldStatus;
+    showToast('⚠ 保存失敗', true);
+  }
+  renderBookings();
+}
+
+// === v264 ピン留め (お気に入り) ===
+function getPinnedBookings() {
+  try { return new Set(JSON.parse(localStorage.getItem('bk-pins') || '[]')); }
+  catch { return new Set(); }
+}
+function savePinnedBookings(set) {
+  localStorage.setItem('bk-pins', JSON.stringify([...set]));
+}
+function togglePinnedBooking(name, applyDate) {
+  const set = getPinnedBookings();
+  const key = name + '|' + applyDate;
+  if (set.has(key)) set.delete(key); else set.add(key);
+  savePinnedBookings(set);
+  return set.has(key);
+}
+
+// === v264 一括ステータス更新 (バルクアクション) ===
+function setupBulkBookingActions() {
+  const tbody = document.getElementById('bk-tbody');
+  if (!tbody) return;
+  const headerCheckbox = document.getElementById('bk-select-all');
+  const allCbs = () => tbody.querySelectorAll('.bk-row-select');
+
+  function getSelected() {
+    return [...allCbs()].filter(cb => cb.checked).map(cb => ({ name: cb.dataset.name, applyDate: cb.dataset.apply }));
+  }
+
+  function ensureBar() {
+    let bar = document.getElementById('bk-bulk-bar');
+    if (bar) return bar;
+    bar = document.createElement('div');
+    bar.id = 'bk-bulk-bar';
+    bar.style.cssText = 'position:fixed;bottom:64px;left:50%;transform:translateX(-50%);background:#111;color:#fff;padding:10px 14px;border-radius:14px;box-shadow:0 8px 28px rgba(0,0,0,.4);z-index:9998;display:none;align-items:center;gap:8px;font-family:inherit;flex-wrap:wrap;max-width:calc(100vw - 24px);font-size:13px';
+    bar.innerHTML = `
+      <span class="bbar-count" style="font-weight:700;font-size:13px;white-space:nowrap">0件選択中</span>
+      <select class="bbar-status" style="padding:6px 8px;border-radius:6px;border:none;font-family:inherit;font-size:12px;background:#fff;color:#111;font-weight:600;min-width:140px">
+        <option value="">ステータスを選択…</option>
+        <option value="確認済">✅ 確認済</option>
+        <option value="後追いLINE済み">💬 後追いLINE済み</option>
+        <option value="予約連絡待ち">⏳ 予約連絡待ち</option>
+        <option value="予約変更">📅 予約変更</option>
+        <option value="来院済">🏥 来院済</option>
+        <option value="キャンセル">❌ キャンセル</option>
+        <option value="除外">🚫 除外</option>
+      </select>
+      <button class="bbar-apply" style="padding:6px 12px;background:#fff;color:#111;border:none;border-radius:6px;font-weight:700;font-family:inherit;cursor:pointer;font-size:12px">適用</button>
+      <button class="bbar-cancel" style="padding:6px 10px;background:transparent;color:#fff;border:1px solid #555;border-radius:6px;font-family:inherit;cursor:pointer;font-size:12px">解除</button>
+    `;
+    document.body.appendChild(bar);
+
+    bar.querySelector('.bbar-cancel').addEventListener('click', () => {
+      document.getElementById('bk-tbody')?.querySelectorAll('.bk-row-select:checked').forEach(cb => cb.checked = false);
+      const hcb = document.getElementById('bk-select-all'); if (hcb) { hcb.checked = false; hcb.indeterminate = false; }
+      bar.style.display = 'none';
+    });
+
+    bar.querySelector('.bbar-apply').addEventListener('click', async () => {
+      const newStatus = bar.querySelector('.bbar-status').value;
+      if (!newStatus) { showToast('ステータスを選択してください', true); return; }
+      const sel = getSelected();
+      if (sel.length === 0) { showToast('対象がありません', true); return; }
+      if (!confirm(`選択中の ${sel.length} 件を「${newStatus}」に変更します。よろしいですか？`)) return;
+
+      const applyBtn = bar.querySelector('.bbar-apply');
+      const orig = applyBtn.textContent;
+      applyBtn.disabled = true; applyBtn.textContent = '保存中…';
+
+      let okCount = 0, failCount = 0;
+      for (const item of sel) {
+        try {
+          const match = bookingsData.find(d => d.name === item.name && d.applyDate === item.applyDate);
+          if (!match) { failCount++; continue; }
+          match.status = newStatus;
+          const bkEx = loadData('bk-extra', {});
+          const key = item.name + '|' + item.applyDate;
+          if (!bkEx[key]) bkEx[key] = {};
+          bkEx[key].editedStatus = newStatus;
+          saveData('bk-extra', bkEx);
+          const upsertData = { name: item.name, apply_date: item.applyDate, status: newStatus };
+          if (isBFBooking(match) && typeof STATUS_TO_BF !== 'undefined' && STATUS_TO_BF[newStatus] !== undefined) {
+            const targetBF = STATUS_TO_BF[newStatus];
+            const curBF = bfLifecycleCache[key]?.bf_status;
+            const resettable = !curBF || curBF === '離脱' || curBF === 'キャンセル';
+            if ((newStatus === '成約' || newStatus === 'キャンセル' || resettable) && targetBF !== null) {
+              upsertData.bf_status = targetBF;
+              if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: item.name, apply_date: item.applyDate };
+              bfLifecycleCache[key].bf_status = targetBF;
+            }
+          }
+          await safeSave({ type:'upsert', table:'booking_status', payload: upsertData, options: { onConflict:'name,apply_date' } });
+          fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: item.name, applyDate: item.applyDate, status: newStatus }) }).catch(() => {});
+          okCount++;
+        } catch(e) {
+          console.warn('bulk update failed', item, e);
+          failCount++;
+        }
+      }
+
+      applyBtn.disabled = false; applyBtn.textContent = orig;
+      showToast(`✅ ${okCount}件更新${failCount > 0 ? ` (失敗${failCount}件)` : ''}`, failCount > 0);
+      bar.style.display = 'none';
+      renderBookings();
+    });
+
+    return bar;
+  }
+
+  function updateBar() {
+    const sel = getSelected();
+    const bar = document.getElementById('bk-bulk-bar');
+    if (sel.length === 0) {
+      if (bar) bar.style.display = 'none';
+      if (headerCheckbox) { headerCheckbox.checked = false; headerCheckbox.indeterminate = false; }
+      return;
+    }
+    const b = ensureBar();
+    b.style.display = 'flex';
+    b.querySelector('.bbar-count').textContent = sel.length + '件選択中';
+    if (headerCheckbox) {
+      const total = allCbs().length;
+      headerCheckbox.checked = sel.length === total && total > 0;
+      headerCheckbox.indeterminate = sel.length > 0 && sel.length < total;
+    }
+  }
+
+  if (headerCheckbox) {
+    headerCheckbox.onchange = () => {
+      allCbs().forEach(cb => cb.checked = headerCheckbox.checked);
+      updateBar();
+    };
+  }
+  allCbs().forEach(cb => cb.addEventListener('change', updateBar));
+  updateBar();
 }
 
 // === Facility Tabs ===
@@ -4011,8 +4369,11 @@ function renderBookings() {
 
   // Table
   const tbody = document.getElementById('bk-tbody');
+  // v264 ピン留めセット
+  const pinnedSet = getPinnedBookings();
+  const isPinned = (d) => pinnedSet.has(d.name + '|' + d.applyDate);
   // 重複モードの時は 正規化名+医院 でグルーピングして隣接表示
-  const sorted = window._bkDupFilter
+  const baseSorted = window._bkDupFilter
     ? [...filtered].sort((a, b) => {
         const ka = normName(a.name) + '|' + normFac(a.facility);
         const kb = normName(b.name) + '|' + normFac(b.facility);
@@ -4020,6 +4381,8 @@ function renderBookings() {
         return (b.applyDate || '').localeCompare(a.applyDate || '');
       })
     : [...filtered].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
+  // ピン留めを先頭へ
+  const sorted = [...baseSorted].sort((a, b) => (isPinned(b) ? 1 : 0) - (isPinned(a) ? 1 : 0));
 
   const statusBadge = (s) => {
     if (!s || s === '未対応') return '<span class="badge badge-default">未対応</span>';
@@ -4089,15 +4452,17 @@ function renderBookings() {
     const overdue = isOverdue(d);
     const dupKey = normName(d.name) + '|' + normFac(d.facility);
     const isDup = dupCounts[dupKey] > 1;
-    const dupStyle = isDup ? 'border-left:3px solid #f59e0b;' : '';
+    const pinned = isPinned(d);
+    const dupStyle = isDup ? 'border-left:3px solid #f59e0b;' : (pinned ? 'border-left:3px solid #fbbf24;' : '');
     const rowStyle = dupStyle + (d.status==='除外' ? 'background:#f5f5f5;opacity:0.4;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#f8f8f8;color:#9ca3af' : (!d.status||d.status==='未対応') ? 'background:#fff5f5' : '');
-    return `<tr style="${rowStyle}">
+    return `<tr style="${rowStyle}" data-bk-name="${esc(d.name)}" data-bk-apply="${esc(d.applyDate)}">
+    <td class="bk-select-col" style="text-align:center;padding:4px">${isAdmin?`<input type="checkbox" class="bk-row-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;width:14px;height:14px;margin:0">`:''}</td>
     <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
     <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
     <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
       ${esc(fmtBookDate(d.bookDate))}</td>
-    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-row-edit" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="クリックで編集"`:''}>
-      ${esc(maskName(d.name))}</td>
+    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">
+      <button type="button" class="bk-pin-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${pinned?'ピン解除':'ピン留め'}" style="background:none;border:none;cursor:pointer;padding:0 4px 0 0;font-size:13px;line-height:1;color:${pinned?'#f59e0b':'#d1d5db'};vertical-align:middle">${pinned?'★':'☆'}</button><span ${isAdmin?`class="bk-row-edit" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="クリックで編集" style="cursor:pointer;text-decoration:underline dotted"`:''}>${esc(maskName(d.name))}</span></td>
     <td style="font-size:10px;white-space:nowrap">${esc(normSvc(d.service))}</td>
     <td style="font-size:10px;white-space:nowrap">${esc(normFac(d.facility))}</td>
     <td style="font-size:10px;white-space:nowrap">${isAdmin ? esc(fmtPhone(d.phone)) : esc(maskPhone(d.phone) || '-')}</td>
@@ -4176,10 +4541,10 @@ function renderBookings() {
       return `<span class="bk-incpaid-toggle" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-paid="${paid?1:0}" style="cursor:pointer;display:inline-block" title="${tip}">${badge}</span>`;
     })()}</td>
     <td>${isAdmin ? `<button class="bk-del-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="この予約を削除" style="font-size:10px;padding:2px 6px;background:#fff;border:1px solid #fecaca;color:#c00;border-radius:4px;cursor:pointer">🗑</button>` : ''}</td>
-  </tr>`}).join('') || '<tr><td colspan="19" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  </tr>`}).join('') || '<tr><td colspan="20" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   if (sorted.length > displayLimit) {
-    tbody.innerHTML += `<tr><td colspan="19" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
+    tbody.innerHTML += `<tr><td colspan="20" style="text-align:center;padding:12px"><button class="btn btn-outline" onclick="window._bkDisplayLimit=${displayLimit+200};renderBookings()" style="font-size:12px;padding:6px 16px;min-height:32px">さらに200件表示（全${sorted.length}件中${displayLimit}件表示中）</button></td></tr>`;
   }
 
   // ステータス変更イベント
@@ -4459,7 +4824,20 @@ function renderBookings() {
         input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { input.value = d.bookDate || ''; input.blur(); } });
       });
     });
+
+    // v264 一括選択 + バルクアクション
+    setupBulkBookingActions();
   }
+
+  // v264 ピン留めボタン (全ユーザー)
+  tbody.querySelectorAll('.bk-pin-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const isPinned = togglePinnedBooking(btn.dataset.name, btn.dataset.apply);
+      showToast(isPinned ? '★ ピン留めしました' : '☆ ピン解除しました');
+      renderBookings();
+    });
+  });
 
   // 請求トグル (admin/partner両方で操作可。請求済→未請求は admin のみ)
   tbody.querySelectorAll('.bk-incpaid-toggle').forEach(el => {
