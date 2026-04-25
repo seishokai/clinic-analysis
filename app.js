@@ -724,6 +724,9 @@ async function logout() {
   document.getElementById('app').hidden = true;
   document.getElementById('login-screen').hidden = false;
   document.getElementById('login-screen').style.display = '';
+  // v265 ログイン画面表示中はプルリフレッシュインジケーター完全非表示 (CSS :has() フォールバック)
+  const _pri = document.getElementById('pull-refresh-indicator');
+  if (_pri) { _pri.classList.remove('show', 'loading'); _pri.style.transform = ''; _pri.style.display = 'none'; }
   const em = document.getElementById('login-email'); if (em) em.value = '';
   document.getElementById('password').value = '';
   document.getElementById('login-error').hidden = true;
@@ -1917,6 +1920,9 @@ function showApp() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
+  // v265 ログイン後にプルリフレッシュインジケーターを再表示可能に (logout で display:none にされている可能性)
+  const _pri = document.getElementById('pull-refresh-indicator');
+  if (_pri) _pri.style.display = '';
 
   // Phase 6: ロール別 UI ガード (ナビ非表示 + 編集禁止ビット)
   try { applyRoleUI(); } catch(e) { console.warn('applyRoleUI failed', e); }
@@ -2460,6 +2466,8 @@ function setupPullRefresh() {
   const THRESHOLD = 70;
   const scrollEl = document.scrollingElement || document.documentElement;
   document.addEventListener('touchstart', (e) => {
+    // v265 ログイン画面表示中はスキップ
+    if (document.getElementById('app')?.hidden) { pulling = false; return; }
     if (scrollEl.scrollTop > 0) { pulling = false; return; }
     if (document.body.classList.contains('pr-loading')) return;
     startY = e.touches[0].clientY;
