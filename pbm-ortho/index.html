@@ -371,31 +371,24 @@
     display: flex; align-items: center; justify-content: center;
   }
   .device-glow {
-    position: absolute; inset: 18%;
+    position: absolute; inset: 12%;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(236, 138, 138, 0.5) 0%, rgba(236, 138, 138, 0.15) 40%, transparent 70%);
-    filter: blur(20px);
+    background: radial-gradient(circle, rgba(236, 138, 138, 0.32) 0%, rgba(236, 138, 138, 0.08) 45%, transparent 75%);
+    filter: blur(28px);
     z-index: 0;
-    animation: pulse 3.5s ease-in-out infinite;
+    animation: pulse 4s ease-in-out infinite;
   }
-  .device-rings {
-    position: absolute; inset: 0;
-    background:
-      radial-gradient(circle at center, transparent 38%, rgba(243, 223, 219, 0.5) 38.4%, transparent 39%),
-      radial-gradient(circle at center, transparent 48%, rgba(243, 223, 219, 0.35) 48.3%, transparent 49%),
-      radial-gradient(circle at center, transparent 58%, rgba(243, 223, 219, 0.22) 58.2%, transparent 59%);
-    z-index: 0;
-  }
+  .device-rings { display: none; }
   .device-img {
     position: relative; z-index: 2;
-    width: 88%; height: 88%;
-    background-image: url('device-only.png');
+    width: 96%; aspect-ratio: 3 / 2;
+    background-image: url('pbm-set.jpg');
     background-repeat: no-repeat;
-    /* PNG は 1414x2000 で デバイスは左上1/3 に集中。
-       拡大して中心に持ってくる */
-    background-size: 200% auto;
-    background-position: 38% 18%;
-    filter: drop-shadow(0 14px 28px rgba(208, 90, 88, 0.22));
+    background-size: contain;
+    background-position: center center;
+    border-radius: 22px;
+    box-shadow: 0 24px 60px rgba(208, 90, 88, 0.15), 0 6px 18px rgba(0,0,0,0.06);
+    background-color: #fff;
   }
   .device-tag-top, .device-tag-bottom {
     position: absolute; left: 50%;
@@ -405,17 +398,26 @@
     text-align: center;
   }
   .device-tag-top {
-    top: 6%;
-    font-size: 11px; font-weight: 600;
-    color: var(--ink-mute); letter-spacing: 0.3em;
+    top: 4%;
+    background: #fff;
+    padding: 6px 14px;
+    border-radius: 100px;
+    font-size: 10px; font-weight: 700;
+    color: var(--rose-deep); letter-spacing: 0.25em;
+    box-shadow: 0 4px 14px rgba(208, 90, 88, 0.15);
+    border: 1px solid var(--line-soft);
   }
   .device-tag-bottom {
-    bottom: 8%;
-    font-size: 28px; font-weight: 800;
-    color: var(--rose-deep); letter-spacing: 0.05em;
-    line-height: 1;
+    bottom: 4%;
+    background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+    color: #fff;
+    padding: 8px 18px;
+    border-radius: 100px;
+    font-size: 14px; font-weight: 800;
+    letter-spacing: 0.05em; line-height: 1;
+    box-shadow: 0 8px 22px rgba(208, 90, 88, 0.32);
   }
-  .device-tag-bottom span { font-size: 14px; font-weight: 600; color: var(--ink); margin-left: 2px; }
+  .device-tag-bottom span { font-size: 11px; font-weight: 600; opacity: 0.85; margin-left: 4px; }
   @keyframes pulse {
     0%, 100% { opacity: 0.7; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.06); }
