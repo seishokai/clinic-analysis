@@ -3,1289 +3,926 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>PBMオルソ｜矯正期間を半分に｜清翔会</title>
+<title>PBMオルソ｜矯正期間を最短で半分に｜清翔会</title>
+<meta name="description" content="光加速矯正装置PBMオルソ。マウスピース矯正の期間を最短で半分に。痛みを和らげ計画通りの治療をサポートします。">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@300;400;500;600;700;800;900&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #fdfbf7;
-    --bg-warm: #f5ede0;
-    --bg-cream: #ebe0cc;
-    --ink: #2a2520;
-    --ink-soft: #4a4038;
-    --ink-mute: #8a7e72;
-    --rose: #c8856e;
-    --rose-deep: #a8654d;
-    --gold: #c9a876;
-    --gold-deep: #9c7d4f;
-    --leaf: #7a8868;
-    --line: #d8cdb8;
-    --line-soft: #ebe2d0;
-    --mincho: 'Shippori Mincho', serif;
-    --display: 'Cormorant Garamond', 'Shippori Mincho', serif;
-    --sans: 'Inter', 'Shippori Mincho', sans-serif;
+    --bg: #ffffff;
+    --bg-soft: #fef7f5;
+    --bg-mute: #fbf5f3;
+    --ink: #1a1a1a;
+    --ink-soft: #4a4045;
+    --ink-mute: #8a7f82;
+    --rose: #ec8a8a;
+    --rose-deep: #e0606a;
+    --rose-soft: #fde2e0;
+    --rose-bg: #fff1ee;
+    --line: #f3dfdb;
+    --line-soft: #fae8e3;
+    --shadow-sm: 0 2px 10px rgba(224, 96, 106, 0.05);
+    --shadow-md: 0 10px 30px rgba(224, 96, 106, 0.1);
+    --shadow-lg: 0 24px 60px rgba(224, 96, 106, 0.16);
+    --sans: 'Noto Sans JP', sans-serif;
+    --en: 'Inter', sans-serif;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
-
   html { scroll-behavior: smooth; }
-
   body {
-    font-family: var(--mincho);
+    font-family: var(--sans);
     background: var(--bg);
     color: var(--ink);
-    line-height: 1.9;
     font-feature-settings: "palt";
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.7;
     overflow-x: hidden;
   }
+  img { max-width: 100%; display: block; }
+  a { text-decoration: none; color: inherit; }
+  button { font-family: inherit; cursor: pointer; }
 
-  /* 紙のテクスチャ */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    pointer-events: none;
-    opacity: 0.5;
-    z-index: 1;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  /* ===== HEADER ===== */
+  .site-header {
+    position: sticky; top: 0; z-index: 100;
+    background: rgba(255, 255, 255, 0.94);
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-bottom: 1px solid var(--line-soft);
   }
-
-  .container { position: relative; z-index: 2; }
+  .header-inner {
+    max-width: 1280px; margin: 0 auto;
+    padding: 14px 32px;
+    display: flex; align-items: center; gap: 36px;
+  }
+  .logo {
+    display: flex; flex-direction: column; gap: 1px; line-height: 1;
+  }
+  .logo-en {
+    font-family: var(--en); font-size: 22px; font-weight: 700;
+    color: var(--rose-deep); letter-spacing: 0.06em;
+  }
+  .logo-jp { font-size: 10px; color: var(--ink-mute); letter-spacing: 0.3em; margin-top: 4px; }
+  .site-nav { display: flex; gap: 30px; margin-left: auto; }
+  .site-nav a {
+    font-size: 13px; color: var(--ink-soft); font-weight: 500;
+    letter-spacing: 0.05em; transition: color .2s;
+    padding: 6px 0; position: relative;
+  }
+  .site-nav a::after {
+    content: ''; position: absolute; bottom: -2px; left: 50%;
+    width: 0; height: 2px; background: var(--rose-deep);
+    transition: width .25s, left .25s;
+  }
+  .site-nav a:hover { color: var(--rose-deep); }
+  .site-nav a:hover::after { width: 100%; left: 0; }
+  .header-cta {
+    display: inline-flex; align-items: center; gap: 8px;
+    background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+    color: #fff; padding: 12px 24px; border-radius: 100px;
+    font-size: 13px; font-weight: 700; letter-spacing: 0.05em;
+    box-shadow: 0 6px 18px rgba(224, 96, 106, 0.32);
+    transition: transform .2s, box-shadow .2s;
+  }
+  .header-cta:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(224, 96, 106, 0.4); }
 
   /* ===== HERO ===== */
   .hero {
-    min-height: 100vh;
-    padding: 60px 8vw 80px;
-    display: grid;
-    grid-template-columns: 1.1fr 1fr;
-    gap: 60px;
-    align-items: center;
     position: relative;
-    background: 
-      radial-gradient(ellipse at top right, rgba(200, 133, 110, 0.12), transparent 60%),
-      radial-gradient(ellipse at bottom left, rgba(201, 168, 118, 0.15), transparent 60%),
-      linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+    background:
+      radial-gradient(ellipse at top right, rgba(236, 138, 138, 0.16), transparent 55%),
+      radial-gradient(ellipse at 30% 80%, rgba(253, 226, 224, 0.4), transparent 60%),
+      linear-gradient(180deg, #fff 0%, var(--bg-soft) 100%);
+    padding: 70px 32px 110px;
     overflow: hidden;
   }
-
-  /* 装飾的な円 */
   .hero::before {
-    content: '';
-    position: absolute;
-    top: -150px;
-    left: -150px;
-    width: 400px;
-    height: 400px;
+    content: ''; position: absolute;
+    top: -180px; left: -180px;
+    width: 540px; height: 540px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(201, 168, 118, 0.18), transparent 70%);
-    pointer-events: none;
-    z-index: 1;
+    background: radial-gradient(circle, rgba(253, 226, 224, 0.55), transparent 70%);
   }
-
-  .hero::after {
-    content: '';
-    position: absolute;
-    bottom: -200px;
-    left: -100px;
-    width: 500px;
-    height: 500px;
-    border-radius: 50%;
-    background: radial-gradient(circle, rgba(200, 133, 110, 0.1), transparent 70%);
-    pointer-events: none;
-    z-index: 1;
+  .hero-inner {
+    max-width: 1280px; margin: 0 auto;
+    display: grid; grid-template-columns: 1.05fr 1fr;
+    gap: 60px; align-items: center;
+    position: relative; z-index: 2;
   }
-
-  .brand-mark {
-    position: absolute;
-    top: 40px;
-    left: 8vw;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    font-family: var(--sans);
-    font-size: 11px;
-    letter-spacing: 0.4em;
-    color: var(--gold-deep);
-    text-transform: uppercase;
-    font-weight: 500;
-    z-index: 4;
-  }
-
-  .brand-mark::before {
-    content: '';
-    width: 24px;
-    height: 1px;
-    background: var(--gold);
-  }
-
-  .hero-content {
-    max-width: 100%;
-    position: relative;
-    z-index: 3;
-    margin-top: 60px;
-  }
-
-  /* ヒーロー右側ビジュアル */
-  .hero-visual {
-    position: relative;
-    z-index: 2;
-    aspect-ratio: 4 / 5;
-    width: 100%;
-    max-width: 560px;
-    margin-left: auto;
-    overflow: hidden;
-    background: var(--bg-warm);
-  }
-
-  .hero-visual::before {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border: 1px solid rgba(200, 133, 110, 0.3);
-    z-index: 3;
-    pointer-events: none;
-  }
-
-  .hero-visual::after {
-    content: '';
-    position: absolute;
-    inset: 12px;
-    border: 1px solid rgba(253, 251, 247, 0.6);
-    z-index: 3;
-    pointer-events: none;
-  }
-
-  .hero-visual img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    object-position: center 30%;
-    filter: saturate(0.92) contrast(1.02);
-    transition: transform 8s ease;
-  }
-
-  .hero-visual:hover img {
-    transform: scale(1.04);
-  }
-
-  /* 画像の上にうっすらオーバーレイ */
-  .hero-visual-overlay {
-    position: absolute;
-    inset: 0;
-    background: 
-      linear-gradient(135deg, rgba(253, 251, 247, 0.0) 0%, rgba(253, 251, 247, 0.0) 60%, rgba(245, 237, 224, 0.25) 100%),
-      radial-gradient(ellipse at top left, rgba(200, 133, 110, 0.08), transparent 50%);
-    z-index: 2;
-    pointer-events: none;
-  }
-
-  /* 装飾ラベル（画像の上） */
-  .hero-visual-label {
-    position: absolute;
-    bottom: 24px;
-    left: 24px;
-    z-index: 4;
-    background: rgba(253, 251, 247, 0.92);
-    padding: 12px 20px;
-    border-left: 2px solid var(--rose-deep);
-    backdrop-filter: blur(8px);
-  }
-
-  .hero-visual-label-en {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 13px;
-    color: var(--rose-deep);
-    letter-spacing: 0.1em;
-    margin-bottom: 2px;
-  }
-
-  .hero-visual-label-jp {
-    font-family: var(--mincho);
-    font-size: 13px;
-    color: var(--ink);
-    font-weight: 500;
-    letter-spacing: 0.1em;
-  }
-
-  /* 画像横の縦書きキャッチ */
-  .hero-visual-side {
-    position: absolute;
-    top: 50%;
-    left: -40px;
-    transform: translateY(-50%);
-    writing-mode: vertical-rl;
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 12px;
-    letter-spacing: 0.4em;
-    color: var(--gold-deep);
-    z-index: 4;
-    text-transform: uppercase;
-  }
-
-  .hero-eyebrow {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: clamp(18px, 2vw, 26px);
-    color: var(--rose-deep);
-    letter-spacing: 0.05em;
-    margin-bottom: 16px;
-    font-weight: 400;
-  }
+  .hero-content { max-width: 100%; }
 
   .hero h1 {
-    font-family: var(--mincho);
-    font-weight: 600;
-    font-size: clamp(36px, 6vw, 76px);
+    font-weight: 800;
+    font-size: clamp(36px, 5.6vw, 68px);
     line-height: 1.25;
-    letter-spacing: 0.02em;
+    letter-spacing: -0.01em;
     color: var(--ink);
-    margin-bottom: 32px;
+    margin-bottom: 26px;
   }
-
-  .hero h1 .highlight {
-    position: relative;
-    display: inline-block;
+  .hero h1 .accent {
+    position: relative; display: inline-block;
     color: var(--rose-deep);
   }
-
-  .hero h1 .highlight::after {
-    content: '';
-    position: absolute;
-    bottom: 4px;
-    left: -4px;
-    right: -4px;
-    height: 14px;
-    background: rgba(200, 133, 110, 0.2);
-    z-index: -1;
+  .hero h1 .accent::after {
+    content: ''; position: absolute;
+    bottom: 4px; left: -4px; right: -4px;
+    height: 14px; background: var(--rose-soft);
+    z-index: -1; border-radius: 4px;
   }
-
+  .hero h1 sup {
+    font-size: 0.32em; color: var(--ink-mute); font-weight: 500;
+    margin-left: 6px; vertical-align: top; top: 0.4em;
+  }
   .hero-lead {
-    font-size: clamp(15px, 1.6vw, 19px);
-    line-height: 2.2;
-    color: var(--ink-soft);
-    max-width: 700px;
-    margin-bottom: 48px;
+    font-size: 15px; color: var(--ink-soft);
+    line-height: 2; margin-bottom: 30px; max-width: 520px;
   }
 
-  .hero-stats {
-    display: flex;
-    gap: 0;
-    border-top: 1px solid var(--line);
-    border-bottom: 1px solid var(--line);
-    padding: 32px 0;
-    max-width: 800px;
+  .hero-chips {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 28px;
   }
-
-  .hero-stat {
-    flex: 1;
-    padding: 0 32px;
-    border-right: 1px solid var(--line);
-    text-align: left;
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 18px; background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 100px;
+    font-size: 12.5px; font-weight: 600; color: var(--ink);
+    box-shadow: var(--shadow-sm);
   }
+  .chip svg { width: 14px; height: 14px; color: var(--rose-deep); }
 
-  .hero-stat:first-child { padding-left: 0; }
-  .hero-stat:last-child { border-right: none; }
-
-  .hero-stat-num {
-    font-family: var(--display);
-    font-size: clamp(40px, 5vw, 64px);
-    font-weight: 500;
-    line-height: 1;
-    color: var(--rose-deep);
-    margin-bottom: 8px;
-    font-style: italic;
+  .hero-checks { list-style: none; margin-bottom: 36px; }
+  .hero-checks li {
+    display: flex; align-items: center; gap: 12px;
+    font-size: 14.5px; color: var(--ink); font-weight: 500;
+    padding: 7px 0;
   }
-
-  .hero-stat-num small {
-    font-size: 0.5em;
-    color: var(--ink-mute);
-    margin-left: 4px;
+  .hero-checks .dot {
+    flex-shrink: 0; width: 22px; height: 22px;
+    border-radius: 50%; background: var(--rose-deep);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 12px; font-weight: 700;
   }
+  .hero-checks strong { color: var(--rose-deep); font-weight: 700; }
 
-  .hero-stat-label {
-    font-family: var(--mincho);
-    font-size: 13px;
-    color: var(--ink-soft);
-    letter-spacing: 0.1em;
-    line-height: 1.6;
+  .hero-ctas {
+    display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 28px;
   }
-
-  .hero-scroll {
-    position: absolute;
-    bottom: 40px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-family: var(--sans);
-    font-size: 10px;
-    letter-spacing: 0.4em;
-    color: var(--ink-mute);
-    text-transform: uppercase;
-    writing-mode: vertical-rl;
-    animation: scrollDown 2s ease-in-out infinite;
+  .btn-primary {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 18px 38px;
+    background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+    color: #fff; border-radius: 100px;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.05em;
+    box-shadow: 0 10px 28px rgba(224, 96, 106, 0.38);
+    transition: transform .25s, box-shadow .25s;
+    border: none;
   }
-
-  @keyframes scrollDown {
-    0%, 100% { transform: translateX(-50%) translateY(0); opacity: 0.6; }
-    50% { transform: translateX(-50%) translateY(8px); opacity: 1; }
+  .btn-primary:hover { transform: translateY(-3px); box-shadow: 0 14px 34px rgba(224, 96, 106, 0.5); }
+  .btn-secondary {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 18px 38px; background: #fff;
+    color: var(--ink); border: 1.5px solid var(--line);
+    border-radius: 100px;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.05em;
+    transition: all .25s;
   }
+  .btn-secondary:hover { border-color: var(--rose-deep); color: var(--rose-deep); transform: translateY(-3px); }
 
-  /* ===== セクション共通 ===== */
-  .section {
-    padding: 120px 8vw;
+  .hero-trust {
+    display: flex; flex-wrap: wrap; gap: 16px;
+    font-size: 12px; color: var(--ink-mute); align-items: center;
+  }
+  .trust-item { display: inline-flex; align-items: center; gap: 6px; }
+  .trust-divider { color: var(--line); }
+  .trust-item strong { color: var(--ink-soft); font-weight: 600; }
+
+  /* === Hero Visual === */
+  .hero-visual {
     position: relative;
+    aspect-ratio: 4/5; max-width: 560px; width: 100%;
+    margin-left: auto;
+  }
+  .hero-photo {
+    position: relative; width: 100%; height: 100%;
+    border-radius: 24px; overflow: hidden;
+    box-shadow: var(--shadow-lg);
+  }
+  .hero-photo img {
+    width: 100%; height: 100%; object-fit: cover; object-position: center 25%;
   }
 
-  .section-tag {
-    display: inline-block;
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 14px;
-    color: var(--rose-deep);
-    letter-spacing: 0.15em;
-    margin-bottom: 16px;
-  }
-
-  .section-tag::before {
-    content: '— ';
-  }
-
-  .section-title {
-    font-family: var(--mincho);
-    font-size: clamp(28px, 4vw, 44px);
-    font-weight: 600;
-    line-height: 1.5;
-    margin-bottom: 24px;
-    letter-spacing: 0.02em;
-  }
-
-  .section-title .em {
-    color: var(--rose-deep);
-  }
-
-  .section-lead {
-    font-size: 17px;
-    line-height: 2.2;
-    color: var(--ink-soft);
-    max-width: 700px;
-    margin-bottom: 60px;
-  }
-
-  /* ===== Section: こんなお悩みありませんか ===== */
-  .worries {
-    background: var(--bg);
+  /* Floating badges */
+  .badge {
+    position: absolute; background: #fff;
+    border-radius: 18px; padding: 16px 18px;
     text-align: center;
-  }
-
-  .worries-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-    gap: 24px;
-    max-width: 1100px;
-    margin: 60px auto 0;
-  }
-
-  .worry-card {
-    background: var(--bg-warm);
-    padding: 40px 28px;
-    border-radius: 4px;
-    text-align: center;
+    box-shadow: var(--shadow-md);
     border: 1px solid var(--line-soft);
-    position: relative;
-    transition: transform 0.4s ease;
+    z-index: 3;
   }
-
-  .worry-card:hover {
-    transform: translateY(-6px);
+  .badge-laurel {
+    font-family: var(--en); font-style: italic; font-size: 9px;
+    color: var(--rose-deep); letter-spacing: 0.2em;
+    margin-bottom: 4px; font-weight: 600;
+    text-transform: uppercase;
   }
+  .badge-num {
+    font-family: var(--en); font-weight: 700;
+    font-size: 38px; color: var(--rose-deep);
+    line-height: 1; letter-spacing: -0.02em;
+    display: flex; align-items: baseline; justify-content: center;
+  }
+  .badge-num .small { font-size: 14px; color: var(--ink); margin-left: 3px; font-weight: 500; }
+  .badge-num .slash { font-size: 22px; color: var(--ink-mute); margin: 0 1px; }
+  .badge-label {
+    font-size: 10.5px; color: var(--ink-soft);
+    letter-spacing: 0.05em; line-height: 1.5; margin-top: 4px;
+    font-weight: 500;
+  }
+  .badge.b1 { top: 24px; right: -28px; }
+  .badge.b2 { top: 44%; left: -38px; padding: 14px 18px; }
+  .badge.b3 { bottom: 30px; right: -16px; padding: 14px 18px; }
+  .stars { color: #f5b333; font-size: 11px; letter-spacing: 1px; margin-top: 2px; }
 
-  .worry-icon {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 36px;
-    color: var(--gold);
+  /* ===== Hero下 features bar ===== */
+  .features-bar {
+    max-width: 1280px; margin: -56px auto 0;
+    padding: 0 32px;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 16px; position: relative; z-index: 5;
+  }
+  .feat-card {
+    background: #fff; border-radius: 20px;
+    padding: 28px 30px;
+    border: 1px solid var(--line-soft);
+    box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; gap: 18px;
+    transition: transform .25s, box-shadow .25s;
+  }
+  .feat-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+  .feat-icon {
+    flex-shrink: 0; width: 56px; height: 56px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--rose-soft), var(--rose-bg));
+    display: flex; align-items: center; justify-content: center;
+    color: var(--rose-deep);
+  }
+  .feat-icon svg { width: 26px; height: 26px; }
+  .feat-title {
+    font-size: 16px; font-weight: 700; color: var(--ink);
+    margin-bottom: 4px;
+  }
+  .feat-desc { font-size: 12px; color: var(--ink-mute); line-height: 1.7; }
+
+  /* ===== SECTION ===== */
+  .section { padding: 110px 32px; position: relative; }
+  .section-inner { max-width: 1280px; margin: 0 auto; }
+  .section-head { text-align: center; margin-bottom: 64px; }
+  .section-eyebrow {
+    display: inline-block;
+    font-family: var(--en); font-weight: 600;
+    font-size: 12px; color: var(--rose-deep);
+    letter-spacing: 0.3em; text-transform: uppercase;
     margin-bottom: 16px;
+    padding: 6px 18px; background: var(--rose-bg); border-radius: 100px;
+  }
+  .section-title {
+    font-size: clamp(26px, 3.6vw, 40px);
+    font-weight: 800; line-height: 1.45;
+    color: var(--ink); letter-spacing: -0.005em;
+  }
+  .section-title .em { color: var(--rose-deep); }
+  .section-lead {
+    font-size: 15px; color: var(--ink-soft);
+    line-height: 2; margin-top: 22px;
+    max-width: 620px; margin-left: auto; margin-right: auto;
   }
 
+  /* ===== WORRIES ===== */
+  .worries { background: var(--bg-soft); }
+  .worries-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+  }
+  .worry-card {
+    background: #fff; border-radius: 18px;
+    padding: 38px 24px 32px; text-align: center;
+    border: 1px solid var(--line-soft);
+    transition: transform .3s, box-shadow .3s;
+  }
+  .worry-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-md); }
+  .worry-num {
+    font-family: var(--en); font-size: 13px; font-weight: 600;
+    color: var(--rose-deep); letter-spacing: 0.18em; margin-bottom: 16px;
+  }
+  .worry-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--rose-bg);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 18px; color: var(--rose-deep);
+  }
+  .worry-icon svg { width: 26px; height: 26px; }
   .worry-text {
-    font-family: var(--mincho);
-    font-size: 15px;
-    line-height: 1.9;
-    color: var(--ink-soft);
+    font-size: 15px; font-weight: 500; line-height: 1.85; color: var(--ink);
   }
+  .worry-text strong { color: var(--rose-deep); font-weight: 800; }
 
-  .worry-text strong {
-    color: var(--ink);
-    font-weight: 600;
+  .worries-bridge {
+    margin-top: 60px; text-align: center;
+    font-size: 18px; color: var(--ink-soft); font-weight: 500;
   }
+  .worries-bridge strong { color: var(--rose-deep); font-weight: 700; }
 
-  /* ===== Section: PBMとは ===== */
-  .what-is {
-    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
-    position: relative;
-    overflow: hidden;
-  }
-
+  /* ===== WHAT IS ===== */
+  .what-is { background: #fff; position: relative; overflow: hidden; }
   .what-is::before {
     content: 'PBM';
-    position: absolute;
-    top: 50%;
-    right: -50px;
+    position: absolute; top: 50%; right: -100px;
     transform: translateY(-50%);
-    font-family: var(--display);
-    font-size: 400px;
-    font-weight: 300;
-    color: rgba(200, 133, 110, 0.06);
-    line-height: 1;
+    font-family: var(--en); font-weight: 800;
+    font-size: 380px; color: rgba(236, 138, 138, 0.05);
+    line-height: 1; letter-spacing: -0.02em;
     pointer-events: none;
   }
-
   .what-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 80px;
-    align-items: center;
-    position: relative;
-    z-index: 2;
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 70px; align-items: center;
   }
-
+  .what-text .section-eyebrow,
+  .what-text .section-title { text-align: left; }
+  .what-text .section-eyebrow { display: inline-block; }
+  .what-text .section-title { margin-bottom: 26px; }
   .what-text p {
-    font-size: 16px;
-    line-height: 2.2;
-    color: var(--ink-soft);
-    margin-bottom: 20px;
+    font-size: 15px; line-height: 2.1; color: var(--ink-soft); margin-bottom: 18px;
   }
-
-  .what-text p:first-of-type::first-letter {
-    font-family: var(--display);
-    font-size: 56px;
-    float: left;
-    line-height: 0.9;
-    margin-right: 12px;
-    margin-top: 6px;
-    color: var(--rose-deep);
-  }
-
   .what-text strong {
-    color: var(--ink);
-    font-weight: 600;
-    background: linear-gradient(180deg, transparent 65%, rgba(200, 133, 110, 0.25) 65%);
-    padding: 0 2px;
+    color: var(--ink); font-weight: 700;
+    background: linear-gradient(180deg, transparent 65%, var(--rose-soft) 65%);
+    padding: 0 3px;
   }
-
-  /* SVG イメージ */
   .what-visual {
-    position: relative;
-    aspect-ratio: 1;
-    max-width: 480px;
-    margin: 0 auto;
+    position: relative; aspect-ratio: 1;
+    max-width: 480px; margin: 0 auto;
   }
 
-  .what-visual svg {
-    width: 100%;
-    height: 100%;
+  /* ===== MECHANISM ===== */
+  .mechanism { background: var(--bg-soft); }
+  .mech-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
   }
-
-  /* ===== Section: 仕組み ===== */
-  .mechanism {
-    background: var(--bg);
-  }
-
-  .mechanism-flow {
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    gap: 0;
-    margin-top: 60px;
-    position: relative;
-  }
-
-  .step {
-    padding: 32px 24px;
-    text-align: center;
-    position: relative;
-    border-right: 1px solid var(--line);
-  }
-
-  .step:last-child { border-right: none; }
-
-  .step-num {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 14px;
-    color: var(--gold-deep);
-    letter-spacing: 0.3em;
-    margin-bottom: 16px;
-  }
-
-  .step-icon {
-    width: 80px;
-    height: 80px;
-    margin: 0 auto 24px;
-    border-radius: 50%;
-    background: var(--bg-warm);
-    border: 1px solid var(--line);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: var(--display);
-    font-size: 32px;
-    font-style: italic;
-    color: var(--rose-deep);
-    position: relative;
-  }
-
-  .step-icon::before {
-    content: '';
-    position: absolute;
-    inset: -8px;
-    border-radius: 50%;
-    border: 1px dashed var(--line);
-  }
-
-  .step-title {
-    font-family: var(--mincho);
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 12px;
-  }
-
-  .step-desc {
-    font-size: 13px;
-    line-height: 1.9;
-    color: var(--ink-soft);
-  }
-
-  /* ===== Section: 3つのメリット ===== */
-  .benefits {
-    background: linear-gradient(180deg, var(--bg-warm) 0%, var(--bg) 100%);
-  }
-
-  .benefit-list {
-    display: grid;
-    gap: 60px;
-    margin-top: 60px;
-  }
-
-  .benefit-item {
-    display: grid;
-    grid-template-columns: 80px 1fr 1.2fr;
-    gap: 60px;
-    align-items: start;
-    padding-bottom: 60px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .benefit-item:last-child {
-    border-bottom: none;
-    padding-bottom: 0;
-  }
-
-  .benefit-num {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 80px;
-    line-height: 1;
-    color: var(--rose);
-    font-weight: 400;
-  }
-
-  .benefit-content .benefit-en {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 16px;
-    color: var(--gold-deep);
-    letter-spacing: 0.1em;
-    margin-bottom: 8px;
-  }
-
-  .benefit-title {
-    font-family: var(--mincho);
-    font-size: 28px;
-    font-weight: 700;
-    color: var(--ink);
-    margin-bottom: 20px;
-    letter-spacing: 0.02em;
-    line-height: 1.4;
-  }
-
-  .benefit-desc {
-    font-size: 15px;
-    line-height: 2;
-    color: var(--ink-soft);
-  }
-
-  .benefit-visual {
-    background: var(--bg);
-    border: 1px solid var(--line);
-    padding: 32px;
-    text-align: center;
-    position: relative;
-  }
-
-  .benefit-visual::before {
-    content: '';
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
+  .mech-card {
+    background: #fff; border-radius: 20px;
+    padding: 36px 28px; text-align: center;
     border: 1px solid var(--line-soft);
-    pointer-events: none;
-  }
-
-  .benefit-stat {
-    font-family: var(--display);
-    font-size: 64px;
-    font-weight: 500;
-    line-height: 1;
-    color: var(--rose-deep);
-    margin-bottom: 8px;
-    font-style: italic;
-  }
-
-  .benefit-stat small {
-    font-size: 0.4em;
-    color: var(--ink-mute);
-  }
-
-  .benefit-stat-label {
-    font-family: var(--mincho);
-    font-size: 13px;
-    color: var(--ink-soft);
-    letter-spacing: 0.15em;
-    margin-bottom: 16px;
-  }
-
-  .benefit-comparison {
-    display: flex;
-    gap: 16px;
-    justify-content: center;
-    align-items: center;
-    margin-top: 16px;
-    padding-top: 16px;
-    border-top: 1px dashed var(--line);
-  }
-
-  .comp-item {
-    flex: 1;
-  }
-
-  .comp-label {
-    font-family: var(--sans);
-    font-size: 10px;
-    color: var(--ink-mute);
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    margin-bottom: 4px;
-  }
-
-  .comp-value {
-    font-family: var(--mincho);
-    font-size: 14px;
-    color: var(--ink);
-    font-weight: 600;
-  }
-
-  .comp-arrow {
-    font-family: var(--display);
-    font-style: italic;
-    color: var(--rose-deep);
-    font-size: 20px;
-  }
-
-  /* ===== Section: 治療期間比較 ===== */
-  .timeline {
-    background: var(--ink);
-    color: var(--bg);
-    padding: 100px 8vw;
+    transition: transform .3s, box-shadow .3s;
     position: relative;
-    overflow: hidden;
+  }
+  .mech-card:hover { transform: translateY(-6px); box-shadow: var(--shadow-md); }
+  .mech-num {
+    font-family: var(--en); font-weight: 800;
+    font-size: 56px; color: var(--rose);
+    line-height: 1; margin-bottom: 16px;
+    letter-spacing: -0.04em;
+  }
+  .mech-title {
+    font-size: 17px; font-weight: 700; color: var(--ink); margin-bottom: 12px;
+  }
+  .mech-desc { font-size: 13px; color: var(--ink-soft); line-height: 1.85; }
+
+  /* ===== BENEFITS ===== */
+  .benefits { background: #fff; }
+  .benefit-list { display: grid; gap: 28px; }
+  .benefit-row {
+    display: grid; grid-template-columns: 1.4fr 1fr;
+    gap: 56px; align-items: center;
+    background: var(--bg-soft);
+    border-radius: 28px; padding: 56px;
+    position: relative; overflow: hidden;
+  }
+  .benefit-row:nth-child(even) { grid-template-columns: 1fr 1.4fr; }
+  .benefit-row:nth-child(even) .benefit-content { order: 2; }
+  .benefit-row:nth-child(even) .benefit-stat { order: 1; }
+
+  .b-eyebrow {
+    font-family: var(--en); font-size: 12px; font-weight: 600;
+    color: var(--rose-deep); letter-spacing: 0.3em;
+    text-transform: uppercase; margin-bottom: 12px;
+  }
+  .b-en {
+    font-family: var(--en); font-size: 18px;
+    color: var(--rose); font-weight: 600; margin-bottom: 6px;
+    letter-spacing: 0.02em;
+  }
+  .benefit-content h3 {
+    font-size: clamp(24px, 2.6vw, 34px);
+    font-weight: 800; line-height: 1.4;
+    color: var(--ink); margin-bottom: 22px; letter-spacing: -0.01em;
+  }
+  .benefit-content h3 .em { color: var(--rose-deep); }
+  .benefit-content p { font-size: 14.5px; line-height: 2; color: var(--ink-soft); }
+  .benefit-content p strong {
+    color: var(--ink); font-weight: 700;
+    background: linear-gradient(180deg, transparent 65%, var(--rose-soft) 65%);
+    padding: 0 3px;
+  }
+  .benefit-stat {
+    background: #fff; border-radius: 24px;
+    padding: 44px 36px; text-align: center;
+    box-shadow: var(--shadow-md);
+    border: 1px solid var(--line-soft);
+  }
+  .b-stat-big {
+    font-family: var(--en); font-weight: 800;
+    font-size: 88px; color: var(--rose-deep);
+    line-height: 1; letter-spacing: -0.04em;
+    display: flex; align-items: baseline; justify-content: center;
+  }
+  .b-stat-big .small { font-size: 32px; color: var(--ink); font-weight: 500; }
+  .b-stat-big .slash { font-size: 48px; color: var(--ink-mute); margin: 0 2px; }
+  .b-stat-label {
+    font-size: 13px; color: var(--ink-soft); font-weight: 600;
+    letter-spacing: 0.1em; margin: 14px 0 24px;
+  }
+  .b-compare {
+    display: flex; gap: 12px; align-items: center; justify-content: center;
+    padding-top: 22px; border-top: 1px dashed var(--line);
+  }
+  .b-comp-item { flex: 1; }
+  .b-comp-l {
+    font-family: var(--en); font-size: 10px; font-weight: 600;
+    color: var(--ink-mute); letter-spacing: 0.2em;
+    text-transform: uppercase; margin-bottom: 4px;
+  }
+  .b-comp-v { font-size: 15px; font-weight: 700; color: var(--ink); }
+  .b-arrow {
+    font-family: var(--en); color: var(--rose); font-size: 22px; font-weight: 600;
   }
 
+  /* ===== TIMELINE ===== */
+  .timeline {
+    background: var(--ink); color: #fff;
+    overflow: hidden; position: relative;
+  }
   .timeline::before {
     content: '';
-    position: absolute;
-    top: -100px;
-    right: -100px;
-    width: 400px;
-    height: 400px;
+    position: absolute; top: -120px; right: -120px;
+    width: 480px; height: 480px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(200, 133, 110, 0.15), transparent 70%);
+    background: radial-gradient(circle, rgba(236, 138, 138, 0.18), transparent 70%);
+  }
+  .timeline .section-eyebrow { background: rgba(236, 138, 138, 0.18); color: var(--rose); }
+  .timeline .section-title { color: #fff; }
+  .timeline .section-lead { color: rgba(255,255,255,0.7); }
+  .tl-rows { max-width: 880px; margin: 0 auto; display: grid; gap: 28px; }
+  .tl-row {
+    display: grid; grid-template-columns: 200px 1fr;
+    gap: 28px; align-items: center;
+  }
+  .tl-label { font-size: 16px; font-weight: 600; }
+  .tl-label small {
+    display: block; font-family: var(--en); font-size: 12px;
+    color: var(--rose); margin-top: 4px;
+    letter-spacing: 0.08em; font-style: italic;
+  }
+  .tl-bar-wrap {
+    position: relative; height: 46px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 8px; overflow: hidden;
+  }
+  .tl-bar {
+    height: 100%; display: flex; align-items: center;
+    padding: 0 22px; font-family: var(--en);
+    font-size: 18px; font-weight: 700; color: #fff;
+    letter-spacing: 0.02em;
+  }
+  .tl-bar.normal { width: 100%; background: linear-gradient(90deg, #4a4045, #6b5a5e); }
+  .tl-bar.pbm { width: 50%; background: linear-gradient(90deg, var(--rose), var(--rose-deep)); }
+  .tl-bar.normal-mp { width: 100%; background: linear-gradient(90deg, #4a4045, #6b5a5e); font-size: 15px; padding: 0 18px; }
+  .tl-bar.pbm-mp { width: 40%; background: linear-gradient(90deg, var(--rose), var(--rose-deep)); font-size: 15px; padding: 0 18px; }
+  .tl-note {
+    margin-top: 50px; font-size: 12px;
+    color: rgba(255,255,255,0.55); line-height: 1.95;
+    max-width: 700px; letter-spacing: 0.03em;
   }
 
-  .timeline .section-title { color: var(--bg); }
-  .timeline .section-tag { color: var(--gold); }
-
-  .timeline-compare {
-    margin-top: 60px;
-    display: grid;
-    gap: 32px;
-    max-width: 900px;
-  }
-
-  .timeline-row {
-    display: grid;
-    grid-template-columns: 200px 1fr;
-    gap: 32px;
-    align-items: center;
-  }
-
-  .timeline-label {
-    font-family: var(--mincho);
-    font-size: 16px;
-    font-weight: 500;
-    color: var(--bg);
-  }
-
-  .timeline-label small {
-    display: block;
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 13px;
-    color: var(--gold);
-    margin-top: 4px;
-    letter-spacing: 0.1em;
-  }
-
-  .timeline-bar-wrap {
-    position: relative;
-    height: 40px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 2px;
-    overflow: hidden;
-  }
-
-  .timeline-bar {
-    height: 100%;
-    display: flex;
-    align-items: center;
-    padding: 0 20px;
-    font-family: var(--display);
-    font-size: 18px;
-    color: var(--bg);
-    font-weight: 500;
-    letter-spacing: 0.05em;
-  }
-
-  .timeline-bar.normal {
-    width: 100%;
-    background: linear-gradient(90deg, var(--ink-mute), var(--gold-deep));
-  }
-
-  .timeline-bar.pbm {
-    width: 50%;
-    background: linear-gradient(90deg, var(--rose), var(--rose-deep));
-  }
-
-  .timeline-bar.normal-mp {
-    width: 100%;
-    background: linear-gradient(90deg, var(--ink-mute), var(--gold-deep));
-    padding: 0 16px;
-    font-size: 14px;
-  }
-
-  .timeline-bar.pbm-mp {
-    width: 40%;
-    background: linear-gradient(90deg, var(--rose), var(--rose-deep));
-    padding: 0 16px;
-    font-size: 14px;
-  }
-
-  /* ===== Section: 使い方 ===== */
-  .usage {
-    background: var(--bg);
-  }
-
+  /* ===== USAGE ===== */
+  .usage { background: #fff; }
   .usage-card {
-    background: var(--bg-warm);
-    padding: 60px 80px;
-    margin-top: 40px;
-    text-align: center;
-    border: 1px solid var(--line);
+    max-width: 920px; margin: 0 auto;
+    background: linear-gradient(135deg, #fff 0%, var(--bg-soft) 100%);
+    border: 1px solid var(--line-soft);
+    border-radius: 28px; padding: 64px 56px;
+    text-align: center; box-shadow: var(--shadow-sm);
     position: relative;
   }
-
-  .usage-card::before, .usage-card::after {
-    content: '';
-    position: absolute;
-    width: 40px;
-    height: 40px;
-    border-color: var(--rose-deep);
-    border-style: solid;
-  }
-
-  .usage-card::before {
-    top: 16px;
-    left: 16px;
-    border-width: 1px 0 0 1px;
-  }
-
-  .usage-card::after {
-    bottom: 16px;
-    right: 16px;
-    border-width: 0 1px 1px 0;
-  }
-
   .usage-time {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 80px;
-    font-weight: 400;
-    color: var(--rose-deep);
-    line-height: 1;
-    margin-bottom: 16px;
+    font-family: var(--en); font-weight: 800;
+    font-size: clamp(64px, 8vw, 96px);
+    color: var(--rose-deep); line-height: 1; margin-bottom: 8px;
+    letter-spacing: -0.04em;
   }
-
-  .usage-time small {
-    font-size: 0.4em;
-    color: var(--ink);
-    margin-left: 8px;
+  .usage-time .small { font-size: 0.4em; color: var(--ink); margin-left: 8px; font-weight: 500; }
+  .usage-sub {
+    font-family: var(--en); font-size: 13px; font-weight: 600;
+    color: var(--rose-deep); letter-spacing: 0.3em;
+    margin-bottom: 18px; text-transform: uppercase;
   }
-
-  .usage-label {
-    font-family: var(--mincho);
-    font-size: 14px;
-    color: var(--ink-soft);
-    letter-spacing: 0.2em;
-    margin-bottom: 32px;
+  .usage-desc {
+    font-size: 15px; color: var(--ink-soft); line-height: 2.1;
+    max-width: 540px; margin: 0 auto 40px;
   }
-
   .usage-steps {
-    display: flex;
-    justify-content: center;
-    gap: 0;
-    margin-top: 40px;
-    padding-top: 40px;
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 24px; padding-top: 36px;
     border-top: 1px solid var(--line);
   }
-
-  .usage-step {
-    flex: 1;
-    padding: 0 24px;
-    border-right: 1px solid var(--line);
-    text-align: center;
-  }
-
-  .usage-step:last-child { border-right: none; }
-
+  .usage-step { text-align: center; }
   .usage-step-num {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 14px;
-    color: var(--gold-deep);
-    letter-spacing: 0.2em;
-    margin-bottom: 8px;
-  }
-
-  .usage-step-title {
-    font-family: var(--mincho);
-    font-size: 15px;
-    font-weight: 600;
-    color: var(--ink);
-    margin-bottom: 8px;
-  }
-
-  .usage-step-desc {
-    font-size: 13px;
-    color: var(--ink-soft);
-    line-height: 1.7;
-  }
-
-  /* ===== Section: 価格 ===== */
-  .price-section {
-    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
-    text-align: center;
-  }
-
-  .price-card {
-    max-width: 600px;
-    margin: 60px auto 0;
-    background: var(--bg);
-    border: 1px solid var(--ink);
-    padding: 60px 60px 40px;
-    position: relative;
-    box-shadow: 12px 12px 0 var(--bg-cream);
-  }
-
-  .price-card::before {
-    content: '';
-    position: absolute;
-    inset: 12px;
-    border: 1px solid var(--line);
-    pointer-events: none;
-  }
-
-  .price-product {
-    font-family: var(--display);
-    font-size: 36px;
-    font-weight: 500;
-    color: var(--ink);
-    margin-bottom: 4px;
-  }
-
-  .price-product-jp {
-    font-family: var(--mincho);
-    font-size: 14px;
-    color: var(--ink-soft);
-    letter-spacing: 0.2em;
-    margin-bottom: 32px;
-    padding-bottom: 24px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  .price-amount {
-    font-family: var(--display);
-    font-size: 88px;
-    font-weight: 500;
-    color: var(--rose-deep);
-    line-height: 1;
-    margin-bottom: 8px;
-    font-style: italic;
-    letter-spacing: -0.02em;
-  }
-
-  .price-amount .yen {
-    font-size: 36px;
-    margin-right: 4px;
-  }
-
-  .price-amount-tax {
-    font-family: var(--mincho);
-    font-size: 13px;
-    color: var(--ink-mute);
-    letter-spacing: 0.15em;
-    margin-bottom: 32px;
-  }
-
-  .price-perday {
-    background: var(--bg-warm);
-    padding: 24px;
-    margin-top: 32px;
-    border-left: 3px solid var(--rose);
-    text-align: left;
-  }
-
-  .price-perday-label {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 14px;
-    color: var(--gold-deep);
-    margin-bottom: 8px;
-    letter-spacing: 0.1em;
-  }
-
-  .price-perday-text {
-    font-family: var(--mincho);
-    font-size: 15px;
-    line-height: 1.9;
-    color: var(--ink);
-  }
-
-  .price-perday-text strong {
-    color: var(--rose-deep);
-    font-weight: 600;
-    font-size: 18px;
-  }
-
-  /* ===== Section: 安心ポイント ===== */
-  .reassurance {
-    background: var(--bg);
-  }
-
-  .reassurance-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 32px;
-    margin-top: 60px;
-  }
-
-  .reassurance-card {
-    text-align: center;
-    padding: 40px 32px;
-    border: 1px solid var(--line-soft);
-    background: var(--bg-warm);
-    position: relative;
-  }
-
-  .reassurance-icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto 24px;
-    border-radius: 50%;
-    background: var(--bg);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1px solid var(--line);
-  }
-
-  .reassurance-icon svg {
-    width: 28px;
-    height: 28px;
-    fill: none;
-    stroke: var(--rose-deep);
-    stroke-width: 1.5;
-  }
-
-  .reassurance-title {
-    font-family: var(--mincho);
-    font-size: 17px;
-    font-weight: 600;
-    color: var(--ink);
+    font-family: var(--en); font-size: 13px; font-weight: 700;
+    color: var(--rose-deep); letter-spacing: 0.25em;
     margin-bottom: 12px;
   }
+  .usage-step-icon {
+    width: 56px; height: 56px; border-radius: 50%;
+    background: var(--rose-bg); color: var(--rose-deep);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 14px;
+  }
+  .usage-step-icon svg { width: 24px; height: 24px; }
+  .usage-step-title { font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 6px; }
+  .usage-step-desc { font-size: 12.5px; color: var(--ink-soft); line-height: 1.85; }
 
-  .reassurance-desc {
-    font-size: 13px;
-    line-height: 1.9;
-    color: var(--ink-soft);
+  /* ===== PRICE ===== */
+  .price-section { background: var(--bg-soft); text-align: center; }
+  .price-card {
+    max-width: 640px; margin: 0 auto;
+    background: #fff; border: 1px solid var(--line-soft);
+    border-radius: 28px; padding: 64px 56px 48px;
+    box-shadow: var(--shadow-md); position: relative;
+  }
+  .price-card::before {
+    content: ''; position: absolute;
+    top: -1px; left: 24px; right: 24px;
+    height: 4px;
+    background: linear-gradient(90deg, var(--rose), var(--rose-deep));
+    border-radius: 0 0 4px 4px;
+  }
+  .price-eyebrow {
+    display: inline-block; background: var(--rose-bg);
+    color: var(--rose-deep); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.25em; padding: 6px 18px; border-radius: 100px;
+    margin-bottom: 22px;
+  }
+  .price-product {
+    font-family: var(--en); font-size: 30px; font-weight: 700;
+    color: var(--ink); letter-spacing: 0.02em; margin-bottom: 6px;
+  }
+  .price-product-jp {
+    font-size: 13px; color: var(--ink-soft);
+    letter-spacing: 0.25em; margin-bottom: 30px;
+    padding-bottom: 24px; border-bottom: 1px solid var(--line);
+  }
+  .price-amount {
+    font-family: var(--en); font-weight: 800;
+    font-size: clamp(72px, 9vw, 100px);
+    color: var(--rose-deep); line-height: 1;
+    letter-spacing: -0.04em;
+  }
+  .price-amount .yen { font-size: 0.4em; margin-right: 4px; font-weight: 700; }
+  .price-amount-tax {
+    font-size: 12px; color: var(--ink-mute);
+    letter-spacing: 0.15em; margin: 12px 0 32px;
+  }
+  .price-perday {
+    background: linear-gradient(135deg, var(--rose-bg) 0%, var(--bg-soft) 100%);
+    border-radius: 16px; padding: 24px 28px;
+    text-align: left; border-left: 4px solid var(--rose);
+  }
+  .price-perday-label {
+    font-family: var(--en); font-size: 12px; font-weight: 700;
+    color: var(--rose-deep); margin-bottom: 8px;
+    letter-spacing: 0.15em; text-transform: uppercase;
+  }
+  .price-perday-text { font-size: 14px; line-height: 1.95; color: var(--ink); }
+  .price-perday-text strong { color: var(--rose-deep); font-weight: 800; font-size: 17px; }
+
+  /* ===== REASSURANCE ===== */
+  .reassurance { background: #fff; }
+  .reass-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px;
+  }
+  .reass-card {
+    text-align: center; padding: 40px 28px;
+    border-radius: 20px; background: var(--bg-soft);
+    border: 1px solid var(--line-soft);
+    transition: transform .3s, box-shadow .3s;
+  }
+  .reass-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+  .reass-icon {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: #fff; color: var(--rose-deep);
+    display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 20px; border: 1px solid var(--line);
+  }
+  .reass-icon svg { width: 26px; height: 26px; }
+  .reass-title { font-size: 16px; font-weight: 700; color: var(--ink); margin-bottom: 10px; }
+  .reass-desc { font-size: 13px; color: var(--ink-soft); line-height: 1.9; }
+
+  /* ===== FAQ ===== */
+  .faq { background: var(--bg-soft); }
+  .faq-list { max-width: 800px; margin: 0 auto; display: grid; gap: 14px; }
+  .faq-item {
+    background: #fff; border-radius: 14px;
+    border: 1px solid var(--line-soft);
+    overflow: hidden; transition: box-shadow .25s;
+  }
+  .faq-item[open] { box-shadow: var(--shadow-md); }
+  .faq-q {
+    list-style: none;
+    padding: 22px 28px; cursor: pointer;
+    display: flex; align-items: center; gap: 16px;
+    font-size: 15px; font-weight: 700; color: var(--ink);
+  }
+  .faq-q::-webkit-details-marker { display: none; }
+  .q-mark {
+    flex-shrink: 0; width: 32px; height: 32px;
+    border-radius: 50%; background: var(--rose-bg);
+    color: var(--rose-deep);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--en); font-size: 16px; font-weight: 700;
+  }
+  .q-arrow { margin-left: auto; color: var(--rose); transition: transform .3s; font-size: 14px; }
+  .faq-item[open] .q-arrow { transform: rotate(180deg); }
+  .faq-a {
+    padding: 0 28px 22px 76px;
+    font-size: 14px; color: var(--ink-soft); line-height: 2;
   }
 
   /* ===== CTA ===== */
-  .cta {
-    padding: 120px 8vw;
+  .cta-section {
+    padding: 100px 32px 110px;
+    background:
+      radial-gradient(ellipse at top right, rgba(236, 138, 138, 0.2), transparent 50%),
+      radial-gradient(ellipse at bottom left, rgba(253, 226, 224, 0.5), transparent 60%),
+      linear-gradient(180deg, var(--bg-soft) 0%, var(--rose-bg) 100%);
     text-align: center;
-    background: linear-gradient(180deg, var(--bg-warm) 0%, var(--bg) 100%);
-    position: relative;
-    overflow: hidden;
+    position: relative; overflow: hidden;
   }
-
-  .cta::before {
-    content: '✦';
-    position: absolute;
-    top: 60px;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 24px;
-    color: var(--gold);
+  .cta-eyebrow {
+    font-family: var(--en); font-size: 12px; font-weight: 700;
+    color: var(--rose-deep); letter-spacing: 0.3em;
+    margin-bottom: 16px; text-transform: uppercase;
   }
-
-  .cta-message {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: clamp(28px, 4vw, 48px);
-    line-height: 1.4;
-    color: var(--ink);
-    margin-bottom: 24px;
-    font-weight: 400;
+  .cta-title {
+    font-size: clamp(28px, 4vw, 44px); font-weight: 800;
+    line-height: 1.5; color: var(--ink);
+    margin-bottom: 22px; letter-spacing: -0.01em;
   }
-
-  .cta-message .em {
-    color: var(--rose-deep);
-  }
-
-  .cta-jp {
-    font-family: var(--mincho);
-    font-size: clamp(20px, 2.5vw, 32px);
-    color: var(--ink);
-    margin-bottom: 16px;
-    font-weight: 600;
-    letter-spacing: 0.1em;
-  }
-
+  .cta-title .em { color: var(--rose-deep); }
   .cta-sub {
-    font-family: var(--mincho);
-    font-size: 16px;
-    color: var(--ink-soft);
-    margin-bottom: 48px;
-    line-height: 2;
+    font-size: 15px; color: var(--ink-soft);
+    line-height: 2; max-width: 580px; margin: 0 auto 44px;
   }
-
-  .cta-button {
-    display: inline-block;
-    padding: 22px 60px;
-    background: var(--rose-deep);
-    color: var(--bg);
-    text-decoration: none;
-    font-family: var(--mincho);
-    font-size: 16px;
-    letter-spacing: 0.2em;
-    font-weight: 500;
-    border: 1px solid var(--rose-deep);
-    transition: all 0.4s ease;
-    position: relative;
+  .cta-buttons {
+    display: flex; gap: 16px; justify-content: center;
+    flex-wrap: wrap; margin-bottom: 26px;
   }
+  .cta-buttons .btn-primary { padding: 22px 48px; font-size: 16px; }
+  .cta-buttons .btn-secondary { padding: 22px 48px; font-size: 16px; background: rgba(255,255,255,0.85); }
+  .cta-note { font-size: 12px; color: var(--ink-mute); letter-spacing: 0.05em; }
 
-  .cta-button:hover {
-    background: var(--ink);
-    border-color: var(--ink);
-    transform: translateY(-3px);
-    box-shadow: 0 12px 24px rgba(168, 101, 77, 0.25);
-  }
-
-  .cta-note {
-    font-family: var(--mincho);
-    font-size: 12px;
-    color: var(--ink-mute);
-    margin-top: 24px;
-    letter-spacing: 0.1em;
-  }
-
-  /* ===== フッター ===== */
+  /* ===== FOOTER ===== */
   footer {
-    padding: 50px 8vw;
-    text-align: center;
+    padding: 56px 32px 40px;
     background: var(--ink);
-    color: rgba(253, 251, 247, 0.6);
-    font-family: var(--mincho);
-    font-size: 12px;
-    letter-spacing: 0.15em;
+    color: rgba(255,255,255,0.6);
+    text-align: center; font-size: 12px;
+    letter-spacing: 0.08em; line-height: 2;
   }
-
   footer .clinic-name {
-    font-family: var(--display);
-    font-style: italic;
-    font-size: 18px;
-    color: var(--gold);
-    margin-bottom: 8px;
+    font-family: var(--en); font-weight: 700;
+    font-size: 22px; color: var(--rose);
+    margin-bottom: 6px; letter-spacing: 0.04em;
+  }
+  footer .clinic-jp {
+    font-size: 14px; color: rgba(255,255,255,0.85);
+    margin-bottom: 24px; letter-spacing: 0.15em; font-weight: 500;
   }
 
-  /* ===== レスポンシブ ===== */
+  /* ===== RESPONSIVE ===== */
   @media (max-width: 1100px) {
-    .hero {
-      grid-template-columns: 1fr;
-      gap: 40px;
-      min-height: auto;
-      padding-top: 100px;
-      padding-bottom: 80px;
+    .hero-inner { grid-template-columns: 1fr; gap: 50px; }
+    .hero-visual { max-width: 440px; margin: 0 auto; aspect-ratio: 4/4.5; }
+    .features-bar { grid-template-columns: 1fr; gap: 12px; margin-top: -32px; }
+    .what-grid { grid-template-columns: 1fr; gap: 50px; }
+    .worries-grid { grid-template-columns: repeat(2, 1fr); }
+    .mech-grid { grid-template-columns: repeat(2, 1fr); }
+    .reass-grid { grid-template-columns: repeat(2, 1fr); }
+    .benefit-row, .benefit-row:nth-child(even) {
+      grid-template-columns: 1fr; gap: 36px; padding: 40px 32px;
     }
-    .hero-content { margin-top: 20px; }
-    .hero-visual {
-      max-width: 480px;
-      margin: 0 auto;
-      aspect-ratio: 4 / 4;
-    }
-    .hero-visual-side { display: none; }
-    .hero-scroll { display: none; }
-  }
-
-  @media (max-width: 900px) {
-    .hero-stats { flex-direction: column; gap: 24px; }
-    .hero-stat { border-right: none; padding: 0; }
-    .what-grid { grid-template-columns: 1fr; gap: 40px; }
-    .mechanism-flow { grid-template-columns: 1fr 1fr; gap: 0; }
-    .step { border-bottom: 1px solid var(--line); }
-    .step:nth-child(2) { border-right: none; }
-    .step:nth-child(3), .step:nth-child(4) { border-bottom: none; }
-    .benefit-item { grid-template-columns: 60px 1fr; gap: 24px; }
-    .benefit-visual { grid-column: 1 / -1; margin-top: 24px; }
-    .benefit-num { font-size: 48px; }
-    .timeline-row { grid-template-columns: 1fr; gap: 8px; }
-    .usage-card { padding: 40px 24px; }
-    .usage-time { font-size: 56px; }
-    .usage-steps { flex-direction: column; gap: 24px; }
-    .usage-step { border-right: none; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
-    .usage-step:last-child { border-bottom: none; }
-    .price-card { padding: 40px 24px 24px; }
-    .price-amount { font-size: 60px; }
-    .section { padding: 80px 6vw; }
-    .hero { padding: 80px 6vw 60px; }
+    .benefit-row:nth-child(even) .benefit-content { order: 1; }
+    .benefit-row:nth-child(even) .benefit-stat { order: 2; }
+    .tl-row { grid-template-columns: 1fr; gap: 8px; }
+    .usage-steps { grid-template-columns: 1fr; gap: 28px; }
     .what-is::before { font-size: 200px; right: -30px; }
-    .hero-visual {
-      aspect-ratio: 1 / 1;
-      max-width: 100%;
-    }
+  }
+  @media (max-width: 720px) {
+    .header-inner { padding: 12px 20px; gap: 14px; }
+    .site-nav { display: none; }
+    .header-cta { padding: 9px 16px; font-size: 12px; }
+    .logo-en { font-size: 18px; }
+    .hero { padding: 44px 20px 80px; }
+    .section { padding: 70px 20px; }
+    .badge.b1 { top: 12px; right: -8px; padding: 12px 14px; }
+    .badge.b1 .badge-num { font-size: 28px; }
+    .badge.b2 { left: -10px; padding: 12px; }
+    .badge.b3 { right: 0; padding: 12px; }
+    .worries-grid { grid-template-columns: 1fr; }
+    .reass-grid { grid-template-columns: 1fr 1fr; }
+    .price-card, .usage-card { padding: 40px 24px; }
+    .cta-section { padding: 70px 20px; }
+    .cta-buttons { flex-direction: column; }
+    .cta-buttons .btn-primary, .cta-buttons .btn-secondary { width: 100%; justify-content: center; }
+    .features-bar { padding: 0 20px; }
+    .feat-card { padding: 20px; }
   }
 
-  /* ===== 動き ===== */
+  /* ===== MOTION ===== */
   @keyframes fadeUp {
-    from { opacity: 0; transform: translateY(30px); }
+    from { opacity: 0; transform: translateY(24px); }
     to { opacity: 1; transform: translateY(0); }
   }
-
-  .hero-eyebrow, .hero h1, .hero-lead, .hero-stats {
-    animation: fadeUp 1.2s ease forwards;
+  .hero h1, .hero-lead, .hero-chips, .hero-checks, .hero-ctas, .hero-trust {
+    animation: fadeUp .9s ease forwards;
   }
-
-  .hero h1 { animation-delay: 0.2s; opacity: 0; }
-  .hero-lead { animation-delay: 0.4s; opacity: 0; }
-  .hero-stats { animation-delay: 0.6s; opacity: 0; }
+  .hero-lead { animation-delay: .12s; opacity: 0; }
+  .hero-chips { animation-delay: .24s; opacity: 0; }
+  .hero-checks { animation-delay: .36s; opacity: 0; }
+  .hero-ctas { animation-delay: .48s; opacity: 0; }
+  .hero-trust { animation-delay: .6s; opacity: 0; }
+  .hero-photo { animation: fadeUp 1.2s ease forwards; animation-delay: .2s; opacity: 0; }
+  .badge.b1 { animation: fadeUp .8s ease forwards; animation-delay: .8s; opacity: 0; }
+  .badge.b2 { animation: fadeUp .8s ease forwards; animation-delay: .95s; opacity: 0; }
+  .badge.b3 { animation: fadeUp .8s ease forwards; animation-delay: 1.1s; opacity: 0; }
 </style>
 </head>
 <body>
-<div class="container">
 
-  <!-- ===== HERO ===== -->
-  <section class="hero">
-    <div class="brand-mark">SEISHOKAI ／ ORTHO</div>
-    
+<!-- ===== HEADER ===== -->
+<header class="site-header">
+  <div class="header-inner">
+    <a href="#top" class="logo">
+      <span class="logo-en">PBM ORTHO</span>
+      <span class="logo-jp">P B M オ ル ソ</span>
+    </a>
+    <nav class="site-nav">
+      <a href="#what">PBMとは</a>
+      <a href="#mech">仕組み</a>
+      <a href="#benefits">メリット</a>
+      <a href="#usage">使い方</a>
+      <a href="#price">価格</a>
+      <a href="#faq">よくある質問</a>
+    </nav>
+    <a href="#cta" class="header-cta">無料カウンセリング →</a>
+  </div>
+</header>
+
+<!-- ===== HERO ===== -->
+<section class="hero" id="top">
+  <div class="hero-inner">
     <div class="hero-content">
-      <div class="hero-eyebrow">For your beautiful smile —</div>
       <h1>
         矯正期間を、<br>
-        <span class="highlight">最短で半分に。</span>
+        最短で<span class="accent">半分</span>に。<sup>※1</sup>
       </h1>
       <p class="hero-lead">
-        光の力で、歯を支える組織にやさしくはたらきかける。<br>
-        新しい矯正治療のかたち、PBMオルソ。<br>
-        痛みを和らげ、計画通りの動きをサポートします。
+        ドイツ生まれの光加速矯正装置「PBMオルソ」。<br>
+        近赤外線がやさしく細胞にはたらきかけ、歯の動きをスムーズに。<br>
+        痛みを和らげながら、計画通りの治療をサポートします。
       </p>
 
-      <div class="hero-stats">
-        <div class="hero-stat">
-          <div class="hero-stat-num">1/2<small></small></div>
-          <div class="hero-stat-label">治療期間が<br>最大半分に</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-num">3-4<small>日</small></div>
-          <div class="hero-stat-label">マウスピース<br>交換サイクル</div>
-        </div>
-        <div class="hero-stat">
-          <div class="hero-stat-num">1日<small>数分</small></div>
-          <div class="hero-stat-label">ご自宅での<br>使用時間</div>
-        </div>
+      <div class="hero-chips">
+        <span class="chip"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>1日数分</span>
+        <span class="chip"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M20 7L9 18l-5-5"/></svg>痛みが軽減</span>
+        <span class="chip"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 2L3 14h7l-1 8 10-12h-7z"/></svg>期間が短縮</span>
+        <span class="chip"><svg fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l3 3 5-5M14 14l3 3 4-7"/></svg>計画通り</span>
+      </div>
+
+      <ul class="hero-checks">
+        <li><span class="dot">✓</span>治療期間が、最短で <strong>約 1/2</strong> に</li>
+        <li><span class="dot">✓</span>マウスピース交換が <strong>7〜10 日 → 3〜4 日</strong></li>
+        <li><span class="dot">✓</span>動かす痛み・締めつけ感を <strong>軽減</strong></li>
+      </ul>
+
+      <div class="hero-ctas">
+        <a href="#cta" class="btn-primary">無料カウンセリング予約 →</a>
+        <a href="#what" class="btn-secondary">詳しく見る →</a>
+      </div>
+
+      <div class="hero-trust">
+        <span class="trust-item">🇩🇪 <strong>ドイツ製</strong></span>
+        <span class="trust-divider">／</span>
+        <span class="trust-item">⏱ <strong>1日 数分</strong></span>
+        <span class="trust-divider">／</span>
+        <span class="trust-item">💎 <strong>マウスピース矯正と併用</strong></span>
       </div>
     </div>
 
     <div class="hero-visual">
-      <div class="hero-visual-side">— Your Smile, Faster</div>
-      <img src="hero-smile.png" alt="マウスピース矯正中の女性の笑顔">
-      <div class="hero-visual-overlay"></div>
-      <div class="hero-visual-label">
-        <div class="hero-visual-label-en">PBM × Aligner</div>
-        <div class="hero-visual-label-jp">マウスピース矯正と、共に。</div>
+      <div class="hero-photo">
+        <img src="hero-smile.png" alt="PBMオルソでマウスピース矯正中の女性">
+      </div>
+      <div class="badge b1">
+        <div class="badge-laurel">★ Recommended</div>
+        <div class="badge-num">1<span class="slash">/</span>2</div>
+        <div class="badge-label">治療期間が<br>最大半分に</div>
+      </div>
+      <div class="badge b2">
+        <div class="badge-num">3-4<span class="small">日</span></div>
+        <div class="badge-label">交換サイクル</div>
+      </div>
+      <div class="badge b3">
+        <div class="badge-num">数分<span class="small">／日</span></div>
+        <div class="badge-label">自宅で<br>毎日カンタン</div>
       </div>
     </div>
+  </div>
+</section>
 
-    <div class="hero-scroll">SCROLL</div>
-  </section>
+<!-- ===== Hero下 features ===== -->
+<div class="features-bar">
+  <div class="feat-card">
+    <div class="feat-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+    <div>
+      <div class="feat-title">期間が、半分に。</div>
+      <div class="feat-desc">通常 約2年 → 約1年。動きがスムーズに。</div>
+    </div>
+  </div>
+  <div class="feat-card">
+    <div class="feat-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M21 15a4 4 0 01-4 4H7l-4 4V5a4 4 0 014-4h10a4 4 0 014 4z"/></svg></div>
+    <div>
+      <div class="feat-title">痛みが、和らぐ。</div>
+      <div class="feat-desc">近赤外線が血行を促進、炎症を抑制。</div>
+    </div>
+  </div>
+  <div class="feat-card">
+    <div class="feat-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><path d="M22 4l-10 10-3-3"/></svg></div>
+    <div>
+      <div class="feat-title">計画通り、確実に。</div>
+      <div class="feat-desc">アンフィットを抑え、再スキャンを最小化。</div>
+    </div>
+  </div>
+</div>
 
-  <!-- ===== お悩み ===== -->
-  <section class="section worries">
-    <div class="section-tag">Voices</div>
-    <h2 class="section-title">こんな<span class="em">お悩み</span>はありませんか？</h2>
-    <p class="section-lead" style="margin-left: auto; margin-right: auto;">
-      矯正治療を考えるとき、多くの方が同じような不安を抱えていらっしゃいます。
-    </p>
+<!-- ===== お悩み ===== -->
+<section class="section worries">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">VOICES</span>
+      <h2 class="section-title">こんな <span class="em">お悩み</span> はありませんか？</h2>
+      <p class="section-lead">
+        矯正治療を考えるとき、多くの方が同じような不安を抱えていらっしゃいます。<br>
+        ひとつでも当てはまる方は、PBMオルソが解決のヒントになるかもしれません。
+      </p>
+    </div>
 
     <div class="worries-grid">
       <div class="worry-card">
-        <div class="worry-icon">i.</div>
+        <div class="worry-num">— 01</div>
+        <div class="worry-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg></div>
         <p class="worry-text">大切な日までに<br><strong>歯並びを整えたい</strong></p>
       </div>
       <div class="worry-card">
-        <div class="worry-icon">ii.</div>
+        <div class="worry-num">— 02</div>
+        <div class="worry-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9h.01M15 9h.01M9 16s1.5-2 3-2 3 2 3 2"/></svg></div>
         <p class="worry-text">矯正の<strong>痛み</strong>が<br>不安で踏み出せない</p>
       </div>
       <div class="worry-card">
-        <div class="worry-icon">iii.</div>
+        <div class="worry-num">— 03</div>
+        <div class="worry-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M3 12l3 3 5-5M14 14l3 3 4-7"/></svg></div>
         <p class="worry-text">治療期間が<br><strong>2〜3年</strong>は長すぎる</p>
       </div>
       <div class="worry-card">
-        <div class="worry-icon">iv.</div>
+        <div class="worry-num">— 04</div>
+        <div class="worry-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4M3 12c0 5 4 9 9 9s9-4 9-9-4-9-9-9-9 4-9 9z"/></svg></div>
         <p class="worry-text"><strong>計画通り</strong>に<br>進むか心配</p>
       </div>
     </div>
-  </section>
 
-  <!-- ===== PBMとは ===== -->
-  <section class="section what-is">
+    <div class="worries-bridge">
+      その不安を、<strong>光の力</strong> でやさしく解決していきます。
+    </div>
+  </div>
+</section>
+
+<!-- ===== PBMとは ===== -->
+<section class="section what-is" id="what">
+  <div class="section-inner">
     <div class="what-grid">
       <div class="what-text">
-        <div class="section-tag">What is PBM?</div>
+        <span class="section-eyebrow">WHAT IS PBM</span>
         <h2 class="section-title">光が、矯正を<br><span class="em">やさしく加速する。</span></h2>
         <p>
           PBMオルソは、ドイツで開発された<strong>光加速矯正装置</strong>です。
@@ -1293,7 +930,7 @@
         </p>
         <p>
           歯を支える骨は、矯正中つねに「壊れて、つくり直される」を繰り返しています。
-          PBMは、この<strong>骨の代謝サイクル</strong>を自然なかたちで促進。結果として、歯の動きがスムーズになり、治療期間が大幅に短縮されます。
+          PBMはこの<strong>骨の代謝サイクル</strong>を自然なかたちで促進し、結果として歯の動きがスムーズになります。
         </p>
         <p>
           無理な力で歯を動かすのではなく、お身体本来の力を引き出して整えていく。
@@ -1303,292 +940,247 @@
 
       <div class="what-visual">
         <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
-          <!-- 背景の円 -->
-          <circle cx="200" cy="200" r="180" fill="none" stroke="#d8cdb8" stroke-width="1" stroke-dasharray="2 4" opacity="0.6"/>
-          <circle cx="200" cy="200" r="150" fill="none" stroke="#d8cdb8" stroke-width="1" opacity="0.5"/>
-          <circle cx="200" cy="200" r="120" fill="rgba(200, 133, 110, 0.06)" stroke="#c8856e" stroke-width="0.5" opacity="0.6"/>
-          
-          <!-- 中央のマウスピース風 -->
-          <ellipse cx="200" cy="200" rx="80" ry="50" fill="rgba(253, 251, 247, 0.9)" stroke="#a8654d" stroke-width="1.5"/>
-          <ellipse cx="200" cy="200" rx="60" ry="35" fill="none" stroke="#c9a876" stroke-width="0.8" stroke-dasharray="3 3"/>
-          
-          <!-- 歯のシルエット -->
-          <g fill="#fdfbf7" stroke="#a8654d" stroke-width="1">
+          <defs>
+            <radialGradient id="glow"><stop offset="0%" stop-color="#ec8a8a" stop-opacity="0.65"/><stop offset="100%" stop-color="#ec8a8a" stop-opacity="0"/></radialGradient>
+            <linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stop-color="#ec8a8a"/><stop offset="100%" stop-color="#e0606a"/></linearGradient>
+          </defs>
+          <circle cx="200" cy="200" r="180" fill="none" stroke="#f3dfdb" stroke-width="1" stroke-dasharray="2 5" opacity="0.7"/>
+          <circle cx="200" cy="200" r="150" fill="none" stroke="#f3dfdb" stroke-width="1" opacity="0.6"/>
+          <circle cx="200" cy="200" r="120" fill="rgba(236, 138, 138, 0.06)" stroke="url(#ringGrad)" stroke-width="1" opacity="0.7"/>
+          <circle cx="200" cy="200" r="100" fill="url(#glow)" opacity="0.55"/>
+          <ellipse cx="200" cy="200" rx="78" ry="48" fill="rgba(255, 255, 255, 0.94)" stroke="#e0606a" stroke-width="1.5"/>
+          <ellipse cx="200" cy="200" rx="58" ry="32" fill="none" stroke="#ec8a8a" stroke-width="0.8" stroke-dasharray="3 3" opacity="0.6"/>
+          <g fill="#fff" stroke="#e0606a" stroke-width="1">
             <rect x="170" y="190" width="12" height="20" rx="3"/>
             <rect x="186" y="188" width="12" height="22" rx="3"/>
             <rect x="202" y="188" width="12" height="22" rx="3"/>
             <rect x="218" y="190" width="12" height="20" rx="3"/>
           </g>
-          
-          <!-- 光の放射線 -->
-          <g stroke="#c8856e" stroke-width="1.5" opacity="0.4" stroke-linecap="round">
-            <line x1="200" y1="50" x2="200" y2="80"/>
-            <line x1="200" y1="320" x2="200" y2="350"/>
-            <line x1="50" y1="200" x2="80" y2="200"/>
-            <line x1="320" y1="200" x2="350" y2="200"/>
-            <line x1="95" y1="95" x2="120" y2="120"/>
-            <line x1="280" y1="280" x2="305" y2="305"/>
-            <line x1="305" y1="95" x2="280" y2="120"/>
-            <line x1="120" y1="280" x2="95" y2="305"/>
+          <g stroke="#ec8a8a" stroke-width="1.6" opacity="0.55" stroke-linecap="round">
+            <line x1="200" y1="55" x2="200" y2="80"/><line x1="200" y1="320" x2="200" y2="345"/>
+            <line x1="55" y1="200" x2="80" y2="200"/><line x1="320" y1="200" x2="345" y2="200"/>
+            <line x1="98" y1="98" x2="120" y2="120"/><line x1="280" y1="280" x2="302" y2="302"/>
+            <line x1="302" y1="98" x2="280" y2="120"/><line x1="120" y1="280" x2="98" y2="302"/>
           </g>
-          
-          <!-- 中心の発光 -->
-          <circle cx="200" cy="200" r="100" fill="url(#glow)" opacity="0.5"/>
-          
-          <defs>
-            <radialGradient id="glow">
-              <stop offset="0%" stop-color="#c8856e" stop-opacity="0.6"/>
-              <stop offset="100%" stop-color="#c8856e" stop-opacity="0"/>
-            </radialGradient>
-          </defs>
-          
-          <!-- 装飾文字 -->
-          <text x="200" y="80" text-anchor="middle" font-family="Cormorant Garamond" font-style="italic" font-size="14" fill="#9c7d4f" opacity="0.8">
-            Near Infrared Light
-          </text>
-          <text x="200" y="335" text-anchor="middle" font-family="Cormorant Garamond" font-style="italic" font-size="14" fill="#9c7d4f" opacity="0.8">
-            850nm
-          </text>
+          <text x="200" y="80" text-anchor="middle" font-family="Inter" font-size="13" fill="#8a7f82" font-weight="500" letter-spacing="2">NEAR INFRARED LIGHT</text>
+          <text x="200" y="335" text-anchor="middle" font-family="Inter" font-size="20" fill="#e0606a" font-weight="700" letter-spacing="1">850nm</text>
         </svg>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ===== 仕組み ===== -->
-  <section class="section mechanism">
-    <div class="section-tag">How it works</div>
-    <h2 class="section-title">PBMオルソの<span class="em">仕組み</span></h2>
-    <p class="section-lead">
-      光が細胞に届き、自然な力で歯の動きを助ける。<br>4つのステップで、あなたの矯正を加速します。
-    </p>
+<!-- ===== 仕組み ===== -->
+<section class="section mechanism" id="mech">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">HOW IT WORKS</span>
+      <h2 class="section-title">PBMオルソの<span class="em">仕組み</span></h2>
+      <p class="section-lead">
+        光が細胞に届き、自然な力で歯の動きを助ける。<br>
+        4つのステップで、あなたの矯正を加速します。
+      </p>
+    </div>
 
-    <div class="mechanism-flow">
-      <div class="step">
-        <div class="step-num">— STEP 01</div>
-        <div class="step-icon">i</div>
-        <h3 class="step-title">光を照射</h3>
-        <p class="step-desc">マウスピース型の装置から、近赤外線（850nm）が歯ぐきに届きます。</p>
+    <div class="mech-grid">
+      <div class="mech-card">
+        <div class="mech-num">01</div>
+        <h3 class="mech-title">光を照射</h3>
+        <p class="mech-desc">マウスピース型の装置から、近赤外線（850nm）が歯ぐきにやさしく届きます。</p>
       </div>
-      <div class="step">
-        <div class="step-num">— STEP 02</div>
-        <div class="step-icon">ii</div>
-        <h3 class="step-title">細胞が活性化</h3>
-        <p class="step-desc">光が細胞内のミトコンドリアに作用し、エネルギーを高めます。</p>
+      <div class="mech-card">
+        <div class="mech-num">02</div>
+        <h3 class="mech-title">細胞が活性化</h3>
+        <p class="mech-desc">光が細胞内のミトコンドリアに作用し、エネルギー産生を高めます。</p>
       </div>
-      <div class="step">
-        <div class="step-num">— STEP 03</div>
-        <div class="step-icon">iii</div>
-        <h3 class="step-title">骨の代謝が促進</h3>
-        <p class="step-desc">歯を支える骨のリモデリング（再構築）サイクルが早まります。</p>
+      <div class="mech-card">
+        <div class="mech-num">03</div>
+        <h3 class="mech-title">骨の代謝が促進</h3>
+        <p class="mech-desc">歯を支える骨のリモデリング（再構築）サイクルが自然に早まります。</p>
       </div>
-      <div class="step">
-        <div class="step-num">— STEP 04</div>
-        <div class="step-icon">iv</div>
-        <h3 class="step-title">歯がスムーズに動く</h3>
-        <p class="step-desc">移動効率が上がり、治療期間が短縮。痛みも和らぎます。</p>
+      <div class="mech-card">
+        <div class="mech-num">04</div>
+        <h3 class="mech-title">歯がスムーズに動く</h3>
+        <p class="mech-desc">移動効率が上がり、治療期間が短縮。痛みも和らぎます。</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ===== 3つのメリット ===== -->
-  <section class="section benefits">
-    <div class="section-tag">Three Benefits</div>
-    <h2 class="section-title">PBMオルソが届ける<br><span class="em">3つの価値</span></h2>
+<!-- ===== 3つのメリット ===== -->
+<section class="section benefits" id="benefits">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">THREE BENEFITS</span>
+      <h2 class="section-title">PBMオルソが届ける<br><span class="em">3つの価値</span></h2>
+    </div>
 
     <div class="benefit-list">
-      <article class="benefit-item">
-        <div class="benefit-num">01</div>
+      <article class="benefit-row">
         <div class="benefit-content">
-          <div class="benefit-en">Speed —</div>
-          <h3 class="benefit-title">期間が、半分に。</h3>
-          <p class="benefit-desc">
-            通常2年かかる矯正治療が、PBMオルソの併用で<strong>1年前後</strong>に短縮できる可能性があります。<br>
-            マウスピースの交換サイクルも、通常の7〜10日から<strong>最短3〜4日</strong>へ。<br>
+          <div class="b-eyebrow">BENEFIT 01</div>
+          <div class="b-en">Speed</div>
+          <h3>期間が、<span class="em">半分</span>に。</h3>
+          <p>
+            通常2年かかる矯正治療が、PBMオルソの併用で<strong>1年前後</strong>に短縮できる可能性があります。
+            マウスピースの交換サイクルも、通常の7〜10日から<strong>最短3〜4日</strong>へ。
             理想の歯並びまでの時間を、大きく縮めます。
           </p>
         </div>
-        <div class="benefit-visual">
-          <div class="benefit-stat">1/2</div>
-          <div class="benefit-stat-label">治療期間 短縮</div>
-          <div class="benefit-comparison">
-            <div class="comp-item">
-              <div class="comp-label">通常</div>
-              <div class="comp-value">約2年</div>
-            </div>
-            <div class="comp-arrow">→</div>
-            <div class="comp-item">
-              <div class="comp-label">PBM併用</div>
-              <div class="comp-value">約1年</div>
-            </div>
+        <div class="benefit-stat">
+          <div class="b-stat-big">1<span class="slash">/</span>2</div>
+          <div class="b-stat-label">治療期間 短縮</div>
+          <div class="b-compare">
+            <div class="b-comp-item"><div class="b-comp-l">通常</div><div class="b-comp-v">約 2 年</div></div>
+            <div class="b-arrow">→</div>
+            <div class="b-comp-item"><div class="b-comp-l">PBM併用</div><div class="b-comp-v">約 1 年</div></div>
           </div>
         </div>
       </article>
 
-      <article class="benefit-item">
-        <div class="benefit-num">02</div>
+      <article class="benefit-row">
         <div class="benefit-content">
-          <div class="benefit-en">Comfort —</div>
-          <h3 class="benefit-title">痛みを、和らげる。</h3>
-          <p class="benefit-desc">
-            近赤外線には、血行を促進し、炎症や痛みの成分を抑える働きがあります。<br>
-            歯が動くときの<strong>あの締め付けるような痛み</strong>や、マウスピース交換直後の違和感が、ぐっと軽くなります。<br>
+          <div class="b-eyebrow">BENEFIT 02</div>
+          <div class="b-en">Comfort</div>
+          <h3>痛みを、<span class="em">和らげる</span>。</h3>
+          <p>
+            近赤外線には、血行を促進し、炎症や痛みの成分を抑える働きがあります。
+            歯が動くときの<strong>あの締め付けるような痛み</strong>や、マウスピース交換直後の違和感が、ぐっと軽くなります。
             「痛みが心配で矯正に踏み出せなかった」という方にこそ、選んでいただきたい装置です。
           </p>
         </div>
-        <div class="benefit-visual">
-          <div class="benefit-stat">−</div>
-          <div class="benefit-stat-label">矯正痛の軽減</div>
-          <div class="benefit-comparison">
-            <div class="comp-item">
-              <div class="comp-label">締め付け感</div>
-              <div class="comp-value">軽減</div>
-            </div>
-            <div class="comp-arrow">／</div>
-            <div class="comp-item">
-              <div class="comp-label">炎症</div>
-              <div class="comp-value">抑制</div>
-            </div>
+        <div class="benefit-stat">
+          <div class="b-stat-big">−</div>
+          <div class="b-stat-label">矯正痛の軽減</div>
+          <div class="b-compare">
+            <div class="b-comp-item"><div class="b-comp-l">締め付け感</div><div class="b-comp-v">軽減</div></div>
+            <div class="b-arrow">／</div>
+            <div class="b-comp-item"><div class="b-comp-l">炎症</div><div class="b-comp-v">抑制</div></div>
           </div>
         </div>
       </article>
 
-      <article class="benefit-item">
-        <div class="benefit-num">03</div>
+      <article class="benefit-row">
         <div class="benefit-content">
-          <div class="benefit-en">Reliability —</div>
-          <h3 class="benefit-title">計画通り、確実に。</h3>
-          <p class="benefit-desc">
-            歯の移動効率が上がることで、<strong>マウスピースとのズレ（アンフィット）</strong>が起きにくくなります。<br>
-            治療計画通りに歯が動くため、再スキャンや作り直しのリスクを最小限に。<br>
+          <div class="b-eyebrow">BENEFIT 03</div>
+          <div class="b-en">Reliability</div>
+          <h3>計画通り、<span class="em">確実に</span>。</h3>
+          <p>
+            歯の移動効率が上がることで、<strong>マウスピースとのズレ（アンフィット）</strong>が起きにくくなります。
+            治療計画通りに歯が動くため、再スキャンや作り直しのリスクを最小限に。
             お忙しい方にこそ、結果として通院回数や追加費用を抑えられる安心の選択肢です。
           </p>
         </div>
-        <div class="benefit-visual">
-          <div class="benefit-stat">◎</div>
-          <div class="benefit-stat-label">計画通りの移動</div>
-          <div class="benefit-comparison">
-            <div class="comp-item">
-              <div class="comp-label">アンフィット</div>
-              <div class="comp-value">減少</div>
-            </div>
-            <div class="comp-arrow">／</div>
-            <div class="comp-item">
-              <div class="comp-label">通院回数</div>
-              <div class="comp-value">最小化</div>
-            </div>
+        <div class="benefit-stat">
+          <div class="b-stat-big">◎</div>
+          <div class="b-stat-label">計画通りの移動</div>
+          <div class="b-compare">
+            <div class="b-comp-item"><div class="b-comp-l">アンフィット</div><div class="b-comp-v">減少</div></div>
+            <div class="b-arrow">／</div>
+            <div class="b-comp-item"><div class="b-comp-l">通院回数</div><div class="b-comp-v">最小化</div></div>
           </div>
         </div>
       </article>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ===== 比較タイムライン ===== -->
-  <section class="section timeline">
-    <div class="section-tag">Time Comparison</div>
-    <h2 class="section-title">どれくらい<span style="color: var(--gold);">早くなる</span>？</h2>
+<!-- ===== TIMELINE ===== -->
+<section class="section timeline">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">TIME COMPARISON</span>
+      <h2 class="section-title">どれくらい<span style="color:var(--rose)">早くなる</span>？</h2>
+    </div>
 
-    <div class="timeline-compare">
-      <div class="timeline-row">
-        <div class="timeline-label">
-          通常の矯正治療
-          <small>without PBM</small>
-        </div>
-        <div class="timeline-bar-wrap">
-          <div class="timeline-bar normal">約 2 年</div>
-        </div>
+    <div class="tl-rows">
+      <div class="tl-row">
+        <div class="tl-label">通常の矯正治療<small>without PBM</small></div>
+        <div class="tl-bar-wrap"><div class="tl-bar normal">約 2 年</div></div>
       </div>
-
-      <div class="timeline-row">
-        <div class="timeline-label">
-          PBMオルソ併用
-          <small>with PBM</small>
-        </div>
-        <div class="timeline-bar-wrap">
-          <div class="timeline-bar pbm">約 1 年</div>
-        </div>
+      <div class="tl-row">
+        <div class="tl-label">PBMオルソ 併用<small>with PBM</small></div>
+        <div class="tl-bar-wrap"><div class="tl-bar pbm">約 1 年</div></div>
       </div>
-
-      <div class="timeline-row" style="margin-top: 32px;">
-        <div class="timeline-label">
-          通常のマウスピース交換
-          <small>aligner change cycle</small>
-        </div>
-        <div class="timeline-bar-wrap">
-          <div class="timeline-bar normal-mp">7 〜 10 日</div>
-        </div>
+      <div class="tl-row" style="margin-top:24px">
+        <div class="tl-label">通常のマウスピース交換<small>aligner change cycle</small></div>
+        <div class="tl-bar-wrap"><div class="tl-bar normal-mp">7 〜 10 日</div></div>
       </div>
-
-      <div class="timeline-row">
-        <div class="timeline-label">
-          PBMオルソ併用
-          <small>with PBM</small>
-        </div>
-        <div class="timeline-bar-wrap">
-          <div class="timeline-bar pbm-mp">3 〜 4 日</div>
-        </div>
+      <div class="tl-row">
+        <div class="tl-label">PBMオルソ 併用<small>with PBM</small></div>
+        <div class="tl-bar-wrap"><div class="tl-bar pbm-mp">3 〜 4 日</div></div>
       </div>
     </div>
 
-    <p style="margin-top: 40px; font-family: var(--mincho); font-size: 13px; color: rgba(253,251,247,0.6); letter-spacing: 0.1em; max-width: 600px;">
+    <p class="tl-note">
       ※治療期間および短縮効果には個人差があります。患者様の歯並びの状態、骨の代謝、装置の使用状況により結果は異なります。
     </p>
-  </section>
+  </div>
+</section>
 
-  <!-- ===== 使い方 ===== -->
-  <section class="section usage">
-    <div class="section-tag">Easy to use</div>
-    <h2 class="section-title">使い方は、<span class="em">とてもシンプル</span>。</h2>
-    <p class="section-lead">
-      ご自宅で、毎日たった数分。<br>
-      マウスピースを装着するように、お口にくわえるだけ。
-    </p>
+<!-- ===== USAGE ===== -->
+<section class="section usage" id="usage">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">EASY TO USE</span>
+      <h2 class="section-title">使い方は、<span class="em">とてもシンプル</span>。</h2>
+      <p class="section-lead">
+        ご自宅で、毎日たった数分。<br>
+        マウスピースを装着するように、お口にくわえるだけ。
+      </p>
+    </div>
 
     <div class="usage-card">
-      <div class="usage-time">4-8<small>分／日</small></div>
-      <div class="usage-label">— ONE SESSION PER DAY —</div>
-      
-      <p style="font-size: 16px; line-height: 2; color: var(--ink-soft); max-width: 500px; margin: 0 auto;">
+      <div class="usage-time">4-8<span class="small">分／日</span></div>
+      <div class="usage-sub">ONE SESSION PER DAY</div>
+      <p class="usage-desc">
         上下それぞれ4〜8分の照射を、毎日続けるだけ。<br>
-        痛みもなく、テレビを見ながら、お風呂上がりに、就寝前に。
+        痛みもなく、テレビを見ながら／お風呂上がりに／就寝前に。
       </p>
 
       <div class="usage-steps">
         <div class="usage-step">
-          <div class="usage-step-num">— STEP 01</div>
+          <div class="usage-step-num">STEP 01</div>
+          <div class="usage-step-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M18 13a6 6 0 11-12 0V7a6 6 0 1112 0z"/><line x1="12" y1="2" x2="12" y2="22"/></svg></div>
           <div class="usage-step-title">電源を入れる</div>
           <div class="usage-step-desc">充電式で、配線も不要</div>
         </div>
         <div class="usage-step">
-          <div class="usage-step-num">— STEP 02</div>
+          <div class="usage-step-num">STEP 02</div>
+          <div class="usage-step-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 14s1.5 2 4 2 4-2 4-2M9 9h.01M15 9h.01"/></svg></div>
           <div class="usage-step-title">お口にくわえる</div>
           <div class="usage-step-desc">マウスピースのように装着</div>
         </div>
         <div class="usage-step">
-          <div class="usage-step-num">— STEP 03</div>
+          <div class="usage-step-num">STEP 03</div>
+          <div class="usage-step-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
           <div class="usage-step-title">数分でおしまい</div>
           <div class="usage-step-desc">タイマー機能付き</div>
         </div>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ===== 価格 ===== -->
-  <section class="section price-section">
-    <div class="section-tag">Investment</div>
-    <h2 class="section-title">価格について</h2>
-    <p class="section-lead" style="margin: 0 auto;">
-      未来のあなたの笑顔への、確かな投資。
-    </p>
+<!-- ===== PRICE ===== -->
+<section class="section price-section" id="price">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">INVESTMENT</span>
+      <h2 class="section-title">価格について</h2>
+      <p class="section-lead">未来のあなたの笑顔への、確かな投資。</p>
+    </div>
 
     <div class="price-card">
+      <div class="price-eyebrow">PBM ORTHO ／ 光加速矯正装置</div>
       <div class="price-product">PBM Ortho</div>
-      <div class="price-product-jp">PBMオルソ ／ 光加速矯正装置</div>
-      
+      <div class="price-product-jp">P B M オ ル ソ</div>
+
       <div class="price-amount"><span class="yen">¥</span>220,000</div>
       <div class="price-amount-tax">（税込）</div>
 
       <div class="price-perday">
-        <div class="price-perday-label">— Per day calculation</div>
+        <div class="price-perday-label">PER DAY CALCULATION</div>
         <p class="price-perday-text">
           2年間の治療で換算すると、<br>
           <strong>1日あたり 約300円</strong>（コーヒー1杯分）。<br>
@@ -1596,68 +1188,129 @@
         </p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ===== 安心ポイント ===== -->
-  <section class="section reassurance">
-    <div class="section-tag">Reassurance</div>
-    <h2 class="section-title">安心して<span class="em">お使いいただくために</span></h2>
+<!-- ===== REASSURANCE ===== -->
+<section class="section reassurance">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">REASSURANCE</span>
+      <h2 class="section-title">安心して<span class="em">お使いいただくために</span></h2>
+    </div>
 
-    <div class="reassurance-grid">
-      <div class="reassurance-card">
-        <div class="reassurance-icon">
-          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
-        </div>
-        <h3 class="reassurance-title">毎日の使用が大切</h3>
-        <p class="reassurance-desc">効果を実感いただくには、毎日の継続が必要です。簡単に続けられる設計です。</p>
+    <div class="reass-grid">
+      <div class="reass-card">
+        <div class="reass-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+        <h3 class="reass-title">毎日の使用が大切</h3>
+        <p class="reass-desc">効果を実感いただくには、毎日の継続が必要です。簡単に続けられる設計です。</p>
       </div>
-
-      <div class="reassurance-card">
-        <div class="reassurance-icon">
-          <svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z"/></svg>
-        </div>
-        <h3 class="reassurance-title">ドイツ製の信頼</h3>
-        <p class="reassurance-desc">医療先進国ドイツで設計開発された、信頼性の高い装置です。</p>
+      <div class="reass-card">
+        <div class="reass-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg></div>
+        <h3 class="reass-title">ドイツ製の信頼</h3>
+        <p class="reass-desc">医療先進国ドイツで設計開発された、信頼性の高い装置です。</p>
       </div>
-
-      <div class="reassurance-card">
-        <div class="reassurance-icon">
-          <svg viewBox="0 0 24 24"><path d="M20 7h-4V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM10 4h4v3h-4z"/></svg>
-        </div>
-        <h3 class="reassurance-title">個人差について</h3>
-        <p class="reassurance-desc">体質や生活習慣により効果には個人差があります。詳しくはご相談ください。</p>
+      <div class="reass-card">
+        <div class="reass-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M20 7h-4V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM10 4h4v3h-4z"/></svg></div>
+        <h3 class="reass-title">個人差について</h3>
+        <p class="reass-desc">体質や生活習慣により効果には個人差があります。詳しくはご相談ください。</p>
       </div>
-
-      <div class="reassurance-card">
-        <div class="reassurance-icon">
-          <svg viewBox="0 0 24 24"><path d="M16 14l-2-2-2 2-4-4M3 12c0 5 4 9 9 9s9-4 9-9-4-9-9-9-9 4-9 9z"/></svg>
-        </div>
-        <h3 class="reassurance-title">専門医のサポート</h3>
-        <p class="reassurance-desc">使用方法や経過について、当院の専門医がしっかりサポートいたします。</p>
+      <div class="reass-card">
+        <div class="reass-icon"><svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg></div>
+        <h3 class="reass-title">専門医のサポート</h3>
+        <p class="reass-desc">使用方法や経過について、当院の専門医がしっかりサポートいたします。</p>
       </div>
     </div>
-  </section>
+  </div>
+</section>
 
-  <!-- ===== CTA ===== -->
-  <section class="cta">
-    <p class="cta-message">
-      未来のあなたの笑顔は、<br>
-      <span class="em">もっと近くにある。</span>
-    </p>
-    <h2 class="cta-jp">まずは、お気軽にご相談ください</h2>
-    <p class="cta-sub">
-      PBMオルソが、あなたに合うかどうか。<br>
-      担当医がお話を伺い、最適なご提案をさせていただきます。
-    </p>
-    <a href="#" class="cta-button">無料カウンセリング予約</a>
-    <p class="cta-note">＊本資料はマウスピース矯正の患者様を対象としています</p>
-  </section>
+<!-- ===== FAQ ===== -->
+<section class="section faq" id="faq">
+  <div class="section-inner">
+    <div class="section-head">
+      <span class="section-eyebrow">FAQ</span>
+      <h2 class="section-title">よくある<span class="em">ご質問</span></h2>
+    </div>
 
-  <footer>
-    <div class="clinic-name">SEISHOKAI Orthodontics</div>
-    清翔会 ／ あなたの笑顔のために
-  </footer>
+    <div class="faq-list">
+      <details class="faq-item" open>
+        <summary class="faq-q">
+          <span class="q-mark">Q</span>
+          本当に治療期間は半分になりますか？
+          <span class="q-arrow">▾</span>
+        </summary>
+        <div class="faq-a">
+          歯並びの状態や個人の骨代謝、装置の使用頻度によって異なりますが、毎日継続して使用された方の多くで明らかな短縮効果が確認されています。最大で約1/2、平均でも数ヶ月〜半年以上の短縮が見込まれます。
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">
+          <span class="q-mark">Q</span>
+          痛みは本当に和らぎますか？
+          <span class="q-arrow">▾</span>
+        </summary>
+        <div class="faq-a">
+          近赤外線には血行を促進し炎症成分を抑える働きがあるため、多くの患者様が「マウスピース交換直後の締め付け感が軽くなった」と実感されています。ただし完全に痛みがなくなるわけではない点はご理解ください。
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">
+          <span class="q-mark">Q</span>
+          毎日使わないとダメですか？
+          <span class="q-arrow">▾</span>
+        </summary>
+        <div class="faq-a">
+          効果を最大限に得るには毎日の継続が大切です。1日4〜8分なので、就寝前やお風呂上がり、テレビを見ながらなど、生活のなかに自然に組み込んでいただけます。
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">
+          <span class="q-mark">Q</span>
+          ワイヤー矯正でも使えますか？
+          <span class="q-arrow">▾</span>
+        </summary>
+        <div class="faq-a">
+          基本的にはマウスピース矯正の患者様向けの装置です。ワイヤー矯正の方への併用については、担当医にご相談ください。
+        </div>
+      </details>
+      <details class="faq-item">
+        <summary class="faq-q">
+          <span class="q-mark">Q</span>
+          支払い方法は？分割は可能ですか？
+          <span class="q-arrow">▾</span>
+        </summary>
+        <div class="faq-a">
+          現金・各種クレジットカードに対応しております。デンタルローン・分割払いも可能です。詳しくはお気軽にご相談ください。
+        </div>
+      </details>
+    </div>
+  </div>
+</section>
 
-</div>
+<!-- ===== CTA ===== -->
+<section class="cta-section" id="cta">
+  <div class="cta-eyebrow">FOR YOUR BEAUTIFUL SMILE</div>
+  <h2 class="cta-title">
+    未来のあなたの笑顔は、<br>
+    <span class="em">もっと近くにある。</span>
+  </h2>
+  <p class="cta-sub">
+    PBMオルソが、あなたに合うかどうか。<br>
+    担当医がお話を伺い、最適なご提案をさせていただきます。
+  </p>
+  <div class="cta-buttons">
+    <a href="#" class="btn-primary">🌸 無料カウンセリング予約 →</a>
+    <a href="#what" class="btn-secondary">もう一度詳しく見る →</a>
+  </div>
+  <p class="cta-note">※1 治療期間の短縮効果には個人差があります</p>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer>
+  <div class="clinic-name">SEISHOKAI</div>
+  <div class="clinic-jp">清翔会 ／ あなたの笑顔のために</div>
+  <div>© SEISHOKAI Group ／ All rights reserved.</div>
+</footer>
+
 </body>
 </html>
