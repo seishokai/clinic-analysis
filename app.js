@@ -2451,6 +2451,9 @@ function updateHeaderBadge() {
 // === v261 プルリフレッシュ (モバイルのみ) ===
 let _pullRefreshActive = false;
 function setupPullRefresh() {
+  // v266 機能削除 — ユーザー要望「じゃま」のため何もしない
+  return;
+  // 以下デッドコード (将来再有効化時の参考)
   if (_pullRefreshActive) return;
   _pullRefreshActive = true;
   // インジケータ作成

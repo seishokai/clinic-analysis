@@ -792,31 +792,9 @@ body {
 .skeleton-row { height: 36px; margin-bottom: 6px; }
 .skeleton-card { height: 64px; margin-bottom: 8px; border-radius: 10px; }
 
-/* === v261 プルリフレッシュ === */
-.pull-refresh-indicator {
-  position: fixed;
-  top: 52px;
-  left: 50%;
-  transform: translate(-50%, -100%);
-  background: #fff;
-  color: #1d4ed8;
-  padding: 8px 18px;
-  border-radius: 0 0 14px 14px;
-  font-size: 12px;
-  font-weight: 600;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.12);
-  z-index: 9999;
-  transition: transform 0.2s ease;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-.pull-refresh-indicator.show { transform: translate(-50%, 0); }
+/* === v261 プルリフレッシュ (v266 機能削除 — 「じゃま」で全環境で非表示) === */
+.pull-refresh-indicator { display: none !important; }
 .pull-refresh-indicator.loading svg { animation: spin 0.8s linear infinite; }
-/* v264 ログイン画面表示中はプルリフレッシュ非表示 (#app が hidden の時) */
-body:has(#app[hidden]) .pull-refresh-indicator,
-body:has(#login-screen:not([hidden])) .pull-refresh-indicator { display: none !important; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* 380px 以下 (小型スマホ) 追加調整 */
