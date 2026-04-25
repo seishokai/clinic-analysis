@@ -494,12 +494,18 @@
     position: relative; padding: 0;
     overflow: hidden; aspect-ratio: 4 / 5;
     border: 1px solid var(--line-soft);
+    /* ロード中の placeholder: ピンクグラデでブランクの白を防ぐ */
+    background: linear-gradient(135deg, var(--rose-bg) 0%, var(--bg-soft) 50%, var(--rose-soft) 100%);
   }
   .benefit-photo-img {
     position: absolute; inset: 0;
     width: 100%; height: 100%;
     object-fit: cover; object-position: center;
+    transition: opacity .4s ease;
   }
+  /* 画像ロード完了で .is-loaded を付ける (JS で制御) */
+  .benefit-photo-img:not(.is-loaded) { opacity: 0; }
+  .benefit-photo-img.is-loaded { opacity: 1; }
   .benefit-photo-overlay {
     position: absolute; left: 0; right: 0; bottom: 0;
     padding: 26px 24px 24px;
@@ -1201,7 +1207,7 @@
 
     <div class="hero-visual">
       <div class="hero-photo">
-        <img src="hero-smile.png" alt="PBMオルソでマウスピース矯正中の女性">
+        <img src="hero-smile.jpg" alt="PBMオルソでマウスピース矯正中の女性" fetchpriority="high" decoding="async" width="900" height="679">
       </div>
       <div class="badge b1">
         <div class="badge-laurel">★ Recommended</div>
@@ -1401,7 +1407,7 @@
           </p>
         </div>
         <div class="benefit-stat benefit-photo">
-          <img src="comfort-smile.jpg" alt="痛みから解放され笑顔の女性" class="benefit-photo-img" style="object-position: 68% center;">
+          <img src="comfort-smile.jpg" alt="痛みから解放され笑顔の女性" class="benefit-photo-img" loading="lazy" decoding="async" width="900" height="621" style="object-position: 68% center;">
           <div class="benefit-photo-overlay">
             <div class="b-stat-label" style="margin:0 0 14px">矯正痛の軽減</div>
             <div class="b-compare" style="border-top:1px dashed rgba(255,255,255,0.35)">
@@ -1425,7 +1431,7 @@
           </p>
         </div>
         <div class="benefit-stat benefit-photo">
-          <img src="reliability-smile.jpg" alt="計画通りの治療で安心した笑顔の女性" class="benefit-photo-img">
+          <img src="reliability-smile.jpg" alt="計画通りの治療で安心した笑顔の女性" class="benefit-photo-img" loading="lazy" decoding="async" width="900" height="600">
           <div class="benefit-photo-overlay">
             <div class="b-stat-label" style="margin:0 0 14px">計画通りの移動</div>
             <div class="b-compare" style="border-top:1px dashed rgba(255,255,255,0.35)">
@@ -1665,6 +1671,18 @@
 </footer>
 
 <script>
+  // 画像ロード完了でフェードイン (.benefit-photo-img)
+  (function(){
+    document.querySelectorAll('.benefit-photo-img').forEach(img => {
+      if (img.complete && img.naturalWidth > 0) {
+        img.classList.add('is-loaded');
+      } else {
+        img.addEventListener('load', () => img.classList.add('is-loaded'), { once: true });
+        img.addEventListener('error', () => img.classList.add('is-loaded'), { once: true });
+      }
+    });
+  })();
+
   // ハンバーガーメニュー トグル
   (function(){
     const toggle = document.getElementById('navToggle');
