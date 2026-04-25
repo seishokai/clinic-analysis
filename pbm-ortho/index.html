@@ -1,0 +1,1663 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>PBMオルソ｜矯正期間を半分に｜清翔会</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Shippori+Mincho:wght@400;500;600;700;800&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #fdfbf7;
+    --bg-warm: #f5ede0;
+    --bg-cream: #ebe0cc;
+    --ink: #2a2520;
+    --ink-soft: #4a4038;
+    --ink-mute: #8a7e72;
+    --rose: #c8856e;
+    --rose-deep: #a8654d;
+    --gold: #c9a876;
+    --gold-deep: #9c7d4f;
+    --leaf: #7a8868;
+    --line: #d8cdb8;
+    --line-soft: #ebe2d0;
+    --mincho: 'Shippori Mincho', serif;
+    --display: 'Cormorant Garamond', 'Shippori Mincho', serif;
+    --sans: 'Inter', 'Shippori Mincho', sans-serif;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    font-family: var(--mincho);
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.9;
+    font-feature-settings: "palt";
+    overflow-x: hidden;
+  }
+
+  /* 紙のテクスチャ */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.5;
+    z-index: 1;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.35'/%3E%3C/svg%3E");
+  }
+
+  .container { position: relative; z-index: 2; }
+
+  /* ===== HERO ===== */
+  .hero {
+    min-height: 100vh;
+    padding: 60px 8vw 80px;
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 60px;
+    align-items: center;
+    position: relative;
+    background: 
+      radial-gradient(ellipse at top right, rgba(200, 133, 110, 0.12), transparent 60%),
+      radial-gradient(ellipse at bottom left, rgba(201, 168, 118, 0.15), transparent 60%),
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+    overflow: hidden;
+  }
+
+  /* 装飾的な円 */
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: -150px;
+    left: -150px;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(201, 168, 118, 0.18), transparent 70%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .hero::after {
+    content: '';
+    position: absolute;
+    bottom: -200px;
+    left: -100px;
+    width: 500px;
+    height: 500px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(200, 133, 110, 0.1), transparent 70%);
+    pointer-events: none;
+    z-index: 1;
+  }
+
+  .brand-mark {
+    position: absolute;
+    top: 40px;
+    left: 8vw;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--sans);
+    font-size: 11px;
+    letter-spacing: 0.4em;
+    color: var(--gold-deep);
+    text-transform: uppercase;
+    font-weight: 500;
+    z-index: 4;
+  }
+
+  .brand-mark::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--gold);
+  }
+
+  .hero-content {
+    max-width: 100%;
+    position: relative;
+    z-index: 3;
+    margin-top: 60px;
+  }
+
+  /* ヒーロー右側ビジュアル */
+  .hero-visual {
+    position: relative;
+    z-index: 2;
+    aspect-ratio: 4 / 5;
+    width: 100%;
+    max-width: 560px;
+    margin-left: auto;
+    overflow: hidden;
+    background: var(--bg-warm);
+  }
+
+  .hero-visual::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(200, 133, 110, 0.3);
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .hero-visual::after {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    border: 1px solid rgba(253, 251, 247, 0.6);
+    z-index: 3;
+    pointer-events: none;
+  }
+
+  .hero-visual img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: center 30%;
+    filter: saturate(0.92) contrast(1.02);
+    transition: transform 8s ease;
+  }
+
+  .hero-visual:hover img {
+    transform: scale(1.04);
+  }
+
+  /* 画像の上にうっすらオーバーレイ */
+  .hero-visual-overlay {
+    position: absolute;
+    inset: 0;
+    background: 
+      linear-gradient(135deg, rgba(253, 251, 247, 0.0) 0%, rgba(253, 251, 247, 0.0) 60%, rgba(245, 237, 224, 0.25) 100%),
+      radial-gradient(ellipse at top left, rgba(200, 133, 110, 0.08), transparent 50%);
+    z-index: 2;
+    pointer-events: none;
+  }
+
+  /* 装飾ラベル（画像の上） */
+  .hero-visual-label {
+    position: absolute;
+    bottom: 24px;
+    left: 24px;
+    z-index: 4;
+    background: rgba(253, 251, 247, 0.92);
+    padding: 12px 20px;
+    border-left: 2px solid var(--rose-deep);
+    backdrop-filter: blur(8px);
+  }
+
+  .hero-visual-label-en {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--rose-deep);
+    letter-spacing: 0.1em;
+    margin-bottom: 2px;
+  }
+
+  .hero-visual-label-jp {
+    font-family: var(--mincho);
+    font-size: 13px;
+    color: var(--ink);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+  }
+
+  /* 画像横の縦書きキャッチ */
+  .hero-visual-side {
+    position: absolute;
+    top: 50%;
+    left: -40px;
+    transform: translateY(-50%);
+    writing-mode: vertical-rl;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 12px;
+    letter-spacing: 0.4em;
+    color: var(--gold-deep);
+    z-index: 4;
+    text-transform: uppercase;
+  }
+
+  .hero-eyebrow {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: clamp(18px, 2vw, 26px);
+    color: var(--rose-deep);
+    letter-spacing: 0.05em;
+    margin-bottom: 16px;
+    font-weight: 400;
+  }
+
+  .hero h1 {
+    font-family: var(--mincho);
+    font-weight: 600;
+    font-size: clamp(36px, 6vw, 76px);
+    line-height: 1.25;
+    letter-spacing: 0.02em;
+    color: var(--ink);
+    margin-bottom: 32px;
+  }
+
+  .hero h1 .highlight {
+    position: relative;
+    display: inline-block;
+    color: var(--rose-deep);
+  }
+
+  .hero h1 .highlight::after {
+    content: '';
+    position: absolute;
+    bottom: 4px;
+    left: -4px;
+    right: -4px;
+    height: 14px;
+    background: rgba(200, 133, 110, 0.2);
+    z-index: -1;
+  }
+
+  .hero-lead {
+    font-size: clamp(15px, 1.6vw, 19px);
+    line-height: 2.2;
+    color: var(--ink-soft);
+    max-width: 700px;
+    margin-bottom: 48px;
+  }
+
+  .hero-stats {
+    display: flex;
+    gap: 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+    padding: 32px 0;
+    max-width: 800px;
+  }
+
+  .hero-stat {
+    flex: 1;
+    padding: 0 32px;
+    border-right: 1px solid var(--line);
+    text-align: left;
+  }
+
+  .hero-stat:first-child { padding-left: 0; }
+  .hero-stat:last-child { border-right: none; }
+
+  .hero-stat-num {
+    font-family: var(--display);
+    font-size: clamp(40px, 5vw, 64px);
+    font-weight: 500;
+    line-height: 1;
+    color: var(--rose-deep);
+    margin-bottom: 8px;
+    font-style: italic;
+  }
+
+  .hero-stat-num small {
+    font-size: 0.5em;
+    color: var(--ink-mute);
+    margin-left: 4px;
+  }
+
+  .hero-stat-label {
+    font-family: var(--mincho);
+    font-size: 13px;
+    color: var(--ink-soft);
+    letter-spacing: 0.1em;
+    line-height: 1.6;
+  }
+
+  .hero-scroll {
+    position: absolute;
+    bottom: 40px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--sans);
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    writing-mode: vertical-rl;
+    animation: scrollDown 2s ease-in-out infinite;
+  }
+
+  @keyframes scrollDown {
+    0%, 100% { transform: translateX(-50%) translateY(0); opacity: 0.6; }
+    50% { transform: translateX(-50%) translateY(8px); opacity: 1; }
+  }
+
+  /* ===== セクション共通 ===== */
+  .section {
+    padding: 120px 8vw;
+    position: relative;
+  }
+
+  .section-tag {
+    display: inline-block;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--rose-deep);
+    letter-spacing: 0.15em;
+    margin-bottom: 16px;
+  }
+
+  .section-tag::before {
+    content: '— ';
+  }
+
+  .section-title {
+    font-family: var(--mincho);
+    font-size: clamp(28px, 4vw, 44px);
+    font-weight: 600;
+    line-height: 1.5;
+    margin-bottom: 24px;
+    letter-spacing: 0.02em;
+  }
+
+  .section-title .em {
+    color: var(--rose-deep);
+  }
+
+  .section-lead {
+    font-size: 17px;
+    line-height: 2.2;
+    color: var(--ink-soft);
+    max-width: 700px;
+    margin-bottom: 60px;
+  }
+
+  /* ===== Section: こんなお悩みありませんか ===== */
+  .worries {
+    background: var(--bg);
+    text-align: center;
+  }
+
+  .worries-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 24px;
+    max-width: 1100px;
+    margin: 60px auto 0;
+  }
+
+  .worry-card {
+    background: var(--bg-warm);
+    padding: 40px 28px;
+    border-radius: 4px;
+    text-align: center;
+    border: 1px solid var(--line-soft);
+    position: relative;
+    transition: transform 0.4s ease;
+  }
+
+  .worry-card:hover {
+    transform: translateY(-6px);
+  }
+
+  .worry-icon {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 36px;
+    color: var(--gold);
+    margin-bottom: 16px;
+  }
+
+  .worry-text {
+    font-family: var(--mincho);
+    font-size: 15px;
+    line-height: 1.9;
+    color: var(--ink-soft);
+  }
+
+  .worry-text strong {
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  /* ===== Section: PBMとは ===== */
+  .what-is {
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .what-is::before {
+    content: 'PBM';
+    position: absolute;
+    top: 50%;
+    right: -50px;
+    transform: translateY(-50%);
+    font-family: var(--display);
+    font-size: 400px;
+    font-weight: 300;
+    color: rgba(200, 133, 110, 0.06);
+    line-height: 1;
+    pointer-events: none;
+  }
+
+  .what-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 80px;
+    align-items: center;
+    position: relative;
+    z-index: 2;
+  }
+
+  .what-text p {
+    font-size: 16px;
+    line-height: 2.2;
+    color: var(--ink-soft);
+    margin-bottom: 20px;
+  }
+
+  .what-text p:first-of-type::first-letter {
+    font-family: var(--display);
+    font-size: 56px;
+    float: left;
+    line-height: 0.9;
+    margin-right: 12px;
+    margin-top: 6px;
+    color: var(--rose-deep);
+  }
+
+  .what-text strong {
+    color: var(--ink);
+    font-weight: 600;
+    background: linear-gradient(180deg, transparent 65%, rgba(200, 133, 110, 0.25) 65%);
+    padding: 0 2px;
+  }
+
+  /* SVG イメージ */
+  .what-visual {
+    position: relative;
+    aspect-ratio: 1;
+    max-width: 480px;
+    margin: 0 auto;
+  }
+
+  .what-visual svg {
+    width: 100%;
+    height: 100%;
+  }
+
+  /* ===== Section: 仕組み ===== */
+  .mechanism {
+    background: var(--bg);
+  }
+
+  .mechanism-flow {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-top: 60px;
+    position: relative;
+  }
+
+  .step {
+    padding: 32px 24px;
+    text-align: center;
+    position: relative;
+    border-right: 1px solid var(--line);
+  }
+
+  .step:last-child { border-right: none; }
+
+  .step-num {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--gold-deep);
+    letter-spacing: 0.3em;
+    margin-bottom: 16px;
+  }
+
+  .step-icon {
+    width: 80px;
+    height: 80px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    background: var(--bg-warm);
+    border: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--display);
+    font-size: 32px;
+    font-style: italic;
+    color: var(--rose-deep);
+    position: relative;
+  }
+
+  .step-icon::before {
+    content: '';
+    position: absolute;
+    inset: -8px;
+    border-radius: 50%;
+    border: 1px dashed var(--line);
+  }
+
+  .step-title {
+    font-family: var(--mincho);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+
+  .step-desc {
+    font-size: 13px;
+    line-height: 1.9;
+    color: var(--ink-soft);
+  }
+
+  /* ===== Section: 3つのメリット ===== */
+  .benefits {
+    background: linear-gradient(180deg, var(--bg-warm) 0%, var(--bg) 100%);
+  }
+
+  .benefit-list {
+    display: grid;
+    gap: 60px;
+    margin-top: 60px;
+  }
+
+  .benefit-item {
+    display: grid;
+    grid-template-columns: 80px 1fr 1.2fr;
+    gap: 60px;
+    align-items: start;
+    padding-bottom: 60px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .benefit-item:last-child {
+    border-bottom: none;
+    padding-bottom: 0;
+  }
+
+  .benefit-num {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 80px;
+    line-height: 1;
+    color: var(--rose);
+    font-weight: 400;
+  }
+
+  .benefit-content .benefit-en {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 16px;
+    color: var(--gold-deep);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+  }
+
+  .benefit-title {
+    font-family: var(--mincho);
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 20px;
+    letter-spacing: 0.02em;
+    line-height: 1.4;
+  }
+
+  .benefit-desc {
+    font-size: 15px;
+    line-height: 2;
+    color: var(--ink-soft);
+  }
+
+  .benefit-visual {
+    background: var(--bg);
+    border: 1px solid var(--line);
+    padding: 32px;
+    text-align: center;
+    position: relative;
+  }
+
+  .benefit-visual::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    border: 1px solid var(--line-soft);
+    pointer-events: none;
+  }
+
+  .benefit-stat {
+    font-family: var(--display);
+    font-size: 64px;
+    font-weight: 500;
+    line-height: 1;
+    color: var(--rose-deep);
+    margin-bottom: 8px;
+    font-style: italic;
+  }
+
+  .benefit-stat small {
+    font-size: 0.4em;
+    color: var(--ink-mute);
+  }
+
+  .benefit-stat-label {
+    font-family: var(--mincho);
+    font-size: 13px;
+    color: var(--ink-soft);
+    letter-spacing: 0.15em;
+    margin-bottom: 16px;
+  }
+
+  .benefit-comparison {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    align-items: center;
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px dashed var(--line);
+  }
+
+  .comp-item {
+    flex: 1;
+  }
+
+  .comp-label {
+    font-family: var(--sans);
+    font-size: 10px;
+    color: var(--ink-mute);
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+
+  .comp-value {
+    font-family: var(--mincho);
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 600;
+  }
+
+  .comp-arrow {
+    font-family: var(--display);
+    font-style: italic;
+    color: var(--rose-deep);
+    font-size: 20px;
+  }
+
+  /* ===== Section: 治療期間比較 ===== */
+  .timeline {
+    background: var(--ink);
+    color: var(--bg);
+    padding: 100px 8vw;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: -100px;
+    right: -100px;
+    width: 400px;
+    height: 400px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(200, 133, 110, 0.15), transparent 70%);
+  }
+
+  .timeline .section-title { color: var(--bg); }
+  .timeline .section-tag { color: var(--gold); }
+
+  .timeline-compare {
+    margin-top: 60px;
+    display: grid;
+    gap: 32px;
+    max-width: 900px;
+  }
+
+  .timeline-row {
+    display: grid;
+    grid-template-columns: 200px 1fr;
+    gap: 32px;
+    align-items: center;
+  }
+
+  .timeline-label {
+    font-family: var(--mincho);
+    font-size: 16px;
+    font-weight: 500;
+    color: var(--bg);
+  }
+
+  .timeline-label small {
+    display: block;
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 13px;
+    color: var(--gold);
+    margin-top: 4px;
+    letter-spacing: 0.1em;
+  }
+
+  .timeline-bar-wrap {
+    position: relative;
+    height: 40px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .timeline-bar {
+    height: 100%;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+    font-family: var(--display);
+    font-size: 18px;
+    color: var(--bg);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+  }
+
+  .timeline-bar.normal {
+    width: 100%;
+    background: linear-gradient(90deg, var(--ink-mute), var(--gold-deep));
+  }
+
+  .timeline-bar.pbm {
+    width: 50%;
+    background: linear-gradient(90deg, var(--rose), var(--rose-deep));
+  }
+
+  .timeline-bar.normal-mp {
+    width: 100%;
+    background: linear-gradient(90deg, var(--ink-mute), var(--gold-deep));
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  .timeline-bar.pbm-mp {
+    width: 40%;
+    background: linear-gradient(90deg, var(--rose), var(--rose-deep));
+    padding: 0 16px;
+    font-size: 14px;
+  }
+
+  /* ===== Section: 使い方 ===== */
+  .usage {
+    background: var(--bg);
+  }
+
+  .usage-card {
+    background: var(--bg-warm);
+    padding: 60px 80px;
+    margin-top: 40px;
+    text-align: center;
+    border: 1px solid var(--line);
+    position: relative;
+  }
+
+  .usage-card::before, .usage-card::after {
+    content: '';
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-color: var(--rose-deep);
+    border-style: solid;
+  }
+
+  .usage-card::before {
+    top: 16px;
+    left: 16px;
+    border-width: 1px 0 0 1px;
+  }
+
+  .usage-card::after {
+    bottom: 16px;
+    right: 16px;
+    border-width: 0 1px 1px 0;
+  }
+
+  .usage-time {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 80px;
+    font-weight: 400;
+    color: var(--rose-deep);
+    line-height: 1;
+    margin-bottom: 16px;
+  }
+
+  .usage-time small {
+    font-size: 0.4em;
+    color: var(--ink);
+    margin-left: 8px;
+  }
+
+  .usage-label {
+    font-family: var(--mincho);
+    font-size: 14px;
+    color: var(--ink-soft);
+    letter-spacing: 0.2em;
+    margin-bottom: 32px;
+  }
+
+  .usage-steps {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    margin-top: 40px;
+    padding-top: 40px;
+    border-top: 1px solid var(--line);
+  }
+
+  .usage-step {
+    flex: 1;
+    padding: 0 24px;
+    border-right: 1px solid var(--line);
+    text-align: center;
+  }
+
+  .usage-step:last-child { border-right: none; }
+
+  .usage-step-num {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--gold-deep);
+    letter-spacing: 0.2em;
+    margin-bottom: 8px;
+  }
+
+  .usage-step-title {
+    font-family: var(--mincho);
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 8px;
+  }
+
+  .usage-step-desc {
+    font-size: 13px;
+    color: var(--ink-soft);
+    line-height: 1.7;
+  }
+
+  /* ===== Section: 価格 ===== */
+  .price-section {
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-warm) 100%);
+    text-align: center;
+  }
+
+  .price-card {
+    max-width: 600px;
+    margin: 60px auto 0;
+    background: var(--bg);
+    border: 1px solid var(--ink);
+    padding: 60px 60px 40px;
+    position: relative;
+    box-shadow: 12px 12px 0 var(--bg-cream);
+  }
+
+  .price-card::before {
+    content: '';
+    position: absolute;
+    inset: 12px;
+    border: 1px solid var(--line);
+    pointer-events: none;
+  }
+
+  .price-product {
+    font-family: var(--display);
+    font-size: 36px;
+    font-weight: 500;
+    color: var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .price-product-jp {
+    font-family: var(--mincho);
+    font-size: 14px;
+    color: var(--ink-soft);
+    letter-spacing: 0.2em;
+    margin-bottom: 32px;
+    padding-bottom: 24px;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .price-amount {
+    font-family: var(--display);
+    font-size: 88px;
+    font-weight: 500;
+    color: var(--rose-deep);
+    line-height: 1;
+    margin-bottom: 8px;
+    font-style: italic;
+    letter-spacing: -0.02em;
+  }
+
+  .price-amount .yen {
+    font-size: 36px;
+    margin-right: 4px;
+  }
+
+  .price-amount-tax {
+    font-family: var(--mincho);
+    font-size: 13px;
+    color: var(--ink-mute);
+    letter-spacing: 0.15em;
+    margin-bottom: 32px;
+  }
+
+  .price-perday {
+    background: var(--bg-warm);
+    padding: 24px;
+    margin-top: 32px;
+    border-left: 3px solid var(--rose);
+    text-align: left;
+  }
+
+  .price-perday-label {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 14px;
+    color: var(--gold-deep);
+    margin-bottom: 8px;
+    letter-spacing: 0.1em;
+  }
+
+  .price-perday-text {
+    font-family: var(--mincho);
+    font-size: 15px;
+    line-height: 1.9;
+    color: var(--ink);
+  }
+
+  .price-perday-text strong {
+    color: var(--rose-deep);
+    font-weight: 600;
+    font-size: 18px;
+  }
+
+  /* ===== Section: 安心ポイント ===== */
+  .reassurance {
+    background: var(--bg);
+  }
+
+  .reassurance-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 32px;
+    margin-top: 60px;
+  }
+
+  .reassurance-card {
+    text-align: center;
+    padding: 40px 32px;
+    border: 1px solid var(--line-soft);
+    background: var(--bg-warm);
+    position: relative;
+  }
+
+  .reassurance-icon {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 24px;
+    border-radius: 50%;
+    background: var(--bg);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1px solid var(--line);
+  }
+
+  .reassurance-icon svg {
+    width: 28px;
+    height: 28px;
+    fill: none;
+    stroke: var(--rose-deep);
+    stroke-width: 1.5;
+  }
+
+  .reassurance-title {
+    font-family: var(--mincho);
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ink);
+    margin-bottom: 12px;
+  }
+
+  .reassurance-desc {
+    font-size: 13px;
+    line-height: 1.9;
+    color: var(--ink-soft);
+  }
+
+  /* ===== CTA ===== */
+  .cta {
+    padding: 120px 8vw;
+    text-align: center;
+    background: linear-gradient(180deg, var(--bg-warm) 0%, var(--bg) 100%);
+    position: relative;
+    overflow: hidden;
+  }
+
+  .cta::before {
+    content: '✦';
+    position: absolute;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 24px;
+    color: var(--gold);
+  }
+
+  .cta-message {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: clamp(28px, 4vw, 48px);
+    line-height: 1.4;
+    color: var(--ink);
+    margin-bottom: 24px;
+    font-weight: 400;
+  }
+
+  .cta-message .em {
+    color: var(--rose-deep);
+  }
+
+  .cta-jp {
+    font-family: var(--mincho);
+    font-size: clamp(20px, 2.5vw, 32px);
+    color: var(--ink);
+    margin-bottom: 16px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+
+  .cta-sub {
+    font-family: var(--mincho);
+    font-size: 16px;
+    color: var(--ink-soft);
+    margin-bottom: 48px;
+    line-height: 2;
+  }
+
+  .cta-button {
+    display: inline-block;
+    padding: 22px 60px;
+    background: var(--rose-deep);
+    color: var(--bg);
+    text-decoration: none;
+    font-family: var(--mincho);
+    font-size: 16px;
+    letter-spacing: 0.2em;
+    font-weight: 500;
+    border: 1px solid var(--rose-deep);
+    transition: all 0.4s ease;
+    position: relative;
+  }
+
+  .cta-button:hover {
+    background: var(--ink);
+    border-color: var(--ink);
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px rgba(168, 101, 77, 0.25);
+  }
+
+  .cta-note {
+    font-family: var(--mincho);
+    font-size: 12px;
+    color: var(--ink-mute);
+    margin-top: 24px;
+    letter-spacing: 0.1em;
+  }
+
+  /* ===== フッター ===== */
+  footer {
+    padding: 50px 8vw;
+    text-align: center;
+    background: var(--ink);
+    color: rgba(253, 251, 247, 0.6);
+    font-family: var(--mincho);
+    font-size: 12px;
+    letter-spacing: 0.15em;
+  }
+
+  footer .clinic-name {
+    font-family: var(--display);
+    font-style: italic;
+    font-size: 18px;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+
+  /* ===== レスポンシブ ===== */
+  @media (max-width: 1100px) {
+    .hero {
+      grid-template-columns: 1fr;
+      gap: 40px;
+      min-height: auto;
+      padding-top: 100px;
+      padding-bottom: 80px;
+    }
+    .hero-content { margin-top: 20px; }
+    .hero-visual {
+      max-width: 480px;
+      margin: 0 auto;
+      aspect-ratio: 4 / 4;
+    }
+    .hero-visual-side { display: none; }
+    .hero-scroll { display: none; }
+  }
+
+  @media (max-width: 900px) {
+    .hero-stats { flex-direction: column; gap: 24px; }
+    .hero-stat { border-right: none; padding: 0; }
+    .what-grid { grid-template-columns: 1fr; gap: 40px; }
+    .mechanism-flow { grid-template-columns: 1fr 1fr; gap: 0; }
+    .step { border-bottom: 1px solid var(--line); }
+    .step:nth-child(2) { border-right: none; }
+    .step:nth-child(3), .step:nth-child(4) { border-bottom: none; }
+    .benefit-item { grid-template-columns: 60px 1fr; gap: 24px; }
+    .benefit-visual { grid-column: 1 / -1; margin-top: 24px; }
+    .benefit-num { font-size: 48px; }
+    .timeline-row { grid-template-columns: 1fr; gap: 8px; }
+    .usage-card { padding: 40px 24px; }
+    .usage-time { font-size: 56px; }
+    .usage-steps { flex-direction: column; gap: 24px; }
+    .usage-step { border-right: none; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+    .usage-step:last-child { border-bottom: none; }
+    .price-card { padding: 40px 24px 24px; }
+    .price-amount { font-size: 60px; }
+    .section { padding: 80px 6vw; }
+    .hero { padding: 80px 6vw 60px; }
+    .what-is::before { font-size: 200px; right: -30px; }
+    .hero-visual {
+      aspect-ratio: 1 / 1;
+      max-width: 100%;
+    }
+  }
+
+  /* ===== 動き ===== */
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(30px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .hero-eyebrow, .hero h1, .hero-lead, .hero-stats {
+    animation: fadeUp 1.2s ease forwards;
+  }
+
+  .hero h1 { animation-delay: 0.2s; opacity: 0; }
+  .hero-lead { animation-delay: 0.4s; opacity: 0; }
+  .hero-stats { animation-delay: 0.6s; opacity: 0; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- ===== HERO ===== -->
+  <section class="hero">
+    <div class="brand-mark">SEISHOKAI ／ ORTHO</div>
+    
+    <div class="hero-content">
+      <div class="hero-eyebrow">For your beautiful smile —</div>
+      <h1>
+        矯正期間を、<br>
+        <span class="highlight">最短で半分に。</span>
+      </h1>
+      <p class="hero-lead">
+        光の力で、歯を支える組織にやさしくはたらきかける。<br>
+        新しい矯正治療のかたち、PBMオルソ。<br>
+        痛みを和らげ、計画通りの動きをサポートします。
+      </p>
+
+      <div class="hero-stats">
+        <div class="hero-stat">
+          <div class="hero-stat-num">1/2<small></small></div>
+          <div class="hero-stat-label">治療期間が<br>最大半分に</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">3-4<small>日</small></div>
+          <div class="hero-stat-label">マウスピース<br>交換サイクル</div>
+        </div>
+        <div class="hero-stat">
+          <div class="hero-stat-num">1日<small>数分</small></div>
+          <div class="hero-stat-label">ご自宅での<br>使用時間</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <div class="hero-visual-side">— Your Smile, Faster</div>
+      <img src="hero-smile.png" alt="マウスピース矯正中の女性の笑顔">
+      <div class="hero-visual-overlay"></div>
+      <div class="hero-visual-label">
+        <div class="hero-visual-label-en">PBM × Aligner</div>
+        <div class="hero-visual-label-jp">マウスピース矯正と、共に。</div>
+      </div>
+    </div>
+
+    <div class="hero-scroll">SCROLL</div>
+  </section>
+
+  <!-- ===== お悩み ===== -->
+  <section class="section worries">
+    <div class="section-tag">Voices</div>
+    <h2 class="section-title">こんな<span class="em">お悩み</span>はありませんか？</h2>
+    <p class="section-lead" style="margin-left: auto; margin-right: auto;">
+      矯正治療を考えるとき、多くの方が同じような不安を抱えていらっしゃいます。
+    </p>
+
+    <div class="worries-grid">
+      <div class="worry-card">
+        <div class="worry-icon">i.</div>
+        <p class="worry-text">大切な日までに<br><strong>歯並びを整えたい</strong></p>
+      </div>
+      <div class="worry-card">
+        <div class="worry-icon">ii.</div>
+        <p class="worry-text">矯正の<strong>痛み</strong>が<br>不安で踏み出せない</p>
+      </div>
+      <div class="worry-card">
+        <div class="worry-icon">iii.</div>
+        <p class="worry-text">治療期間が<br><strong>2〜3年</strong>は長すぎる</p>
+      </div>
+      <div class="worry-card">
+        <div class="worry-icon">iv.</div>
+        <p class="worry-text"><strong>計画通り</strong>に<br>進むか心配</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== PBMとは ===== -->
+  <section class="section what-is">
+    <div class="what-grid">
+      <div class="what-text">
+        <div class="section-tag">What is PBM?</div>
+        <h2 class="section-title">光が、矯正を<br><span class="em">やさしく加速する。</span></h2>
+        <p>
+          PBMオルソは、ドイツで開発された<strong>光加速矯正装置</strong>です。
+          特別な波長の近赤外線（850nm）を歯ぐきに照射することで、お口の中の細胞をやさしく活性化させます。
+        </p>
+        <p>
+          歯を支える骨は、矯正中つねに「壊れて、つくり直される」を繰り返しています。
+          PBMは、この<strong>骨の代謝サイクル</strong>を自然なかたちで促進。結果として、歯の動きがスムーズになり、治療期間が大幅に短縮されます。
+        </p>
+        <p>
+          無理な力で歯を動かすのではなく、お身体本来の力を引き出して整えていく。
+          それがPBMオルソの考え方です。
+        </p>
+      </div>
+
+      <div class="what-visual">
+        <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+          <!-- 背景の円 -->
+          <circle cx="200" cy="200" r="180" fill="none" stroke="#d8cdb8" stroke-width="1" stroke-dasharray="2 4" opacity="0.6"/>
+          <circle cx="200" cy="200" r="150" fill="none" stroke="#d8cdb8" stroke-width="1" opacity="0.5"/>
+          <circle cx="200" cy="200" r="120" fill="rgba(200, 133, 110, 0.06)" stroke="#c8856e" stroke-width="0.5" opacity="0.6"/>
+          
+          <!-- 中央のマウスピース風 -->
+          <ellipse cx="200" cy="200" rx="80" ry="50" fill="rgba(253, 251, 247, 0.9)" stroke="#a8654d" stroke-width="1.5"/>
+          <ellipse cx="200" cy="200" rx="60" ry="35" fill="none" stroke="#c9a876" stroke-width="0.8" stroke-dasharray="3 3"/>
+          
+          <!-- 歯のシルエット -->
+          <g fill="#fdfbf7" stroke="#a8654d" stroke-width="1">
+            <rect x="170" y="190" width="12" height="20" rx="3"/>
+            <rect x="186" y="188" width="12" height="22" rx="3"/>
+            <rect x="202" y="188" width="12" height="22" rx="3"/>
+            <rect x="218" y="190" width="12" height="20" rx="3"/>
+          </g>
+          
+          <!-- 光の放射線 -->
+          <g stroke="#c8856e" stroke-width="1.5" opacity="0.4" stroke-linecap="round">
+            <line x1="200" y1="50" x2="200" y2="80"/>
+            <line x1="200" y1="320" x2="200" y2="350"/>
+            <line x1="50" y1="200" x2="80" y2="200"/>
+            <line x1="320" y1="200" x2="350" y2="200"/>
+            <line x1="95" y1="95" x2="120" y2="120"/>
+            <line x1="280" y1="280" x2="305" y2="305"/>
+            <line x1="305" y1="95" x2="280" y2="120"/>
+            <line x1="120" y1="280" x2="95" y2="305"/>
+          </g>
+          
+          <!-- 中心の発光 -->
+          <circle cx="200" cy="200" r="100" fill="url(#glow)" opacity="0.5"/>
+          
+          <defs>
+            <radialGradient id="glow">
+              <stop offset="0%" stop-color="#c8856e" stop-opacity="0.6"/>
+              <stop offset="100%" stop-color="#c8856e" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          
+          <!-- 装飾文字 -->
+          <text x="200" y="80" text-anchor="middle" font-family="Cormorant Garamond" font-style="italic" font-size="14" fill="#9c7d4f" opacity="0.8">
+            Near Infrared Light
+          </text>
+          <text x="200" y="335" text-anchor="middle" font-family="Cormorant Garamond" font-style="italic" font-size="14" fill="#9c7d4f" opacity="0.8">
+            850nm
+          </text>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 仕組み ===== -->
+  <section class="section mechanism">
+    <div class="section-tag">How it works</div>
+    <h2 class="section-title">PBMオルソの<span class="em">仕組み</span></h2>
+    <p class="section-lead">
+      光が細胞に届き、自然な力で歯の動きを助ける。<br>4つのステップで、あなたの矯正を加速します。
+    </p>
+
+    <div class="mechanism-flow">
+      <div class="step">
+        <div class="step-num">— STEP 01</div>
+        <div class="step-icon">i</div>
+        <h3 class="step-title">光を照射</h3>
+        <p class="step-desc">マウスピース型の装置から、近赤外線（850nm）が歯ぐきに届きます。</p>
+      </div>
+      <div class="step">
+        <div class="step-num">— STEP 02</div>
+        <div class="step-icon">ii</div>
+        <h3 class="step-title">細胞が活性化</h3>
+        <p class="step-desc">光が細胞内のミトコンドリアに作用し、エネルギーを高めます。</p>
+      </div>
+      <div class="step">
+        <div class="step-num">— STEP 03</div>
+        <div class="step-icon">iii</div>
+        <h3 class="step-title">骨の代謝が促進</h3>
+        <p class="step-desc">歯を支える骨のリモデリング（再構築）サイクルが早まります。</p>
+      </div>
+      <div class="step">
+        <div class="step-num">— STEP 04</div>
+        <div class="step-icon">iv</div>
+        <h3 class="step-title">歯がスムーズに動く</h3>
+        <p class="step-desc">移動効率が上がり、治療期間が短縮。痛みも和らぎます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 3つのメリット ===== -->
+  <section class="section benefits">
+    <div class="section-tag">Three Benefits</div>
+    <h2 class="section-title">PBMオルソが届ける<br><span class="em">3つの価値</span></h2>
+
+    <div class="benefit-list">
+      <article class="benefit-item">
+        <div class="benefit-num">01</div>
+        <div class="benefit-content">
+          <div class="benefit-en">Speed —</div>
+          <h3 class="benefit-title">期間が、半分に。</h3>
+          <p class="benefit-desc">
+            通常2年かかる矯正治療が、PBMオルソの併用で<strong>1年前後</strong>に短縮できる可能性があります。<br>
+            マウスピースの交換サイクルも、通常の7〜10日から<strong>最短3〜4日</strong>へ。<br>
+            理想の歯並びまでの時間を、大きく縮めます。
+          </p>
+        </div>
+        <div class="benefit-visual">
+          <div class="benefit-stat">1/2</div>
+          <div class="benefit-stat-label">治療期間 短縮</div>
+          <div class="benefit-comparison">
+            <div class="comp-item">
+              <div class="comp-label">通常</div>
+              <div class="comp-value">約2年</div>
+            </div>
+            <div class="comp-arrow">→</div>
+            <div class="comp-item">
+              <div class="comp-label">PBM併用</div>
+              <div class="comp-value">約1年</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="benefit-item">
+        <div class="benefit-num">02</div>
+        <div class="benefit-content">
+          <div class="benefit-en">Comfort —</div>
+          <h3 class="benefit-title">痛みを、和らげる。</h3>
+          <p class="benefit-desc">
+            近赤外線には、血行を促進し、炎症や痛みの成分を抑える働きがあります。<br>
+            歯が動くときの<strong>あの締め付けるような痛み</strong>や、マウスピース交換直後の違和感が、ぐっと軽くなります。<br>
+            「痛みが心配で矯正に踏み出せなかった」という方にこそ、選んでいただきたい装置です。
+          </p>
+        </div>
+        <div class="benefit-visual">
+          <div class="benefit-stat">−</div>
+          <div class="benefit-stat-label">矯正痛の軽減</div>
+          <div class="benefit-comparison">
+            <div class="comp-item">
+              <div class="comp-label">締め付け感</div>
+              <div class="comp-value">軽減</div>
+            </div>
+            <div class="comp-arrow">／</div>
+            <div class="comp-item">
+              <div class="comp-label">炎症</div>
+              <div class="comp-value">抑制</div>
+            </div>
+          </div>
+        </div>
+      </article>
+
+      <article class="benefit-item">
+        <div class="benefit-num">03</div>
+        <div class="benefit-content">
+          <div class="benefit-en">Reliability —</div>
+          <h3 class="benefit-title">計画通り、確実に。</h3>
+          <p class="benefit-desc">
+            歯の移動効率が上がることで、<strong>マウスピースとのズレ（アンフィット）</strong>が起きにくくなります。<br>
+            治療計画通りに歯が動くため、再スキャンや作り直しのリスクを最小限に。<br>
+            お忙しい方にこそ、結果として通院回数や追加費用を抑えられる安心の選択肢です。
+          </p>
+        </div>
+        <div class="benefit-visual">
+          <div class="benefit-stat">◎</div>
+          <div class="benefit-stat-label">計画通りの移動</div>
+          <div class="benefit-comparison">
+            <div class="comp-item">
+              <div class="comp-label">アンフィット</div>
+              <div class="comp-value">減少</div>
+            </div>
+            <div class="comp-arrow">／</div>
+            <div class="comp-item">
+              <div class="comp-label">通院回数</div>
+              <div class="comp-value">最小化</div>
+            </div>
+          </div>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <!-- ===== 比較タイムライン ===== -->
+  <section class="section timeline">
+    <div class="section-tag">Time Comparison</div>
+    <h2 class="section-title">どれくらい<span style="color: var(--gold);">早くなる</span>？</h2>
+
+    <div class="timeline-compare">
+      <div class="timeline-row">
+        <div class="timeline-label">
+          通常の矯正治療
+          <small>without PBM</small>
+        </div>
+        <div class="timeline-bar-wrap">
+          <div class="timeline-bar normal">約 2 年</div>
+        </div>
+      </div>
+
+      <div class="timeline-row">
+        <div class="timeline-label">
+          PBMオルソ併用
+          <small>with PBM</small>
+        </div>
+        <div class="timeline-bar-wrap">
+          <div class="timeline-bar pbm">約 1 年</div>
+        </div>
+      </div>
+
+      <div class="timeline-row" style="margin-top: 32px;">
+        <div class="timeline-label">
+          通常のマウスピース交換
+          <small>aligner change cycle</small>
+        </div>
+        <div class="timeline-bar-wrap">
+          <div class="timeline-bar normal-mp">7 〜 10 日</div>
+        </div>
+      </div>
+
+      <div class="timeline-row">
+        <div class="timeline-label">
+          PBMオルソ併用
+          <small>with PBM</small>
+        </div>
+        <div class="timeline-bar-wrap">
+          <div class="timeline-bar pbm-mp">3 〜 4 日</div>
+        </div>
+      </div>
+    </div>
+
+    <p style="margin-top: 40px; font-family: var(--mincho); font-size: 13px; color: rgba(253,251,247,0.6); letter-spacing: 0.1em; max-width: 600px;">
+      ※治療期間および短縮効果には個人差があります。患者様の歯並びの状態、骨の代謝、装置の使用状況により結果は異なります。
+    </p>
+  </section>
+
+  <!-- ===== 使い方 ===== -->
+  <section class="section usage">
+    <div class="section-tag">Easy to use</div>
+    <h2 class="section-title">使い方は、<span class="em">とてもシンプル</span>。</h2>
+    <p class="section-lead">
+      ご自宅で、毎日たった数分。<br>
+      マウスピースを装着するように、お口にくわえるだけ。
+    </p>
+
+    <div class="usage-card">
+      <div class="usage-time">4-8<small>分／日</small></div>
+      <div class="usage-label">— ONE SESSION PER DAY —</div>
+      
+      <p style="font-size: 16px; line-height: 2; color: var(--ink-soft); max-width: 500px; margin: 0 auto;">
+        上下それぞれ4〜8分の照射を、毎日続けるだけ。<br>
+        痛みもなく、テレビを見ながら、お風呂上がりに、就寝前に。
+      </p>
+
+      <div class="usage-steps">
+        <div class="usage-step">
+          <div class="usage-step-num">— STEP 01</div>
+          <div class="usage-step-title">電源を入れる</div>
+          <div class="usage-step-desc">充電式で、配線も不要</div>
+        </div>
+        <div class="usage-step">
+          <div class="usage-step-num">— STEP 02</div>
+          <div class="usage-step-title">お口にくわえる</div>
+          <div class="usage-step-desc">マウスピースのように装着</div>
+        </div>
+        <div class="usage-step">
+          <div class="usage-step-num">— STEP 03</div>
+          <div class="usage-step-title">数分でおしまい</div>
+          <div class="usage-step-desc">タイマー機能付き</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 価格 ===== -->
+  <section class="section price-section">
+    <div class="section-tag">Investment</div>
+    <h2 class="section-title">価格について</h2>
+    <p class="section-lead" style="margin: 0 auto;">
+      未来のあなたの笑顔への、確かな投資。
+    </p>
+
+    <div class="price-card">
+      <div class="price-product">PBM Ortho</div>
+      <div class="price-product-jp">PBMオルソ ／ 光加速矯正装置</div>
+      
+      <div class="price-amount"><span class="yen">¥</span>220,000</div>
+      <div class="price-amount-tax">（税込）</div>
+
+      <div class="price-perday">
+        <div class="price-perday-label">— Per day calculation</div>
+        <p class="price-perday-text">
+          2年間の治療で換算すると、<br>
+          <strong>1日あたり 約300円</strong>（コーヒー1杯分）。<br>
+          この投資で、痛みが減り、半年〜1年早く理想の笑顔に。
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 安心ポイント ===== -->
+  <section class="section reassurance">
+    <div class="section-tag">Reassurance</div>
+    <h2 class="section-title">安心して<span class="em">お使いいただくために</span></h2>
+
+    <div class="reassurance-grid">
+      <div class="reassurance-card">
+        <div class="reassurance-icon">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>
+        </div>
+        <h3 class="reassurance-title">毎日の使用が大切</h3>
+        <p class="reassurance-desc">効果を実感いただくには、毎日の継続が必要です。簡単に続けられる設計です。</p>
+      </div>
+
+      <div class="reassurance-card">
+        <div class="reassurance-icon">
+          <svg viewBox="0 0 24 24"><path d="M12 2l3 7h7l-5.5 4 2 7-6.5-4.5L5.5 20l2-7L2 9h7z"/></svg>
+        </div>
+        <h3 class="reassurance-title">ドイツ製の信頼</h3>
+        <p class="reassurance-desc">医療先進国ドイツで設計開発された、信頼性の高い装置です。</p>
+      </div>
+
+      <div class="reassurance-card">
+        <div class="reassurance-icon">
+          <svg viewBox="0 0 24 24"><path d="M20 7h-4V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v3H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2zM10 4h4v3h-4z"/></svg>
+        </div>
+        <h3 class="reassurance-title">個人差について</h3>
+        <p class="reassurance-desc">体質や生活習慣により効果には個人差があります。詳しくはご相談ください。</p>
+      </div>
+
+      <div class="reassurance-card">
+        <div class="reassurance-icon">
+          <svg viewBox="0 0 24 24"><path d="M16 14l-2-2-2 2-4-4M3 12c0 5 4 9 9 9s9-4 9-9-4-9-9-9-9 4-9 9z"/></svg>
+        </div>
+        <h3 class="reassurance-title">専門医のサポート</h3>
+        <p class="reassurance-desc">使用方法や経過について、当院の専門医がしっかりサポートいたします。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== CTA ===== -->
+  <section class="cta">
+    <p class="cta-message">
+      未来のあなたの笑顔は、<br>
+      <span class="em">もっと近くにある。</span>
+    </p>
+    <h2 class="cta-jp">まずは、お気軽にご相談ください</h2>
+    <p class="cta-sub">
+      PBMオルソが、あなたに合うかどうか。<br>
+      担当医がお話を伺い、最適なご提案をさせていただきます。
+    </p>
+    <a href="#" class="cta-button">無料カウンセリング予約</a>
+    <p class="cta-note">＊本資料はマウスピース矯正の患者様を対象としています</p>
+  </section>
+
+  <footer>
+    <div class="clinic-name">SEISHOKAI Orthodontics</div>
+    清翔会 ／ あなたの笑顔のために
+  </footer>
+
+</div>
+</body>
+</html>
