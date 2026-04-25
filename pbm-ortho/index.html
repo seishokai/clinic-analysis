@@ -767,43 +767,348 @@
     margin-bottom: 24px; letter-spacing: 0.15em; font-weight: 500;
   }
 
-  /* ===== RESPONSIVE ===== */
-  @media (max-width: 1100px) {
-    .hero-inner { grid-template-columns: 1fr; gap: 50px; }
-    .hero-visual { max-width: 440px; margin: 0 auto; aspect-ratio: 4/4.5; }
+  /* ============================================================
+     RESPONSIVE — 4-tier system
+     XL: 1100px+ (desktop)
+     LG: 900-1099px (tablet landscape)
+     MD: 640-899px (tablet portrait)
+     SM: 481-639px (large mobile)
+     XS: 0-480px (iPhone SE etc)
+     ============================================================ */
+
+  /* === ハンバーガーメニュー (desktop は非表示) === */
+  .nav-toggle {
+    display: none;
+    background: none; border: none; padding: 8px;
+    cursor: pointer; margin-left: auto;
+    width: 40px; height: 40px;
+    align-items: center; justify-content: center;
+  }
+  .nav-toggle span {
+    display: block; width: 22px; height: 2px;
+    background: var(--ink); border-radius: 2px;
+    position: relative;
+  }
+  .nav-toggle span::before, .nav-toggle span::after {
+    content: ''; position: absolute; left: 0;
+    width: 22px; height: 2px; background: var(--ink); border-radius: 2px;
+    transition: transform .25s, top .25s;
+  }
+  .nav-toggle span::before { top: -7px; }
+  .nav-toggle span::after { top: 7px; }
+  body.menu-open .nav-toggle span { background: transparent; }
+  body.menu-open .nav-toggle span::before { top: 0; transform: rotate(45deg); }
+  body.menu-open .nav-toggle span::after { top: 0; transform: rotate(-45deg); }
+
+  /* === Sticky mobile CTA (モバイルのみ) === */
+  .mobile-cta {
+    display: none;
+    position: fixed; bottom: 0; left: 0; right: 0;
+    z-index: 90;
+    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(255, 255, 255, 0.96);
+    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+    border-top: 1px solid var(--line-soft);
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
+  }
+  .mobile-cta a {
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px; width: 100%;
+    padding: 16px 20px;
+    background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
+    color: #fff; border-radius: 100px;
+    font-size: 15px; font-weight: 700; letter-spacing: 0.05em;
+    box-shadow: 0 8px 20px rgba(208, 90, 88, 0.35);
+  }
+
+  /* ===========================
+     LG : 1100px 以下 (tablet landscape)
+     =========================== */
+  @media (max-width: 1099px) {
+    .hero-inner { grid-template-columns: 1fr; gap: 48px; }
+    .hero-visual {
+      max-width: min(440px, 80vw);
+      margin: 0 auto; aspect-ratio: 1 / 1.05;
+    }
     .features-bar { grid-template-columns: 1fr; gap: 12px; margin-top: -32px; }
-    .what-grid { grid-template-columns: 1fr; gap: 50px; }
+    .what-grid { grid-template-columns: 1fr; gap: 48px; }
     .worries-grid { grid-template-columns: repeat(2, 1fr); }
     .mech-grid { grid-template-columns: repeat(2, 1fr); }
     .reass-grid { grid-template-columns: repeat(2, 1fr); }
     .benefit-row, .benefit-row:nth-child(even) {
-      grid-template-columns: 1fr; gap: 36px; padding: 40px 32px;
+      grid-template-columns: 1fr; gap: 32px; padding: 44px 36px;
     }
     .benefit-row:nth-child(even) .benefit-content { order: 1; }
     .benefit-row:nth-child(even) .benefit-stat { order: 2; }
-    .tl-row { grid-template-columns: 1fr; gap: 8px; }
-    .usage-steps { grid-template-columns: 1fr; gap: 28px; }
-    .what-is::before { font-size: 200px; right: -30px; }
+    .tl-row { grid-template-columns: 1fr; gap: 10px; }
+    .usage-steps { grid-template-columns: 1fr; gap: 24px; }
+    .what-is::before { font-size: 220px; right: -40px; }
   }
-  @media (max-width: 720px) {
-    .header-inner { padding: 12px 20px; gap: 14px; }
-    .site-nav { display: none; }
-    .header-cta { padding: 9px 16px; font-size: 12px; }
-    .logo-en { font-size: 18px; }
-    .hero { padding: 44px 20px 80px; }
-    .section { padding: 70px 20px; }
-    .badge.b1 { top: 12px; right: -8px; padding: 12px 14px; }
-    .badge.b1 .badge-num { font-size: 28px; }
-    .badge.b2 { left: -10px; padding: 12px; }
-    .badge.b3 { right: 0; padding: 12px; }
+
+  /* ===========================
+     MD : 900px 以下 (tablet portrait)
+     ハンバーガーメニュー出現
+     =========================== */
+  @media (max-width: 899px) {
+    .header-inner { padding: 12px 20px; gap: 12px; }
+    .site-nav {
+      position: fixed; top: 60px; left: 0; right: 0;
+      background: #fff;
+      flex-direction: column; gap: 0;
+      padding: 12px 0 24px;
+      border-bottom: 1px solid var(--line-soft);
+      box-shadow: 0 12px 24px rgba(0,0,0,0.08);
+      transform: translateY(-110%);
+      opacity: 0;
+      visibility: hidden;
+      transition: transform .3s ease, opacity .3s ease, visibility 0s linear .3s;
+      pointer-events: none;
+      z-index: 99;
+      max-height: calc(100vh - 60px);
+      overflow-y: auto;
+      will-change: transform, opacity;
+    }
+    body.menu-open .site-nav {
+      transform: translateY(0); opacity: 1; visibility: visible;
+      pointer-events: auto;
+      transition: transform .3s ease, opacity .3s ease, visibility 0s linear 0s;
+    }
+    .site-nav a {
+      padding: 14px 24px;
+      border-bottom: 1px solid var(--line-soft);
+      width: 100%; min-height: 44px;
+      display: flex; align-items: center;
+    }
+    .site-nav a::after { display: none; }
+    .nav-toggle { display: flex; }
+    .header-cta { padding: 10px 18px; font-size: 12.5px; }
+    .logo-en { font-size: 19px; }
+  }
+
+  /* ===========================
+     SM : 640px 以下 (large mobile)
+     =========================== */
+  @media (max-width: 639px) {
+    .header-inner { padding: 10px 16px; }
+    .header-cta { display: none; }   /* ヘッダーCTAは Sticky CTA に置換 */
+    .nav-toggle { margin-left: auto; }
+    .mobile-cta { display: block; }
+
+    .hero {
+      padding: 36px 16px 72px;
+    }
+    .hero h1 { font-size: clamp(28px, 8vw, 42px); margin-bottom: 20px; }
+    .hero-lead { font-size: 14px; line-height: 1.95; margin-bottom: 24px; }
+    .hero-chips { gap: 8px; margin-bottom: 22px; }
+    .chip { padding: 8px 14px; font-size: 11.5px; }
+    .hero-checks li { font-size: 13.5px; gap: 10px; padding: 5px 0; }
+    .hero-checks .dot { width: 20px; height: 20px; font-size: 11px; }
+    .hero-ctas { flex-direction: column; gap: 10px; margin-bottom: 24px; }
+    .hero-ctas .btn-primary,
+    .hero-ctas .btn-secondary { width: 100%; justify-content: center; padding: 16px 24px; font-size: 14.5px; }
+    .hero-trust { font-size: 11.5px; gap: 10px; }
+
+    .hero-visual {
+      max-width: min(360px, 92vw);
+      aspect-ratio: 1 / 1;
+    }
+    /* バッジを画像の中に収める */
+    .badge.b1 { top: 8px; right: 8px; padding: 10px 12px; }
+    .badge.b1 .badge-num { font-size: 24px; }
+    .badge.b1 .badge-label { font-size: 9.5px; }
+    .badge.b2 { top: 50%; left: 4px; padding: 10px 12px; }
+    .badge.b2 .badge-num { font-size: 22px; }
+    .badge.b3 { bottom: 12px; right: 4px; padding: 10px 12px; }
+    .badge.b3 .badge-num { font-size: 22px; }
+    .badge-laurel { font-size: 8px; letter-spacing: 0.15em; }
+
+    .features-bar { padding: 0 16px; gap: 10px; margin-top: -28px; }
+    .feat-card { padding: 18px 20px; gap: 14px; }
+    .feat-icon { width: 44px; height: 44px; }
+    .feat-icon svg { width: 20px; height: 20px; }
+    .feat-title { font-size: 15px; }
+    .feat-desc { font-size: 11.5px; }
+
+    .section { padding: 64px 16px; }
+    .section-head { margin-bottom: 44px; }
+    .section-eyebrow { font-size: 11px; padding: 5px 14px; }
+    .section-title { font-size: clamp(22px, 5.5vw, 30px); }
+    .section-lead { font-size: 14px; margin-top: 18px; }
+
+    .worries-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .worry-card { padding: 28px 18px 24px; }
+    .worry-num { font-size: 11px; margin-bottom: 12px; }
+    .worry-icon { width: 48px; height: 48px; margin-bottom: 14px; }
+    .worry-icon svg { width: 22px; height: 22px; }
+    .worry-text { font-size: 13.5px; line-height: 1.7; }
+    .worries-bridge { font-size: 15px; margin-top: 40px; }
+
+    .what-is::before { font-size: 140px; right: -20px; opacity: 0.5; }
+    .what-text p { font-size: 14px; line-height: 1.95; }
+    .device-tag-top { font-size: 9px; padding: 5px 12px; letter-spacing: 0.18em; }
+    .device-tag-bottom { font-size: 12px; padding: 7px 14px; }
+    .device-tag-bottom span { font-size: 10px; }
+
+    .mech-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .mech-card { padding: 28px 18px; }
+    .mech-num { font-size: 44px; margin-bottom: 12px; }
+    .mech-title { font-size: 15px; margin-bottom: 8px; }
+    .mech-desc { font-size: 12.5px; line-height: 1.75; }
+
+    .benefit-list { gap: 20px; }
+    .benefit-row, .benefit-row:nth-child(even) {
+      padding: 32px 22px; gap: 24px; border-radius: 22px;
+    }
+    .benefit-content h3 { font-size: 22px; margin-bottom: 16px; }
+    .benefit-content p { font-size: 13.5px; line-height: 1.95; }
+    .benefit-stat { padding: 32px 22px; border-radius: 18px; }
+    .b-stat-big { font-size: 64px; }
+    .b-stat-big .small { font-size: 22px; }
+    .b-stat-big .slash { font-size: 36px; }
+    .b-stat-label { font-size: 12px; margin: 10px 0 18px; }
+    .b-comp-l { font-size: 9px; }
+    .b-comp-v { font-size: 13.5px; }
+
+    .timeline { padding: 64px 16px; }
+    .tl-rows { gap: 18px; }
+    .tl-label { font-size: 14.5px; }
+    .tl-label small { font-size: 11px; }
+    .tl-bar-wrap { height: 38px; }
+    .tl-bar { font-size: 14px; padding: 0 16px; }
+    .tl-bar.normal-mp, .tl-bar.pbm-mp { font-size: 12.5px; padding: 0 14px; }
+
+    .usage-card { padding: 40px 22px; border-radius: 22px; }
+    .usage-time { font-size: clamp(54px, 14vw, 72px); }
+    .usage-sub { font-size: 11px; letter-spacing: 0.2em; }
+    .usage-desc { font-size: 13.5px; margin-bottom: 32px; }
+    .usage-steps { grid-template-columns: 1fr; gap: 22px; padding-top: 28px; }
+    .usage-step-num { font-size: 11px; }
+
+    .price-card { padding: 44px 24px 32px; border-radius: 22px; }
+    .price-eyebrow { font-size: 10px; padding: 5px 14px; }
+    .price-product { font-size: 26px; }
+    .price-product-jp { font-size: 12px; margin-bottom: 24px; padding-bottom: 18px; }
+    .price-amount { font-size: clamp(60px, 14vw, 80px); }
+    .price-amount-tax { font-size: 11px; margin: 10px 0 24px; }
+    .price-perday { padding: 18px 20px; }
+    .price-perday-label { font-size: 11px; }
+    .price-perday-text { font-size: 13px; }
+    .price-perday-text strong { font-size: 15px; }
+
+    .reass-grid { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .reass-card { padding: 28px 18px; border-radius: 16px; }
+    .reass-icon { width: 48px; height: 48px; margin-bottom: 14px; }
+    .reass-icon svg { width: 22px; height: 22px; }
+    .reass-title { font-size: 14.5px; }
+    .reass-desc { font-size: 12px; line-height: 1.75; }
+
+    .faq-q { padding: 18px 18px; gap: 12px; font-size: 14px; }
+    .q-mark { width: 28px; height: 28px; font-size: 14px; }
+    .faq-a { padding: 0 18px 18px 58px; font-size: 13.5px; line-height: 1.85; }
+
+    .cta-section { padding: 72px 16px 90px; }
+    .cta-eyebrow { font-size: 11px; }
+    .cta-title { font-size: clamp(24px, 6vw, 32px); margin-bottom: 18px; }
+    .cta-sub { font-size: 14px; margin-bottom: 32px; }
+    .cta-buttons { flex-direction: column; gap: 10px; margin-bottom: 20px; }
+    .cta-buttons .btn-primary, .cta-buttons .btn-secondary {
+      width: 100%; justify-content: center; padding: 18px 28px; font-size: 14.5px;
+    }
+    .cta-note { font-size: 11px; line-height: 1.7; }
+
+    footer {
+      padding: 44px 20px calc(40px + 80px); /* sticky CTA 分の余白を確保 */
+      font-size: 11px;
+    }
+    footer .clinic-name { font-size: 19px; }
+    footer .clinic-jp { font-size: 13px; margin-bottom: 18px; }
+  }
+
+  /* ===========================
+     XS : 480px 以下 (iPhone SE 等)
+     =========================== */
+  @media (max-width: 480px) {
+    .hero { padding: 32px 14px 64px; }
+    .hero h1 { font-size: clamp(26px, 8vw, 36px); }
+    .hero-chips { gap: 6px; }
+    .chip { padding: 7px 12px; font-size: 11px; }
+    .chip svg { width: 12px; height: 12px; }
+    .hero-trust { gap: 8px; font-size: 11px; }
+    .trust-divider { display: none; }
+
+    .hero-visual { max-width: min(320px, 90vw); }
+    .badge { padding: 8px 10px; border-radius: 14px; }
+    .badge.b1 { top: 6px; right: 6px; }
+    .badge.b1 .badge-num { font-size: 20px; }
+    .badge.b1 .badge-label { font-size: 9px; line-height: 1.3; }
+    .badge.b2 { left: 2px; padding: 8px 10px; }
+    .badge.b2 .badge-num { font-size: 18px; }
+    .badge.b2 .badge-label { font-size: 9px; }
+    .badge.b3 { right: 2px; bottom: 6px; padding: 8px 10px; }
+    .badge.b3 .badge-num { font-size: 18px; }
+    .badge.b3 .badge-label { font-size: 9px; line-height: 1.3; }
+    .badge-laurel { font-size: 7px; margin-bottom: 2px; }
+
+    .section { padding: 56px 14px; }
+
     .worries-grid { grid-template-columns: 1fr; }
-    .reass-grid { grid-template-columns: 1fr 1fr; }
-    .price-card, .usage-card { padding: 40px 24px; }
-    .cta-section { padding: 70px 20px; }
-    .cta-buttons { flex-direction: column; }
-    .cta-buttons .btn-primary, .cta-buttons .btn-secondary { width: 100%; justify-content: center; }
-    .features-bar { padding: 0 20px; }
-    .feat-card { padding: 20px; }
+    .reass-grid { grid-template-columns: 1fr; }
+    .mech-grid { grid-template-columns: 1fr; }
+
+    .what-is::before { display: none; }   /* PBM ゴーストテキスト非表示 */
+
+    .benefit-row, .benefit-row:nth-child(even) {
+      padding: 28px 18px; border-radius: 18px;
+    }
+    .benefit-content h3 { font-size: 20px; }
+    .b-stat-big { font-size: 56px; }
+    .b-stat-big .small { font-size: 18px; }
+    .b-stat-big .slash { font-size: 32px; }
+
+    .usage-card { padding: 36px 20px; }
+    .usage-time { font-size: 52px; }
+
+    .price-card { padding: 36px 22px 28px; }
+    .price-amount { font-size: 60px; }
+
+    .faq-q { padding: 16px 14px; font-size: 13.5px; gap: 10px; }
+    .q-mark { width: 26px; height: 26px; font-size: 13px; }
+    .faq-a { padding: 0 14px 16px 50px; font-size: 13px; }
+
+    .cta-section { padding: 60px 14px 80px; }
+
+    .mobile-cta a { padding: 14px 18px; font-size: 14px; }
+  }
+
+  /* ============================================================
+     Touch device hover 無効化
+     ============================================================ */
+  @media (hover: none) {
+    .feat-card:hover, .worry-card:hover, .mech-card:hover,
+    .reass-card:hover { transform: none; box-shadow: var(--shadow-sm); }
+    .btn-primary:hover, .btn-secondary:hover, .header-cta:hover {
+      transform: none;
+    }
+  }
+
+  /* ============================================================
+     横向き低高さ (landscape phone)
+     ============================================================ */
+  @media (max-height: 480px) and (orientation: landscape) {
+    .hero { padding: 32px 24px 48px; min-height: auto; }
+    .hero-visual { max-width: 280px; }
+  }
+
+  /* ============================================================
+     Reduced motion
+     ============================================================ */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 
   /* ===== MOTION ===== */
@@ -834,7 +1139,7 @@
       <span class="logo-en">PBM ORTHO</span>
       <span class="logo-jp">P B M オ ル ソ</span>
     </a>
-    <nav class="site-nav">
+    <nav class="site-nav" id="siteNav">
       <a href="#what">PBMとは</a>
       <a href="#mech">仕組み</a>
       <a href="#benefits">メリット</a>
@@ -843,8 +1148,16 @@
       <a href="#faq">よくある質問</a>
     </nav>
     <a href="#cta" class="header-cta">無料カウンセリング →</a>
+    <button class="nav-toggle" id="navToggle" aria-label="メニュー" aria-expanded="false" aria-controls="siteNav">
+      <span></span>
+    </button>
   </div>
 </header>
+
+<!-- ===== Sticky Mobile CTA ===== -->
+<div class="mobile-cta">
+  <a href="#cta">🌸 無料カウンセリング予約 →</a>
+</div>
 
 <!-- ===== HERO ===== -->
 <section class="hero" id="top">
@@ -1351,6 +1664,34 @@
   <div class="clinic-jp">清翔会 ／ あなたの笑顔のために</div>
   <div>© SEISHOKAI Group ／ All rights reserved.</div>
 </footer>
+
+<script>
+  // ハンバーガーメニュー トグル
+  (function(){
+    const toggle = document.getElementById('navToggle');
+    const nav = document.getElementById('siteNav');
+    const body = document.body;
+    if (!toggle || !nav) return;
+    toggle.addEventListener('click', () => {
+      const open = body.classList.toggle('menu-open');
+      toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+    });
+    // ナビ内リンクをタップしたら自動で閉じる
+    nav.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        body.classList.remove('menu-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      });
+    });
+    // ESC で閉じる
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && body.classList.contains('menu-open')) {
+        body.classList.remove('menu-open');
+        toggle.setAttribute('aria-expanded', 'false');
+      }
+    });
+  })();
+</script>
 
 </body>
 </html>
