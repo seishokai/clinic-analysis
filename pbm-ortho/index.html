@@ -800,27 +800,6 @@
   body.menu-open .nav-toggle span::before { top: 0; transform: rotate(45deg); }
   body.menu-open .nav-toggle span::after { top: 0; transform: rotate(-45deg); }
 
-  /* === Sticky mobile CTA (モバイルのみ) === */
-  .mobile-cta {
-    display: none;
-    position: fixed; bottom: 0; left: 0; right: 0;
-    z-index: 90;
-    padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-    background: rgba(255, 255, 255, 0.96);
-    backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-    border-top: 1px solid var(--line-soft);
-    box-shadow: 0 -4px 20px rgba(0,0,0,0.06);
-  }
-  .mobile-cta a {
-    display: flex; align-items: center; justify-content: center;
-    gap: 8px; width: 100%;
-    padding: 16px 20px;
-    background: linear-gradient(135deg, var(--rose) 0%, var(--rose-deep) 100%);
-    color: #fff; border-radius: 100px;
-    font-size: 15px; font-weight: 700; letter-spacing: 0.05em;
-    box-shadow: 0 8px 20px rgba(208, 90, 88, 0.35);
-  }
-
   /* ===========================
      LG : 1100px 以下 (tablet landscape)
      =========================== */
@@ -890,9 +869,7 @@
      =========================== */
   @media (max-width: 639px) {
     .header-inner { padding: 10px 16px; }
-    .header-cta { display: none; }   /* ヘッダーCTAは Sticky CTA に置換 */
     .nav-toggle { margin-left: auto; }
-    .mobile-cta { display: block; }
 
     .hero {
       padding: 36px 16px 72px;
@@ -1006,18 +983,14 @@
     .q-mark { width: 28px; height: 28px; font-size: 14px; }
     .faq-a { padding: 0 18px 18px 58px; font-size: 13.5px; line-height: 1.85; }
 
-    .cta-section { padding: 72px 16px 90px; }
+    .cta-section { padding: 72px 16px 80px; }
     .cta-eyebrow { font-size: 11px; }
     .cta-title { font-size: clamp(24px, 6vw, 32px); margin-bottom: 18px; }
-    .cta-sub { font-size: 14px; margin-bottom: 32px; }
-    .cta-buttons { flex-direction: column; gap: 10px; margin-bottom: 20px; }
-    .cta-buttons .btn-primary, .cta-buttons .btn-secondary {
-      width: 100%; justify-content: center; padding: 18px 28px; font-size: 14.5px;
-    }
+    .cta-sub { font-size: 14px; margin-bottom: 24px; }
     .cta-note { font-size: 11px; line-height: 1.7; }
 
     footer {
-      padding: 44px 20px calc(40px + 80px); /* sticky CTA 分の余白を確保 */
+      padding: 44px 20px 40px;
       font-size: 11px;
     }
     footer .clinic-name { font-size: 19px; }
@@ -1075,9 +1048,7 @@
     .q-mark { width: 26px; height: 26px; font-size: 13px; }
     .faq-a { padding: 0 14px 16px 50px; font-size: 13px; }
 
-    .cta-section { padding: 60px 14px 80px; }
-
-    .mobile-cta a { padding: 14px 18px; font-size: 14px; }
+    .cta-section { padding: 60px 14px 70px; }
   }
 
   /* ============================================================
@@ -1147,17 +1118,11 @@
       <a href="#price">価格</a>
       <a href="#faq">よくある質問</a>
     </nav>
-    <a href="#cta" class="header-cta">無料カウンセリング →</a>
     <button class="nav-toggle" id="navToggle" aria-label="メニュー" aria-expanded="false" aria-controls="siteNav">
       <span></span>
     </button>
   </div>
 </header>
-
-<!-- ===== Sticky Mobile CTA ===== -->
-<div class="mobile-cta">
-  <a href="#cta">🌸 無料カウンセリング予約 →</a>
-</div>
 
 <!-- ===== HERO ===== -->
 <section class="hero" id="top">
@@ -1187,8 +1152,8 @@
       </ul>
 
       <div class="hero-ctas">
-        <a href="#cta" class="btn-primary">無料カウンセリング予約 →</a>
-        <a href="#what" class="btn-secondary">詳しく見る →</a>
+        <a href="#what" class="btn-primary">PBMオルソを詳しく知る →</a>
+        <a href="#price" class="btn-secondary">価格を見る →</a>
       </div>
 
       <div class="hero-trust">
@@ -1648,13 +1613,9 @@
     <span class="em">もっと近くにある。</span>
   </h2>
   <p class="cta-sub">
-    PBMオルソが、あなたに合うかどうか。<br>
-    担当医がお話を伺い、最適なご提案をさせていただきます。
+    気になることがあれば、ぜひ担当医までお気軽にご相談ください。<br>
+    PBMオルソがあなたに合うかどうか、丁寧にご案内させていただきます。
   </p>
-  <div class="cta-buttons">
-    <a href="#" class="btn-primary">🌸 無料カウンセリング予約 →</a>
-    <a href="#what" class="btn-secondary">もう一度詳しく見る →</a>
-  </div>
   <p class="cta-note">※1 治療期間は通常2年に対し3〜6ヶ月程度の短縮が見込まれます。短縮効果には個人差があり、歯並び・骨代謝・装置の使用状況により結果は異なります。</p>
 </section>
 
