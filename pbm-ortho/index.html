@@ -538,9 +538,9 @@
     font-family: var(--en); color: var(--rose); font-size: 22px; font-weight: 600;
   }
 
-  /* ===== TIMELINE ===== */
+  /* ===== TIMELINE (ライトテーマ + ローズアクセント) ===== */
   .timeline {
-    background: var(--ink); color: #fff;
+    background: var(--bg-soft);
     overflow: hidden; position: relative;
   }
   .timeline::before {
@@ -548,26 +548,37 @@
     position: absolute; top: -120px; right: -120px;
     width: 480px; height: 480px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(236, 138, 138, 0.18), transparent 70%);
+    background: radial-gradient(circle, rgba(236, 138, 138, 0.22), transparent 70%);
+    pointer-events: none;
   }
-  .timeline .section-eyebrow { background: rgba(236, 138, 138, 0.18); color: var(--rose); }
-  .timeline .section-title { color: #fff; }
-  .timeline .section-lead { color: rgba(255,255,255,0.7); }
-  .tl-rows { max-width: 880px; margin: 0 auto; display: grid; gap: 28px; }
+  .timeline::after {
+    content: '';
+    position: absolute; bottom: -100px; left: -100px;
+    width: 360px; height: 360px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(253, 226, 224, 0.45), transparent 70%);
+    pointer-events: none;
+  }
+  .tl-rows {
+    max-width: 880px; margin: 0 auto; display: grid; gap: 24px;
+    position: relative; z-index: 2;
+  }
   .tl-row {
     display: grid; grid-template-columns: 200px 1fr;
     gap: 28px; align-items: center;
   }
-  .tl-label { font-size: 16px; font-weight: 600; }
+  .tl-label { font-size: 16px; font-weight: 700; color: var(--ink); }
   .tl-label small {
     display: block; font-family: var(--en); font-size: 12px;
-    color: var(--rose); margin-top: 4px;
-    letter-spacing: 0.08em; font-style: italic;
+    color: var(--rose-deep); margin-top: 4px;
+    letter-spacing: 0.08em; font-weight: 500;
   }
   .tl-bar-wrap {
     position: relative; height: 46px;
-    background: rgba(255,255,255,0.06);
-    border-radius: 8px; overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--line-soft);
+    border-radius: 10px; overflow: hidden;
+    box-shadow: var(--shadow-sm);
   }
   .tl-bar {
     height: 100%; display: flex; align-items: center;
@@ -575,14 +586,15 @@
     font-size: 18px; font-weight: 700; color: #fff;
     letter-spacing: 0.02em;
   }
-  .tl-bar.normal { width: 100%; background: linear-gradient(90deg, #4a4045, #6b5a5e); }
+  .tl-bar.normal { width: 100%; background: linear-gradient(90deg, #c8b8b4, #a89490); }
   .tl-bar.pbm { width: 75%; background: linear-gradient(90deg, var(--rose), var(--rose-deep)); }
-  .tl-bar.normal-mp { width: 100%; background: linear-gradient(90deg, #4a4045, #6b5a5e); font-size: 15px; padding: 0 18px; }
+  .tl-bar.normal-mp { width: 100%; background: linear-gradient(90deg, #c8b8b4, #a89490); font-size: 15px; padding: 0 18px; }
   .tl-bar.pbm-mp { width: 40%; background: linear-gradient(90deg, var(--rose), var(--rose-deep)); font-size: 15px; padding: 0 18px; }
   .tl-note {
     margin-top: 50px; font-size: 12px;
-    color: rgba(255,255,255,0.55); line-height: 1.95;
+    color: var(--ink-mute); line-height: 1.95;
     max-width: 700px; letter-spacing: 0.03em;
+    position: relative; z-index: 2;
   }
 
   /* ===== USAGE ===== */
@@ -1389,7 +1401,7 @@
           </p>
         </div>
         <div class="benefit-stat benefit-photo">
-          <img src="comfort-smile.jpg" alt="痛みから解放され笑顔の女性" class="benefit-photo-img">
+          <img src="comfort-smile.jpg" alt="痛みから解放され笑顔の女性" class="benefit-photo-img" style="object-position: 68% center;">
           <div class="benefit-photo-overlay">
             <div class="b-stat-label" style="margin:0 0 14px">矯正痛の軽減</div>
             <div class="b-compare" style="border-top:1px dashed rgba(255,255,255,0.35)">
