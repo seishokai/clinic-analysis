@@ -683,6 +683,18 @@ document.addEventListener('DOMContentLoaded', () => {
     try { if (sb && sb.auth) sb.auth.signOut().catch(()=>{}); } catch(_){}
   }
 
+  // v267 セッションタイムアウト: 期限切れなら自動ログインを阻止
+  if (_isSessionExpired()) {
+    try {
+      Object.keys(sessionStorage).forEach(k => sessionStorage.removeItem(k));
+      Object.keys(localStorage).forEach(k => {
+        if (k.includes('supabase') || k.startsWith('sb-')) localStorage.removeItem(k);
+      });
+      localStorage.removeItem(ACTIVITY_KEY);
+    } catch(_) {}
+    try { if (sb && sb.auth) sb.auth.signOut().catch(()=>{}); } catch(_){}
+  }
+
   // Supabase Auth セッション復元 (Phase 6: 一本化済み)
   // 既存認証済みなら UI は下の同期ブロックで即時復元し、Supabase 側は裏で同期のみ
   // 未認証なら Supabase セッションから復元 → あれば showApp へ
@@ -709,12 +721,69 @@ document.addEventListener('DOMContentLoaded', () => {
   setupEventListeners();
 });
 
+// === v267 セッションタイムアウト (TODO #19) ===
+// 30分間無操作で自動ログアウト。再訪時もタイムスタンプが古ければ自動ログインを阻止。
+const SESSION_TIMEOUT_MS = 30 * 60 * 1000;
+const ACTIVITY_KEY = 'last-activity';
+let _sessionTimeoutInterval = null;
+let _lastActivityWrite = 0;
+
+function _markActivity() {
+  const now = Date.now();
+  // 5秒スロットル: localStorage 書き込みを抑制
+  if (now - _lastActivityWrite < 5000) return;
+  _lastActivityWrite = now;
+  try { localStorage.setItem(ACTIVITY_KEY, String(now)); } catch(_){}
+}
+
+function _isSessionExpired() {
+  try {
+    const last = parseInt(localStorage.getItem(ACTIVITY_KEY) || '0', 10);
+    if (!last) return false; // 未設定 = 初回ログイン前
+    return (Date.now() - last) > SESSION_TIMEOUT_MS;
+  } catch(_) { return false; }
+}
+
+function _onUserActivity() { _markActivity(); }
+
+function setupSessionTimeout() {
+  // 認証成功直後に 1 回呼ぶ。重複登録を防ぐ
+  _clearSessionTimeout();
+  _lastActivityWrite = 0;
+  _markActivity();
+  ['mousemove','keydown','touchstart','click','scroll'].forEach(evt =>
+    document.addEventListener(evt, _onUserActivity, { passive: true })
+  );
+  _sessionTimeoutInterval = setInterval(() => {
+    if (_isSessionExpired()) {
+      _clearSessionTimeout();
+      console.warn('Session timed out (30min idle)');
+      logout().then(() => {
+        try { alert('30分間操作がなかったため、自動的にログアウトしました。再度ログインしてください。'); } catch(_){}
+      });
+    }
+  }, 30 * 1000);
+}
+
+function _clearSessionTimeout() {
+  if (_sessionTimeoutInterval) {
+    clearInterval(_sessionTimeoutInterval);
+    _sessionTimeoutInterval = null;
+  }
+  ['mousemove','keydown','touchstart','click','scroll'].forEach(evt =>
+    document.removeEventListener(evt, _onUserActivity)
+  );
+}
+
 // === Auth ===
 async function logout() {
   // Supabase Auth signOut (authMode に関わらず実行: クッキー/トークンの取り残し防止)
   try { if (sb && sb.auth) await sb.auth.signOut(); } catch (_) { /* ignore */ }
   // setInterval リーク対策
   if (_qInterval) { clearInterval(_qInterval); _qInterval = null; }
+  // v267 セッションタイムアウト解除
+  _clearSessionTimeout();
+  try { localStorage.removeItem(ACTIVITY_KEY); } catch(_){}
   sessionStorage.clear();
   userRole = 'admin';
   promoFilter = '';
@@ -1920,6 +1989,8 @@ function showApp() {
   document.getElementById('login-screen').hidden = true;
   document.getElementById('login-screen').style.display = 'none';
   document.getElementById('app').hidden = false;
+  // v267 セッションタイムアウト監視を開始 (30分無操作で自動ログアウト)
+  try { setupSessionTimeout(); } catch(e) { console.warn('setupSessionTimeout failed', e); }
   // v265 ログイン後にプルリフレッシュインジケーターを再表示可能に (logout で display:none にされている可能性)
   const _pri = document.getElementById('pull-refresh-indicator');
   if (_pri) _pri.style.display = '';
