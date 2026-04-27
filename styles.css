@@ -56,7 +56,28 @@ body {
 }
 .login-logo { margin-bottom: 32px; }
 .login-logo h1 { font-size: 22px; font-weight: 700; letter-spacing: 3px; }
-.login-logo p { color: var(--text-sub); font-size: 13px; margin-top: 4px; }
+.login-logo p { color: var(--text-sub); font-size: 13px; margin-top: 6px; letter-spacing: 2px; }
+/* Aladdin ブランド: 筆記体 (Great Vibes) */
+.brand-script {
+  font-family: 'Great Vibes', cursive !important;
+  font-weight: 400 !important;
+  font-size: 76px !important;
+  letter-spacing: 1px !important;
+  line-height: 1 !important;
+  background: linear-gradient(135deg, #1a1a1a 0%, #555 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+.brand-script-sm {
+  font-family: 'Great Vibes', cursive !important;
+  font-weight: 400 !important;
+  font-size: 26px !important;
+  letter-spacing: 0.5px !important;
+  line-height: 1 !important;
+  text-transform: none !important;
+}
 .input-group { text-align: left; margin-bottom: 20px; }
 .input-group label { display: block; font-size: 12px; font-weight: 600; color: var(--text-sub); margin-bottom: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
 .input-group input, .form-input {

@@ -3,8 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-  <title>清翔会</title>
-  <link rel="stylesheet" href="styles.css?v=113">
+  <title>Aladdin / 清翔会</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap">
+  <link rel="stylesheet" href="styles.css?v=114">
   <script>
     // ?view=para: メインアプリのフラッシュを防止 (para は完全に独自UIで置換するため)
     (function(){
@@ -260,8 +263,8 @@
   <div id="login-screen" class="login-screen">
     <div class="login-card">
       <div class="login-logo">
-        <h1>SEISHOKAI</h1>
-        <p>Portal</p>
+        <h1 class="brand-script">Aladdin</h1>
+        <p>清翔会 Portal</p>
       </div>
       <!-- ポータルメニュー -->
       <div id="portal-menu" class="portal-cols" style="margin-bottom:20px">
@@ -349,7 +352,7 @@
 
   <!-- 録音専用画面 (?view=rec) -->
   <div id="rec-standalone" hidden style="position:fixed;inset:0;background:#0a0a0a;color:#fff;z-index:9998;flex-direction:column;align-items:center;justify-content:center;padding:20px;font-family:inherit">
-    <div style="position:absolute;top:20px;left:24px;font-size:11px;letter-spacing:2px;opacity:.5">SEISHOKAI REC</div>
+    <div style="position:absolute;top:20px;left:24px;font-size:11px;letter-spacing:2px;opacity:.5">ALADDIN REC</div>
     <div style="position:absolute;top:20px;right:24px;display:flex;gap:12px;align-items:center">
       <span id="rs-wake" style="font-size:10px;opacity:.4">○ 画面ロック防止</span>
       <button id="rs-close" style="background:none;border:1px solid #555;color:#aaa;padding:4px 10px;font-size:11px;border-radius:4px;cursor:pointer;font-family:inherit">✕</button>
@@ -395,7 +398,7 @@
     <!-- Header -->
     <header class="header">
       <div class="header-left">
-        <span class="logo-text">SEISHOKAI</span>
+        <span class="logo-text brand-script-sm">Aladdin</span>
       </div>
       <nav class="desktop-nav">
         <button class="nav-btn active" data-view="bookings">予約</button>
