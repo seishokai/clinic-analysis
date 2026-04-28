@@ -739,7 +739,15 @@ function _markActivity() {
 function _isSessionExpired() {
   try {
     const last = parseInt(localStorage.getItem(ACTIVITY_KEY) || '0', 10);
-    if (!last) return false; // 未設定 = 初回ログイン前
+    if (!last) {
+      // last-activity 未設定:
+      //   - 完全新規 (Supabase token も無い) → false (ログイン画面を出す)
+      //   - 移行ケース (token だけ残ってる) → true (強制再ログイン)
+      const hasSupabaseToken = Object.keys(localStorage).some(k =>
+        k.includes('supabase') || k.startsWith('sb-')
+      );
+      return hasSupabaseToken;
+    }
     return (Date.now() - last) > SESSION_TIMEOUT_MS;
   } catch(_) { return false; }
 }
