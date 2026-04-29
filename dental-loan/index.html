@@ -130,7 +130,7 @@
       <label for="company">ローン会社（任意）</label>
       <select id="company" class="company">
         <option value="">選択しない</option>
-        <option value="suruga" data-variable="1">スルガ（変動金利）</option>
+        <option value="suruga" data-variable="1" data-rate="3.7">スルガ銀行（3.4〜5.5% 変動）</option>
         <option value="jaccs" data-rate="4.5">ジャックス（4.5%）</option>
         <option value="epos" data-rate="5.8">エポス（5.8%）</option>
         <option value="aplus" data-rate="6.9">アプラス（6.9%）</option>
@@ -187,7 +187,7 @@
       <tbody id="compare-tbody"></tbody>
     </table>
     <div class="note" style="margin-top:10px">
-      ※ 変動金利の会社は本シミュレーターの参考レート(3.7%)で計算しています。実際の金利は会社にご確認ください。
+      ※ スルガ銀行は変動金利のため、参考レート 3.7% で計算しています。実際の金利は会社にご確認ください。
     </div>
   </div>
 
@@ -201,17 +201,16 @@
   const fmtFix = n => Number(n).toFixed(1);
 
   // ローン会社マスタ
-  // - rate=null & variable=true: 純粋な変動金利 (参考レートで計算)
-  // - rate=数値 & rateLabel あり: 範囲固定 (中間値で計算、表示は範囲)
-  // - rate=数値 & variable=false: 固定金利
+  // - rate: 計算に使う参考レート (必須)
+  // - variable: 変動金利か (UI でヒント表示を分岐)
+  // - rateLabel: 表示ラベルを上書き (範囲表示など)
   const COMPANIES = [
-    { id:'suruga', label:'スルガ',     rate:null, variable:true                          },
-    { id:'jaccs',  label:'ジャックス', rate:4.5,  variable:false                         },
-    { id:'epos',   label:'エポス',     rate:5.8,  variable:false                         },
-    { id:'aplus',  label:'アプラス',   rate:6.9,  variable:false                         },
-    { id:'cbs',    label:'CBS',        rate:14.5, variable:false, rateLabel:'14〜15%'    },
+    { id:'suruga', label:'スルガ銀行', rate:3.7,  variable:true,  rateLabel:'3.4〜5.5%（変動）' },
+    { id:'jaccs',  label:'ジャックス', rate:4.5,  variable:false                                },
+    { id:'epos',   label:'エポス',     rate:5.8,  variable:false                                },
+    { id:'aplus',  label:'アプラス',   rate:6.9,  variable:false                                },
+    { id:'cbs',    label:'CBS',        rate:14.5, variable:false, rateLabel:'14〜15%'           },
   ];
-  const VARIABLE_REF_RATE = 3.7; // 変動金利の参考レート
 
   // 元利均等返済 月々支払額
   function calcMonthly(principal, annualRate, years){
@@ -240,12 +239,9 @@
     const selectedId = $('company').value;
     const tb = $('compare-tbody');
     tb.innerHTML = COMPANIES.map(c => {
-      const useRate = c.variable ? VARIABLE_REF_RATE : c.rate;
-      const mm = calcMonthly(p, useRate, y);
+      const mm = calcMonthly(p, c.rate, y);
       const tt = mm * y * 12;
-      const rateLabel = c.rateLabel
-        ? c.rateLabel
-        : (c.variable ? `変動 (参考${fmtFix(VARIABLE_REF_RATE)}%)` : `${fmtFix(c.rate)}%`);
+      const rateLabel = c.rateLabel || `${fmtFix(c.rate)}%`;
       const isCurrent = c.id === selectedId;
       return `<tr class="${isCurrent ? 'current' : ''}">
         <td>${c.label}</td>
@@ -265,10 +261,14 @@
       hint.textContent = '選択すると参考金利が自動で入力されます。任意項目です。';
       hint.classList.remove('warn');
     } else if (opt.dataset.variable === '1') {
-      hint.textContent = `変動金利のため、参考レート ${VARIABLE_REF_RATE}% で計算しています。実際の金利は会社にご確認ください。`;
+      const rate = opt.dataset.rate || '3.7';
+      const cleanName = opt.textContent.replace(/[（()].*[)）]/, '').trim();
+      const labelMatch = opt.textContent.match(/（(.*?)）/);
+      const rangeText = labelMatch ? labelMatch[1] : '変動金利';
+      hint.textContent = `${cleanName}は${rangeText}。参考レート ${rate}% で計算しています。実際の金利は会社にご確認ください。`;
       hint.classList.add('warn');
-      $('rate').value = VARIABLE_REF_RATE;
-      $('rate-range').value = VARIABLE_REF_RATE;
+      $('rate').value = rate;
+      $('rate-range').value = rate;
     } else {
       const rate = opt.dataset.rate;
       hint.textContent = `${opt.textContent.replace(/[（()].*[)）]/, '').trim()} の参考金利 ${rate}% を入力しました。上書き編集も可能です。`;
