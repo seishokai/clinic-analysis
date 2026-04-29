@@ -30,7 +30,13 @@
   }
   .subtitle{font-size:13px; letter-spacing:3px; color:var(--text-sub); margin-top:6px; text-transform:uppercase}
   h1{font-size:20px; font-weight:700; margin:24px 0 4px; letter-spacing:1px}
-  .lead{font-size:13px; color:var(--text-sub); margin:0 0 24px}
+  .lead{font-size:13px; color:var(--text-sub); margin:0 0 16px}
+  .disclaimer{
+    background:#fff7ed; border:1px solid #fed7aa; border-radius:10px;
+    padding:12px 14px; font-size:12px; color:#9a3412; line-height:1.6;
+    margin-bottom:24px;
+  }
+  .disclaimer strong{color:#c2410c; font-weight:700}
 
   .card{
     background:var(--card); border:1px solid var(--border); border-radius:14px;
@@ -54,7 +60,17 @@
     background:#f5f5f5; border-left:1px solid var(--border); white-space:nowrap;
   }
   .field .hint{font-size:11px; color:var(--text-sub); margin-top:6px}
+  .field .hint.warn{color:#c2410c}
   input[type="range"]{width:100%; margin-top:8px; accent-color:#1a1a1a}
+  select.company{
+    width:100%; padding:14px 16px; font-size:15px; font-weight:600;
+    border:1px solid var(--border); border-radius:10px; background:#fff; color:var(--text);
+    outline:none; appearance:none; -webkit-appearance:none; -moz-appearance:none;
+    background-image:url("data:image/svg+xml;charset=UTF-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%236b7280' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right 16px center; padding-right:40px;
+    font-family:inherit; cursor:pointer;
+  }
+  select.company:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,0,0,.05)}
 
   .result-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
   @media(max-width:480px){.result-grid{grid-template-columns:1fr}}
@@ -95,14 +111,32 @@
   <h1>デンタルローン シミュレーション</h1>
   <p class="lead">借入金額・年利・支払年数を入力すると、月々の支払額と支払総額がリアルタイムで表示されます。</p>
 
+  <div class="disclaimer">
+    <strong>※ 本シミュレーションは参考例です。</strong>
+    実際の金利・月々の支払額・支払総額は、各ローン会社の審査・契約条件・金利変動などにより異なります。正式な金額は提携ローン会社にご確認ください。
+  </div>
+
   <div class="card">
     <div class="field">
       <label for="amount">借入金額（元金）</label>
       <div class="input-row">
-        <input id="amount" type="number" min="10000" max="10000000" step="10000" value="660000" inputmode="numeric">
+        <input id="amount" type="text" inputmode="numeric" autocomplete="off" value="660,000">
         <span class="unit">円</span>
       </div>
       <input id="amount-range" type="range" min="50000" max="3000000" step="10000" value="660000">
+    </div>
+
+    <div class="field">
+      <label for="company">ローン会社（任意）</label>
+      <select id="company" class="company">
+        <option value="">選択しない</option>
+        <option value="suruga" data-variable="1">スルガ（変動金利）</option>
+        <option value="jaccs" data-rate="4.5">ジャックス（4.5%）</option>
+        <option value="aplus" data-rate="6.9">アプラス（6.9%)</option>
+        <option value="epos" data-rate="5.8">エポス（5.8%)</option>
+        <option value="cbs" data-variable="1">CBS（変動金利）</option>
+      </select>
+      <div id="company-hint" class="hint">選択すると参考金利が自動で入力されます。任意項目です。</div>
     </div>
 
     <div class="field">
@@ -140,18 +174,21 @@
   </div>
 
   <div class="compare">
-    <h2>金利別 比較</h2>
+    <h2>ローン会社別 比較（参考例）</h2>
     <table>
       <thead>
         <tr>
+          <th>会社</th>
           <th>年利</th>
           <th>月々</th>
           <th>支払総額</th>
-          <th>利息</th>
         </tr>
       </thead>
       <tbody id="compare-tbody"></tbody>
     </table>
+    <div class="note" style="margin-top:10px">
+      ※ 変動金利の会社は本シミュレーターの参考レート(3.7%)で計算しています。実際の金利は会社にご確認ください。
+    </div>
   </div>
 
   <footer>SEISHOKAI Group / Aladdin</footer>
@@ -163,6 +200,16 @@
   const fmt = n => Math.round(n).toLocaleString('ja-JP');
   const fmtFix = n => Number(n).toFixed(1);
 
+  // ローン会社マスタ (rate=null は変動金利)
+  const COMPANIES = [
+    { id:'suruga', label:'スルガ',     rate:null, variable:true  },
+    { id:'jaccs',  label:'ジャックス', rate:4.5,  variable:false },
+    { id:'aplus',  label:'アプラス',   rate:6.9,  variable:false },
+    { id:'epos',   label:'エポス',     rate:5.8,  variable:false },
+    { id:'cbs',    label:'CBS',        rate:null, variable:true  },
+  ];
+  const VARIABLE_REF_RATE = 3.7; // 変動金利の参考レート
+
   // 元利均等返済 月々支払額
   function calcMonthly(principal, annualRate, years){
     if (!(principal > 0) || !(years > 0)) return 0;
@@ -173,8 +220,11 @@
     return principal * r * factor / (factor - 1);
   }
 
+  // 文字列から数値を抽出 (カンマ・通貨記号などを除去)
+  function parseNum(s){ return Number(String(s).replace(/[^\d.-]/g, '')) || 0; }
+
   function update(){
-    const p = Math.max(0, Number($('amount').value) || 0);
+    const p = Math.max(0, parseNum($('amount').value));
     const r = Math.max(0, Number($('rate').value) || 0);
     const y = Math.max(1, Number($('years').value) || 1);
 
@@ -183,33 +233,81 @@
     $('monthly').textContent = fmt(m);
     $('total').textContent = fmt(total);
 
-    // 比較表 (現在金利 ± 各種)
-    const rates = [...new Set([r, 3.7, 3.8, 4.5, 5.4].map(x => Math.round(x*10)/10))]
-      .sort((a,b)=>a-b);
+    // 比較表: 各ローン会社で計算
+    const selectedId = $('company').value;
     const tb = $('compare-tbody');
-    tb.innerHTML = rates.map(rt => {
-      const mm = calcMonthly(p, rt, y);
+    tb.innerHTML = COMPANIES.map(c => {
+      const useRate = c.variable ? VARIABLE_REF_RATE : c.rate;
+      const mm = calcMonthly(p, useRate, y);
       const tt = mm * y * 12;
-      const interest = tt - p;
-      const isCurrent = Math.abs(rt - r) < 0.05;
+      const rateLabel = c.variable ? `変動 (参考${fmtFix(VARIABLE_REF_RATE)}%)` : `${fmtFix(c.rate)}%`;
+      const isCurrent = c.id === selectedId;
       return `<tr class="${isCurrent ? 'current' : ''}">
-        <td>${fmtFix(rt)}%</td>
+        <td>${c.label}</td>
+        <td>${rateLabel}</td>
         <td>¥${fmt(mm)}</td>
         <td>¥${fmt(tt)}</td>
-        <td>¥${fmt(interest)}</td>
       </tr>`;
     }).join('');
   }
 
-  // 数値↔レンジ 双方向
+  // 会社選択 → 年利を自動入力
+  function onCompanyChange(){
+    const sel = $('company');
+    const opt = sel.options[sel.selectedIndex];
+    const hint = $('company-hint');
+    if (!sel.value) {
+      hint.textContent = '選択すると参考金利が自動で入力されます。任意項目です。';
+      hint.classList.remove('warn');
+    } else if (opt.dataset.variable === '1') {
+      hint.textContent = `変動金利のため、参考レート ${VARIABLE_REF_RATE}% で計算しています。実際の金利は会社にご確認ください。`;
+      hint.classList.add('warn');
+      $('rate').value = VARIABLE_REF_RATE;
+      $('rate-range').value = VARIABLE_REF_RATE;
+    } else {
+      const rate = opt.dataset.rate;
+      hint.textContent = `${opt.textContent.replace(/[（()].*[)）]/, '').trim()} の参考金利 ${rate}% を入力しました。上書き編集も可能です。`;
+      hint.classList.remove('warn');
+      $('rate').value = rate;
+      $('rate-range').value = rate;
+    }
+    update();
+  }
+
+  // 元金: カンマ区切り表記 + カーソル位置保持
+  const amountInput = $('amount');
+  const amountRange = $('amount-range');
+  amountInput.addEventListener('input', () => {
+    // 現在のカーソル位置までの数字数を記録
+    const cursor = amountInput.selectionStart || 0;
+    const beforeDigits = amountInput.value.slice(0, cursor).replace(/[^\d]/g, '').length;
+    const raw = parseNum(amountInput.value);
+    amountInput.value = fmt(raw);
+    amountRange.value = raw;
+    // カーソル位置を「数字数」基準で復元
+    let pos = 0, count = 0;
+    while (pos < amountInput.value.length && count < beforeDigits) {
+      if (/\d/.test(amountInput.value[pos])) count++;
+      pos++;
+    }
+    try { amountInput.setSelectionRange(pos, pos); } catch(_){}
+    update();
+  });
+  amountRange.addEventListener('input', () => {
+    amountInput.value = fmt(parseNum(amountRange.value));
+    update();
+  });
+
+  // 年利・年数: 通常の数値↔レンジ 双方向
   function bind(numId, rangeId){
     const num = $(numId), range = $(rangeId);
     num.addEventListener('input', () => { range.value = num.value; update(); });
     range.addEventListener('input', () => { num.value = range.value; update(); });
   }
-  bind('amount','amount-range');
   bind('rate','rate-range');
   bind('years','years-range');
+
+  $('company').addEventListener('change', onCompanyChange);
 
   update();
 })();
