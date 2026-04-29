@@ -187,7 +187,7 @@
       <tbody id="compare-tbody"></tbody>
     </table>
     <div class="note" style="margin-top:10px">
-      ※ スルガ銀行は変動金利のため、参考レート 3.7% で計算しています。実際の金利は会社にご確認ください。
+      ※ スルガ銀行は審査結果により金利が決定される変動金利（3.4〜5.5%）です。本シミュレーターでは参考レート 3.7% で計算しています。
     </div>
   </div>
 
@@ -265,7 +265,7 @@
       const cleanName = opt.textContent.replace(/[（()].*[)）]/, '').trim();
       const labelMatch = opt.textContent.match(/（(.*?)）/);
       const rangeText = labelMatch ? labelMatch[1] : '変動金利';
-      hint.textContent = `${cleanName}は${rangeText}。参考レート ${rate}% で計算しています。実際の金利は会社にご確認ください。`;
+      hint.textContent = `${cleanName}は審査結果により金利が決定されます（${rangeText}）。本シミュレーターでは参考レート ${rate}% で計算しています。`;
       hint.classList.add('warn');
       $('rate').value = rate;
       $('rate-range').value = rate;
