@@ -132,9 +132,9 @@
         <option value="">選択しない</option>
         <option value="suruga" data-variable="1">スルガ（変動金利）</option>
         <option value="jaccs" data-rate="4.5">ジャックス（4.5%）</option>
-        <option value="aplus" data-rate="6.9">アプラス（6.9%)</option>
-        <option value="epos" data-rate="5.8">エポス（5.8%)</option>
-        <option value="cbs" data-variable="1">CBS（変動金利）</option>
+        <option value="epos" data-rate="5.8">エポス（5.8%）</option>
+        <option value="aplus" data-rate="6.9">アプラス（6.9%）</option>
+        <option value="cbs" data-rate="14.5">CBS（14〜15%）</option>
       </select>
       <div id="company-hint" class="hint">選択すると参考金利が自動で入力されます。任意項目です。</div>
     </div>
@@ -200,13 +200,16 @@
   const fmt = n => Math.round(n).toLocaleString('ja-JP');
   const fmtFix = n => Number(n).toFixed(1);
 
-  // ローン会社マスタ (rate=null は変動金利)
+  // ローン会社マスタ
+  // - rate=null & variable=true: 純粋な変動金利 (参考レートで計算)
+  // - rate=数値 & rateLabel あり: 範囲固定 (中間値で計算、表示は範囲)
+  // - rate=数値 & variable=false: 固定金利
   const COMPANIES = [
-    { id:'suruga', label:'スルガ',     rate:null, variable:true  },
-    { id:'jaccs',  label:'ジャックス', rate:4.5,  variable:false },
-    { id:'aplus',  label:'アプラス',   rate:6.9,  variable:false },
-    { id:'epos',   label:'エポス',     rate:5.8,  variable:false },
-    { id:'cbs',    label:'CBS',        rate:null, variable:true  },
+    { id:'suruga', label:'スルガ',     rate:null, variable:true                          },
+    { id:'jaccs',  label:'ジャックス', rate:4.5,  variable:false                         },
+    { id:'epos',   label:'エポス',     rate:5.8,  variable:false                         },
+    { id:'aplus',  label:'アプラス',   rate:6.9,  variable:false                         },
+    { id:'cbs',    label:'CBS',        rate:14.5, variable:false, rateLabel:'14〜15%'    },
   ];
   const VARIABLE_REF_RATE = 3.7; // 変動金利の参考レート
 
@@ -240,7 +243,9 @@
       const useRate = c.variable ? VARIABLE_REF_RATE : c.rate;
       const mm = calcMonthly(p, useRate, y);
       const tt = mm * y * 12;
-      const rateLabel = c.variable ? `変動 (参考${fmtFix(VARIABLE_REF_RATE)}%)` : `${fmtFix(c.rate)}%`;
+      const rateLabel = c.rateLabel
+        ? c.rateLabel
+        : (c.variable ? `変動 (参考${fmtFix(VARIABLE_REF_RATE)}%)` : `${fmtFix(c.rate)}%`);
       const isCurrent = c.id === selectedId;
       return `<tr class="${isCurrent ? 'current' : ''}">
         <td>${c.label}</td>
