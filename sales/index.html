@@ -155,7 +155,8 @@
 <div class="wrap">
   <div class="top-bar">
     <a href="../" class="back-link">← ポータルへ戻る</a>
-    <div class="auth-area">
+    <!-- Bug 2修正: 認証チェック完了まで非表示にしてフリッカー防止 -->
+    <div class="auth-area" id="auth-area" hidden>
       <span id="auth-badge" class="badge guest">ゲスト</span>
       <button id="auth-btn" class="auth-btn">ログイン</button>
     </div>
@@ -228,7 +229,10 @@
   let tabsFlat = [];   // 全タブ (フラット)
   let tabsTree = [];   // ツリー化
   let isAdmin = false;
-  let expandedIds = new Set(JSON.parse(localStorage.getItem('sales-expanded') || '[]'));
+  // Bug 11修正: localStorage 破損時の保護
+  let expandedIds;
+  try { expandedIds = new Set(JSON.parse(localStorage.getItem('sales-expanded') || '[]')); }
+  catch(_) { expandedIds = new Set(); localStorage.removeItem('sales-expanded'); }
 
   // ===== Toast =====
   function toast(msg, isError = false){
@@ -240,23 +244,18 @@
   }
 
   // ===== Auth =====
-  async function checkAuth(){
+  // Bug 2修正: getSession() は localStorage 即時参照、rpc は遅い → 分離して並列化を可能に
+  async function fetchAuthState(){
     try {
       const { data: { session } } = await sb.auth.getSession();
-      if (!session) {
-        setAuthState(false, null);
-        return;
-      }
+      if (!session) return { isAdmin: false, profile: null };
       const { data: profile, error } = await sb.rpc('get_my_account');
-      if (error || !profile) {
-        setAuthState(false, null);
-        return;
-      }
+      if (error || !profile) return { isAdmin: false, profile: null };
       const isAdminRole = profile.role === 'admin' || profile.account_type === 'admin';
-      setAuthState(isAdminRole, profile);
+      return { isAdmin: isAdminRole, profile };
     } catch(e) {
       console.warn('auth check failed', e);
-      setAuthState(false, null);
+      return { isAdmin: false, profile: null };
     }
   }
 
@@ -282,22 +281,25 @@
       btn.onclick = () => { location.href = '../?login'; };
       cta.hidden = false;
     }
+    // Bug 2修正: 認証チェック完了後にエリア表示
+    $('auth-area').hidden = false;
   }
 
   // ===== Data =====
-  async function loadTabs(){
-    $('loading').hidden = false;
-    $('empty').hidden = true;
-    $('tabs-tree').hidden = true;
-    const { data, error } = await sb
-      .from('sales_tabs')
+  // Bug 1修正: 取得と適用を分離 → init で並列実行可能に
+  function fetchTabs(){
+    return sb.from('sales_tabs')
       .select('id, parent_id, label, url, external, highlight, sort_order')
       .eq('is_active', true)
       .order('sort_order');
+  }
+
+  function applyTabsResult({ data, error }){
     $('loading').hidden = true;
+    $('empty').hidden = true;
+    $('tabs-tree').hidden = true;
     if (error) {
       console.error('sales_tabs load error', error);
-      // テーブル未作成（マイグレーション未実行）も含めて empty 扱いに
       const msg = (error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '');
       const isMissing = error.code === '42P01'
         || error.code === 'PGRST205'
@@ -311,19 +313,32 @@
         : '読み込みエラー: ' + (error.message || '');
       emptyEl.hidden = false;
       if (!isAdmin) return;
-      // admin なら空ツリーでも追加できるように
       $('tabs-tree').hidden = false;
       renderTree();
       return;
     }
     tabsFlat = data || [];
     tabsTree = buildTree(tabsFlat);
+    // Bug 12修正: 削除されたタブIDを expandedIds から自動クリーンアップ
+    const validIds = new Set(tabsFlat.map(t => t.id));
+    let changed = false;
+    for (const id of expandedIds) {
+      if (!validIds.has(id)) { expandedIds.delete(id); changed = true; }
+    }
+    if (changed) localStorage.setItem('sales-expanded', JSON.stringify([...expandedIds]));
+
     if (tabsTree.length === 0 && !isAdmin) {
       $('empty').hidden = false;
     } else {
       $('tabs-tree').hidden = false;
       renderTree();
     }
+  }
+
+  async function loadTabs(){
+    $('loading').hidden = false;
+    const result = await fetchTabs();
+    applyTabsResult(result);
   }
 
   function buildTree(flat){
@@ -374,7 +389,7 @@
         const goBtn = document.createElement('a');
         goBtn.className = 'icon-btn';
         goBtn.href = node.url;
-        if (node.external) { goBtn.target = '_blank'; goBtn.rel = 'noopener'; }
+        if (node.external) { goBtn.target = '_blank'; goBtn.rel = 'noopener noreferrer'; }
         goBtn.title = '開く';
         goBtn.textContent = '↗';
         row.appendChild(goBtn);
@@ -383,7 +398,7 @@
       const link = document.createElement('a');
       link.className = 'node-main';
       link.href = node.url;
-      if (node.external) { link.target = '_blank'; link.rel = 'noopener'; }
+      if (node.external) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
       link.textContent = node.label;
       row.appendChild(link);
     }
@@ -532,36 +547,77 @@
 
   $('tab-form').onsubmit = async (e) => {
     e.preventDefault();
-    const payload = {
-      label: $('form-label').value.trim(),
-      url: $('form-url').value.trim() || null,
-      parent_id: $('form-parent').value || null,
-      external: $('form-external').checked,
-      highlight: $('form-highlight').checked,
-    };
-    if (!payload.label) { toast('ラベルを入力してください', true); return; }
-    let res;
-    if (modalMode === 'edit' && modalNode?.id) {
-      res = await sb.from('sales_tabs').update(payload).eq('id', modalNode.id);
-    } else {
-      // sort_order: 同階層の末尾に追加
-      const siblings = tabsFlat.filter(t => (t.parent_id || null) === (payload.parent_id || null));
-      const maxSort = siblings.reduce((m, t) => Math.max(m, t.sort_order || 0), 0);
-      payload.sort_order = maxSort + 10;
-      res = await sb.from('sales_tabs').insert(payload);
+    // Bug 4修正: 二重サブミット防止
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    if (submitBtn.disabled) return;
+    submitBtn.disabled = true;
+    const origText = submitBtn.textContent;
+    submitBtn.textContent = '保存中…';
+
+    try {
+      let url = $('form-url').value.trim();
+      const ext = $('form-external').checked;
+
+      // Bug 5修正: javascript: スキームをブロック (XSS 防止)
+      if (url && /^(javascript|data|vbscript):/i.test(url)) {
+        toast('このURLスキームは使用できません', true);
+        return;
+      }
+      // Bug 3修正: 外部リンクで http(s):// が無い場合、自動補完
+      if (url && ext && !/^https?:\/\//i.test(url) && !/^\//.test(url)) {
+        url = 'https://' + url;
+      }
+
+      const payload = {
+        label: $('form-label').value.trim(),
+        url: url || null,
+        parent_id: $('form-parent').value || null,
+        external: ext,
+        highlight: $('form-highlight').checked,
+      };
+      if (!payload.label) { toast('ラベルを入力してください', true); return; }
+
+      let res;
+      if (modalMode === 'edit' && modalNode?.id) {
+        res = await sb.from('sales_tabs').update(payload).eq('id', modalNode.id);
+      } else {
+        const siblings = tabsFlat.filter(t => (t.parent_id || null) === (payload.parent_id || null));
+        const maxSort = siblings.reduce((m, t) => Math.max(m, t.sort_order || 0), 0);
+        payload.sort_order = maxSort + 10;
+        res = await sb.from('sales_tabs').insert(payload);
+      }
+      if (res.error) { toast('保存失敗: ' + res.error.message, true); return; }
+      toast(modalMode === 'edit' ? '更新しました' : '追加しました');
+      closeModal();
+      if (payload.parent_id) {
+        expandedIds.add(payload.parent_id);
+        // Bug 14修正: 追加後の親展開状態を localStorage にも反映
+        localStorage.setItem('sales-expanded', JSON.stringify([...expandedIds]));
+      }
+      await loadTabs();
+    } finally {
+      submitBtn.disabled = false;
+      submitBtn.textContent = origText;
     }
-    if (res.error) { toast('保存失敗: ' + res.error.message, true); return; }
-    toast(modalMode === 'edit' ? '更新しました' : '追加しました');
-    closeModal();
-    if (payload.parent_id) expandedIds.add(payload.parent_id);
-    await loadTabs();
   };
 
   $('add-root-btn').onclick = () => openModal({ parent_id: null });
 
   // ===== Init =====
-  await checkAuth();
-  await loadTabs();
+  // Bug 1修正: 認証チェックとタブ読み込みを並列実行 (約半分の時間に)
+  $('loading').hidden = false;
+  const tabsPromise = fetchTabs();
+  const authData = await fetchAuthState();
+  setAuthState(authData.isAdmin, authData.profile);
+  const tabsResult = await tabsPromise;
+  applyTabsResult(tabsResult);
+
+  // Bug 13修正: Esc キーでモーダルを閉じる
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && !$('modal-overlay').hidden) {
+      closeModal();
+    }
+  });
 })();
 </script>
 </body>
