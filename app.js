@@ -2069,7 +2069,6 @@ function showApp() {
 
 function restoreLastView() {
   try {
-    const lastView = sessionStorage.getItem('lastView');
     // ロールごとに許可されたビューしか復元しない (Phase 6: currentRole ベース)
     const isAllowed = (v) => {
       if (isAdminRole()) return ['bookings','kaiin','tc','adbudget','admin','sales'].includes(v);
@@ -2077,6 +2076,26 @@ function restoreLastView() {
       if (isAgencyRole()) return v === 'bookings';
       return v === 'bookings';
     };
+
+    // v270: ポータルからのリダイレクト (例: ユーザー管理ボタン → admin/権限管理)
+    const redirectView = sessionStorage.getItem('portal-redirect-view');
+    if (redirectView) {
+      sessionStorage.removeItem('portal-redirect-view');
+      const redirectSub = sessionStorage.getItem('portal-redirect-sub');
+      sessionStorage.removeItem('portal-redirect-sub');
+      if (isAllowed(redirectView)) {
+        switchView(redirectView);
+        if (redirectSub) {
+          setTimeout(() => {
+            const subBtn = document.querySelector(`#view-${redirectView} .sub-nav-btn[data-sub="${redirectSub}"]`);
+            if (subBtn) subBtn.click();
+          }, 150);
+        }
+        return; // 通常の lastView 復元はスキップ
+      }
+    }
+
+    const lastView = sessionStorage.getItem('lastView');
     if (lastView && isAllowed(lastView)) {
       switchView(lastView);
     }
