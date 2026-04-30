@@ -4574,9 +4574,13 @@ function renderBookings() {
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='予約変更'?'selected':''}>予約変更</option>
       <option ${d.status==='来院済'?'selected':''}>来院済</option>
+      ${isImplantBooking(d) ? `<option ${d.status==='検討中'?'selected':''}>検討中</option>` : ''}
       <option ${d.status==='成約'?'selected':''}>成約</option>
       ${isImplantBooking(d) ? `
+        <option ${d.status==='P処置'?'selected':''}>P処置</option>
+        <option ${d.status==='C処置'?'selected':''}>C処置</option>
         <option ${d.status==='CT/診断'?'selected':''}>CT/診断</option>
+        <option ${d.status==='ガイド印象'?'selected':''}>ガイド印象</option>
         <option ${d.status==='手術予定'?'selected':''}>手術予定</option>
         <option ${d.status==='治癒期間'?'selected':''}>治癒期間</option>
         <option ${d.status==='印象'?'selected':''}>印象</option>
@@ -4584,6 +4588,7 @@ function renderBookings() {
         <option ${d.status==='完了'?'selected':''}>完了</option>
       ` : ''}
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
+      ${isImplantBooking(d) ? `<option ${d.status==='お断り'?'selected':''}>お断り</option>` : ''}
       <option ${d.status==='除外'?'selected':''}>除外</option>
     </select>`) : statusBadge(isBFBooking(d) ? (getBFInfo(d.name, d.applyDate)?.bf_status || d.status) : d.status)}</td>
     <td style="text-align:center">${(() => {
@@ -5811,16 +5816,19 @@ function renderBF(period) {
 
 // === BF セット進捗 (lifecycle) ===
 // インプラント用拡張ステータス (予約と来院で共通)
+// v269: 検討中 / お断り / P処置 / C処置 / ガイド印象 を追加
 const IMPLANT_STATUSES_ORDERED = [
-  '未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','成約',
-  'CT/診断','手術予定','治癒期間','印象','セット','完了',
-  'キャンセル','除外'
+  '未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','検討中','成約',
+  'P処置','C処置','CT/診断','ガイド印象','手術予定','治癒期間','印象','セット','完了',
+  'キャンセル','お断り','除外'
 ];
 // 治療ステージ (来院済+αとして扱う) - インプラント用
-const IMPLANT_TREATMENT_STAGES = ['CT/診断','手術予定','治癒期間','印象','セット','完了'];
+// v269: P処置 / C処置 / ガイド印象 を治療ステージに追加 (来院済としてカウント)
+const IMPLANT_TREATMENT_STAGES = ['P処置','C処置','CT/診断','ガイド印象','手術予定','治癒期間','印象','セット','完了'];
 // 来院済としてカウントするステータス (インプラントの治療ステージも含む)
+// v269: 検討中 も来院済として扱う (来院後の検討中であるため)
 function isVisitedStatus(s) {
-  return s === '来院済' || s === '成約' || IMPLANT_TREATMENT_STAGES.includes(s);
+  return s === '来院済' || s === '検討中' || s === '成約' || IMPLANT_TREATMENT_STAGES.includes(s);
 }
 // 成約済としてカウントするステータス (成約 + 治療継続ステージ)
 function isContractedStatus(s) {
@@ -6482,14 +6490,19 @@ const TREATMENT_STATUSES = {
     { value: '確認済', color: '#6366f1' },
     { value: '予約変更', color: '#f59e0b' },
     { value: '来院済', color: '#1d4ed8' },
+    { value: '検討中', color: '#f59e0b' },
     { value: '成約', color: '#10b981' },
+    { value: 'P処置', color: '#14b8a6' },
+    { value: 'C処置', color: '#0d9488' },
     { value: 'CT/診断', color: '#3b82f6' },
+    { value: 'ガイド印象', color: '#0891b2' },
     { value: '手術予定', color: '#2563eb' },
     { value: '治癒期間', color: '#1d4ed8' },
     { value: '印象', color: '#0891b2' },
     { value: 'セット', color: '#0e7490' },
     { value: '完了', color: '#059669' },
     { value: 'キャンセル', color: '#dc2626' },
+    { value: 'お断り', color: '#78716c' },
     { value: '除外', color: '#6b7280' }
   ],
   'デフォルト': [
