@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>営業ポータル / Aladdin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap">
+<style>
+  :root{
+    --bg:#fafafa; --card:#fff; --border:#e5e7eb; --text:#1a1a1a; --text-sub:#6b7280;
+    --accent:#1a1a1a; --hi-bg:#fffbea; --hi-border:#d4a010; --hi-text:#b07800;
+    --danger:#dc2626;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',Meiryo,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:680px; margin:0 auto; padding:24px 20px 60px}
+
+  /* Header */
+  .top-bar{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px}
+  .back-link{color:var(--text-sub); text-decoration:none}
+  .back-link:hover{color:var(--text)}
+  .auth-area{display:flex; align-items:center; gap:8px}
+  .badge{padding:3px 10px; border-radius:999px; font-size:11px; font-weight:600; letter-spacing:1px}
+  .badge.admin{background:#1a1a1a; color:#fff}
+  .badge.guest{background:#e5e7eb; color:var(--text-sub)}
+  .auth-btn{font-size:11px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text-sub); cursor:pointer; font-family:inherit}
+  .auth-btn:hover{background:var(--bg)}
+
+  header.brand-head{text-align:center; margin:32px 0 24px}
+  .brand{
+    font-family:'Great Vibes', cursive; font-size:64px; line-height:1;
+    background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    margin:0;
+  }
+  .subtitle{font-size:13px; letter-spacing:3px; color:var(--text-sub); margin-top:6px; text-transform:uppercase}
+
+  /* Tab tree */
+  #tabs-tree{display:flex; flex-direction:column; gap:8px}
+  .node{display:flex; flex-direction:column; gap:6px}
+  .node-row{
+    display:flex; align-items:stretch; gap:6px;
+    background:#fff; border:1px solid var(--border); border-radius:10px;
+    transition:border-color .15s;
+  }
+  .node-row:hover{border-color:#94a3b8}
+  .node-row.highlight{
+    border-color:var(--hi-border);
+    background:linear-gradient(135deg, var(--hi-bg) 0%, #fff 100%);
+  }
+  .node-row.highlight .node-main{color:var(--hi-text)}
+
+  .node-main{
+    flex:1; min-width:0; padding:14px 16px; font-size:14px; font-weight:600;
+    color:var(--text); text-decoration:none; cursor:pointer; text-align:center;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .node-main:hover{background:rgba(0,0,0,.02)}
+  .node-main .toggle-icon{font-size:11px; color:var(--text-sub); transition:transform .15s}
+  .node-row.expanded .node-main .toggle-icon{transform:rotate(180deg)}
+
+  .node-actions{display:flex; align-items:center; padding:0 8px 0 0; gap:4px}
+  .icon-btn{
+    width:32px; height:32px; border:none; background:transparent; cursor:pointer;
+    border-radius:6px; font-size:14px; color:var(--text-sub); padding:0;
+    display:flex; align-items:center; justify-content:center; font-family:inherit;
+  }
+  .icon-btn:hover{background:rgba(0,0,0,.05); color:var(--text)}
+  .icon-btn.danger:hover{background:#fee2e2; color:var(--danger)}
+
+  .node-children{
+    display:none; flex-direction:column; gap:6px;
+    margin-left:24px; padding-left:14px; border-left:2px solid #e5e7eb;
+  }
+  .node.expanded > .node-children{display:flex}
+
+  .add-child-btn{
+    padding:10px; font-size:12px; color:var(--text-sub); background:transparent;
+    border:1px dashed var(--border); border-radius:8px; cursor:pointer; font-family:inherit;
+  }
+  .add-child-btn:hover{border-color:var(--accent); color:var(--text); background:#fff}
+
+  #add-root-btn{
+    margin-top:20px; width:100%; padding:14px; font-size:14px; font-weight:600;
+    color:var(--text); background:#fff; border:2px dashed var(--border); border-radius:10px;
+    cursor:pointer; font-family:inherit;
+  }
+  #add-root-btn:hover{border-color:var(--accent); border-style:solid}
+
+  /* Login CTA */
+  #login-cta{
+    margin-top:24px; padding:14px; background:#fff; border:1px solid var(--border);
+    border-radius:10px; font-size:12px; text-align:center; color:var(--text-sub);
+  }
+  #login-cta a{color:var(--text); font-weight:600; text-decoration:none; border-bottom:1px solid var(--text)}
+
+  /* Loading state */
+  #loading{padding:40px; text-align:center; color:var(--text-sub); font-size:13px}
+  #empty{padding:40px; text-align:center; color:var(--text-sub); font-size:13px}
+
+  /* Modal */
+  .modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+  }
+  .modal-overlay[hidden]{display:none !important}
+  [hidden]{display:none !important}
+  .modal{
+    background:#fff; border-radius:14px; padding:24px; width:100%; max-width:480px;
+    max-height:90vh; overflow-y:auto;
+  }
+  .modal h2{margin:0 0 18px; font-size:17px; font-weight:700; letter-spacing:1px}
+  .modal label{display:block; font-size:11px; font-weight:700; color:var(--text-sub); letter-spacing:1px; text-transform:uppercase; margin:14px 0 6px}
+  .modal label.checkbox{display:flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0; font-size:13px; color:var(--text); font-weight:500; cursor:pointer; margin-top:10px}
+  .modal label.checkbox input{width:auto}
+  .modal input[type="text"], .modal input[type="url"], .modal select{
+    width:100%; padding:11px 13px; font-size:14px; border:1px solid var(--border);
+    border-radius:8px; outline:none; background:#fff; font-family:inherit;
+  }
+  .modal input:focus, .modal select:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+  .modal-actions{display:flex; gap:8px; margin-top:24px; flex-wrap:wrap}
+  .modal-actions button{
+    flex:1; min-width:90px; padding:11px 16px; font-size:13px; font-weight:600;
+    border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text);
+    cursor:pointer; font-family:inherit;
+  }
+  .modal-actions button:hover{background:var(--bg)}
+  .modal-actions .primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .modal-actions .primary:hover{background:#000}
+  .modal-actions .danger-btn{background:#fff; color:var(--danger); border-color:#fecaca}
+  .modal-actions .danger-btn:hover{background:#fee2e2}
+
+  /* Toast */
+  #toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:#1a1a1a; color:#fff; padding:11px 18px; border-radius:8px;
+    font-size:13px; z-index:2000; opacity:0; pointer-events:none; transition:opacity .2s;
+  }
+  #toast.show{opacity:1}
+  #toast.error{background:#dc2626}
+
+  /* hide elements when not admin */
+  body:not(.is-admin) .admin-only{display:none !important}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="top-bar">
+    <a href="../" class="back-link">← ポータルへ戻る</a>
+    <div class="auth-area">
+      <span id="auth-badge" class="badge guest">ゲスト</span>
+      <button id="auth-btn" class="auth-btn">ログイン</button>
+    </div>
+  </div>
+
+  <header class="brand-head">
+    <h1 class="brand">Aladdin</h1>
+    <div class="subtitle">Sales Portal</div>
+  </header>
+
+  <div id="loading">読み込み中…</div>
+  <div id="empty" hidden>タブが登録されていません。</div>
+  <div id="tabs-tree" hidden></div>
+
+  <button id="add-root-btn" class="admin-only" hidden>＋ トップレベルにタブを追加</button>
+
+  <div id="login-cta" hidden>
+    タブの追加・編集には <a href="../?login">管理者ログイン</a> が必要です。
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Edit / Add Modal -->
+<div id="modal-overlay" class="modal-overlay" hidden>
+  <div class="modal">
+    <h2 id="modal-title">タブを追加</h2>
+    <form id="tab-form">
+      <input type="hidden" id="form-id">
+
+      <label for="form-label">ラベル *</label>
+      <input type="text" id="form-label" required maxlength="50" placeholder="例: 動画研修">
+
+      <label for="form-url">URL（空欄ならグループタブ＝サブタブの親になる）</label>
+      <input type="text" id="form-url" placeholder="例: https://... / qa.html / dental-loan/">
+
+      <label for="form-parent">親タブ</label>
+      <select id="form-parent">
+        <option value="">（トップレベル）</option>
+      </select>
+
+      <label class="checkbox">
+        <input type="checkbox" id="form-external">
+        新しいタブで開く（外部リンク）
+      </label>
+      <label class="checkbox">
+        <input type="checkbox" id="form-highlight">
+        ハイライト表示（黄色強調）
+      </label>
+
+      <div class="modal-actions">
+        <button type="button" id="modal-cancel">キャンセル</button>
+        <button type="button" id="modal-delete" class="danger-btn" hidden>削除</button>
+        <button type="submit" class="primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(async function(){
+  const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+  let tabsFlat = [];   // 全タブ (フラット)
+  let tabsTree = [];   // ツリー化
+  let isAdmin = false;
+  let expandedIds = new Set(JSON.parse(localStorage.getItem('sales-expanded') || '[]'));
+
+  // ===== Toast =====
+  function toast(msg, isError = false){
+    const t = $('toast');
+    t.textContent = msg;
+    t.classList.toggle('error', isError);
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2400);
+  }
+
+  // ===== Auth =====
+  async function checkAuth(){
+    try {
+      const { data: { session } } = await sb.auth.getSession();
+      if (!session) {
+        setAuthState(false, null);
+        return;
+      }
+      const { data: profile, error } = await sb.rpc('get_my_account');
+      if (error || !profile) {
+        setAuthState(false, null);
+        return;
+      }
+      const isAdminRole = profile.role === 'admin' || profile.account_type === 'admin';
+      setAuthState(isAdminRole, profile);
+    } catch(e) {
+      console.warn('auth check failed', e);
+      setAuthState(false, null);
+    }
+  }
+
+  function setAuthState(adminFlag, profile){
+    isAdmin = adminFlag;
+    document.body.classList.toggle('is-admin', adminFlag);
+    const badge = $('auth-badge');
+    const btn = $('auth-btn');
+    const cta = $('login-cta');
+    if (profile) {
+      badge.textContent = adminFlag ? '👤 admin' : (profile.name || profile.account_type || 'ログイン中');
+      badge.className = 'badge ' + (adminFlag ? 'admin' : 'guest');
+      btn.textContent = 'ログアウト';
+      btn.onclick = async () => {
+        await sb.auth.signOut();
+        location.reload();
+      };
+      cta.hidden = true;
+    } else {
+      badge.textContent = 'ゲスト';
+      badge.className = 'badge guest';
+      btn.textContent = '管理者ログイン';
+      btn.onclick = () => { location.href = '../?login'; };
+      cta.hidden = false;
+    }
+  }
+
+  // ===== Data =====
+  async function loadTabs(){
+    $('loading').hidden = false;
+    $('empty').hidden = true;
+    $('tabs-tree').hidden = true;
+    const { data, error } = await sb
+      .from('sales_tabs')
+      .select('id, parent_id, label, url, external, highlight, sort_order')
+      .eq('is_active', true)
+      .order('sort_order');
+    $('loading').hidden = true;
+    if (error) {
+      console.error('sales_tabs load error', error);
+      // テーブル未作成（マイグレーション未実行）も含めて empty 扱いに
+      const msg = (error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '');
+      const isMissing = error.code === '42P01'
+        || error.code === 'PGRST205'
+        || /relation .* does not exist/i.test(msg)
+        || /could not find the table/i.test(msg);
+      tabsFlat = [];
+      tabsTree = [];
+      const emptyEl = $('empty');
+      emptyEl.textContent = isMissing
+        ? 'sales_tabs テーブルが未作成です。管理者は migrations/sales_tabs.sql を Supabase で実行してください。'
+        : '読み込みエラー: ' + (error.message || '');
+      emptyEl.hidden = false;
+      if (!isAdmin) return;
+      // admin なら空ツリーでも追加できるように
+      $('tabs-tree').hidden = false;
+      renderTree();
+      return;
+    }
+    tabsFlat = data || [];
+    tabsTree = buildTree(tabsFlat);
+    if (tabsTree.length === 0 && !isAdmin) {
+      $('empty').hidden = false;
+    } else {
+      $('tabs-tree').hidden = false;
+      renderTree();
+    }
+  }
+
+  function buildTree(flat){
+    const byParent = new Map();
+    flat.forEach(t => {
+      const key = t.parent_id || 'ROOT';
+      if (!byParent.has(key)) byParent.set(key, []);
+      byParent.get(key).push(t);
+    });
+    function attach(parentKey){
+      const arr = (byParent.get(parentKey) || []).slice().sort((a,b) => a.sort_order - b.sort_order);
+      return arr.map(t => ({ ...t, children: attach(t.id) }));
+    }
+    return attach('ROOT');
+  }
+
+  // ===== Render =====
+  function renderTree(){
+    const root = $('tabs-tree');
+    root.innerHTML = '';
+    tabsTree.forEach(node => root.appendChild(renderNode(node)));
+  }
+
+  function renderNode(node){
+    const wrap = document.createElement('div');
+    wrap.className = 'node';
+    if (expandedIds.has(node.id)) wrap.classList.add('expanded');
+    wrap.dataset.id = node.id;
+
+    const hasChildren = node.children && node.children.length > 0;
+    const isGroup = !node.url || hasChildren;
+
+    const row = document.createElement('div');
+    row.className = 'node-row' + (node.highlight ? ' highlight' : '');
+
+    if (isGroup) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'node-main';
+      btn.innerHTML = `${esc(node.label)}<span class="toggle-icon">▾</span>`;
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        toggleNode(node.id, wrap);
+      };
+      row.appendChild(btn);
+      if (node.url) {
+        // group with own URL - secondary link
+        const goBtn = document.createElement('a');
+        goBtn.className = 'icon-btn';
+        goBtn.href = node.url;
+        if (node.external) { goBtn.target = '_blank'; goBtn.rel = 'noopener'; }
+        goBtn.title = '開く';
+        goBtn.textContent = '↗';
+        row.appendChild(goBtn);
+      }
+    } else {
+      const link = document.createElement('a');
+      link.className = 'node-main';
+      link.href = node.url;
+      if (node.external) { link.target = '_blank'; link.rel = 'noopener'; }
+      link.textContent = node.label;
+      row.appendChild(link);
+    }
+
+    // Admin actions
+    const actions = document.createElement('div');
+    actions.className = 'node-actions admin-only';
+    actions.innerHTML = `
+      <button class="icon-btn" data-act="up" title="上へ">▲</button>
+      <button class="icon-btn" data-act="down" title="下へ">▼</button>
+      <button class="icon-btn" data-act="edit" title="編集">✏️</button>
+      <button class="icon-btn danger" data-act="delete" title="削除">🗑</button>
+    `;
+    actions.querySelectorAll('button').forEach(b => {
+      b.onclick = (e) => {
+        e.stopPropagation();
+        handleAction(b.dataset.act, node);
+      };
+    });
+    row.appendChild(actions);
+    wrap.appendChild(row);
+
+    // Children container (always present for admin to add)
+    const childWrap = document.createElement('div');
+    childWrap.className = 'node-children';
+    (node.children || []).forEach(c => childWrap.appendChild(renderNode(c)));
+    if (isAdmin) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-child-btn admin-only';
+      addBtn.type = 'button';
+      addBtn.textContent = '＋ サブタブを追加';
+      addBtn.onclick = (e) => { e.stopPropagation(); openModal({ parent_id: node.id }); };
+      childWrap.appendChild(addBtn);
+    }
+    wrap.appendChild(childWrap);
+
+    return wrap;
+  }
+
+  function toggleNode(id, el){
+    const expanded = el.classList.toggle('expanded');
+    if (expanded) expandedIds.add(id); else expandedIds.delete(id);
+    localStorage.setItem('sales-expanded', JSON.stringify([...expandedIds]));
+  }
+
+  // ===== Actions =====
+  async function handleAction(act, node){
+    if (act === 'edit') return openModal(node);
+    if (act === 'delete') return deleteTab(node);
+    if (act === 'up' || act === 'down') return reorder(node, act);
+  }
+
+  async function deleteTab(node){
+    const hasChildren = (node.children || []).length > 0;
+    const msg = hasChildren
+      ? `「${node.label}」とその配下のサブタブをすべて削除しますか？`
+      : `「${node.label}」を削除しますか？`;
+    if (!confirm(msg)) return;
+    const { error } = await sb.from('sales_tabs').delete().eq('id', node.id);
+    if (error) { toast('削除失敗: ' + error.message, true); return; }
+    toast('削除しました');
+    await loadTabs();
+  }
+
+  async function reorder(node, dir){
+    // 同じ parent_id を持つ兄弟の中で並び替え
+    const siblings = tabsFlat
+      .filter(t => (t.parent_id || null) === (node.parent_id || null))
+      .sort((a,b) => a.sort_order - b.sort_order);
+    const idx = siblings.findIndex(t => t.id === node.id);
+    if (idx < 0) return;
+    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= siblings.length) return;
+    const a = siblings[idx], b = siblings[targetIdx];
+    // sort_order を入れ替え
+    const updates = [
+      sb.from('sales_tabs').update({ sort_order: b.sort_order }).eq('id', a.id),
+      sb.from('sales_tabs').update({ sort_order: a.sort_order }).eq('id', b.id),
+    ];
+    const results = await Promise.all(updates);
+    const errs = results.filter(r => r.error);
+    if (errs.length) { toast('並び替え失敗', true); return; }
+    await loadTabs();
+  }
+
+  // ===== Modal =====
+  let modalMode = 'add'; // 'add' | 'edit'
+  let modalNode = null;
+
+  function openModal(node){
+    modalNode = node;
+    modalMode = node && node.id ? 'edit' : 'add';
+    $('modal-title').textContent = modalMode === 'edit' ? 'タブを編集' : 'タブを追加';
+    $('form-id').value = node?.id || '';
+    $('form-label').value = node?.label || '';
+    $('form-url').value = node?.url || '';
+    $('form-external').checked = !!node?.external;
+    $('form-highlight').checked = !!node?.highlight;
+    // 親タブ select を構築 (自分自身と子孫は除外)
+    const sel = $('form-parent');
+    sel.innerHTML = '<option value="">（トップレベル）</option>';
+    const excludeIds = new Set();
+    if (node?.id) {
+      // 自分自身と子孫は親に選べない
+      const collectDescendants = (id) => {
+        excludeIds.add(id);
+        tabsFlat.filter(t => t.parent_id === id).forEach(c => collectDescendants(c.id));
+      };
+      collectDescendants(node.id);
+    }
+    tabsFlat
+      .filter(t => !excludeIds.has(t.id))
+      .forEach(t => {
+        const path = buildPath(t);
+        const opt = document.createElement('option');
+        opt.value = t.id;
+        opt.textContent = path;
+        if ((node?.parent_id || '') === t.id) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    $('modal-delete').hidden = modalMode !== 'edit';
+    $('modal-overlay').hidden = false;
+    setTimeout(() => $('form-label').focus(), 50);
+  }
+
+  function buildPath(t){
+    const names = [];
+    let cur = t;
+    while (cur) {
+      names.unshift(cur.label);
+      cur = tabsFlat.find(x => x.id === cur.parent_id);
+    }
+    return names.join(' › ');
+  }
+
+  function closeModal(){ $('modal-overlay').hidden = true; modalNode = null; }
+
+  $('modal-cancel').onclick = closeModal;
+  $('modal-overlay').onclick = (e) => { if (e.target === $('modal-overlay')) closeModal(); };
+
+  $('modal-delete').onclick = async () => {
+    if (!modalNode?.id) return;
+    closeModal();
+    await deleteTab(modalNode);
+  };
+
+  $('tab-form').onsubmit = async (e) => {
+    e.preventDefault();
+    const payload = {
+      label: $('form-label').value.trim(),
+      url: $('form-url').value.trim() || null,
+      parent_id: $('form-parent').value || null,
+      external: $('form-external').checked,
+      highlight: $('form-highlight').checked,
+    };
+    if (!payload.label) { toast('ラベルを入力してください', true); return; }
+    let res;
+    if (modalMode === 'edit' && modalNode?.id) {
+      res = await sb.from('sales_tabs').update(payload).eq('id', modalNode.id);
+    } else {
+      // sort_order: 同階層の末尾に追加
+      const siblings = tabsFlat.filter(t => (t.parent_id || null) === (payload.parent_id || null));
+      const maxSort = siblings.reduce((m, t) => Math.max(m, t.sort_order || 0), 0);
+      payload.sort_order = maxSort + 10;
+      res = await sb.from('sales_tabs').insert(payload);
+    }
+    if (res.error) { toast('保存失敗: ' + res.error.message, true); return; }
+    toast(modalMode === 'edit' ? '更新しました' : '追加しました');
+    closeModal();
+    if (payload.parent_id) expandedIds.add(payload.parent_id);
+    await loadTabs();
+  };
+
+  $('add-root-btn').onclick = () => openModal({ parent_id: null });
+
+  // ===== Init =====
+  await checkAuth();
+  await loadTabs();
+})();
+</script>
+</body>
+</html>
