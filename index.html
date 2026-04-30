@@ -334,10 +334,11 @@
           </div>
         </div>
       </div>
-      <!-- v270: 小さなユーザー管理リンク (admin専用、login経由で 管理→権限管理 へ直行) -->
+      <!-- v270: 小さなユーザー管理リンク (admin専用) -->
+      <!-- ?login URL は admin ブロックされるため、redirect flag を立てて 管理パネルを開くだけ -->
       <div style="text-align:center;margin-top:18px">
         <button type="button" id="portal-users-btn"
-          onclick="sessionStorage.setItem('portal-redirect-view','admin');sessionStorage.setItem('portal-redirect-sub','adm-auth-migration');location.href='?login'"
+          onclick="sessionStorage.setItem('portal-redirect-view','admin');sessionStorage.setItem('portal-redirect-sub','adm-auth-migration');var ls=document.getElementById('login-section');if(ls&&ls.style.display!=='block'){document.getElementById('portal-manage-btn').click();}setTimeout(function(){var em=document.getElementById('login-email');if(em)em.focus();},120);"
           style="background:none;border:none;color:var(--text-sub);font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;letter-spacing:1px;text-decoration:underline;text-decoration-color:#d4d4d4;text-underline-offset:3px"
           onmouseover="this.style.color='#1a1a1a';this.style.textDecorationColor='#1a1a1a'"
           onmouseout="this.style.color='var(--text-sub)';this.style.textDecorationColor='#d4d4d4'">
