@@ -334,17 +334,35 @@
           </div>
         </div>
       </div>
-      <!-- v270: 小さなユーザー管理リンク (admin専用) -->
-      <!-- ?login URL は admin ブロックされるため、redirect flag を立てて 管理パネルを開くだけ -->
+      <!-- v271: 小さなユーザー管理リンク → 専用 /users/ ページへ直行 -->
       <div style="text-align:center;margin-top:18px">
-        <button type="button" id="portal-users-btn"
-          onclick="sessionStorage.setItem('portal-redirect-view','admin');sessionStorage.setItem('portal-redirect-sub','adm-auth-migration');var ls=document.getElementById('login-section');if(ls&&ls.style.display!=='block'){document.getElementById('portal-manage-btn').click();}setTimeout(function(){var em=document.getElementById('login-email');if(em)em.focus();},120);"
-          style="background:none;border:none;color:var(--text-sub);font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;letter-spacing:1px;text-decoration:underline;text-decoration-color:#d4d4d4;text-underline-offset:3px"
+        <a id="portal-users-btn" href="users/"
+          style="display:inline-block;background:none;border:none;color:var(--text-sub);font-size:12px;font-family:inherit;cursor:pointer;padding:6px 12px;letter-spacing:1px;text-decoration:underline;text-decoration-color:#d4d4d4;text-underline-offset:3px"
           onmouseover="this.style.color='#1a1a1a';this.style.textDecorationColor='#1a1a1a'"
           onmouseout="this.style.color='var(--text-sub)';this.style.textDecorationColor='#d4d4d4'">
           👤 ユーザー管理
-        </button>
+        </a>
       </div>
+      <!-- v271: /users/ から戻ってきた場合は自動でログインフォーム展開 -->
+      <script>
+        (function(){
+          try {
+            if (sessionStorage.getItem('after-login-url')) {
+              setTimeout(function(){
+                var ls = document.getElementById('login-section');
+                if (ls && ls.style.display !== 'block') {
+                  var b = document.getElementById('portal-manage-btn');
+                  if (b) b.click();
+                }
+                setTimeout(function(){
+                  var em = document.getElementById('login-email');
+                  if (em) em.focus();
+                }, 100);
+              }, 50);
+            }
+          } catch(_){}
+        })();
+      </script>
     </div>
   </div>
 
@@ -1154,7 +1172,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=270"></script>
+  <script src="app.js?v=271"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

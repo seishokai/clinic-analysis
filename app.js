@@ -2069,6 +2069,17 @@ function showApp() {
 
 function restoreLastView() {
   try {
+    // v271: 外部ページへのログイン後リダイレクト (例: /users/ から戻ってきた場合)
+    const afterLoginUrl = sessionStorage.getItem('after-login-url');
+    if (afterLoginUrl) {
+      sessionStorage.removeItem('after-login-url');
+      // 同一オリジン内のパスのみ許可 (オープンリダイレクト防止)
+      if (/^\/[\w\-/]/.test(afterLoginUrl) && !afterLoginUrl.startsWith('//')) {
+        location.href = afterLoginUrl;
+        return;
+      }
+    }
+
     // ロールごとに許可されたビューしか復元しない (Phase 6: currentRole ベース)
     const isAllowed = (v) => {
       if (isAdminRole()) return ['bookings','kaiin','tc','adbudget','admin','sales'].includes(v);
