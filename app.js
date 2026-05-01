@@ -2456,13 +2456,13 @@ function renderPhoneCheck() {
           <thead>
             <tr style="background:#f9fafb">
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">登録日</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">プロモ</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">施術名</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">プロモ</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);width:100%">メモ</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
             </tr>
@@ -2513,11 +2513,9 @@ function renderPhoneCheck() {
 // v273: テーブル行 (登録日 / 予約日時 / 名前 / 医院 / 連絡先 / 状況 / アクション)
 function _renderPhoneCheckRow(d, canViewPII, memos) {
   const key = d.name + '|' + d.applyDate;
-  // メモ取得: 予約・来院タブと同じロジックに統一
-  // 1. このレコードの _memo (Sheets 側のメモ)
-  // 2. 既存メモ (BF lifecycle / bk-memos / 他レコード) を名前ベースで検索
-  // 3. 個別キーのメモ (この予約専用)
-  const memo = (d._memo || findAnyMemo(d.name) || memos[key] || '');
+  // メモ取得: この予約専用のメモのみ表示 (削除しても他の予約から復活しないように)
+  // findAnyMemo は名前ベースで全予約を横断検索するため、一つを消しても他から復活する問題があった
+  const memo = (memos[key] || d._memo || '');
   // 共通フォーマッタ: Date→MM/DD (登録日・予約日で統一)
   const fmtMD = (date) => {
     if (!date || isNaN(date.getTime())) return '';
@@ -2568,21 +2566,31 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
 
   return `<tr class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="border-bottom:1px solid var(--border)">
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap">${adStr}</td>
-    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
     <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
     <td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap">${escapeHtml(name || '')}</td>
-    <td style="padding:8px 10px;font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(normSvc(d.service) || '-')}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
+    <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td style="padding:8px 10px;font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
     ${memoCellHtml}
     <td style="padding:6px 10px;text-align:left;white-space:nowrap">
-      <button class="phone-status-btn" data-st="確認済"   title="確認済" style="padding:4px 7px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">✅</button>
-      <button class="phone-status-btn" data-st="留守電"   title="留守電" style="padding:4px 7px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">🎤</button>
-      <button class="phone-status-btn" data-st="折り返し" title="折り返し" style="padding:4px 7px;background:#f5f3ff;color:#7c3aed;border:1px solid #d8b4fe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">↩</button>
-      <button class="phone-status-btn" data-st="未対応"   title="取り消し (未対応に戻す)" style="padding:4px 7px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↻</button>
+      ${_phoneStatusBtn('確認済',   '✅', '確認済',     '#dbeafe', '#1d4ed8', '#bfdbfe', st)}
+      ${_phoneStatusBtn('留守電',   '🎤', '留守電',     '#fef3c7', '#92400e', '#fcd34d', st)}
+      ${_phoneStatusBtn('折り返し', '↩',  '折り返し',   '#f5f3ff', '#7c3aed', '#d8b4fe', st)}
+      ${_phoneStatusBtn('未対応',   '↻',  '取り消し (未対応に戻す)', '#f3f4f6', '#6b7280', '#e5e7eb', st)}
     </td>
   </tr>`;
+}
+
+// v273: 状況ボタンのレンダリング (現在のステータスはハイライト表示)
+function _phoneStatusBtn(targetSt, icon, title, bg, fg, border, currentSt) {
+  const isActive = currentSt === targetSt;
+  // アクティブ時は色反転 (背景=fg, 文字=白)、非アクティブは通常
+  const style = isActive
+    ? `padding:4px 7px;background:${fg};color:#fff;border:1px solid ${fg};border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit;box-shadow:0 0 0 2px ${border}`
+    : `padding:4px 7px;background:${bg};color:${fg};border:1px solid ${border};border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit`;
+  return `<button class="phone-status-btn" data-st="${escapeHtml(targetSt)}" title="${escapeHtml(title)}" style="${style}">${icon}</button>`;
 }
 
 function _bindPhoneCheckRowEvents(el) {
