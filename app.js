@@ -4820,11 +4820,16 @@ function renderBookings() {
         <input type="date" class="bk-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(iso)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
       </span>`;
     })()}</td>
-    <td style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:center" class="bk-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${esc(d._memo||findAnyMemo(d.name)||'')}">${(() => {
+    <td class="bk-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${esc(d._memo||findAnyMemo(d.name)||'')}" style="${(() => {
       const memo = d._memo || findAnyMemo(d.name);
-      if (!isAdmin) return memo ? '📝 ' + esc(memo) : '-';
-      if (memo) return `<span style="display:inline-block;padding:3px 10px;background:#fef3c7;border:2px solid #f59e0b;border-radius:6px;color:#92400e;font-weight:700;box-shadow:0 1px 3px rgba(245,158,11,.3)">📝 あり</span>`;
-      return '<span style="display:inline-block;padding:2px 8px;color:#bbb;border:1px dashed #ddd;border-radius:4px">＋</span>';
+      // 内容を直接表示 (来院タブと同じスマートUI、次回予定とのカブり解消)
+      const hasMemo = !!memo;
+      return `font-size:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:left;padding:4px 8px;background:${hasMemo?'#fff8e1':'transparent'};border:1px dashed ${hasMemo?'#f9a825':'var(--border)'};border-radius:4px;color:${hasMemo?'#92400e':'#bbb'}`;
+    })()}">${(() => {
+      const memo = d._memo || findAnyMemo(d.name);
+      if (!isAdmin) return memo ? '📝 ' + esc(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo) : '-';
+      if (memo) return esc(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo);
+      return '＋ メモ';
     })()}</td>
     <td style="text-align:center">${isAdmin ? `<select class="form-select bk-field-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contractService" style="font-size:10px;padding:2px 4px;min-width:60px;text-align:center;${d.contractService?'background:#dcfce7;color:#15803d':(d.status==='成約'?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':'')}">
       <option value="">-</option>
