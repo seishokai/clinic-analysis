@@ -2466,18 +2466,19 @@ function renderPhoneCheck() {
 function _renderPhoneCheckRow(d, canViewPII, memos) {
   const key = d.name + '|' + d.applyDate;
   const memo = memos[key] || d._memo || '';
-  // 予約日時
-  const bd = d.bookDate || '';
-  const tm = bd.match(/(\d{1,2}):(\d{2})/);
-  const tstr = tm ? `${tm[1]}:${tm[2]}` : '--:--';
-  const bdM = bd.match(/(\d{1,2})\D+(\d{1,2})/);
-  const bdStr = bdM ? `${bdM[1]}/${bdM[2]}` : '';
+  // 共通フォーマッタ: Date→MM/DD (登録日・予約日で統一)
+  const fmtMD = (date) => {
+    if (!date || isNaN(date.getTime())) return '';
+    return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
+  };
+  // 予約日 (parseDate は日付のみ、時刻は別途抽出)
+  const bdDate = parseDate(d.bookDate);
+  const bdStr = fmtMD(bdDate);
+  const tm = (d.bookDate || '').match(/(\d{1,2}):(\d{2})/);
+  const tstr = tm ? `${tm[1].padStart(2, '0')}:${tm[2]}` : '--:--';
   // 登録日
-  const ad = d.applyDate || '';
-  const adM = ad.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/) || ad.match(/(\d{1,2})\D+(\d{1,2})/);
-  const adStr = adM
-    ? (adM.length === 4 ? `${adM[2]}/${adM[3]}` : `${adM[1]}/${adM[2]}`)
-    : '';
+  const adDate = parseDate(d.applyDate);
+  const adStr = fmtMD(adDate);
   // ステータス色
   const st = d.status || '未対応';
   const stColors = {
