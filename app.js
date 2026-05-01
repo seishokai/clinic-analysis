@@ -4545,12 +4545,30 @@ function renderBookings() {
   }
   if (contractSet.size) filtered = filtered.filter(d => contractSet.has(d.contractService));
   // 期間フィルター
+  // v273: 予約日基準 (デフォルト) と 登録日基準 (申込) を選べるように
   const periodFilter = document.getElementById('bk-period')?.value || '';
   if (periodFilter) {
-    const getYM = (d) => { const m = (d.applyDate||'').match(/(\d{4})\D+(\d{1,2})/); return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : ''; };
-    if (periodFilter === 'thisMonth') { const now = new Date(); const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; filtered = filtered.filter(d => getYM(d) === ym); }
-    else if (periodFilter === 'lastMonth') { const now = new Date(); now.setMonth(now.getMonth()-1); const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`; filtered = filtered.filter(d => getYM(d) === ym); }
-    else if (periodFilter === 'fiscal') { const now = new Date(); const fy = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear()-1; filtered = filtered.filter(d => getYM(d) >= fy+'-07'); }
+    const ymOf = (d, useApply) => {
+      const src = useApply ? (d.applyDate || '') : (d.bookDate || d.applyDate || '');
+      const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
+      return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : '';
+    };
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    if (periodFilter === 'thisMonth') {
+      // 予約日基準で今月
+      filtered = filtered.filter(d => ymOf(d, false) === ym);
+    } else if (periodFilter === 'thisMonthApply') {
+      // 登録日基準で今月
+      filtered = filtered.filter(d => ymOf(d, true) === ym);
+    } else if (periodFilter === 'lastMonth') {
+      const last = new Date(now); last.setMonth(last.getMonth()-1);
+      const lym = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}`;
+      filtered = filtered.filter(d => ymOf(d, false) === lym);
+    } else if (periodFilter === 'fiscal') {
+      const fy = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear()-1;
+      filtered = filtered.filter(d => ymOf(d, false) >= fy+'-07');
+    }
   }
   if (monthFilter) {
     filtered = filtered.filter(d => getYM(d) === monthFilter);
