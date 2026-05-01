@@ -2446,8 +2446,8 @@ function renderPhoneCheck() {
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
-              <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
-              <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
             </tr>
           </thead>
           <tbody id="phone-tbody">
@@ -2529,7 +2529,12 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   const phone = canViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
   const fac = normFac(d.facility);
   const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
-  const memoCellHtml = memo ? `<div style="padding:5px 8px 0;font-size:10px;color:#92400e;background:#fffbeb;border-top:1px dashed #fcd34d;line-height:1.5;white-space:pre-wrap;word-break:break-all">📝 ${escapeHtml(memo)}</div>` : '';
+  // メモ: フル幅で表示、改行をそのまま反映 (white-space:pre-wrap)
+  const memoCellHtml = memo
+    ? `<div style="padding:8px 12px;font-size:12px;color:#5a4a10;background:#fffbeb;border-top:1px dashed #fcd34d;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;text-align:left">
+         <span style="font-weight:700;color:#92400e;letter-spacing:1px;font-size:10px;margin-right:4px">📝 メモ</span>${escapeHtml(memo)}
+       </div>`
+    : '';
 
   return `<tr class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="border-bottom:1px solid var(--border)">
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap">${adStr}</td>
@@ -2537,8 +2542,8 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     <td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap">${escapeHtml(name || '')}</td>
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
     <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td style="padding:8px 10px;text-align:center"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
-    <td style="padding:6px 10px;text-align:center;white-space:nowrap">
+    <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
+    <td style="padding:6px 10px;text-align:left;white-space:nowrap">
       <button class="phone-status-btn" data-st="確認済"   title="確認済" style="padding:4px 7px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">✅</button>
       <button class="phone-status-btn" data-st="留守電"   title="留守電" style="padding:4px 7px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">🎤</button>
       <button class="phone-status-btn" data-st="折り返し" title="折り返し" style="padding:4px 7px;background:#f5f3ff;color:#7c3aed;border:1px solid #d8b4fe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">↩</button>
