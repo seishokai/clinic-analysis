@@ -2442,12 +2442,12 @@ function renderPhoneCheck() {
           <thead>
             <tr style="background:#f9fafb">
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">登録日</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">メモ</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);width:100%">メモ</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
             </tr>
           </thead>
@@ -2531,13 +2531,14 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   const fac = normFac(d.facility);
   const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
   // メモセル (来院タブと同じスタイル: クリックで編集モーダル、黄色ハイライト)
-  const memoCellHtml = `<td class="phone-memo-cell" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${escapeHtml(memo)}">${memo ? escapeHtml(_flattenMemoForDisplay(memo, 60)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>`;
+  // 大幅に幅を確保 + 表示文字数を 200 に拡張
+  const memoCellHtml = `<td class="phone-memo-cell" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;width:100%;min-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${escapeHtml(memo)}">${memo ? escapeHtml(_flattenMemoForDisplay(memo, 200)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>`;
 
   return `<tr class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="border-bottom:1px solid var(--border)">
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap">${adStr}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
     <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
     <td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap">${escapeHtml(name || '')}</td>
-    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
     <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
     ${memoCellHtml}
