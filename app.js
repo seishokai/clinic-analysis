@@ -2345,8 +2345,10 @@ function renderPhoneCheck() {
   const tomorrowEnd = new Date(todayEnd.getTime() + 24*3600*1000);
 
   // フィルタ条件
+  // v273: 荷電対象は未来の予約のみ — 既に過ぎた時刻 (bd < now) は除外
   const isInPeriod = (bd) => {
     if (!bd) return false;
+    if (bd < now) return false;  // 過去 (今より前の時刻) は荷電対象外
     if (_phoneCheckState.period === 'today') return bd >= todayStart && bd <= todayEnd;
     if (_phoneCheckState.period === 'tomorrow') return bd >= tomorrowStart && bd <= tomorrowEnd;
     return bd >= todayStart && bd <= tomorrowEnd;
@@ -2361,16 +2363,21 @@ function renderPhoneCheck() {
     return true;
   });
 
-  // 時刻順ソート
-  rows.sort((a,b) => (a.bookDate || '').localeCompare(b.bookDate || ''));
+  // v273: 登録日時 (applyDate) の降順 - 最新の予約者から順に荷電
+  // 同じ登録日なら予約日時 (bookDate) 昇順 で時間が早い順
+  rows.sort((a,b) => {
+    const ad = (b.applyDate || '').localeCompare(a.applyDate || '');
+    if (ad !== 0) return ad;
+    return (a.bookDate || '').localeCompare(b.bookDate || '');
+  });
 
   // 医院リスト作成
   const allFacs = [...new Set(data.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
   const stats = {
     total: rows.length,
     pending: rows.filter(d => !d.status || d.status === '未対応').length,
-    yoyaku: rows.filter(d => d.status === '予約連絡待ち').length,
-    line: rows.filter(d => d.status === '後追いLINE済み').length,
+    rusu:  rows.filter(d => d.status === '留守電').length,
+    cb:    rows.filter(d => d.status === '折り返し').length,
   };
 
   const canViewPII = !_isPII_MaskNeeded();
@@ -2387,8 +2394,8 @@ function renderPhoneCheck() {
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
       <div style="padding:6px 12px;background:#fef3c7;color:#b45309;border-radius:14px;font-size:11px;font-weight:700">対象 ${stats.total}件</div>
       <div style="padding:6px 12px;background:#fee2e2;color:#dc2626;border-radius:14px;font-size:11px;font-weight:700">未対応 ${stats.pending}件</div>
-      <div style="padding:6px 12px;background:#f5f3ff;color:#7c3aed;border-radius:14px;font-size:11px;font-weight:700">連絡待ち ${stats.yoyaku}件</div>
-      <div style="padding:6px 12px;background:#ecfeff;color:#0891b2;border-radius:14px;font-size:11px;font-weight:700">LINE送信済 ${stats.line}件</div>
+      <div style="padding:6px 12px;background:#fef3c7;color:#92400e;border-radius:14px;font-size:11px;font-weight:700">留守電 ${stats.rusu}件</div>
+      <div style="padding:6px 12px;background:#f5f3ff;color:#7c3aed;border-radius:14px;font-size:11px;font-weight:700">折り返し ${stats.cb}件</div>
     </div>
 
     <!-- フィルタ -->
@@ -2408,7 +2415,7 @@ function renderPhoneCheck() {
       </label>
     </div>
 
-    <!-- リスト -->
+    <!-- リスト (v273 テーブル形式) -->
     ${rows.length === 0 ? `
       <div style="text-align:center;padding:50px 20px;background:#f9fafb;border-radius:12px;color:var(--text-sub)">
         <div style="font-size:40px;margin-bottom:10px">📞✨</div>
@@ -2416,8 +2423,23 @@ function renderPhoneCheck() {
         <div style="font-size:11px;margin-top:4px">すべて確認済、またはフィルタ条件を確認してください</div>
       </div>
     ` : `
-      <div id="phone-list" style="display:flex;flex-direction:column;gap:8px">
-        ${rows.map(d => _renderPhoneCheckRow(d, canViewPII, memos)).join('')}
+      <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:720px">
+          <thead>
+            <tr style="background:#f9fafb">
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">登録日</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
+              <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
+              <th style="padding:8px 10px;text-align:center;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
+            </tr>
+          </thead>
+          <tbody id="phone-tbody">
+            ${rows.map(d => _renderPhoneCheckRow(d, canViewPII, memos)).join('')}
+          </tbody>
+        </table>
       </div>
     `}
   `;
@@ -2441,54 +2463,65 @@ function renderPhoneCheck() {
   _bindPhoneCheckRowEvents(el);
 }
 
+// v273: テーブル行 (登録日 / 予約日時 / 名前 / 医院 / 連絡先 / 状況 / アクション)
 function _renderPhoneCheckRow(d, canViewPII, memos) {
   const key = d.name + '|' + d.applyDate;
   const memo = memos[key] || d._memo || '';
+  // 予約日時
   const bd = d.bookDate || '';
   const tm = bd.match(/(\d{1,2}):(\d{2})/);
   const tstr = tm ? `${tm[1]}:${tm[2]}` : '--:--';
-  const dateM = bd.match(/(\d{1,2})\D+(\d{1,2})/);
-  const dstr = dateM ? `${dateM[1]}/${dateM[2]}` : '';
+  const bdM = bd.match(/(\d{1,2})\D+(\d{1,2})/);
+  const bdStr = bdM ? `${bdM[1]}/${bdM[2]}` : '';
+  // 登録日
+  const ad = d.applyDate || '';
+  const adM = ad.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/) || ad.match(/(\d{1,2})\D+(\d{1,2})/);
+  const adStr = adM
+    ? (adM.length === 4 ? `${adM[2]}/${adM[3]}` : `${adM[1]}/${adM[2]}`)
+    : '';
+  // ステータス色
   const st = d.status || '未対応';
-  const stC = st === '後追いLINE済み' ? '#0891b2' : st === '予約連絡待ち' ? '#7c3aed' : st === '確認済' ? '#6366f1' : '#dc2626';
-  const stBg = st === '後追いLINE済み' ? '#ecfeff' : st === '予約連絡待ち' ? '#f5f3ff' : st === '確認済' ? '#eef2ff' : '#fee2e2';
+  const stColors = {
+    '確認済':         { bg:'#dbeafe', fg:'#1d4ed8' },
+    '留守電':         { bg:'#fef3c7', fg:'#92400e' },
+    '折り返し':       { bg:'#f5f3ff', fg:'#7c3aed' },
+    '後追いLINE済み': { bg:'#ecfeff', fg:'#0891b2' },
+    '予約連絡待ち':   { bg:'#f5f3ff', fg:'#7c3aed' },
+    '来院済':         { bg:'#dbeafe', fg:'#1d4ed8' },
+    '成約':           { bg:'#dcfce7', fg:'#15803d' },
+    'キャンセル':     { bg:'#fee2e2', fg:'#dc2626' },
+  };
+  const stClr = stColors[st] || { bg:'#fee2e2', fg:'#dc2626' };
   const name = canViewPII ? d.name : maskName(d.name);
   const phone = canViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
   const fac = normFac(d.facility);
-  return `<div class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="background:#fff;border:1.5px solid var(--border);border-radius:12px;padding:12px;transition:all 0.15s">
-    <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
-      <div style="flex-shrink:0;text-align:center;background:#f3f4f6;border-radius:8px;padding:6px 10px;min-width:60px">
-        <div style="font-size:10px;color:var(--text-sub);font-weight:600">${dstr}</div>
-        <div style="font-size:16px;font-weight:800;color:#1d4ed8;font-variant-numeric:tabular-nums">${tstr}</div>
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:15px;font-weight:700;color:#1a1a1a">${escapeHtml(name || '')}</div>
-        <div style="font-size:11px;color:var(--text-sub);margin-top:2px">
-          ${escapeHtml(fac)} / ${escapeHtml(normSvc(d.service) || '-')}
-          ${d.source ? ` / <span style="color:#6b7280">${escapeHtml(d.source)}</span>` : ''}
-        </div>
-        ${canViewPII && phone ? `<a href="tel:${phone.replace(/[^0-9]/g,'')}" style="display:inline-flex;align-items:center;gap:4px;margin-top:6px;padding:5px 10px;background:#dcfce7;color:#15803d;border-radius:14px;font-size:13px;font-weight:700;text-decoration:none"><span>📞</span>${escapeHtml(phone)}</a>` : canViewPII ? '<div style="font-size:11px;color:#9ca3af;margin-top:4px">電話番号未登録</div>' : '<div style="font-size:11px;color:#9ca3af;margin-top:4px">電話番号 ※非公開</div>'}
-      </div>
-      <span style="padding:3px 9px;border-radius:12px;font-size:10px;font-weight:700;background:${stBg};color:${stC};white-space:nowrap">${st}</span>
-    </div>
-    <!-- クイックアクション -->
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">
-      <button class="phone-status-btn" data-st="確認済" style="padding:7px 12px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">✅ 確認済</button>
-      <button class="phone-status-btn" data-st="後追いLINE済み" style="padding:7px 12px;background:#ecfeff;color:#0891b2;border:1px solid #67e8f9;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">💬 LINE済</button>
-      <button class="phone-status-btn" data-st="予約連絡待ち" style="padding:7px 12px;background:#f5f3ff;color:#7c3aed;border:1px solid #d8b4fe;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">⏳ 連絡待ち</button>
-      <button class="phone-memo-btn" style="padding:7px 12px;background:#fff8e1;color:#b45309;border:1px solid #fcd34d;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer">📝 メモ</button>
-    </div>
-    ${memo ? `<div style="margin-top:8px;padding:8px 10px;background:#fffbeb;border-left:3px solid #f59e0b;border-radius:4px;font-size:12px;color:#5a4a10;line-height:1.6;white-space:pre-wrap">${escapeHtml(memo)}</div>` : ''}
-  </div>`;
+  const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
+  const memoCellHtml = memo ? `<div style="padding:5px 8px 0;font-size:10px;color:#92400e;background:#fffbeb;border-top:1px dashed #fcd34d;line-height:1.5;white-space:pre-wrap;word-break:break-all">📝 ${escapeHtml(memo)}</div>` : '';
+
+  return `<tr class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="border-bottom:1px solid var(--border)">
+    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap">${adStr}</td>
+    <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
+    <td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap">${escapeHtml(name || '')}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
+    <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td style="padding:8px 10px;text-align:center"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
+    <td style="padding:6px 10px;text-align:center;white-space:nowrap">
+      <button class="phone-status-btn" data-st="確認済"   title="確認済" style="padding:4px 7px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">✅</button>
+      <button class="phone-status-btn" data-st="留守電"   title="留守電" style="padding:4px 7px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">🎤</button>
+      <button class="phone-status-btn" data-st="折り返し" title="折り返し" style="padding:4px 7px;background:#f5f3ff;color:#7c3aed;border:1px solid #d8b4fe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">↩</button>
+      <button class="phone-memo-btn"                     title="メモ"    style="padding:4px 7px;background:#fff8e1;color:#b45309;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📝</button>
+    </td>
+  </tr>${memo ? `<tr><td colspan="7" style="padding:0">${memoCellHtml}</td></tr>` : ''}`;
 }
 
 function _bindPhoneCheckRowEvents(el) {
-  el.querySelectorAll('.phone-row').forEach(row => {
+  el.querySelectorAll('tr.phone-row, .phone-row').forEach(row => {
     const name = row.dataset.name;
     const apply = row.dataset.apply;
     row.querySelectorAll('.phone-status-btn').forEach(btn => {
       btn.addEventListener('click', async () => {
         const newStatus = btn.dataset.st;
+        const origText = btn.textContent;
         btn.disabled = true; btn.textContent = '...';
         try {
           const payload = { name, apply_date: apply, status: newStatus };
@@ -4609,6 +4642,8 @@ function renderBookings() {
     })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='後追いLINE済み'?'background:#ecfeff;color:#0891b2;border-color:#06b6d4':d.status==='予約変更'?'background:#fef3c7;color:#b45309;border-color:#f59e0b':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
       <option ${d.status==='予約連絡待ち'?'selected':''}>予約連絡待ち</option>
+      <option ${d.status==='留守電'?'selected':''}>留守電</option>
+      <option ${d.status==='折り返し'?'selected':''}>折り返し</option>
       <option ${d.status==='後追いLINE済み'?'selected':''}>後追いLINE済み</option>
       <option ${d.status==='確認済'?'selected':''}>確認済</option>
       <option ${d.status==='予約変更'?'selected':''}>予約変更</option>
