@@ -246,12 +246,30 @@
   let portalUsers = [];
   let myUserId = null;
 
+  let _toastTimer = null;
   function toast(msg, isError = false){
     const t = $('toast');
+    t.innerHTML = '';
     t.textContent = msg;
     t.classList.toggle('error', isError);
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2400);
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+  function toastWithUndo(msg, undoFn){
+    const t = $('toast');
+    t.innerHTML = `<span style="margin-right:12px">${msg}</span><button id="toast-undo" style="background:#fff;color:#1a1a1a;border:none;padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">↩ 元に戻す</button>`;
+    t.classList.remove('error');
+    t.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    let used = false;
+    document.getElementById('toast-undo').onclick = async () => {
+      if (used) return;
+      used = true;
+      t.classList.remove('show');
+      try { await undoFn(); } catch(e) { toast('元に戻せませんでした: ' + (e.message||e), true); }
+    };
+    _toastTimer = setTimeout(() => t.classList.remove('show'), 5000);
   }
 
   // ===== Auth =====

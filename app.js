@@ -5442,10 +5442,11 @@ function renderBookings() {
       const iso = info.bf_next_date || '';
       const mmdd = iso ? iso.substring(5).replace('-','/') : '';
       if (!isAdmin) return iso ? `<span style="font-size:10px">${mmdd}</span>` : '<span style="color:var(--text-muted)">-</span>';
-      const label = mmdd || '年/月/日';
+      const label = mmdd || '＋ 日付';
+      // 値あり: 緑バッジ / 値なし: 控えめなダッシュ枠 (メモのカブり解消)
       const style = iso
-        ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
-        : 'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e';
+        ? 'background:#dcfce7;border:1px solid #16a34a;color:#15803d;font-weight:700'
+        : 'background:transparent;border:1px dashed #d4d4d8;color:#a8a8a8;font-weight:400';
       return `<span style="display:inline-flex;gap:2px;align-items:center;position:relative">
         <button type="button" class="bk-next-date-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${esc(iso)}" style="font-size:10px;padding:3px 6px;width:70px;text-align:center;border-radius:4px;cursor:pointer;${style}">${esc(label)}</button>
         <input type="date" class="bk-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(iso)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
@@ -5453,12 +5454,12 @@ function renderBookings() {
     })()}</td>
     <td class="bk-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${esc(d._memo||findAnyMemo(d.name)||'')}" style="${(() => {
       const memo = d._memo || findAnyMemo(d.name);
-      // 内容を直接表示 (来院タブと同じスマートUI、次回予定とのカブり解消)
+      // 次回予定 (黄色) とのカブり解消で淡い青系に変更
       const hasMemo = !!memo;
-      return `font-size:10px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:left;padding:4px 8px;background:${hasMemo?'#fff8e1':'transparent'};border:1px dashed ${hasMemo?'#f9a825':'var(--border)'};border-radius:4px;color:${hasMemo?'#92400e':'#bbb'}`;
+      return `font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:left;padding:4px 8px;background:${hasMemo?'#eff6ff':'transparent'};border:1px ${hasMemo?'solid #bfdbfe':'dashed #e5e7eb'};border-radius:4px;color:${hasMemo?'#1e40af':'#bbb'};font-weight:${hasMemo?500:400}`;
     })()}">${(() => {
       const memo = d._memo || findAnyMemo(d.name);
-      if (!isAdmin) return memo ? '📝 ' + esc(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo) : '-';
+      if (!isAdmin) return memo ? esc(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo) : '-';
       if (memo) return esc(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo);
       return '＋ メモ';
     })()}</td>

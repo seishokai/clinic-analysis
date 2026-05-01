@@ -286,12 +286,31 @@
   catch(_) { expandedIds = new Set(); localStorage.removeItem('sales-expanded'); }
 
   // ===== Toast =====
+  let _toastTimer = null;
   function toast(msg, isError = false){
     const t = $('toast');
+    t.innerHTML = '';
     t.textContent = msg;
     t.classList.toggle('error', isError);
     t.classList.add('show');
-    setTimeout(() => t.classList.remove('show'), 2400);
+    if (_toastTimer) clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+  }
+  // Undoボタン付きトースト (5秒間表示、押下でundoFn 実行)
+  function toastWithUndo(msg, undoFn){
+    const t = $('toast');
+    t.innerHTML = `<span style="margin-right:12px">${msg}</span><button id="toast-undo" style="background:#fff;color:#1a1a1a;border:none;padding:5px 12px;border-radius:14px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">↩ 元に戻す</button>`;
+    t.classList.remove('error');
+    t.classList.add('show');
+    if (_toastTimer) clearTimeout(_toastTimer);
+    let used = false;
+    document.getElementById('toast-undo').onclick = async () => {
+      if (used) return;
+      used = true;
+      t.classList.remove('show');
+      try { await undoFn(); } catch(e) { toast('元に戻せませんでした: ' + (e.message||e), true); }
+    };
+    _toastTimer = setTimeout(() => t.classList.remove('show'), 5000);
   }
 
   // ===== Auth (パスワード方式) =====
@@ -523,13 +542,35 @@
 
   async function deleteTab(node){
     const hasChildren = (node.children || []).length > 0;
+    const childCount = hasChildren ? (node.children || []).length : 0;
     const msg = hasChildren
-      ? `「${node.label}」とその配下のサブタブをすべて削除しますか？`
+      ? `「${node.label}」とその配下のサブタブ ${childCount} 件をすべて削除しますか？`
       : `「${node.label}」を削除しますか？`;
     if (!confirm(msg)) return;
+    // 削除前に親 + 子のフルデータを保存 (Undo用)
+    const savedParent = { ...node };
+    delete savedParent.children;
+    const savedChildren = (node.children || []).map(c => {
+      const x = { ...c };
+      delete x.children;
+      return x;
+    });
     const { error } = await sb.from('sales_tabs').delete().eq('id', node.id);
     if (error) { toast('削除失敗: ' + error.message, true); return; }
-    toast('削除しました');
+    toastWithUndo(
+      hasChildren ? `「${node.label}」とサブ${childCount}件を削除` : `「${node.label}」を削除`,
+      async () => {
+        // 親を先に再 insert (id 維持)
+        const r1 = await sb.from('sales_tabs').insert(savedParent);
+        if (r1.error) throw r1.error;
+        // 子を再 insert
+        for (const c of savedChildren) {
+          await sb.from('sales_tabs').insert(c);
+        }
+        toast('削除を取り消しました');
+        await loadTabs();
+      }
+    );
     await loadTabs();
   }
 
