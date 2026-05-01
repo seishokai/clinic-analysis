@@ -2767,6 +2767,13 @@ function renderPhoneCheck() {
       <p style="font-size:11px;color:var(--text-sub);margin:0">今日・明日の予約を優先度順に整理。電話後はステータス・メモを即更新。</p>
     </div>
 
+    <!-- v273: ヘッダーアクション -->
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <button id="phone-call-mode-btn" style="padding:8px 16px;background:linear-gradient(135deg,#dc2626 0%,#ef4444 100%);color:#fff;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;box-shadow:0 2px 8px rgba(220,38,38,.3);font-family:inherit;display:inline-flex;align-items:center;gap:6px">
+        📞 電話モード <span style="font-size:11px;opacity:.85">(1件ずつ大表示)</span>
+      </button>
+    </div>
+
     <!-- 統計バッジ (クリックで該当ステータスのみ絞り込み) -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
       <button class="phone-stat-btn" data-stat="all"     style="padding:6px 12px;background:${!_phoneCheckState.statusFilter?'#1a1a1a':'#fef3c7'};color:${!_phoneCheckState.statusFilter?'#fff':'#b45309'};border:1px solid ${!_phoneCheckState.statusFilter?'#1a1a1a':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">対象 ${stats.total}件</button>
@@ -2965,10 +2972,173 @@ function renderPhoneCheck() {
     _phoneSelected.clear();
     renderPhoneCheck();
   });
+  // v273: 電話モード起動
+  el.querySelector('#phone-call-mode-btn')?.addEventListener('click', () => enterCallMode(rows, canViewPII, memos));
 
   _bindPhoneCheckRowEvents(el);
   // スクロール位置を復元 (rAF で次フレーム後)
   requestAnimationFrame(() => window.scrollTo(0, _scrollY));
+}
+
+// === v273: 電話モード (1件ずつ大表示) ===
+let _callModeIdx = 0;
+let _callModeRows = [];
+let _callModeCanViewPII = false;
+let _callModeMemos = {};
+
+function enterCallMode(rows, canViewPII, memos) {
+  if (!rows || rows.length === 0) {
+    showToast('対象の予約がありません', true);
+    return;
+  }
+  _callModeRows = rows.slice();
+  _callModeCanViewPII = canViewPII;
+  _callModeMemos = memos || {};
+  // 最初の 未対応 から開始 (なければ先頭)
+  const firstPending = _callModeRows.findIndex(d => !d.status || d.status === '未対応');
+  _callModeIdx = firstPending >= 0 ? firstPending : 0;
+
+  // 既存モーダル削除
+  document.getElementById('call-mode-modal')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'call-mode-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;display:flex;align-items:center;justify-content:center;padding:16px';
+  document.body.appendChild(ov);
+  document.body.style.overflow = 'hidden';
+  renderCallMode();
+
+  // Esc で閉じる
+  const onKey = (e) => {
+    if (e.key === 'Escape') exitCallMode();
+    else if (e.key === 'ArrowLeft') callModePrev();
+    else if (e.key === 'ArrowRight') callModeNext();
+  };
+  document.addEventListener('keydown', onKey);
+  ov._onKey = onKey;
+}
+
+function exitCallMode() {
+  const ov = document.getElementById('call-mode-modal');
+  if (ov?._onKey) document.removeEventListener('keydown', ov._onKey);
+  ov?.remove();
+  document.body.style.overflow = '';
+  renderPhoneCheck();
+}
+
+function callModePrev() {
+  if (_callModeIdx > 0) { _callModeIdx--; renderCallMode(); }
+}
+function callModeNext() {
+  if (_callModeIdx < _callModeRows.length - 1) { _callModeIdx++; renderCallMode(); }
+  else exitCallMode();
+}
+
+async function callModeApplyStatus(newStatus) {
+  const d = _callModeRows[_callModeIdx];
+  if (!d) return;
+  try {
+    await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    const match = bookingsData.find(b => b.name === d.name && b.applyDate === d.applyDate);
+    if (match) match.status = newStatus;
+    d.status = newStatus;
+    showToast(`${d.name}: ${newStatus}`);
+    // 次へ自動進行
+    setTimeout(() => callModeNext(), 300);
+  } catch(e) {
+    showToast('保存エラー: ' + e.message, true);
+  }
+}
+
+function renderCallMode() {
+  const ov = document.getElementById('call-mode-modal');
+  if (!ov) return;
+  const d = _callModeRows[_callModeIdx];
+  if (!d) { exitCallMode(); return; }
+  const total = _callModeRows.length;
+  const idx = _callModeIdx + 1;
+  const memos = _callModeMemos || {};
+  const key = (d.name || '') + '|' + (d.applyDate || '');
+  const memo = memos[key] || d._memo || '';
+  const bdDate = parseDateLoose(d.bookDate);
+  const fmtMD = (date) => date && !isNaN(date.getTime()) ? `${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}` : '';
+  const bdStr = fmtMD(bdDate);
+  const tm = (d.bookDate || '').match(/(\d{1,2}):(\d{2})/);
+  const tstr = tm ? `${tm[1].padStart(2, '0')}:${tm[2]}` : '--:--';
+  const adDate = parseDateLoose(d.applyDate);
+  const adStr = fmtMD(adDate);
+  const st = d.status || '未対応';
+  const stColors = {
+    '未対応':{bg:'#fee2e2',fg:'#dc2626'}, '確認済':{bg:'#dbeafe',fg:'#1d4ed8'},
+    '留守電':{bg:'#fef3c7',fg:'#92400e'}, '折り返し':{bg:'#f5f3ff',fg:'#7c3aed'},
+    '来院済':{bg:'#dbeafe',fg:'#1d4ed8'}, '成約':{bg:'#dcfce7',fg:'#15803d'},
+  };
+  const stClr = stColors[st] || { bg:'#f3f4f6', fg:'#6b7280' };
+  const name = _callModeCanViewPII ? d.name : maskName(d.name);
+  const phone = _callModeCanViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
+  const fac = normFac(d.facility);
+  const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
+
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:20px;padding:28px 24px;width:100%;max-width:480px;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.4);position:relative">
+      <button id="cm-close" style="position:absolute;top:12px;right:12px;background:transparent;border:none;font-size:24px;color:#888;cursor:pointer;padding:6px 10px">×</button>
+      <div style="text-align:center;margin-bottom:14px">
+        <div style="font-size:11px;color:var(--text-sub);font-weight:600;letter-spacing:2px">📞 電話モード</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-top:4px">${idx} / ${total} 件</div>
+      </div>
+      <div style="text-align:center;margin-bottom:18px">
+        <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">登録 ${adStr} / 予約 ${bdStr} ${tstr}</div>
+        <div style="font-size:28px;font-weight:800;color:#1a1a1a;line-height:1.2">${escapeHtml(name || '-')}</div>
+        <div style="font-size:13px;color:var(--text-sub);margin-top:6px">${escapeHtml(fac)} / ${escapeHtml(normSvc(d.service)||'-')} ${d.source ? '· '+escapeHtml(d.source) : ''}</div>
+        <div style="margin-top:8px"><span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:${stClr.bg};color:${stClr.fg}">${st}</span></div>
+      </div>
+      ${_callModeCanViewPII && phone ? `
+        <a href="tel:${phoneDigits}" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:18px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;border-radius:14px;text-decoration:none;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;box-shadow:0 4px 16px rgba(16,185,129,.3);margin-bottom:16px">
+          <span style="font-size:24px">📞</span> ${escapeHtml(phone)}
+        </a>
+      ` : '<div style="text-align:center;padding:18px;background:#f3f4f6;border-radius:12px;color:#888;margin-bottom:16px">電話番号 非公開</div>'}
+
+      ${memo ? `<div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:10px 12px;border-radius:6px;font-size:12px;color:#92400e;line-height:1.6;white-space:pre-wrap;margin-bottom:16px">📝 ${escapeHtml(memo)}</div>` : ''}
+
+      <!-- アクション -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <button class="cm-act" data-st="確認済" style="padding:14px;background:#dbeafe;color:#1d4ed8;border:2px solid #bfdbfe;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✅ 確認済</button>
+        <button class="cm-act" data-st="留守電" style="padding:14px;background:#fef3c7;color:#92400e;border:2px solid #fcd34d;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🎤 留守電</button>
+        <button class="cm-act" data-st="折り返し" style="padding:14px;background:#f5f3ff;color:#7c3aed;border:2px solid #d8b4fe;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">↩ 折り返し</button>
+        <button id="cm-memo" style="padding:14px;background:#fff8e1;color:#b45309;border:2px solid #fcd34d;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📝 メモ</button>
+      </div>
+      <button class="cm-act" data-st="未対応" style="width:100%;padding:10px;background:transparent;color:#6b7280;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:14px">↻ 取り消し（未対応に戻す）</button>
+
+      <!-- ナビゲーション -->
+      <div style="display:flex;gap:8px;align-items:stretch">
+        <button id="cm-prev" ${_callModeIdx === 0 ? 'disabled' : ''} style="flex:1;padding:12px;background:${_callModeIdx===0?'#f3f4f6':'#1a1a1a'};color:${_callModeIdx===0?'#bbb':'#fff'};border:none;border-radius:10px;font-size:13px;font-weight:600;cursor:${_callModeIdx===0?'not-allowed':'pointer'};font-family:inherit">◀ 前</button>
+        <button id="cm-next" style="flex:2;padding:12px;background:#1a1a1a;color:#fff;border:none;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">${_callModeIdx >= total-1 ? '完了' : '次 ▶'}</button>
+      </div>
+      <div style="text-align:center;margin-top:8px;font-size:10px;color:var(--text-sub)">← → キーで前後移動 / Esc で終了</div>
+    </div>
+  `;
+
+  // バインド
+  ov.querySelector('#cm-close').onclick = exitCallMode;
+  ov.querySelectorAll('.cm-act').forEach(b => {
+    b.onclick = () => callModeApplyStatus(b.dataset.st);
+  });
+  ov.querySelector('#cm-memo').onclick = () => {
+    openMemoModal(d.name, d.applyDate, null);
+    // メモ閉じたら call mode 再描画
+    const check = setInterval(() => {
+      const m = document.getElementById('memo-modal');
+      if (!m || m.hidden) {
+        clearInterval(check);
+        // memos 再ロード
+        try { _callModeMemos = loadData('bk-memos', {}); } catch(_){}
+        renderCallMode();
+      }
+    }, 300);
+  };
+  ov.querySelector('#cm-prev').onclick = callModePrev;
+  ov.querySelector('#cm-next').onclick = callModeNext;
+  // 背景クリックで閉じる
+  ov.onclick = (e) => { if (e.target === ov) exitCallMode(); };
 }
 
 // v273: テーブル行 (登録日 / 予約日時 / 名前 / 医院 / 連絡先 / 状況 / アクション)
