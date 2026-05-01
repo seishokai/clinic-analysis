@@ -16,14 +16,15 @@
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
+  [hidden]{display:none !important}
   body{
     font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',Meiryo,sans-serif;
     background:var(--bg); color:var(--text); line-height:1.5;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:680px; margin:0 auto; padding:24px 20px 60px}
+  .wrap{max-width:1100px; margin:0 auto; padding:24px 20px 60px}
 
-  /* Header */
+  /* Top bar */
   .top-bar{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px}
   .back-link{color:var(--text-sub); text-decoration:none}
   .back-link:hover{color:var(--text)}
@@ -32,9 +33,9 @@
   .badge.admin{background:#1a1a1a; color:#fff}
   .badge.guest{background:#e5e7eb; color:var(--text-sub)}
   .auth-btn{font-size:11px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text-sub); cursor:pointer; font-family:inherit}
-  .auth-btn:hover{background:var(--bg)}
+  .auth-btn:hover{background:var(--bg); color:var(--text)}
 
-  header.brand-head{text-align:center; margin:32px 0 24px}
+  header.brand-head{text-align:center; margin:32px 0 28px}
   .brand{
     font-family:'Great Vibes', cursive; font-size:64px; line-height:1;
     background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);
@@ -43,64 +44,79 @@
   }
   .subtitle{font-size:13px; letter-spacing:3px; color:var(--text-sub); margin-top:6px; text-transform:uppercase}
 
-  /* Tab tree */
-  #tabs-tree{display:flex; flex-direction:column; gap:8px}
-  .node{display:flex; flex-direction:column; gap:6px}
-  .node-row{
-    display:flex; align-items:stretch; gap:6px;
-    background:#fff; border:1px solid var(--border); border-radius:10px;
-    transition:border-color .15s;
+  /* Grid layout */
+  #tabs-tree{display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:14px}
+  .node{display:flex; flex-direction:column; gap:8px}
+  .node.is-group{grid-column:1/-1}                    /* Group spans full row to allow sub-grid below */
+
+  /* Card */
+  .tab-card{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    padding:28px 14px; min-height:88px;
+    background:#fff; border:1px solid var(--border); border-radius:14px;
+    cursor:pointer; text-decoration:none; color:var(--text);
+    transition:all .15s; font-family:inherit; font-size:14px; font-weight:600;
+    text-align:center; gap:6px;
+    position:relative;
   }
-  .node-row:hover{border-color:#94a3b8}
-  .node-row.highlight{
-    border-color:var(--hi-border);
+  .tab-card:hover{
+    transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.08);
+    border-color:var(--accent);
+  }
+  .tab-card.highlight{
     background:linear-gradient(135deg, var(--hi-bg) 0%, #fff 100%);
+    border-color:var(--hi-border);
+    color:var(--hi-text);
   }
-  .node-row.highlight .node-main{color:var(--hi-text)}
+  .tab-card .ic{font-size:22px; line-height:1}
+  .tab-card .lbl{font-size:14px; line-height:1.3; word-break:break-word}
+  .tab-card .meta{font-size:10px; color:var(--text-sub); font-weight:500; letter-spacing:1px}
+  .tab-card .toggle-arrow{font-size:11px; color:var(--text-sub); transition:transform .15s}
+  .node.expanded .tab-card .toggle-arrow{transform:rotate(180deg)}
 
-  .node-main{
-    flex:1; min-width:0; padding:14px 16px; font-size:14px; font-weight:600;
-    color:var(--text); text-decoration:none; cursor:pointer; text-align:center;
-    display:flex; align-items:center; justify-content:center; gap:6px;
+  /* Sub-grid for group children */
+  .node-children{
+    display:none;
+    grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+    gap:8px;
+    padding:12px; background:#f9fafb; border-radius:12px;
+    border:1px dashed var(--border);
   }
-  .node-main:hover{background:rgba(0,0,0,.02)}
-  .node-main .toggle-icon{font-size:11px; color:var(--text-sub); transition:transform .15s}
-  .node-row.expanded .node-main .toggle-icon{transform:rotate(180deg)}
+  .node.expanded > .node-children{display:grid}
+  .node-children .tab-card{padding:18px 10px; min-height:60px; font-size:12px}
 
-  .node-actions{display:flex; align-items:center; padding:0 8px 0 0; gap:4px}
+  /* Admin actions on card */
+  .card-actions{
+    position:absolute; top:6px; right:6px;
+    display:flex; gap:2px; opacity:0; transition:opacity .15s;
+    background:rgba(255,255,255,.95); border-radius:6px; padding:2px;
+  }
+  .tab-card:hover .card-actions{opacity:1}
   .icon-btn{
-    width:32px; height:32px; border:none; background:transparent; cursor:pointer;
-    border-radius:6px; font-size:14px; color:var(--text-sub); padding:0;
+    width:26px; height:26px; border:none; background:transparent; cursor:pointer;
+    border-radius:4px; font-size:12px; color:var(--text-sub); padding:0;
     display:flex; align-items:center; justify-content:center; font-family:inherit;
   }
-  .icon-btn:hover{background:rgba(0,0,0,.05); color:var(--text)}
+  .icon-btn:hover{background:rgba(0,0,0,.06); color:var(--text)}
   .icon-btn.danger:hover{background:#fee2e2; color:var(--danger)}
 
-  .node-children{
-    display:none; flex-direction:column; gap:6px;
-    margin-left:24px; padding-left:14px; border-left:2px solid #e5e7eb;
+  /* Add buttons */
+  .add-card{
+    display:flex; align-items:center; justify-content:center;
+    padding:24px; min-height:88px;
+    color:var(--text-sub); background:transparent;
+    border:2px dashed var(--border); border-radius:14px;
+    cursor:pointer; font-family:inherit; font-size:13px; font-weight:600;
   }
-  .node.expanded > .node-children{display:flex}
-
-  .add-child-btn{
-    padding:10px; font-size:12px; color:var(--text-sub); background:transparent;
-    border:1px dashed var(--border); border-radius:8px; cursor:pointer; font-family:inherit;
-  }
-  .add-child-btn:hover{border-color:var(--accent); color:var(--text); background:#fff}
-
-  #add-root-btn{
-    margin-top:20px; width:100%; padding:14px; font-size:14px; font-weight:600;
-    color:var(--text); background:#fff; border:2px dashed var(--border); border-radius:10px;
-    cursor:pointer; font-family:inherit;
-  }
-  #add-root-btn:hover{border-color:var(--accent); border-style:solid}
+  .add-card:hover{border-color:var(--accent); color:var(--text); background:#fff}
+  .add-child-card{padding:14px; min-height:60px; font-size:12px}
 
   /* Login CTA */
   #login-cta{
     margin-top:24px; padding:14px; background:#fff; border:1px solid var(--border);
     border-radius:10px; font-size:12px; text-align:center; color:var(--text-sub);
   }
-  #login-cta a{color:var(--text); font-weight:600; text-decoration:none; border-bottom:1px solid var(--text)}
+  #login-cta button{background:none; border:none; color:var(--text); font-weight:600; text-decoration:underline; cursor:pointer; font-family:inherit; font-size:12px}
 
   /* Loading state */
   #loading{padding:40px; text-align:center; color:var(--text-sub); font-size:13px}
@@ -112,16 +128,16 @@
     display:flex; align-items:center; justify-content:center; padding:20px;
   }
   .modal-overlay[hidden]{display:none !important}
-  [hidden]{display:none !important}
   .modal{
     background:#fff; border-radius:14px; padding:24px; width:100%; max-width:480px;
     max-height:90vh; overflow-y:auto;
   }
-  .modal h2{margin:0 0 18px; font-size:17px; font-weight:700; letter-spacing:1px}
+  .modal h2{margin:0 0 6px; font-size:17px; font-weight:700; letter-spacing:1px}
+  .modal .modal-sub{font-size:11px; color:var(--text-sub); margin-bottom:14px}
   .modal label{display:block; font-size:11px; font-weight:700; color:var(--text-sub); letter-spacing:1px; text-transform:uppercase; margin:14px 0 6px}
   .modal label.checkbox{display:flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0; font-size:13px; color:var(--text); font-weight:500; cursor:pointer; margin-top:10px}
   .modal label.checkbox input{width:auto}
-  .modal input[type="text"], .modal input[type="url"], .modal select{
+  .modal input[type="text"], .modal input[type="url"], .modal input[type="password"], .modal select{
     width:100%; padding:11px 13px; font-size:14px; border:1px solid var(--border);
     border-radius:8px; outline:none; background:#fff; font-family:inherit;
   }
@@ -137,6 +153,9 @@
   .modal-actions .primary:hover{background:#000}
   .modal-actions .danger-btn{background:#fff; color:var(--danger); border-color:#fecaca}
   .modal-actions .danger-btn:hover{background:#fee2e2}
+  .modal-msg{font-size:12px; margin-top:10px; min-height:16px}
+  .modal-msg.error{color:var(--danger)}
+  .modal-msg.success{color:#059669}
 
   /* Toast */
   #toast{
@@ -155,10 +174,9 @@
 <div class="wrap">
   <div class="top-bar">
     <a href="../" class="back-link">← ポータルへ戻る</a>
-    <!-- Bug 2修正: 認証チェック完了まで非表示にしてフリッカー防止 -->
     <div class="auth-area" id="auth-area" hidden>
       <span id="auth-badge" class="badge guest">ゲスト</span>
-      <button id="auth-btn" class="auth-btn">ログイン</button>
+      <button id="auth-btn" class="auth-btn">管理者ログイン</button>
     </div>
   </div>
 
@@ -171,10 +189,10 @@
   <div id="empty" hidden>タブが登録されていません。</div>
   <div id="tabs-tree" hidden></div>
 
-  <button id="add-root-btn" class="admin-only" hidden>＋ トップレベルにタブを追加</button>
+  <button id="add-root-btn" class="admin-only add-card" hidden style="margin-top:20px;width:100%">＋ トップレベルにタブを追加</button>
 
   <div id="login-cta" hidden>
-    タブの追加・編集には <a href="../?login">管理者ログイン</a> が必要です。
+    タブの追加・編集には <button type="button" id="login-link">管理者ログイン</button> が必要です。
   </div>
 </div>
 
@@ -216,20 +234,38 @@
   </div>
 </div>
 
+<!-- Login Modal -->
+<div id="login-modal" class="modal-overlay" hidden>
+  <div class="modal" style="max-width:380px">
+    <h2>管理者ログイン</h2>
+    <div class="modal-sub">パスワードを入力してください。</div>
+    <form id="login-form">
+      <label for="login-pw">パスワード</label>
+      <input type="password" id="login-pw" autocomplete="current-password" autofocus>
+      <div class="modal-msg" id="login-msg"></div>
+      <div class="modal-actions">
+        <button type="button" id="login-cancel">キャンセル</button>
+        <button type="submit" class="primary">ログイン</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 (async function(){
   const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+  const ADMIN_PASSWORD = 'Edoyadepon1';
+  const ADMIN_TOKEN_KEY = 'sales-admin-token';
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  let tabsFlat = [];   // 全タブ (フラット)
-  let tabsTree = [];   // ツリー化
+  let tabsFlat = [];
+  let tabsTree = [];
   let isAdmin = false;
-  // Bug 11修正: localStorage 破損時の保護
   let expandedIds;
   try { expandedIds = new Set(JSON.parse(localStorage.getItem('sales-expanded') || '[]')); }
   catch(_) { expandedIds = new Set(); localStorage.removeItem('sales-expanded'); }
@@ -243,34 +279,28 @@
     setTimeout(() => t.classList.remove('show'), 2400);
   }
 
-  // ===== Auth =====
-  // Bug 2修正: getSession() は localStorage 即時参照、rpc は遅い → 分離して並列化を可能に
-  async function fetchAuthState(){
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) return { isAdmin: false, profile: null };
-      const { data: profile, error } = await sb.rpc('get_my_account');
-      if (error || !profile) return { isAdmin: false, profile: null };
-      const isAdminRole = profile.role === 'admin' || profile.account_type === 'admin';
-      return { isAdmin: isAdminRole, profile };
-    } catch(e) {
-      console.warn('auth check failed', e);
-      return { isAdmin: false, profile: null };
-    }
+  // ===== Auth (パスワード方式) =====
+  function isLocalAdmin(){
+    return localStorage.getItem(ADMIN_TOKEN_KEY) === 'true';
+  }
+  function setLocalAdmin(flag){
+    if (flag) localStorage.setItem(ADMIN_TOKEN_KEY, 'true');
+    else localStorage.removeItem(ADMIN_TOKEN_KEY);
   }
 
-  function setAuthState(adminFlag, profile){
-    isAdmin = adminFlag;
-    document.body.classList.toggle('is-admin', adminFlag);
+  function applyAuthUI(){
+    isAdmin = isLocalAdmin();
+    document.body.classList.toggle('is-admin', isAdmin);
     const badge = $('auth-badge');
     const btn = $('auth-btn');
     const cta = $('login-cta');
-    if (profile) {
-      badge.textContent = adminFlag ? '👤 admin' : (profile.name || profile.account_type || 'ログイン中');
-      badge.className = 'badge ' + (adminFlag ? 'admin' : 'guest');
+    if (isAdmin) {
+      badge.textContent = '👤 admin';
+      badge.className = 'badge admin';
       btn.textContent = 'ログアウト';
-      btn.onclick = async () => {
-        await sb.auth.signOut();
+      btn.onclick = () => {
+        setLocalAdmin(false);
+        toast('ログアウトしました');
         location.reload();
       };
       cta.hidden = true;
@@ -278,15 +308,44 @@
       badge.textContent = 'ゲスト';
       badge.className = 'badge guest';
       btn.textContent = '管理者ログイン';
-      btn.onclick = () => { location.href = '../?login'; };
+      btn.onclick = openLoginModal;
       cta.hidden = false;
     }
-    // Bug 2修正: 認証チェック完了後にエリア表示
     $('auth-area').hidden = false;
   }
 
+  function openLoginModal(){
+    $('login-msg').textContent = '';
+    $('login-msg').className = 'modal-msg';
+    $('login-pw').value = '';
+    $('login-modal').hidden = false;
+    setTimeout(() => $('login-pw').focus(), 50);
+  }
+  function closeLoginModal(){
+    $('login-modal').hidden = true;
+  }
+  $('login-cancel').onclick = closeLoginModal;
+  $('login-link').onclick = openLoginModal;
+  $('login-modal').onclick = (e) => { if (e.target === $('login-modal')) closeLoginModal(); };
+  $('login-form').onsubmit = (e) => {
+    e.preventDefault();
+    const pw = $('login-pw').value;
+    if (pw === ADMIN_PASSWORD) {
+      setLocalAdmin(true);
+      toast('ログインしました');
+      closeLoginModal();
+      // 再読込で UI 更新 (admin ボタン表示等)
+      applyAuthUI();
+      renderTree();
+    } else {
+      const m = $('login-msg');
+      m.textContent = 'パスワードが違います';
+      m.className = 'modal-msg error';
+      $('login-pw').select();
+    }
+  };
+
   // ===== Data =====
-  // Bug 1修正: 取得と適用を分離 → init で並列実行可能に
   function fetchTabs(){
     return sb.from('sales_tabs')
       .select('id, parent_id, label, url, external, highlight, sort_order')
@@ -319,7 +378,7 @@
     }
     tabsFlat = data || [];
     tabsTree = buildTree(tabsFlat);
-    // Bug 12修正: 削除されたタブIDを expandedIds から自動クリーンアップ
+    // 削除されたタブIDを expandedIds から自動クリーンアップ
     const validIds = new Set(tabsFlat.map(t => t.id));
     let changed = false;
     for (const id of expandedIds) {
@@ -355,85 +414,81 @@
     return attach('ROOT');
   }
 
-  // ===== Render =====
+  // ===== Render (Grid layout) =====
   function renderTree(){
     const root = $('tabs-tree');
     root.innerHTML = '';
-    tabsTree.forEach(node => root.appendChild(renderNode(node)));
+    tabsTree.forEach(node => root.appendChild(renderCard(node, true)));
   }
 
-  function renderNode(node){
+  // top: トップレベルかどうか (true=メイングリッド、false=サブグリッド内)
+  function renderCard(node, top){
     const wrap = document.createElement('div');
     wrap.className = 'node';
-    if (expandedIds.has(node.id)) wrap.classList.add('expanded');
     wrap.dataset.id = node.id;
 
     const hasChildren = node.children && node.children.length > 0;
     const isGroup = !node.url || hasChildren;
+    if (isGroup && top) wrap.classList.add('is-group');
+    if (expandedIds.has(node.id)) wrap.classList.add('expanded');
 
-    const row = document.createElement('div');
-    row.className = 'node-row' + (node.highlight ? ' highlight' : '');
-
+    let card;
     if (isGroup) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'node-main';
-      btn.innerHTML = `${esc(node.label)}<span class="toggle-icon">▾</span>`;
-      btn.onclick = (e) => {
-        e.stopPropagation();
+      card = document.createElement('button');
+      card.type = 'button';
+      card.className = 'tab-card' + (node.highlight ? ' highlight' : '');
+      card.innerHTML = `
+        <div class="ic">📁</div>
+        <div class="lbl">${esc(node.label)}</div>
+        <div class="meta">${node.children.length}項目 <span class="toggle-arrow">▾</span></div>
+      `;
+      card.onclick = (e) => {
+        if (e.target.closest('.card-actions')) return;
         toggleNode(node.id, wrap);
       };
-      row.appendChild(btn);
-      if (node.url) {
-        // group with own URL - secondary link
-        const goBtn = document.createElement('a');
-        goBtn.className = 'icon-btn';
-        goBtn.href = node.url;
-        if (node.external) { goBtn.target = '_blank'; goBtn.rel = 'noopener noreferrer'; }
-        goBtn.title = '開く';
-        goBtn.textContent = '↗';
-        row.appendChild(goBtn);
-      }
     } else {
-      const link = document.createElement('a');
-      link.className = 'node-main';
-      link.href = node.url;
-      if (node.external) { link.target = '_blank'; link.rel = 'noopener noreferrer'; }
-      link.textContent = node.label;
-      row.appendChild(link);
+      card = document.createElement('a');
+      card.className = 'tab-card' + (node.highlight ? ' highlight' : '');
+      card.href = node.url;
+      if (node.external) { card.target = '_blank'; card.rel = 'noopener noreferrer'; }
+      card.innerHTML = `
+        <div class="lbl">${esc(node.label)}</div>
+        ${node.external ? '<div class="meta">外部リンク ↗</div>' : ''}
+      `;
     }
 
     // Admin actions
     const actions = document.createElement('div');
-    actions.className = 'node-actions admin-only';
+    actions.className = 'card-actions admin-only';
     actions.innerHTML = `
-      <button class="icon-btn" data-act="up" title="上へ">▲</button>
-      <button class="icon-btn" data-act="down" title="下へ">▼</button>
       <button class="icon-btn" data-act="edit" title="編集">✏️</button>
       <button class="icon-btn danger" data-act="delete" title="削除">🗑</button>
     `;
     actions.querySelectorAll('button').forEach(b => {
       b.onclick = (e) => {
         e.stopPropagation();
+        e.preventDefault();
         handleAction(b.dataset.act, node);
       };
     });
-    row.appendChild(actions);
-    wrap.appendChild(row);
+    card.appendChild(actions);
+    wrap.appendChild(card);
 
-    // Children container (always present for admin to add)
-    const childWrap = document.createElement('div');
-    childWrap.className = 'node-children';
-    (node.children || []).forEach(c => childWrap.appendChild(renderNode(c)));
-    if (isAdmin) {
-      const addBtn = document.createElement('button');
-      addBtn.className = 'add-child-btn admin-only';
-      addBtn.type = 'button';
-      addBtn.textContent = '＋ サブタブを追加';
-      addBtn.onclick = (e) => { e.stopPropagation(); openModal({ parent_id: node.id }); };
-      childWrap.appendChild(addBtn);
+    // Children sub-grid
+    if (hasChildren || (isAdmin && isGroup)) {
+      const childWrap = document.createElement('div');
+      childWrap.className = 'node-children';
+      (node.children || []).forEach(c => childWrap.appendChild(renderCard(c, false)));
+      if (isAdmin) {
+        const addBtn = document.createElement('button');
+        addBtn.className = 'add-card add-child-card admin-only';
+        addBtn.type = 'button';
+        addBtn.textContent = '＋ サブタブを追加';
+        addBtn.onclick = (e) => { e.stopPropagation(); openModal({ parent_id: node.id }); };
+        childWrap.appendChild(addBtn);
+      }
+      wrap.appendChild(childWrap);
     }
-    wrap.appendChild(childWrap);
 
     return wrap;
   }
@@ -446,9 +501,9 @@
 
   // ===== Actions =====
   async function handleAction(act, node){
+    if (!isAdmin) { toast('管理者ログインが必要です', true); return; }
     if (act === 'edit') return openModal(node);
     if (act === 'delete') return deleteTab(node);
-    if (act === 'up' || act === 'down') return reorder(node, act);
   }
 
   async function deleteTab(node){
@@ -463,32 +518,12 @@
     await loadTabs();
   }
 
-  async function reorder(node, dir){
-    // 同じ parent_id を持つ兄弟の中で並び替え
-    const siblings = tabsFlat
-      .filter(t => (t.parent_id || null) === (node.parent_id || null))
-      .sort((a,b) => a.sort_order - b.sort_order);
-    const idx = siblings.findIndex(t => t.id === node.id);
-    if (idx < 0) return;
-    const targetIdx = dir === 'up' ? idx - 1 : idx + 1;
-    if (targetIdx < 0 || targetIdx >= siblings.length) return;
-    const a = siblings[idx], b = siblings[targetIdx];
-    // sort_order を入れ替え
-    const updates = [
-      sb.from('sales_tabs').update({ sort_order: b.sort_order }).eq('id', a.id),
-      sb.from('sales_tabs').update({ sort_order: a.sort_order }).eq('id', b.id),
-    ];
-    const results = await Promise.all(updates);
-    const errs = results.filter(r => r.error);
-    if (errs.length) { toast('並び替え失敗', true); return; }
-    await loadTabs();
-  }
-
   // ===== Modal =====
-  let modalMode = 'add'; // 'add' | 'edit'
+  let modalMode = 'add';
   let modalNode = null;
 
   function openModal(node){
+    if (!isAdmin) { toast('管理者ログインが必要です', true); openLoginModal(); return; }
     modalNode = node;
     modalMode = node && node.id ? 'edit' : 'add';
     $('modal-title').textContent = modalMode === 'edit' ? 'タブを編集' : 'タブを追加';
@@ -497,12 +532,10 @@
     $('form-url').value = node?.url || '';
     $('form-external').checked = !!node?.external;
     $('form-highlight').checked = !!node?.highlight;
-    // 親タブ select を構築 (自分自身と子孫は除外)
     const sel = $('form-parent');
     sel.innerHTML = '<option value="">（トップレベル）</option>';
     const excludeIds = new Set();
     if (node?.id) {
-      // 自分自身と子孫は親に選べない
       const collectDescendants = (id) => {
         excludeIds.add(id);
         tabsFlat.filter(t => t.parent_id === id).forEach(c => collectDescendants(c.id));
@@ -545,9 +578,15 @@
     await deleteTab(modalNode);
   };
 
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (!$('modal-overlay').hidden) closeModal();
+      else if (!$('login-modal').hidden) closeLoginModal();
+    }
+  });
+
   $('tab-form').onsubmit = async (e) => {
     e.preventDefault();
-    // Bug 4修正: 二重サブミット防止
     const submitBtn = e.target.querySelector('button[type="submit"]');
     if (submitBtn.disabled) return;
     submitBtn.disabled = true;
@@ -558,12 +597,10 @@
       let url = $('form-url').value.trim();
       const ext = $('form-external').checked;
 
-      // Bug 5修正: javascript: スキームをブロック (XSS 防止)
       if (url && /^(javascript|data|vbscript):/i.test(url)) {
         toast('このURLスキームは使用できません', true);
         return;
       }
-      // Bug 3修正: 外部リンクで http(s):// が無い場合、自動補完
       if (url && ext && !/^https?:\/\//i.test(url) && !/^\//.test(url)) {
         url = 'https://' + url;
       }
@@ -591,7 +628,6 @@
       closeModal();
       if (payload.parent_id) {
         expandedIds.add(payload.parent_id);
-        // Bug 14修正: 追加後の親展開状態を localStorage にも反映
         localStorage.setItem('sales-expanded', JSON.stringify([...expandedIds]));
       }
       await loadTabs();
@@ -604,20 +640,8 @@
   $('add-root-btn').onclick = () => openModal({ parent_id: null });
 
   // ===== Init =====
-  // Bug 1修正: 認証チェックとタブ読み込みを並列実行 (約半分の時間に)
-  $('loading').hidden = false;
-  const tabsPromise = fetchTabs();
-  const authData = await fetchAuthState();
-  setAuthState(authData.isAdmin, authData.profile);
-  const tabsResult = await tabsPromise;
-  applyTabsResult(tabsResult);
-
-  // Bug 13修正: Esc キーでモーダルを閉じる
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && !$('modal-overlay').hidden) {
-      closeModal();
-    }
-  });
+  applyAuthUI();
+  await loadTabs();
 })();
 </script>
 </body>
