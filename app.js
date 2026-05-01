@@ -2435,37 +2435,88 @@ function renderHomeDashboard() {
       </div>
     ` : ''}
 
-    ${todaySorted.length > 0 ? `
-      <!-- 今日の予約リスト -->
-      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:12px">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-          <div style="font-size:13px;font-weight:700;color:#1a1a1a">🕐 今日の予約 (${todaySorted.length}件)</div>
-          <button class="home-link-btn" data-action="today" style="font-size:11px;color:#1d4ed8;background:none;border:none;cursor:pointer;font-weight:600">詳細 →</button>
+    <!-- v273: 医院 × 治療 クロス集計 (個人名は出さず数字のみ) -->
+    ${facList.length > 0 && treatList.length > 0 ? (() => {
+      // 各医院 × 各治療 の予約 / 来院 / 成約 件数
+      const cross = {};
+      rangeRows.forEach(d => {
+        const f = normFac(d.facility) || '-';
+        const t = (typeof normSvc === 'function' ? normSvc(d.service) : d.service) || '-';
+        const key = f + '|' + t;
+        if (!cross[key]) cross[key] = { booking:0, visited:0, contracted:0 };
+        cross[key].booking++;
+        if (isVisited(d.status)) cross[key].visited++;
+        if (d.status === '成約') cross[key].contracted++;
+      });
+      const cellHtml = (f, t) => {
+        const v = cross[f + '|' + t];
+        if (!v || v.booking === 0) return '<span style="color:#cbd5e1">-</span>';
+        return `<div style="line-height:1.3">
+          <div style="font-size:13px;font-weight:700;color:#1a1a1a">${v.booking}</div>
+          <div style="font-size:9px;color:var(--text-sub)">来 <span style="color:#1d4ed8;font-weight:600">${v.visited}</span> / 約 <span style="color:#059669;font-weight:600">${v.contracted}</span></div>
+        </div>`;
+      };
+      // 行/列の合計
+      const colTotal = (t) => {
+        const r = { booking:0, visited:0, contracted:0 };
+        facList.forEach(f => {
+          const v = cross[f + '|' + t];
+          if (v) { r.booking+=v.booking; r.visited+=v.visited; r.contracted+=v.contracted; }
+        });
+        return r;
+      };
+      const rowTotal = (f) => {
+        const r = { booking:0, visited:0, contracted:0 };
+        treatList.forEach(t => {
+          const v = cross[f + '|' + t];
+          if (v) { r.booking+=v.booking; r.visited+=v.visited; r.contracted+=v.contracted; }
+        });
+        return r;
+      };
+      return `<div style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px">📋 ${escapeHtml(rangeLabel)} 医院 × 治療 クロス集計</div>
+        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow-x:auto">
+          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:560px">
+            <thead>
+              <tr style="background:#f9fafb">
+                <th style="padding:8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);position:sticky;left:0;background:#f9fafb">医院＼治療</th>
+                ${treatList.map(t => `<th style="padding:8px;text-align:center;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);min-width:70px">${escapeHtml(t)}</th>`).join('')}
+                <th style="padding:8px;text-align:center;font-size:10px;color:#1a1a1a;font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);background:#f3f4f6;min-width:70px">合計</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${facList.map(f => {
+                const tot = rowTotal(f);
+                return `<tr style="border-top:1px solid #f3f4f6">
+                  <td style="padding:8px;text-align:left;font-weight:600;background:#fff;position:sticky;left:0">${escapeHtml(f)}</td>
+                  ${treatList.map(t => `<td style="padding:6px;text-align:center;border-left:1px solid #f3f4f6">${cellHtml(f, t)}</td>`).join('')}
+                  <td style="padding:8px;text-align:center;background:#f9fafb;font-weight:700;color:#1a1a1a">
+                    <div style="font-size:14px">${tot.booking}</div>
+                    <div style="font-size:9px;color:var(--text-sub)">来 <span style="color:#1d4ed8">${tot.visited}</span>/約 <span style="color:#059669">${tot.contracted}</span></div>
+                  </td>
+                </tr>`;
+              }).join('')}
+              <!-- 列合計 -->
+              <tr style="border-top:2px solid #d1d5db;background:#f9fafb;font-weight:700">
+                <td style="padding:8px;background:#f3f4f6;color:#1a1a1a;position:sticky;left:0">合計</td>
+                ${treatList.map(t => {
+                  const tot = colTotal(t);
+                  return `<td style="padding:6px;text-align:center;border-left:1px solid #f3f4f6">
+                    <div style="font-size:14px;color:#1a1a1a">${tot.booking}</div>
+                    <div style="font-size:9px;color:var(--text-sub)">来 <span style="color:#1d4ed8">${tot.visited}</span>/約 <span style="color:#059669">${tot.contracted}</span></div>
+                  </td>`;
+                }).join('')}
+                <td style="padding:8px;text-align:center;background:#dbeafe;font-weight:700;color:#1d4ed8">
+                  <div style="font-size:15px">${kpiRange.booking}</div>
+                  <div style="font-size:9px">来 ${kpiRange.visited} / 約 ${kpiRange.contracted}</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
-        <div style="display:flex;flex-direction:column;gap:6px">
-          ${todaySorted.slice(0, 8).map(d => {
-            const bd = d.bookDate || '';
-            const tm = bd.match(/(\d{1,2}):(\d{2})/);
-            const tstr = tm ? `${tm[1]}:${tm[2]}` : '--:--';
-            const st = d.status || '未対応';
-            const stC = st === '成約' ? '#059669' : st === '来院済' ? '#1d4ed8' : st === 'キャンセル' ? '#dc2626' : st === '確認済' ? '#7c3aed' : (!d.status || st === '未対応') ? '#dc2626' : '#555';
-            const stBg = st === '成約' ? '#dcfce7' : st === '来院済' ? '#dbeafe' : st === 'キャンセル' ? '#fee2e2' : st === '確認済' ? '#f3e8ff' : (!d.status || st === '未対応') ? '#fee2e2' : '#f3f4f6';
-            const nm = _isPII_MaskNeeded && _isPII_MaskNeeded() ? maskName(d.name) : d.name;
-            return `<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:#fafafa;border-radius:8px">
-              <div style="font-size:13px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;min-width:50px">${tstr}</div>
-              <div style="flex:1;font-size:13px;color:#1a1a1a;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(nm || '')}</div>
-              <div style="font-size:10px;color:var(--text-sub);white-space:nowrap">${escapeHtml(normFac(d.facility)||'')}</div>
-              <span style="padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:${stBg};color:${stC};white-space:nowrap">${st}</span>
-            </div>`;
-          }).join('')}
-          ${todaySorted.length > 8 ? `<div style="text-align:center;font-size:11px;color:var(--text-sub);padding:4px">他 ${todaySorted.length - 8} 件...</div>` : ''}
-        </div>
-      </div>
-    ` : `
-      <div style="text-align:center;padding:30px;color:var(--text-sub);font-size:13px;background:#fafafa;border-radius:12px;margin-bottom:12px">
-        📭 今日の予約はありません
-      </div>
-    `}
+        <div style="font-size:10px;color:var(--text-sub);margin-top:6px">※ 数字: 予約件数 / 「来N/約N」: 来院数・成約数</div>
+      </div>`;
+    })() : ''}
 
     <!-- ショートカット -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
