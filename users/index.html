@@ -153,7 +153,16 @@
         <span>portal_editor <strong id="stat-editor">-</strong></span>
         <span>有効 <strong id="stat-active">-</strong> / 全 <strong id="stat-all">-</strong></span>
       </div>
-      <div style="display:flex; gap:8px">
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <input type="text" id="user-search" placeholder="🔍 名前/メール 検索" style="font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;width:180px">
+        <select id="user-role-filter" style="font-size:12px;padding:7px 10px;border:1px solid var(--border);border-radius:6px;font-family:inherit;background:#fff">
+          <option value="">ロール:全て</option>
+          <option value="portal_admin">portal_admin</option>
+          <option value="portal_editor">portal_editor</option>
+        </select>
+        <label style="display:inline-flex;align-items:center;gap:4px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="user-show-inactive">無効を含む
+        </label>
         <button class="btn" id="btn-reload">🔄 再読み込み</button>
         <button class="btn primary" id="btn-add">＋ 新規追加</button>
       </div>
@@ -321,13 +330,30 @@
     $('stat-active').textContent = active;
     $('stat-all').textContent = total;
 
-    if (total === 0) {
+    // v273: 検索 + ロール + 無効含む フィルタ
+    const q = ($('user-search')?.value || '').trim().toLowerCase();
+    const roleF = $('user-role-filter')?.value || '';
+    const showInactive = $('user-show-inactive')?.checked;
+    const filtered = portalUsers.filter(u => {
+      if (!showInactive && !u.is_active) return false;
+      if (roleF && u.role !== roleF) return false;
+      if (q) {
+        const hay = ((u.name||'') + ' ' + (u.email||'')).toLowerCase();
+        if (!hay.includes(q)) return false;
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      $('table-wrap').hidden = true;
       $('empty').hidden = false;
+      $('empty').textContent = total === 0 ? 'portal_users がまだ登録されていません。' : '該当するユーザーがありません。';
       return;
     }
+    $('empty').hidden = true;
     $('table-wrap').hidden = false;
     const tb = $('tbody');
-    tb.innerHTML = portalUsers.map(u => {
+    tb.innerHTML = filtered.map(u => {
       const isMe = u.supabase_user_id === myUserId;
       return `<tr class="${u.is_active ? '' : 'inactive'}" data-id="${esc(u.id)}">
         <td>
@@ -469,6 +495,10 @@
 
   $('btn-add').onclick = openAddModal;
   $('btn-reload').onclick = loadUsers;
+  // v273: 検索/フィルタ → 即時再描画
+  $('user-search')?.addEventListener('input', renderTable);
+  $('user-role-filter')?.addEventListener('change', renderTable);
+  $('user-show-inactive')?.addEventListener('change', renderTable);
 
   // ===== Init =====
   const authData = await fetchAuthState();

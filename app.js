@@ -2244,6 +2244,39 @@ function renderHomeDashboard() {
   };
   const kpiRange = calcKPI(rangeRows);
 
+  // v273: 前期間比較 (range と同じ長さの「ひとつ前」期間)
+  const ymToDate = (ym) => { const [y,m] = ym.split('/').map(Number); return new Date(y, m-1, 1); };
+  const dateToYM = (d) => `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  const fromDate = ymToDate(range.fromYM);
+  const toDate = ymToDate(range.toYM);
+  const monthsLen = (toDate.getFullYear()-fromDate.getFullYear())*12 + (toDate.getMonth()-fromDate.getMonth()) + 1;
+  const prevToDate = new Date(fromDate); prevToDate.setMonth(prevToDate.getMonth() - 1);
+  const prevFromDate = new Date(prevToDate); prevFromDate.setMonth(prevFromDate.getMonth() - (monthsLen - 1));
+  const prevFromYM = dateToYM(prevFromDate);
+  const prevToYM = dateToYM(prevToDate);
+  const prevRangeRows = active.filter(d => {
+    const bd = d.bookDate || '';
+    if (!bd) return false;
+    const m = bd.match(/(\d{4})\D+(\d{1,2})/);
+    if (!m) return false;
+    const ym = `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}`;
+    return ym >= prevFromYM && ym <= prevToYM;
+  });
+  const kpiPrev = calcKPI(prevRangeRows);
+  // 増減計算
+  const delta = (cur, prev) => {
+    if (prev === 0) return cur > 0 ? 100 : 0;
+    return Math.round((cur - prev) / prev * 100);
+  };
+  const fmtDelta = (cur, prev) => {
+    if (cur === prev) return '';
+    const d = delta(cur, prev);
+    if (d === 0) return '';
+    const arrow = d > 0 ? '▲' : '▼';
+    const color = d > 0 ? '#059669' : '#dc2626';
+    return `<span style="font-size:9px;color:${color};font-weight:600;margin-left:4px">${arrow}${Math.abs(d)}%</span>`;
+  };
+
   // 既存指標 (互換性のため)
   const thisMonthAll = active.filter(d => (d.bookDate || '').startsWith(thisMonth));
   const thisMonthContracted = thisMonthAll.filter(d => d.status === '成約');
@@ -2355,37 +2388,38 @@ function renderHomeDashboard() {
         <span style="font-size:11px;color:var(--text-sub)">〜</span>
         <input type="month" id="home-to-month" value="${escapeHtml(monthInputValue(range.toYM))}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit">
       </div>
-      <!-- KPI 表示 -->
+      <!-- KPI 表示 (前期間比較付き) -->
       <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
         <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px">
           <div style="font-size:10px;color:var(--text-sub);font-weight:600">予約</div>
-          <div style="font-size:22px;font-weight:800;color:#1a1a1a">${kpiRange.booking}</div>
+          <div style="font-size:22px;font-weight:800;color:#1a1a1a">${kpiRange.booking}${fmtDelta(kpiRange.booking, kpiPrev.booking)}</div>
         </div>
         <div style="text-align:center;padding:10px;background:#eff6ff;border-radius:8px">
           <div style="font-size:10px;color:#1d4ed8;font-weight:600">来院</div>
-          <div style="font-size:22px;font-weight:800;color:#1d4ed8">${kpiRange.visited}</div>
+          <div style="font-size:22px;font-weight:800;color:#1d4ed8">${kpiRange.visited}${fmtDelta(kpiRange.visited, kpiPrev.visited)}</div>
         </div>
         <div style="text-align:center;padding:10px;background:${kpiRange.visitRate>=70?'#dcfce7':kpiRange.visitRate>=50?'#fef3c7':'#fee2e2'};border-radius:8px">
           <div style="font-size:10px;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'};font-weight:600">来院率</div>
-          <div style="font-size:22px;font-weight:800;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'}">${kpiRange.booking?kpiRange.visitRate+'%':'-'}</div>
+          <div style="font-size:22px;font-weight:800;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'}">${kpiRange.booking?kpiRange.visitRate+'%':'-'}${fmtDelta(kpiRange.visitRate, kpiPrev.visitRate)}</div>
         </div>
         <div style="text-align:center;padding:10px;background:#dcfce7;border-radius:8px">
           <div style="font-size:10px;color:#059669;font-weight:600">成約</div>
-          <div style="font-size:22px;font-weight:800;color:#059669">${kpiRange.contracted}</div>
+          <div style="font-size:22px;font-weight:800;color:#059669">${kpiRange.contracted}${fmtDelta(kpiRange.contracted, kpiPrev.contracted)}</div>
         </div>
         <div style="text-align:center;padding:10px;background:${kpiRange.decideRate>=40?'#dcfce7':kpiRange.decideRate>=20?'#fef3c7':'#fee2e2'};border-radius:8px">
           <div style="font-size:10px;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'};font-weight:600">決定率</div>
-          <div style="font-size:22px;font-weight:800;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'}">${kpiRange.visited?kpiRange.decideRate+'%':'-'}</div>
+          <div style="font-size:22px;font-weight:800;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'}">${kpiRange.visited?kpiRange.decideRate+'%':'-'}${fmtDelta(kpiRange.decideRate, kpiPrev.decideRate)}</div>
         </div>
         <div style="text-align:center;padding:10px;background:#ecfeff;border-radius:8px">
           <div style="font-size:10px;color:#0891b2;font-weight:600">成約単価</div>
-          <div style="font-size:18px;font-weight:800;color:#0e7490">${kpiRange.unitPrice?fmtYen(kpiRange.unitPrice):'-'}</div>
+          <div style="font-size:18px;font-weight:800;color:#0e7490">${kpiRange.unitPrice?fmtYen(kpiRange.unitPrice):'-'}${fmtDelta(kpiRange.unitPrice, kpiPrev.unitPrice)}</div>
         </div>
         <div style="text-align:center;padding:10px;background:#ecfeff;border-radius:8px">
           <div style="font-size:10px;color:#0891b2;font-weight:600">合計金額</div>
-          <div style="font-size:18px;font-weight:800;color:#0e7490">${fmtYen(kpiRange.amount)}</div>
+          <div style="font-size:18px;font-weight:800;color:#0e7490">${fmtYen(kpiRange.amount)}${fmtDelta(kpiRange.amount, kpiPrev.amount)}</div>
         </div>
       </div>
+      <div style="margin-top:6px;font-size:10px;color:var(--text-sub)">前期間比較: ${escapeHtml(prevFromYM === prevToYM ? ymToLabel(prevFromYM) : ymToLabel(prevFromYM)+'〜'+ymToLabel(prevToYM))}</div>
       ${weekCancel > 0 ? `<div style="margin-top:8px;font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</div>` : ''}
     </div>
 
@@ -2650,6 +2684,15 @@ function renderPhoneCheck() {
     // 医院フィルタ (空配列なら全医院)
     if (facSet.size > 0 && !facSet.has(normFac(d.facility))) return false;
     if (!_phoneCheckState.showCalled && (d.status === '確認済' || d.status === '来院済' || d.status === '成約')) return false;
+    // v273: 統計バッジ絞り込み
+    if (_phoneCheckState.statusFilter) {
+      const sf = _phoneCheckState.statusFilter;
+      if (sf === '未対応') {
+        if (d.status && d.status !== '未対応') return false;
+      } else {
+        if (d.status !== sf) return false;
+      }
+    }
     return true;
   });
 
@@ -2688,12 +2731,12 @@ function renderPhoneCheck() {
       <p style="font-size:11px;color:var(--text-sub);margin:0">今日・明日の予約を優先度順に整理。電話後はステータス・メモを即更新。</p>
     </div>
 
-    <!-- 統計バッジ -->
+    <!-- 統計バッジ (クリックで該当ステータスのみ絞り込み) -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-      <div style="padding:6px 12px;background:#fef3c7;color:#b45309;border-radius:14px;font-size:11px;font-weight:700">対象 ${stats.total}件</div>
-      <div style="padding:6px 12px;background:#fee2e2;color:#dc2626;border-radius:14px;font-size:11px;font-weight:700">未対応 ${stats.pending}件</div>
-      <div style="padding:6px 12px;background:#fef3c7;color:#92400e;border-radius:14px;font-size:11px;font-weight:700">留守電 ${stats.rusu}件</div>
-      <div style="padding:6px 12px;background:#f5f3ff;color:#7c3aed;border-radius:14px;font-size:11px;font-weight:700">折り返し ${stats.cb}件</div>
+      <button class="phone-stat-btn" data-stat="all"     style="padding:6px 12px;background:${!_phoneCheckState.statusFilter?'#1a1a1a':'#fef3c7'};color:${!_phoneCheckState.statusFilter?'#fff':'#b45309'};border:1px solid ${!_phoneCheckState.statusFilter?'#1a1a1a':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">対象 ${stats.total}件</button>
+      <button class="phone-stat-btn" data-stat="未対応"   style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='未対応'?'#dc2626':'#fee2e2'};color:${_phoneCheckState.statusFilter==='未対応'?'#fff':'#dc2626'};border:1px solid ${_phoneCheckState.statusFilter==='未対応'?'#dc2626':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">未対応 ${stats.pending}件</button>
+      <button class="phone-stat-btn" data-stat="留守電"   style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='留守電'?'#92400e':'#fef3c7'};color:${_phoneCheckState.statusFilter==='留守電'?'#fff':'#92400e'};border:1px solid ${_phoneCheckState.statusFilter==='留守電'?'#92400e':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">留守電 ${stats.rusu}件</button>
+      <button class="phone-stat-btn" data-stat="折り返し" style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='折り返し'?'#7c3aed':'#f5f3ff'};color:${_phoneCheckState.statusFilter==='折り返し'?'#fff':'#7c3aed'};border:1px solid ${_phoneCheckState.statusFilter==='折り返し'?'#7c3aed':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">折り返し ${stats.cb}件</button>
     </div>
 
     <!-- フィルタ -->
@@ -2800,6 +2843,19 @@ function renderPhoneCheck() {
     _phoneCheckState.showCalled = e.target.checked;
     _savePhoneCheckState();
     renderPhoneCheck();
+  });
+  // v273: 統計バッジクリックで絞り込み
+  el.querySelectorAll('.phone-stat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const s = btn.dataset.stat;
+      if (s === 'all' || _phoneCheckState.statusFilter === s) {
+        delete _phoneCheckState.statusFilter;
+      } else {
+        _phoneCheckState.statusFilter = s;
+      }
+      _savePhoneCheckState();
+      renderPhoneCheck();
+    });
   });
 
   _bindPhoneCheckRowEvents(el);
