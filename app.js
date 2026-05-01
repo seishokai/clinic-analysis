@@ -2328,7 +2328,7 @@ function switchBookingSub(subId) {
 
 // === v262 電話前確認タブ ===
 let _phoneCheckState = {
-  period: 'today_tomorrow',  // today / tomorrow / today_tomorrow / all_future
+  period: 'all_future',  // v273: デフォルト「未来全部」(all_future / today / tomorrow / today_tomorrow)
   facilities: [],  // v273: 医院複数選択 (空配列 = 全医院)
   showCalled: true,  // v273: 確認済も含めて表示 (アクション後に行が消えないように)
 };
@@ -2438,7 +2438,7 @@ function renderPhoneCheck() {
       </div>
     ` : `
       <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:720px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:880px">
           <thead>
             <tr style="background:#f9fafb">
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">登録日</th>
@@ -2447,6 +2447,7 @@ function renderPhoneCheck() {
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">メモ</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
             </tr>
           </thead>
@@ -2529,12 +2530,8 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   const phone = canViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
   const fac = normFac(d.facility);
   const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
-  // メモ: フル幅で表示、改行をそのまま反映 (white-space:pre-wrap)
-  const memoCellHtml = memo
-    ? `<div style="padding:8px 12px;font-size:12px;color:#5a4a10;background:#fffbeb;border-top:1px dashed #fcd34d;line-height:1.6;white-space:pre-wrap;word-wrap:break-word;text-align:left">
-         <span style="font-weight:700;color:#92400e;letter-spacing:1px;font-size:10px;margin-right:4px">📝 メモ</span>${escapeHtml(memo)}
-       </div>`
-    : '';
+  // メモセル (来院タブと同じスタイル: クリックで編集モーダル、黄色ハイライト)
+  const memoCellHtml = `<td class="phone-memo-cell" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${escapeHtml(memo)}">${memo ? escapeHtml(_flattenMemoForDisplay(memo, 60)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>`;
 
   return `<tr class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="border-bottom:1px solid var(--border)">
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap">${adStr}</td>
@@ -2543,14 +2540,14 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
     <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
+    ${memoCellHtml}
     <td style="padding:6px 10px;text-align:left;white-space:nowrap">
       <button class="phone-status-btn" data-st="確認済"   title="確認済" style="padding:4px 7px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">✅</button>
       <button class="phone-status-btn" data-st="留守電"   title="留守電" style="padding:4px 7px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">🎤</button>
       <button class="phone-status-btn" data-st="折り返し" title="折り返し" style="padding:4px 7px;background:#f5f3ff;color:#7c3aed;border:1px solid #d8b4fe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">↩</button>
-      <button class="phone-memo-btn"                     title="メモ"    style="padding:4px 7px;background:#fff8e1;color:#b45309;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">📝</button>
       <button class="phone-status-btn" data-st="未対応"   title="取り消し (未対応に戻す)" style="padding:4px 7px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↻</button>
     </td>
-  </tr>${memo ? `<tr><td colspan="7" style="padding:0">${memoCellHtml}</td></tr>` : ''}`;
+  </tr>`;
 }
 
 function _bindPhoneCheckRowEvents(el) {
@@ -2583,16 +2580,21 @@ function _bindPhoneCheckRowEvents(el) {
         }
       });
     });
-    row.querySelector('.phone-memo-btn')?.addEventListener('click', () => {
-      openMemoModal(name, apply, null);
-      // メモ保存後に再描画
-      const check = setInterval(() => {
-        if (document.getElementById('memo-modal').hidden) {
-          clearInterval(check);
-          renderPhoneCheck();
-        }
-      }, 300);
-    });
+    // v273: メモセルクリックで編集モーダル (来院タブと同じUX)
+    const memoCell = row.querySelector('.phone-memo-cell');
+    if (memoCell) {
+      memoCell.addEventListener('click', () => {
+        openMemoModal(memoCell.dataset.name, memoCell.dataset.apply, memoCell);
+        // メモ保存後に再描画
+        const check = setInterval(() => {
+          const modal = document.getElementById('memo-modal');
+          if (!modal || modal.hidden) {
+            clearInterval(check);
+            renderPhoneCheck();
+          }
+        }, 300);
+      });
+    }
   });
 }
 
