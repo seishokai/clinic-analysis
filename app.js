@@ -2494,7 +2494,11 @@ function renderPhoneCheck() {
 // v273: テーブル行 (登録日 / 予約日時 / 名前 / 医院 / 連絡先 / 状況 / アクション)
 function _renderPhoneCheckRow(d, canViewPII, memos) {
   const key = d.name + '|' + d.applyDate;
-  const memo = memos[key] || d._memo || '';
+  // メモ取得: 予約・来院タブと同じロジックに統一
+  // 1. このレコードの _memo (Sheets 側のメモ)
+  // 2. 既存メモ (BF lifecycle / bk-memos / 他レコード) を名前ベースで検索
+  // 3. 個別キーのメモ (この予約専用)
+  const memo = (d._memo || findAnyMemo(d.name) || memos[key] || '');
   // 共通フォーマッタ: Date→MM/DD (登録日・予約日で統一)
   const fmtMD = (date) => {
     if (!date || isNaN(date.getTime())) return '';
