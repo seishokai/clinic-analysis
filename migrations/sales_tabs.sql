@@ -93,16 +93,16 @@ CREATE POLICY sales_tabs_delete
   );
 
 -- 4. 既存タブの初期データ投入
--- 親タブ（順番に sort_order=1〜6）
+-- 注: /sales/index.html から開かれるため、内部URLは /clinic-analysis/ 起点の絶対パス
 WITH inserted_parents AS (
   INSERT INTO public.sales_tabs (label, url, external, highlight, sort_order)
   VALUES
     ('研修サイト',         NULL,                                                FALSE, FALSE, 10),
     ('ドクターシフト',     'https://seishokai.github.io/shift/',                TRUE,  FALSE, 20),
-    ('口コミ',             'reviews.html',                                      FALSE, FALSE, 30),
+    ('口コミ',             '/clinic-analysis/reviews.html',                    FALSE, FALSE, 30),
     ('SEO',                'https://seo-web-lake.vercel.app/sites/1',           TRUE,  FALSE, 40),
-    ('デンタルローン',     'dental-loan/',                                      FALSE, FALSE, 50),
-    ('🎯 PBMインセンティブ', 'pbm.html',                                        FALSE, TRUE,  60)
+    ('デンタルローン',     '/clinic-analysis/dental-loan/',                    FALSE, FALSE, 50),
+    ('🎯 PBMインセンティブ', '/clinic-analysis/pbm.html',                       FALSE, TRUE,  60)
   RETURNING id, label
 )
 INSERT INTO public.sales_tabs (parent_id, label, url, external, sort_order)
@@ -116,9 +116,9 @@ FROM inserted_parents p
 CROSS JOIN LATERAL (
   VALUES
     ('動画研修',       'https://owojchhi.gensparkspace.com/index.html', TRUE,  10),
-    ('Q&A研修',        'qa.html',                                       FALSE, 20),
-    ('矯正アドバンス', 'ortho.html',                                    FALSE, 30),
-    ('矯正アドバンス2','ortho2.html',                                   FALSE, 40)
+    ('Q&A研修',        '/clinic-analysis/qa.html',                       FALSE, 20),
+    ('矯正アドバンス', '/clinic-analysis/ortho.html',                    FALSE, 30),
+    ('矯正アドバンス2','/clinic-analysis/ortho2.html',                   FALSE, 40)
 ) AS c(label, url, external, sort_order)
 WHERE p.label = '研修サイト';
 
