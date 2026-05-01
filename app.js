@@ -1076,6 +1076,15 @@ function setupEventListeners() {
         return;
       }
       sessionStorage.setItem('authenticated', 'true');
+      // v271: 外部ページからの遷移なら main アプリを描画せず即リダイレクト (フラッシュ防止)
+      try {
+        const afterLoginUrl = sessionStorage.getItem('after-login-url');
+        if (afterLoginUrl && /^\/[\w\-/]/.test(afterLoginUrl) && !afterLoginUrl.startsWith('//')) {
+          sessionStorage.removeItem('after-login-url');
+          location.href = afterLoginUrl;
+          return;
+        }
+      } catch(_){}
       showApp();
     } catch (e) {
       if (errEl) { errEl.textContent = (e && e.message) || 'ログインに失敗しました'; errEl.hidden = false; }

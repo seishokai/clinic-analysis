@@ -329,7 +329,8 @@
       badge.className = 'badge guest';
       btn.textContent = '管理者ログイン';
       btn.onclick = () => {
-        sessionStorage.setItem('portal-redirect-after-login', 'users');
+        // ログイン後にこのページへ自動リダイレクト
+        try { sessionStorage.setItem('after-login-url', location.pathname); } catch(_){}
         location.href = '../';
       };
     }
@@ -607,6 +608,8 @@
 
   if (!authData.isAdmin) {
     $('denied').hidden = false;
+    // 権限不足ページでは右上のログインボタンを隠す (中央のCTAと重複するため)
+    $('auth-btn').hidden = true;
     return;
   }
   $('main-ui').hidden = false;
