@@ -6911,6 +6911,12 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     <button class="kaiin-header-toggle" style="padding:4px 10px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▼ ヘッダーを表示</button>
     <div class="kaiin-topbar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:4px 6px;background:var(--card);border:1px solid var(--border);border-radius:6px">
       <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px;padding:5px 8px;font-size:12px">
+      <select class="form-select kaiin-filter-period" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto">
+        <option value="">期間:全て</option>
+        <option value="thisMonth" selected>今月（来院日基準）</option>
+        <option value="thisMonthApply">今月（登録日基準）</option>
+        <option value="lastMonth">先月</option>
+      </select>
       <span class="kaiin-filter-tool-slot"></span>
       <span class="kaiin-filter-promo-slot"></span>
       <span class="kaiin-filter-csfac-slot"></span>
@@ -7061,6 +7067,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const filterScope = el.closest('[id^="sub-kaiin-"]') || el;
   filterScope.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
+  filterScope.querySelector('.kaiin-filter-period')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-pdf-btn')?.addEventListener('click', () => {
     const prevTitle = document.title;
@@ -7086,7 +7093,25 @@ function drawKaiinRows(treatment, rows, container) {
   const statusSet = state.status || new Set();
   const sortBy = scope.querySelector('.kaiin-sort')?.value || 'date-desc';
   const statuses = getStatusesForTreatment(treatment);
+  // v273: 期間フィルタ (デフォルト 今月 来院日基準)
+  const period = scope.querySelector('.kaiin-filter-period')?.value || '';
   let filtered = rows.slice();
+  if (period) {
+    const ymOf = (d, useApply) => {
+      const src = useApply ? (d.applyDate||'') : (d.bookDate || d.applyDate || '');
+      const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
+      return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : '';
+    };
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    if (period === 'thisMonth') filtered = filtered.filter(d => ymOf(d, false) === ym);
+    else if (period === 'thisMonthApply') filtered = filtered.filter(d => ymOf(d, true) === ym);
+    else if (period === 'lastMonth') {
+      const last = new Date(now); last.setMonth(last.getMonth()-1);
+      const lym = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}`;
+      filtered = filtered.filter(d => ymOf(d, false) === lym);
+    }
+  }
   if (fac) filtered = filtered.filter(d => normFac(d.facility) === fac);
   if (q) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(q));
   if (toolSet.size) filtered = filtered.filter(d => toolSet.has(d.tool));
