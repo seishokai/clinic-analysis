@@ -2330,7 +2330,7 @@ function switchBookingSub(subId) {
 let _phoneCheckState = {
   period: 'today_tomorrow',  // today / tomorrow / today_tomorrow
   facility: '',
-  showCalled: false,  // 確認済も表示するか
+  showCalled: true,  // v273: 確認済も含めて表示 (アクション後に行が消えないように)
 };
 
 function renderPhoneCheck() {
