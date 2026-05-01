@@ -2201,6 +2201,31 @@ function renderHomeDashboard() {
   });
   const thisMonthAmount = thisMonthContracted.reduce((s, d) => s + Number(d.contractAmount || 0), 0);
 
+  // v273: 今月の予約 (医院別 / 治療別)
+  const thisMonthAll = active.filter(d => (d.bookDate || '').startsWith(thisMonth));
+  const visitedStatuses = new Set(['来院済', '成約']);
+  const isVisited = (s) => visitedStatuses.has(s) || (typeof IMPLANT_TREATMENT_STAGES !== 'undefined' && Array.isArray(IMPLANT_TREATMENT_STAGES) && IMPLANT_TREATMENT_STAGES.includes(s));
+  // 医院別
+  const byFacMonth = {};
+  thisMonthAll.forEach(d => {
+    const f = normFac(d.facility) || '-';
+    if (!byFacMonth[f]) byFacMonth[f] = { booking: 0, visited: 0, contracted: 0 };
+    byFacMonth[f].booking++;
+    if (isVisited(d.status)) byFacMonth[f].visited++;
+    if (d.status === '成約') byFacMonth[f].contracted++;
+  });
+  const facList = Object.keys(byFacMonth).sort((a,b) => byFacMonth[b].booking - byFacMonth[a].booking);
+  // 治療別
+  const byTreatMonth = {};
+  thisMonthAll.forEach(d => {
+    const t = (typeof normSvc === 'function' ? normSvc(d.service) : d.service) || '-';
+    if (!byTreatMonth[t]) byTreatMonth[t] = { booking: 0, visited: 0, contracted: 0 };
+    byTreatMonth[t].booking++;
+    if (isVisited(d.status)) byTreatMonth[t].visited++;
+    if (d.status === '成約') byTreatMonth[t].contracted++;
+  });
+  const treatList = Object.keys(byTreatMonth).sort((a,b) => byTreatMonth[b].booking - byTreatMonth[a].booking);
+
   // キャンセル (今週)
   const weekCancel = active.filter(d => {
     if (d.status !== 'キャンセル') return false;
@@ -2259,11 +2284,65 @@ function renderHomeDashboard() {
     <div style="background:linear-gradient(135deg,#ecfeff 0%,#dbeafe 100%);border:1px solid #06b6d4;border-radius:12px;padding:12px 14px;margin-bottom:14px">
       <div style="font-size:11px;color:#0891b2;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">📊 今月の実績</div>
       <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline">
-        <div><span style="font-size:22px;font-weight:800;color:#0e7490">${thisMonthContracted.length}</span><span style="font-size:11px;color:#0891b2;margin-left:3px">件成約</span></div>
-        <div><span style="font-size:20px;font-weight:700;color:#0e7490">${fmtYen(thisMonthAmount)}</span></div>
+        <div><span style="font-size:14px;color:#0891b2">予約</span> <span style="font-size:22px;font-weight:800;color:#0e7490">${thisMonthAll.length}</span><span style="font-size:11px;color:#0891b2;margin-left:2px">件</span></div>
+        <div><span style="font-size:14px;color:#0891b2">来院</span> <span style="font-size:22px;font-weight:800;color:#1d4ed8">${thisMonthAll.filter(d => isVisited(d.status)).length}</span><span style="font-size:11px;color:#0891b2;margin-left:2px">件</span></div>
+        <div><span style="font-size:14px;color:#0891b2">成約</span> <span style="font-size:22px;font-weight:800;color:#0e7490">${thisMonthContracted.length}</span><span style="font-size:11px;color:#0891b2;margin-left:2px">件</span></div>
+        <div><span style="font-size:18px;font-weight:700;color:#0e7490">${fmtYen(thisMonthAmount)}</span></div>
         ${weekCancel > 0 ? `<div style="margin-left:auto"><span style="font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</span></div>` : ''}
       </div>
     </div>
+
+    <!-- v273: 今月の医院別 / 治療別 サマリー -->
+    ${facList.length > 0 ? `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
+        <!-- 医院別 -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🏥 今月 医院別</div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="color:var(--text-sub);font-weight:600">
+              <th style="text-align:left;padding:3px 4px;font-weight:600">医院</th>
+              <th style="text-align:right;padding:3px 4px;font-weight:600">予約</th>
+              <th style="text-align:right;padding:3px 4px;font-weight:600">来院</th>
+              <th style="text-align:right;padding:3px 4px;font-weight:600">成約</th>
+            </tr></thead>
+            <tbody>
+              ${facList.map(f => {
+                const v = byFacMonth[f];
+                return `<tr style="border-top:1px solid #f3f4f6">
+                  <td style="padding:4px;text-align:left">${escapeHtml(f)}</td>
+                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#1d4ed8">${v.booking}</td>
+                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#0891b2">${v.visited}</td>
+                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#059669">${v.contracted}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+        <!-- 治療別 -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px">
+          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🦷 今月 治療別</div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px">
+            <thead><tr style="color:var(--text-sub);font-weight:600">
+              <th style="text-align:left;padding:3px 4px;font-weight:600">治療</th>
+              <th style="text-align:right;padding:3px 4px;font-weight:600">予約</th>
+              <th style="text-align:right;padding:3px 4px;font-weight:600">来院</th>
+              <th style="text-align:right;padding:3px 4px;font-weight:600">成約</th>
+            </tr></thead>
+            <tbody>
+              ${treatList.map(t => {
+                const v = byTreatMonth[t];
+                return `<tr style="border-top:1px solid #f3f4f6">
+                  <td style="padding:4px;text-align:left">${escapeHtml(t)}</td>
+                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#1d4ed8">${v.booking}</td>
+                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#0891b2">${v.visited}</td>
+                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#059669">${v.contracted}</td>
+                </tr>`;
+              }).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ` : ''}
 
     ${todaySorted.length > 0 ? `
       <!-- 今日の予約リスト -->
