@@ -2445,6 +2445,8 @@ function renderPhoneCheck() {
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">施術名</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">プロモ</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);width:100%">メモ</th>
@@ -2539,6 +2541,8 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
     <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
     <td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap">${escapeHtml(name || '')}</td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(normSvc(d.service) || '-')}</td>
+    <td style="padding:8px 10px;font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
     ${memoCellHtml}
