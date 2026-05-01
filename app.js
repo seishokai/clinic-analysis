@@ -2154,6 +2154,9 @@ function restoreLastView() {
 
 // === Navigation ===
 // === v261 ホームダッシュボード ===
+// v273: ホームダッシュボードの分析期間 (デフォルト = 今月)
+let _homeAnalysisRange = null; // null = thisMonth、{ fromYM, toYM, label } の形式
+
 function renderHomeDashboard() {
   const el = document.getElementById('home-dashboard-content');
   if (!el) return;
@@ -2170,6 +2173,26 @@ function renderHomeDashboard() {
   const weekEnd = new Date(todayEnd.getTime() + 6*24*3600*1000);
   const thisMonth = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}`;
   const active = data.filter(d => d.status !== '除外');
+  // 選択中の分析期間 (デフォルト = 今月)
+  const ymToLabel = (ym) => {
+    const [y, m] = ym.split('/');
+    return `${y}年${parseInt(m)}月`;
+  };
+  const ymOffset = (offset) => {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  };
+  const range = _homeAnalysisRange || { fromYM: thisMonth, toYM: thisMonth, label: '今月' };
+  // 期間内に含まれる行 (bookDate ベース)
+  const inRange = (d) => {
+    const bd = (d.bookDate || '');
+    if (!bd) return false;
+    const m = bd.match(/(\d{4})\D+(\d{1,2})/);
+    if (!m) return false;
+    const ym = `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}`;
+    return ym >= range.fromYM && ym <= range.toYM;
+  };
+  const rangeRows = active.filter(inRange);
 
   // 今日の予約
   const today = active.filter(d => {
@@ -2193,15 +2216,9 @@ function renderHomeDashboard() {
   // 今日の予約 時間順
   const todaySorted = today.slice().sort((a,b) => (a.bookDate||'').localeCompare(b.bookDate||''));
 
-  // v273: 月別分析 (先月 / 今月 / 来月) + KPI (来院率, 決定率, 成約単価)
+  // v273: KPI計算 (期間範囲対応)
   const visitedStatuses = new Set(['来院済', '成約']);
   const isVisited = (s) => visitedStatuses.has(s) || (typeof IMPLANT_TREATMENT_STAGES !== 'undefined' && Array.isArray(IMPLANT_TREATMENT_STAGES) && IMPLANT_TREATMENT_STAGES.includes(s));
-  const monthKey = (offset) => {
-    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
-    return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
-  };
-  const lastMonth = monthKey(-1);
-  const nextMonth = monthKey(1);
   const calcKPI = (rows) => {
     const booking = rows.length;
     const visited = rows.filter(d => isVisited(d.status)).length;
@@ -2217,22 +2234,16 @@ function renderHomeDashboard() {
       unitPrice: contracted.length > 0 ? Math.round(amount / contracted.length) : 0,
     };
   };
-  // bookDate でその月に該当するもの
-  const filterMonth = (ym) => active.filter(d => (d.bookDate || '').startsWith(ym));
-  const lastMonthRows = filterMonth(lastMonth);
-  const thisMonthAll = filterMonth(thisMonth);
-  const nextMonthRows = filterMonth(nextMonth);
-  const kpiLast = calcKPI(lastMonthRows);
-  const kpiThis = calcKPI(thisMonthAll);
-  const kpiNext = calcKPI(nextMonthRows);
+  const kpiRange = calcKPI(rangeRows);
 
   // 既存指標 (互換性のため)
+  const thisMonthAll = active.filter(d => (d.bookDate || '').startsWith(thisMonth));
   const thisMonthContracted = thisMonthAll.filter(d => d.status === '成約');
-  const thisMonthAmount = kpiThis.amount;
+  const thisMonthAmount = thisMonthContracted.reduce((s,d) => s + Number(d.contractAmount||0), 0);
 
-  // 医院別 / 治療別 (今月)
+  // 医院別 / 治療別 (選択期間)
   const byFacMonth = {};
-  thisMonthAll.forEach(d => {
+  rangeRows.forEach(d => {
     const f = normFac(d.facility) || '-';
     if (!byFacMonth[f]) byFacMonth[f] = { booking: 0, visited: 0, contracted: 0 };
     byFacMonth[f].booking++;
@@ -2242,7 +2253,7 @@ function renderHomeDashboard() {
   const facList = Object.keys(byFacMonth).sort((a,b) => byFacMonth[b].booking - byFacMonth[a].booking);
 
   const byTreatMonth = {};
-  thisMonthAll.forEach(d => {
+  rangeRows.forEach(d => {
     const t = (typeof normSvc === 'function' ? normSvc(d.service) : d.service) || '-';
     if (!byTreatMonth[t]) byTreatMonth[t] = { booking: 0, visited: 0, contracted: 0 };
     byTreatMonth[t].booking++;
@@ -2250,6 +2261,18 @@ function renderHomeDashboard() {
     if (d.status === '成約') byTreatMonth[t].contracted++;
   });
   const treatList = Object.keys(byTreatMonth).sort((a,b) => byTreatMonth[b].booking - byTreatMonth[a].booking);
+
+  // 期間ラベル
+  const rangeLabel = range.label || (range.fromYM === range.toYM ? ymToLabel(range.fromYM) : `${ymToLabel(range.fromYM)}〜${ymToLabel(range.toYM)}`);
+  // 期間プリセットの判定
+  const presetMatch = (preset) => {
+    if (preset === 'last' && range.fromYM === ymOffset(-1) && range.toYM === ymOffset(-1)) return true;
+    if (preset === 'this' && range.fromYM === ymOffset(0) && range.toYM === ymOffset(0)) return true;
+    if (preset === 'next' && range.fromYM === ymOffset(1) && range.toYM === ymOffset(1)) return true;
+    if (preset === '3m' && range.fromYM === ymOffset(-1) && range.toYM === ymOffset(1)) return true;
+    return false;
+  };
+  const monthInputValue = (ym) => ym.replace('/', '-'); // YYYY/MM → YYYY-MM (input type=month)
 
   // キャンセル (今週)
   const weekCancel = active.filter(d => {
@@ -2305,55 +2328,65 @@ function renderHomeDashboard() {
       </div>
     </div>
 
-    <!-- v273 月別分析 (先月 / 今月 / 来月) + KPI -->
+    <!-- v273 期間分析: クイック選択 + カスタム範囲 + KPI -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-        <div style="font-size:13px;font-weight:700;color:#1a1a1a">📊 月別分析</div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a">📊 期間分析: <span style="color:#1d4ed8">${escapeHtml(rangeLabel)}</span></div>
         <div style="font-size:10px;color:var(--text-sub)">予約日基準 / 来院率=来院÷予約 / 決定率=成約÷来院</div>
       </div>
-      <div style="overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
-          <thead>
-            <tr style="background:#f9fafb;color:var(--text-sub);font-weight:600">
-              <th style="padding:6px 8px;text-align:left;font-size:10px;letter-spacing:1px">期間</th>
-              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">予約</th>
-              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">来院</th>
-              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">来院率</th>
-              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">成約</th>
-              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">決定率</th>
-              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">単価</th>
-              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">合計金額</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${[
-              { label: '先月', kpi: kpiLast, color:'#9ca3af' },
-              { label: '今月', kpi: kpiThis, color:'#1d4ed8', highlight: true },
-              { label: '来月 (予定)', kpi: kpiNext, color:'#7c3aed' },
-            ].map(row => `
-              <tr style="border-top:1px solid #f3f4f6;${row.highlight?'background:#eff6ff':''}">
-                <td style="padding:7px 8px;font-weight:${row.highlight?700:500};color:${row.color}">${row.label}</td>
-                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">${row.kpi.booking}</td>
-                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#1d4ed8">${row.kpi.visited}</td>
-                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:${row.kpi.visitRate>=70?'#059669':row.kpi.visitRate>=50?'#d97706':'#dc2626'};font-weight:700">${row.kpi.booking?row.kpi.visitRate+'%':'-'}</td>
-                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#059669;font-weight:700">${row.kpi.contracted}</td>
-                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:${row.kpi.decideRate>=40?'#059669':row.kpi.decideRate>=20?'#d97706':'#dc2626'};font-weight:700">${row.kpi.visited?row.kpi.decideRate+'%':'-'}</td>
-                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#0e7490">${row.kpi.unitPrice?fmtYen(row.kpi.unitPrice):'-'}</td>
-                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#0e7490;font-weight:700">${fmtYen(row.kpi.amount)}</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
+      <!-- 期間セレクター -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:8px;background:#f9fafb;border-radius:8px">
+        <span style="font-size:11px;color:var(--text-sub);font-weight:600;letter-spacing:1px;margin-right:4px">期間</span>
+        <button class="home-period-btn" data-preset="last" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('last')?'#1a1a1a':'var(--border)'};background:${presetMatch('last')?'#1a1a1a':'#fff'};color:${presetMatch('last')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">前月</button>
+        <button class="home-period-btn" data-preset="this" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('this')?'#1a1a1a':'var(--border)'};background:${presetMatch('this')?'#1a1a1a':'#fff'};color:${presetMatch('this')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">今月</button>
+        <button class="home-period-btn" data-preset="next" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('next')?'#1a1a1a':'var(--border)'};background:${presetMatch('next')?'#1a1a1a':'#fff'};color:${presetMatch('next')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">来月</button>
+        <button class="home-period-btn" data-preset="3m" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('3m')?'#1a1a1a':'var(--border)'};background:${presetMatch('3m')?'#1a1a1a':'#fff'};color:${presetMatch('3m')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">前月〜来月</button>
+        <span style="margin:0 4px;color:var(--text-sub)">|</span>
+        <span style="font-size:11px;color:var(--text-sub)">カスタム:</span>
+        <input type="month" id="home-from-month" value="${escapeHtml(monthInputValue(range.fromYM))}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit">
+        <span style="font-size:11px;color:var(--text-sub)">〜</span>
+        <input type="month" id="home-to-month" value="${escapeHtml(monthInputValue(range.toYM))}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit">
+      </div>
+      <!-- KPI 表示 -->
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
+        <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px">
+          <div style="font-size:10px;color:var(--text-sub);font-weight:600">予約</div>
+          <div style="font-size:22px;font-weight:800;color:#1a1a1a">${kpiRange.booking}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#eff6ff;border-radius:8px">
+          <div style="font-size:10px;color:#1d4ed8;font-weight:600">来院</div>
+          <div style="font-size:22px;font-weight:800;color:#1d4ed8">${kpiRange.visited}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:${kpiRange.visitRate>=70?'#dcfce7':kpiRange.visitRate>=50?'#fef3c7':'#fee2e2'};border-radius:8px">
+          <div style="font-size:10px;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'};font-weight:600">来院率</div>
+          <div style="font-size:22px;font-weight:800;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'}">${kpiRange.booking?kpiRange.visitRate+'%':'-'}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#dcfce7;border-radius:8px">
+          <div style="font-size:10px;color:#059669;font-weight:600">成約</div>
+          <div style="font-size:22px;font-weight:800;color:#059669">${kpiRange.contracted}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:${kpiRange.decideRate>=40?'#dcfce7':kpiRange.decideRate>=20?'#fef3c7':'#fee2e2'};border-radius:8px">
+          <div style="font-size:10px;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'};font-weight:600">決定率</div>
+          <div style="font-size:22px;font-weight:800;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'}">${kpiRange.visited?kpiRange.decideRate+'%':'-'}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#ecfeff;border-radius:8px">
+          <div style="font-size:10px;color:#0891b2;font-weight:600">成約単価</div>
+          <div style="font-size:18px;font-weight:800;color:#0e7490">${kpiRange.unitPrice?fmtYen(kpiRange.unitPrice):'-'}</div>
+        </div>
+        <div style="text-align:center;padding:10px;background:#ecfeff;border-radius:8px">
+          <div style="font-size:10px;color:#0891b2;font-weight:600">合計金額</div>
+          <div style="font-size:18px;font-weight:800;color:#0e7490">${fmtYen(kpiRange.amount)}</div>
+        </div>
       </div>
       ${weekCancel > 0 ? `<div style="margin-top:8px;font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</div>` : ''}
     </div>
 
-    <!-- v273: 今月の医院別 / 治療別 サマリー -->
+    <!-- v273: 選択期間の医院別 / 治療別 サマリー -->
     ${facList.length > 0 ? `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
         <!-- 医院別 -->
         <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px">
-          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🏥 今月 医院別</div>
+          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🏥 ${escapeHtml(rangeLabel)} 医院別</div>
           <table style="width:100%;border-collapse:collapse;font-size:11px">
             <thead><tr style="color:var(--text-sub);font-weight:600">
               <th style="text-align:left;padding:3px 4px;font-weight:600">医院</th>
@@ -2376,7 +2409,7 @@ function renderHomeDashboard() {
         </div>
         <!-- 治療別 -->
         <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px">
-          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🦷 今月 治療別</div>
+          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🦷 ${escapeHtml(rangeLabel)} 治療別</div>
           <table style="width:100%;border-collapse:collapse;font-size:11px">
             <thead><tr style="color:var(--text-sub);font-weight:600">
               <th style="text-align:left;padding:3px 4px;font-weight:600">治療</th>
@@ -2470,6 +2503,32 @@ function renderHomeDashboard() {
       setTimeout(() => document.getElementById('bk-today-btn')?.click(), 100);
     });
   });
+  // v273: 期間プリセットボタン
+  el.querySelectorAll('.home-period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const preset = btn.dataset.preset;
+      if (preset === 'last') _homeAnalysisRange = { fromYM: ymOffset(-1), toYM: ymOffset(-1), label: '前月' };
+      else if (preset === 'this') _homeAnalysisRange = { fromYM: ymOffset(0), toYM: ymOffset(0), label: '今月' };
+      else if (preset === 'next') _homeAnalysisRange = { fromYM: ymOffset(1), toYM: ymOffset(1), label: '来月' };
+      else if (preset === '3m') _homeAnalysisRange = { fromYM: ymOffset(-1), toYM: ymOffset(1), label: '前月〜来月' };
+      renderHomeDashboard();
+    });
+  });
+  // カスタム期間 (input type=month) の変更
+  const fromEl = el.querySelector('#home-from-month');
+  const toEl = el.querySelector('#home-to-month');
+  const onCustomChange = () => {
+    const f = (fromEl?.value || '').replace('-', '/');
+    const t = (toEl?.value || '').replace('-', '/');
+    if (f && t) {
+      // 開始 > 終了なら入れ替え
+      const [from, to] = f <= t ? [f, t] : [t, f];
+      _homeAnalysisRange = { fromYM: from, toYM: to, label: null };
+      renderHomeDashboard();
+    }
+  };
+  fromEl?.addEventListener('change', onCustomChange);
+  toEl?.addEventListener('change', onCustomChange);
 }
 function switchBookingSub(subId) {
   const btn = document.querySelector(`#bk-sub-nav .sub-nav-btn[data-sub="${subId}"]`);
