@@ -2333,9 +2333,14 @@ let _phoneCheckState = {
   showCalled: true,  // v273: 確認済も含めて表示 (アクション後に行が消えないように)
 };
 
+// v273: 既存の memo-modal close 検知用 setInterval をモジュールレベルで管理 (スタック防止)
+let _phoneMemoModalCheckInterval = null;
+
 function renderPhoneCheck() {
   const el = document.getElementById('phone-check-content');
   if (!el) return;
+  // Bug fix: 再描画でスクロール位置がリセットされる問題 → 保存して復元
+  const _scrollY = window.scrollY;
 
   const data = Array.isArray(bookingsData) ? (getFilteredBookingsData ? getFilteredBookingsData() : bookingsData) : [];
   const now = new Date();
@@ -2365,12 +2370,21 @@ function renderPhoneCheck() {
     return true;
   });
 
-  // v273: 登録日時 (applyDate) の降順 - 最新の予約者から順に荷電
-  // 同じ登録日なら予約日時 (bookDate) 昇順 で時間が早い順
+  // v273: 登録日時 (applyDate) の降順 / 同登録日なら予約日時 (bookDate) 昇順
+  // (Bug fix: 文字列比較だと "5/30" < "5/7" になるため Date オブジェクトで比較)
+  const _toDateTime = (s) => {
+    if (!s) return 0;
+    const d = parseDate(s);
+    if (!d) return 0;
+    const tm = String(s).match(/(\d{1,2}):(\d{2})/);
+    if (tm) d.setHours(parseInt(tm[1], 10), parseInt(tm[2], 10));
+    return d.getTime();
+  };
   rows.sort((a,b) => {
-    const ad = (b.applyDate || '').localeCompare(a.applyDate || '');
-    if (ad !== 0) return ad;
-    return (a.bookDate || '').localeCompare(b.bookDate || '');
+    const adA = _toDateTime(a.applyDate);
+    const adB = _toDateTime(b.applyDate);
+    if (adA !== adB) return adB - adA; // applyDate DESC
+    return _toDateTime(a.bookDate) - _toDateTime(b.bookDate); // bookDate ASC
   });
 
   // 医院リスト作成
@@ -2445,10 +2459,10 @@ function renderPhoneCheck() {
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">施術名</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">プロモ</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
+              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">施術名</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);width:100%">メモ</th>
               <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
             </tr>
@@ -2492,6 +2506,8 @@ function renderPhoneCheck() {
   });
 
   _bindPhoneCheckRowEvents(el);
+  // スクロール位置を復元 (rAF で次フレーム後)
+  requestAnimationFrame(() => window.scrollTo(0, _scrollY));
 }
 
 // v273: テーブル行 (登録日 / 予約日時 / 名前 / 医院 / 連絡先 / 状況 / アクション)
@@ -2515,19 +2531,33 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   // 登録日
   const adDate = parseDate(d.applyDate);
   const adStr = fmtMD(adDate);
-  // ステータス色
+  // ステータス色 (Bug fix: 全ステータス網羅、未網羅は灰色 default で 未対応 を上書きしないように)
   const st = d.status || '未対応';
   const stColors = {
+    '未対応':         { bg:'#fee2e2', fg:'#dc2626' },
     '確認済':         { bg:'#dbeafe', fg:'#1d4ed8' },
     '留守電':         { bg:'#fef3c7', fg:'#92400e' },
     '折り返し':       { bg:'#f5f3ff', fg:'#7c3aed' },
     '後追いLINE済み': { bg:'#ecfeff', fg:'#0891b2' },
     '予約連絡待ち':   { bg:'#f5f3ff', fg:'#7c3aed' },
+    '予約変更':       { bg:'#fef3c7', fg:'#b45309' },
     '来院済':         { bg:'#dbeafe', fg:'#1d4ed8' },
     '成約':           { bg:'#dcfce7', fg:'#15803d' },
+    '検討中':         { bg:'#fef3c7', fg:'#b45309' },
+    'P処置':          { bg:'#ccfbf1', fg:'#0f766e' },
+    'C処置':          { bg:'#ccfbf1', fg:'#0d9488' },
+    'CT/診断':        { bg:'#dbeafe', fg:'#3b82f6' },
+    'ガイド印象':     { bg:'#cffafe', fg:'#0891b2' },
+    '手術予定':       { bg:'#dbeafe', fg:'#2563eb' },
+    '治癒期間':       { bg:'#dbeafe', fg:'#1d4ed8' },
+    '印象':           { bg:'#cffafe', fg:'#0891b2' },
+    'セット':         { bg:'#cffafe', fg:'#0e7490' },
+    '完了':           { bg:'#dcfce7', fg:'#059669' },
     'キャンセル':     { bg:'#fee2e2', fg:'#dc2626' },
+    'お断り':         { bg:'#f5f5f4', fg:'#78716c' },
+    '除外':           { bg:'#f3f4f6', fg:'#9ca3af' },
   };
-  const stClr = stColors[st] || { bg:'#fee2e2', fg:'#dc2626' };
+  const stClr = stColors[st] || { bg:'#f3f4f6', fg:'#6b7280' };
   const name = canViewPII ? d.name : maskName(d.name);
   const phone = canViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
   const fac = normFac(d.facility);
@@ -2541,10 +2571,10 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
     <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
     <td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap">${escapeHtml(name || '')}</td>
-    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(normSvc(d.service) || '-')}</td>
     <td style="padding:8px 10px;font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
+    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(normSvc(d.service) || '-')}</td>
     ${memoCellHtml}
     <td style="padding:6px 10px;text-align:left;white-space:nowrap">
       <button class="phone-status-btn" data-st="確認済"   title="確認済" style="padding:4px 7px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">✅</button>
@@ -2563,7 +2593,8 @@ function _bindPhoneCheckRowEvents(el) {
       btn.addEventListener('click', async () => {
         const newStatus = btn.dataset.st;
         const origText = btn.textContent;
-        btn.disabled = true; btn.textContent = '...';
+        const origBg = btn.style.background;
+        btn.disabled = true; btn.textContent = '…';
         try {
           const payload = { name, apply_date: apply, status: newStatus };
           await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
@@ -2581,7 +2612,10 @@ function _bindPhoneCheckRowEvents(el) {
           updateHeaderBadge();
         } catch(e) {
           showToast('保存エラー: ' + e.message, true);
+          // Bug fix: エラー時にボタンの見た目を復元 (旧: disabled だけ戻して "..." のまま)
           btn.disabled = false;
+          btn.textContent = origText;
+          if (origBg) btn.style.background = origBg;
         }
       });
     });
@@ -2590,11 +2624,16 @@ function _bindPhoneCheckRowEvents(el) {
     if (memoCell) {
       memoCell.addEventListener('click', () => {
         openMemoModal(memoCell.dataset.name, memoCell.dataset.apply, memoCell);
-        // メモ保存後に再描画
-        const check = setInterval(() => {
+        // Bug fix: 既存の interval を停止 (連打すると setInterval が積み上がる問題を解消)
+        if (_phoneMemoModalCheckInterval) {
+          clearInterval(_phoneMemoModalCheckInterval);
+          _phoneMemoModalCheckInterval = null;
+        }
+        _phoneMemoModalCheckInterval = setInterval(() => {
           const modal = document.getElementById('memo-modal');
           if (!modal || modal.hidden) {
-            clearInterval(check);
+            clearInterval(_phoneMemoModalCheckInterval);
+            _phoneMemoModalCheckInterval = null;
             renderPhoneCheck();
           }
         }, 300);
@@ -5300,19 +5339,29 @@ function saveMemoModal() {
   if (!_memoTarget) return;
   const val = document.getElementById('memo-modal-text').value.trim();
   const memos = loadData('bk-memos', {});
-  memos[_memoTarget.key] = val;
+  if (val) {
+    memos[_memoTarget.key] = val;
+  } else {
+    // v273: 空文字なら entry を完全削除 (空文字残置でゾンビ化を防ぐ)
+    delete memos[_memoTarget.key];
+  }
   saveData('bk-memos', memos);
   if (_memoTarget.tdEl) {
     _memoTarget.tdEl.innerHTML = val ? val.slice(0,6) + (val.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>';
     _memoTarget.tdEl.title = val;
   }
-  // 予約一覧メモとBFメモを連動 (空上書き防止)
-  const payload = { name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val };
-  if (val) payload.bf_memo = val; // 空の時はbf_memo側を上書きしない
+  // 予約一覧メモとBFメモを連動 (v273: 空時も bf_memo を上書きする — 削除を反映するため)
+  const payload = { name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val, bf_memo: val };
   safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
-  // BFライフサイクルキャッシュも同期
-  if (bfLifecycleCache[_memoTarget.key]) bfLifecycleCache[_memoTarget.key].bf_memo = val;
-  showToast('メモを保存しました');
+  // BFライフサイクルキャッシュも同期 (空でも反映)
+  if (bfLifecycleCache[_memoTarget.key]) {
+    bfLifecycleCache[_memoTarget.key].bf_memo = val;
+    bfLifecycleCache[_memoTarget.key].memo = val;
+  }
+  // bookingsData の _memo も同期 (findAnyMemo がここから探すため)
+  const targetBooking = (bookingsData || []).find(b => b.name === _memoTarget.name && b.applyDate === _memoTarget.apply);
+  if (targetBooking) targetBooking._memo = val;
+  showToast(val ? 'メモを保存しました' : 'メモを削除しました');
   closeMemoModal();
 }
 
