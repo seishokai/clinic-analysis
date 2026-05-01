@@ -2819,8 +2819,34 @@ function renderPhoneCheck() {
         <div style="font-size:11px;margin-top:4px">すべて確認済、またはフィルタ条件を確認してください</div>
       </div>
     ` : `
-      <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:960px;table-layout:fixed">
+      <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto" class="phone-check-wrap">
+        <style>
+          @media (max-width: 720px) {
+            .phone-check-table thead { display:none }
+            .phone-check-table tbody, .phone-check-table tr { display:block }
+            .phone-check-table tr.phone-row {
+              border:1px solid var(--border); border-radius:10px;
+              padding:10px; margin:8px; background:#fff;
+            }
+            .phone-check-table tr.phone-row.selected { background:#eff6ff }
+            .phone-check-table colgroup { display:none }
+            .phone-check-table td {
+              display:flex; align-items:center; padding:4px 0;
+              border:none; max-width:none; min-height:0; overflow:visible;
+              white-space:normal;
+            }
+            .phone-check-table td:before {
+              content:attr(data-label) "";
+              flex:0 0 70px; font-size:10px; color:var(--text-sub); font-weight:600;
+              padding-right:6px;
+            }
+            .phone-check-table td[data-label=""]:before { display:none }
+            .phone-check-table td.row-actions { padding-top:8px; border-top:1px dashed var(--border); margin-top:6px; flex-wrap:wrap }
+            .phone-check-table td.row-actions:before { content:"" }
+            .phone-check-table table { min-width:0 !important }
+          }
+        </style>
+        <table class="phone-check-table" style="width:100%;border-collapse:collapse;font-size:12px;min-width:960px;table-layout:fixed">
           <colgroup>
             <col style="width:36px">    <!-- 選択チェックボックス (v273 一括処理) -->
             <col style="width:54px">    <!-- 登録日 (05/01) -->
@@ -3198,17 +3224,17 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   const rowKey = (d.name || '') + '|' + (d.applyDate || '');
   const isChecked = _phoneSelected.has(rowKey);
   return `<tr class="phone-row${isChecked?' selected':''}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-key="${escapeHtml(rowKey)}" style="border-bottom:1px solid var(--border);${isChecked?'background:#eff6ff':''}">
-    <td style="padding:5px 8px;text-align:center"><input type="checkbox" class="phone-row-check" data-key="${escapeHtml(rowKey)}" ${isChecked?'checked':''} style="cursor:pointer;width:14px;height:14px"></td>
-    <td style="padding:5px 8px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${adStr}</td>
-    <td style="padding:5px 8px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
-    <td style="padding:5px 8px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(name || '')}">${escapeHtml(name || '')}</td>
-    <td style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(normSvc(d.service) || '-')}</td>
-    <td style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(fac)}</td>
-    <td style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td style="padding:5px 8px;font-size:10px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td style="padding:5px 8px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
-    ${memoCellHtml}
-    <td style="padding:6px 10px;text-align:left;white-space:nowrap">
+    <td data-label="" style="padding:5px 8px;text-align:center"><input type="checkbox" class="phone-row-check" data-key="${escapeHtml(rowKey)}" ${isChecked?'checked':''} style="cursor:pointer;width:14px;height:14px"></td>
+    <td data-label="登録日" style="padding:5px 8px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${adStr}</td>
+    <td data-label="予約日時" style="padding:5px 8px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
+    <td data-label="名前" style="padding:5px 8px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(name || '')}">${escapeHtml(name || '')}</td>
+    <td data-label="施術" style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(normSvc(d.service) || '-')}</td>
+    <td data-label="医院" style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(fac)}</td>
+    <td data-label="連絡先" style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td data-label="プロモ" style="padding:5px 8px;font-size:10px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td data-label="状況" style="padding:5px 8px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
+    ${memoCellHtml.replace(/<td /, '<td data-label="メモ" ')}
+    <td class="row-actions" data-label="" style="padding:6px 10px;text-align:left;white-space:nowrap">
       ${_phoneStatusBtn('確認済',   '✅', '確認済',     '#dbeafe', '#1d4ed8', '#bfdbfe', st)}
       ${_phoneStatusBtn('留守電',   '🎤', '留守電',     '#fef3c7', '#92400e', '#fcd34d', st)}
       ${_phoneStatusBtn('折り返し', '↩',  '折り返し',   '#f5f3ff', '#7c3aed', '#d8b4fe', st)}
