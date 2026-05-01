@@ -2469,19 +2469,31 @@ function renderPhoneCheck() {
       </div>
     ` : `
       <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:880px">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:920px;table-layout:fixed">
+          <colgroup>
+            <col style="width:48px">    <!-- 登録日 -->
+            <col style="width:80px">    <!-- 予約日時 -->
+            <col style="width:110px">   <!-- 名前 -->
+            <col style="width:60px">    <!-- 施術名 -->
+            <col style="width:60px">    <!-- 医院 -->
+            <col style="width:130px">   <!-- 連絡先 -->
+            <col style="width:110px">   <!-- プロモ -->
+            <col style="width:62px">    <!-- 状況 -->
+            <col>                       <!-- メモ (残り全部) -->
+            <col style="width:180px">   <!-- アクション -->
+          </colgroup>
           <thead>
             <tr style="background:#f9fafb">
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">登録日</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">施術名</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">プロモ</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);width:100%">メモ</th>
-              <th style="padding:8px 10px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">登録日</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">施術名</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">医院</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">連絡先</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">プロモ</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">状況</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">メモ</th>
+              <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">アクション</th>
             </tr>
           </thead>
           <tbody id="phone-tbody">
@@ -2578,18 +2590,18 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   const fac = normFac(d.facility);
   const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
   // メモセル (来院タブと同じスタイル: クリックで編集モーダル、黄色ハイライト)
-  // 大幅に幅を確保 + 表示文字数を 200 に拡張
-  const memoCellHtml = `<td class="phone-memo-cell" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;width:100%;min-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${escapeHtml(memo)}">${memo ? escapeHtml(_flattenMemoForDisplay(memo, 200)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>`;
+  // 表 layout:fixed なので幅は colgroup で制御。残り全部の幅を取る
+  const memoCellHtml = `<td class="phone-memo-cell" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${escapeHtml(memo)}">${memo ? escapeHtml(_flattenMemoForDisplay(memo, 200)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>`;
 
   return `<tr class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="border-bottom:1px solid var(--border)">
-    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap">${adStr}</td>
-    <td style="padding:8px 10px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
-    <td style="padding:8px 10px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap">${escapeHtml(name || '')}</td>
-    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(normSvc(d.service) || '-')}</td>
-    <td style="padding:8px 10px;font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fac)}</td>
-    <td style="padding:8px 10px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td style="padding:8px 10px;font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:140px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td style="padding:8px 10px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
+    <td style="padding:5px 8px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${adStr}</td>
+    <td style="padding:5px 8px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
+    <td style="padding:5px 8px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(name || '')}">${escapeHtml(name || '')}</td>
+    <td style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(normSvc(d.service) || '-')}</td>
+    <td style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(fac)}</td>
+    <td style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td style="padding:5px 8px;font-size:10px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td style="padding:5px 8px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
     ${memoCellHtml}
     <td style="padding:6px 10px;text-align:left;white-space:nowrap">
       ${_phoneStatusBtn('確認済',   '✅', '確認済',     '#dbeafe', '#1d4ed8', '#bfdbfe', st)}
