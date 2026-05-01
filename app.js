@@ -2328,8 +2328,8 @@ function switchBookingSub(subId) {
 
 // === v262 電話前確認タブ ===
 let _phoneCheckState = {
-  period: 'today_tomorrow',  // today / tomorrow / today_tomorrow
-  facility: '',
+  period: 'today_tomorrow',  // today / tomorrow / today_tomorrow / all_future
+  facilities: [],  // v273: 医院複数選択 (空配列 = 全医院)
   showCalled: true,  // v273: 確認済も含めて表示 (アクション後に行が消えないように)
 };
 
@@ -2345,19 +2345,22 @@ function renderPhoneCheck() {
   const tomorrowEnd = new Date(todayEnd.getTime() + 24*3600*1000);
 
   // フィルタ条件
-  // v273: 今日中の過ぎた時刻も含めて表示 (今日の予約全件 + 明日の予約)
+  // v273: 今日中の過ぎた時刻も含めて表示 / all_future = 今日以降すべて
   const isInPeriod = (bd) => {
     if (!bd) return false;
     if (_phoneCheckState.period === 'today') return bd >= todayStart && bd <= todayEnd;
     if (_phoneCheckState.period === 'tomorrow') return bd >= tomorrowStart && bd <= tomorrowEnd;
+    if (_phoneCheckState.period === 'all_future') return bd >= todayStart;  // 今日以降すべて
     return bd >= todayStart && bd <= tomorrowEnd;
   };
+  const facSet = new Set(_phoneCheckState.facilities || []);
 
   let rows = data.filter(d => {
     if (d.status === '除外' || d.status === 'キャンセル') return false;
     const bd = parseDate(d.bookDate);
     if (!isInPeriod(bd)) return false;
-    if (_phoneCheckState.facility && normFac(d.facility) !== _phoneCheckState.facility) return false;
+    // 医院フィルタ (空配列なら全医院)
+    if (facSet.size > 0 && !facSet.has(normFac(d.facility))) return false;
     if (!_phoneCheckState.showCalled && (d.status === '確認済' || d.status === '来院済' || d.status === '成約')) return false;
     return true;
   });
@@ -2398,20 +2401,32 @@ function renderPhoneCheck() {
     </div>
 
     <!-- フィルタ -->
-    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:10px;align-items:center">
-      <div style="display:inline-flex;background:#f3f4f6;border-radius:8px;padding:2px">
-        <button type="button" class="phone-period-btn" data-period="today" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='today'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='today'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600">今日</button>
-        <button type="button" class="phone-period-btn" data-period="tomorrow" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='tomorrow'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='tomorrow'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600">明日</button>
-        <button type="button" class="phone-period-btn" data-period="today_tomorrow" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='today_tomorrow'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='today_tomorrow'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600">両方</button>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px;background:#fff;border:1px solid var(--border);border-radius:10px">
+      <!-- 期間 -->
+      <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text-sub);font-weight:600;letter-spacing:1px;width:50px">期間</span>
+        <div style="display:inline-flex;background:#f3f4f6;border-radius:8px;padding:2px;flex-wrap:wrap">
+          <button type="button" class="phone-period-btn" data-period="today" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='today'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='today'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600;font-family:inherit">今日</button>
+          <button type="button" class="phone-period-btn" data-period="tomorrow" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='tomorrow'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='tomorrow'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600;font-family:inherit">明日</button>
+          <button type="button" class="phone-period-btn" data-period="today_tomorrow" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='today_tomorrow'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='today_tomorrow'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600;font-family:inherit">両方</button>
+          <button type="button" class="phone-period-btn" data-period="all_future" style="padding:6px 14px;font-size:12px;border:none;background:${_phoneCheckState.period==='all_future'?'#1a1a1a':'transparent'};color:${_phoneCheckState.period==='all_future'?'#fff':'#555'};border-radius:6px;cursor:pointer;font-weight:600;font-family:inherit">未来全部</button>
+        </div>
+        <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#555;cursor:pointer;margin-left:auto">
+          <input type="checkbox" id="phone-show-called" ${_phoneCheckState.showCalled?'checked':''}>
+          確認済も表示
+        </label>
       </div>
-      <select id="phone-fac-filter" style="padding:7px 10px;font-size:12px;border:1px solid var(--border);border-radius:8px;min-width:120px">
-        <option value="">全医院</option>
-        ${allFacs.map(f => `<option value="${escapeHtml(f)}" ${_phoneCheckState.facility===f?'selected':''}>${escapeHtml(f)}</option>`).join('')}
-      </select>
-      <label style="display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#555;cursor:pointer">
-        <input type="checkbox" id="phone-show-called" ${_phoneCheckState.showCalled?'checked':''}>
-        確認済も表示
-      </label>
+      <!-- 医院 (複数選択) -->
+      <div style="display:flex;gap:6px;align-items:flex-start;flex-wrap:wrap">
+        <span style="font-size:11px;color:var(--text-sub);font-weight:600;letter-spacing:1px;width:50px;padding-top:4px">医院</span>
+        <div style="display:flex;gap:4px;flex-wrap:wrap;flex:1">
+          <button type="button" class="phone-fac-btn" data-fac=""    style="padding:4px 10px;font-size:11px;border:1px solid ${_phoneCheckState.facilities.length===0?'#1a1a1a':'var(--border)'};background:${_phoneCheckState.facilities.length===0?'#1a1a1a':'#fff'};color:${_phoneCheckState.facilities.length===0?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">全医院</button>
+          ${allFacs.map(f => {
+            const sel = facSet.has(f);
+            return `<button type="button" class="phone-fac-btn" data-fac="${escapeHtml(f)}" style="padding:4px 10px;font-size:11px;border:1px solid ${sel?'#1a1a1a':'var(--border)'};background:${sel?'#1a1a1a':'#fff'};color:${sel?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">${escapeHtml(f)}</button>`;
+          }).join('')}
+        </div>
+      </div>
     </div>
 
     <!-- リスト (v273 テーブル形式) -->
@@ -2450,9 +2465,23 @@ function renderPhoneCheck() {
       renderPhoneCheck();
     });
   });
-  el.querySelector('#phone-fac-filter')?.addEventListener('change', e => {
-    _phoneCheckState.facility = e.target.value;
-    renderPhoneCheck();
+  // v273: 医院複数選択 (チップトグル)
+  el.querySelectorAll('.phone-fac-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const fac = btn.dataset.fac;
+      if (!fac) {
+        // 「全医院」クリック → 選択をクリア
+        _phoneCheckState.facilities = [];
+      } else {
+        const idx = _phoneCheckState.facilities.indexOf(fac);
+        if (idx >= 0) {
+          _phoneCheckState.facilities.splice(idx, 1);
+        } else {
+          _phoneCheckState.facilities.push(fac);
+        }
+      }
+      renderPhoneCheck();
+    });
   });
   el.querySelector('#phone-show-called')?.addEventListener('change', e => {
     _phoneCheckState.showCalled = e.target.checked;
@@ -2509,7 +2538,8 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
       <button class="phone-status-btn" data-st="確認済"   title="確認済" style="padding:4px 7px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">✅</button>
       <button class="phone-status-btn" data-st="留守電"   title="留守電" style="padding:4px 7px;background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">🎤</button>
       <button class="phone-status-btn" data-st="折り返し" title="折り返し" style="padding:4px 7px;background:#f5f3ff;color:#7c3aed;border:1px solid #d8b4fe;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">↩</button>
-      <button class="phone-memo-btn"                     title="メモ"    style="padding:4px 7px;background:#fff8e1;color:#b45309;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📝</button>
+      <button class="phone-memo-btn"                     title="メモ"    style="padding:4px 7px;background:#fff8e1;color:#b45309;border:1px solid #fcd34d;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;margin-right:2px;font-family:inherit">📝</button>
+      <button class="phone-status-btn" data-st="未対応"   title="取り消し (未対応に戻す)" style="padding:4px 7px;background:#f3f4f6;color:#6b7280;border:1px solid #e5e7eb;border-radius:5px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↻</button>
     </td>
   </tr>${memo ? `<tr><td colspan="7" style="padding:0">${memoCellHtml}</td></tr>` : ''}`;
 }
