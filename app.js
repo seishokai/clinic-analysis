@@ -2193,19 +2193,44 @@ function renderHomeDashboard() {
   // 今日の予約 時間順
   const todaySorted = today.slice().sort((a,b) => (a.bookDate||'').localeCompare(b.bookDate||''));
 
-  // 今月の成約件数・金額
-  const thisMonthContracted = active.filter(d => {
-    if (d.status !== '成約') return false;
-    const bd = d.bookDate || '';
-    return bd.startsWith(thisMonth);
-  });
-  const thisMonthAmount = thisMonthContracted.reduce((s, d) => s + Number(d.contractAmount || 0), 0);
-
-  // v273: 今月の予約 (医院別 / 治療別)
-  const thisMonthAll = active.filter(d => (d.bookDate || '').startsWith(thisMonth));
+  // v273: 月別分析 (先月 / 今月 / 来月) + KPI (来院率, 決定率, 成約単価)
   const visitedStatuses = new Set(['来院済', '成約']);
   const isVisited = (s) => visitedStatuses.has(s) || (typeof IMPLANT_TREATMENT_STAGES !== 'undefined' && Array.isArray(IMPLANT_TREATMENT_STAGES) && IMPLANT_TREATMENT_STAGES.includes(s));
-  // 医院別
+  const monthKey = (offset) => {
+    const d = new Date(now.getFullYear(), now.getMonth() + offset, 1);
+    return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
+  };
+  const lastMonth = monthKey(-1);
+  const nextMonth = monthKey(1);
+  const calcKPI = (rows) => {
+    const booking = rows.length;
+    const visited = rows.filter(d => isVisited(d.status)).length;
+    const contracted = rows.filter(d => d.status === '成約');
+    const amount = contracted.reduce((s,d) => s + Number(d.contractAmount || 0), 0);
+    return {
+      booking,
+      visited,
+      visitRate: booking > 0 ? Math.round(visited / booking * 100) : 0,
+      contracted: contracted.length,
+      decideRate: visited > 0 ? Math.round(contracted.length / visited * 100) : 0,
+      amount,
+      unitPrice: contracted.length > 0 ? Math.round(amount / contracted.length) : 0,
+    };
+  };
+  // bookDate でその月に該当するもの
+  const filterMonth = (ym) => active.filter(d => (d.bookDate || '').startsWith(ym));
+  const lastMonthRows = filterMonth(lastMonth);
+  const thisMonthAll = filterMonth(thisMonth);
+  const nextMonthRows = filterMonth(nextMonth);
+  const kpiLast = calcKPI(lastMonthRows);
+  const kpiThis = calcKPI(thisMonthAll);
+  const kpiNext = calcKPI(nextMonthRows);
+
+  // 既存指標 (互換性のため)
+  const thisMonthContracted = thisMonthAll.filter(d => d.status === '成約');
+  const thisMonthAmount = kpiThis.amount;
+
+  // 医院別 / 治療別 (今月)
   const byFacMonth = {};
   thisMonthAll.forEach(d => {
     const f = normFac(d.facility) || '-';
@@ -2215,7 +2240,7 @@ function renderHomeDashboard() {
     if (d.status === '成約') byFacMonth[f].contracted++;
   });
   const facList = Object.keys(byFacMonth).sort((a,b) => byFacMonth[b].booking - byFacMonth[a].booking);
-  // 治療別
+
   const byTreatMonth = {};
   thisMonthAll.forEach(d => {
     const t = (typeof normSvc === 'function' ? normSvc(d.service) : d.service) || '-';
@@ -2280,16 +2305,47 @@ function renderHomeDashboard() {
       </div>
     </div>
 
-    <!-- 今月の実績 -->
-    <div style="background:linear-gradient(135deg,#ecfeff 0%,#dbeafe 100%);border:1px solid #06b6d4;border-radius:12px;padding:12px 14px;margin-bottom:14px">
-      <div style="font-size:11px;color:#0891b2;font-weight:700;letter-spacing:0.5px;margin-bottom:6px">📊 今月の実績</div>
-      <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:baseline">
-        <div><span style="font-size:14px;color:#0891b2">予約</span> <span style="font-size:22px;font-weight:800;color:#0e7490">${thisMonthAll.length}</span><span style="font-size:11px;color:#0891b2;margin-left:2px">件</span></div>
-        <div><span style="font-size:14px;color:#0891b2">来院</span> <span style="font-size:22px;font-weight:800;color:#1d4ed8">${thisMonthAll.filter(d => isVisited(d.status)).length}</span><span style="font-size:11px;color:#0891b2;margin-left:2px">件</span></div>
-        <div><span style="font-size:14px;color:#0891b2">成約</span> <span style="font-size:22px;font-weight:800;color:#0e7490">${thisMonthContracted.length}</span><span style="font-size:11px;color:#0891b2;margin-left:2px">件</span></div>
-        <div><span style="font-size:18px;font-weight:700;color:#0e7490">${fmtYen(thisMonthAmount)}</span></div>
-        ${weekCancel > 0 ? `<div style="margin-left:auto"><span style="font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</span></div>` : ''}
+    <!-- v273 月別分析 (先月 / 今月 / 来月) + KPI -->
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a">📊 月別分析</div>
+        <div style="font-size:10px;color:var(--text-sub)">予約日基準 / 来院率=来院÷予約 / 決定率=成約÷来院</div>
       </div>
+      <div style="overflow-x:auto">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:600px">
+          <thead>
+            <tr style="background:#f9fafb;color:var(--text-sub);font-weight:600">
+              <th style="padding:6px 8px;text-align:left;font-size:10px;letter-spacing:1px">期間</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">予約</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">来院</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">来院率</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">成約</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">決定率</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">単価</th>
+              <th style="padding:6px 8px;text-align:right;font-size:10px;letter-spacing:1px">合計金額</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${[
+              { label: '先月', kpi: kpiLast, color:'#9ca3af' },
+              { label: '今月', kpi: kpiThis, color:'#1d4ed8', highlight: true },
+              { label: '来月 (予定)', kpi: kpiNext, color:'#7c3aed' },
+            ].map(row => `
+              <tr style="border-top:1px solid #f3f4f6;${row.highlight?'background:#eff6ff':''}">
+                <td style="padding:7px 8px;font-weight:${row.highlight?700:500};color:${row.color}">${row.label}</td>
+                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700">${row.kpi.booking}</td>
+                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#1d4ed8">${row.kpi.visited}</td>
+                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:${row.kpi.visitRate>=70?'#059669':row.kpi.visitRate>=50?'#d97706':'#dc2626'};font-weight:700">${row.kpi.booking?row.kpi.visitRate+'%':'-'}</td>
+                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#059669;font-weight:700">${row.kpi.contracted}</td>
+                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:${row.kpi.decideRate>=40?'#059669':row.kpi.decideRate>=20?'#d97706':'#dc2626'};font-weight:700">${row.kpi.visited?row.kpi.decideRate+'%':'-'}</td>
+                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#0e7490">${row.kpi.unitPrice?fmtYen(row.kpi.unitPrice):'-'}</td>
+                <td style="padding:7px 8px;text-align:right;font-variant-numeric:tabular-nums;color:#0e7490;font-weight:700">${fmtYen(row.kpi.amount)}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      ${weekCancel > 0 ? `<div style="margin-top:8px;font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</div>` : ''}
     </div>
 
     <!-- v273: 今月の医院別 / 治療別 サマリー -->
