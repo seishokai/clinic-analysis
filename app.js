@@ -2659,6 +2659,8 @@ function switchBookingSub(subId) {
 }
 
 // === v262 電話前確認タブ ===
+// v273: 複数選択用 (key = name|applyDate)
+let _phoneSelected = new Set();
 // v273: sessionStorage で状態永続化 (リロード/タブ切替で消えない)
 let _phoneCheckState = (() => {
   try {
@@ -2811,8 +2813,9 @@ function renderPhoneCheck() {
       </div>
     ` : `
       <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
-        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:920px;table-layout:fixed">
+        <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:960px;table-layout:fixed">
           <colgroup>
+            <col style="width:36px">    <!-- 選択チェックボックス (v273 一括処理) -->
             <col style="width:54px">    <!-- 登録日 (05/01) -->
             <col style="width:100px">   <!-- 予約日時 (05/23 11:30) ← 切れ防止 -->
             <col style="width:120px">   <!-- 名前 -->
@@ -2826,6 +2829,7 @@ function renderPhoneCheck() {
           </colgroup>
           <thead>
             <tr style="background:#f9fafb">
+              <th style="padding:6px 8px;text-align:center;border-bottom:1px solid var(--border)"><input type="checkbox" id="phone-select-all" style="cursor:pointer;width:14px;height:14px" title="すべて選択/解除"></th>
               <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">登録日</th>
               <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">予約日時</th>
               <th style="padding:6px 8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border)">名前</th>
@@ -2844,6 +2848,17 @@ function renderPhoneCheck() {
         </table>
       </div>
     `}
+    ${_phoneSelected.size > 0 ? `
+      <!-- v273: 一括処理フローティングバー -->
+      <div id="phone-bulk-bar" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:30px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:500;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 32px)">
+        <span style="font-size:13px;font-weight:700;padding:0 8px;white-space:nowrap">${_phoneSelected.size}件 選択中</span>
+        <button class="phone-bulk-btn" data-st="確認済"   style="padding:6px 12px;background:#dbeafe;color:#1d4ed8;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✅ 確認済</button>
+        <button class="phone-bulk-btn" data-st="留守電"   style="padding:6px 12px;background:#fef3c7;color:#92400e;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🎤 留守電</button>
+        <button class="phone-bulk-btn" data-st="折り返し" style="padding:6px 12px;background:#f5f3ff;color:#7c3aed;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↩ 折り返し</button>
+        <button class="phone-bulk-btn" data-st="未対応"   style="padding:6px 12px;background:#f3f4f6;color:#6b7280;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↻ 取消</button>
+        <button id="phone-bulk-cancel" style="padding:6px 12px;background:transparent;color:#fff;border:1px solid #555;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">解除</button>
+      </div>
+    ` : ''}
   `;
 
   // イベントバインド
@@ -2890,6 +2905,65 @@ function renderPhoneCheck() {
       _savePhoneCheckState();
       renderPhoneCheck();
     });
+  });
+  // v273: 行チェックボックス
+  el.querySelectorAll('.phone-row-check').forEach(cb => {
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', e => {
+      const key = cb.dataset.key;
+      if (cb.checked) _phoneSelected.add(key);
+      else _phoneSelected.delete(key);
+      // 行ハイライト即時反映 + 一括バー再描画
+      const tr = cb.closest('tr.phone-row');
+      if (tr) tr.style.background = cb.checked ? '#eff6ff' : '';
+      // バーの再描画は renderPhoneCheck で
+      renderPhoneCheck();
+    });
+  });
+  // 全選択
+  const selectAll = el.querySelector('#phone-select-all');
+  if (selectAll) {
+    // tbody 内の checkbox を集める
+    const allKeys = Array.from(el.querySelectorAll('.phone-row-check')).map(c => c.dataset.key);
+    const allChecked = allKeys.length > 0 && allKeys.every(k => _phoneSelected.has(k));
+    selectAll.checked = allChecked;
+    selectAll.addEventListener('change', () => {
+      if (selectAll.checked) {
+        allKeys.forEach(k => _phoneSelected.add(k));
+      } else {
+        allKeys.forEach(k => _phoneSelected.delete(k));
+      }
+      renderPhoneCheck();
+    });
+  }
+  // 一括処理ボタン
+  el.querySelectorAll('.phone-bulk-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const newStatus = btn.dataset.st;
+      const keys = Array.from(_phoneSelected);
+      if (keys.length === 0) return;
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = '処理中…';
+      let ok = 0;
+      for (const key of keys) {
+        const [name, apply] = key.split('|');
+        try {
+          await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
+          const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
+          if (match) match.status = newStatus;
+          ok++;
+        } catch(_){}
+      }
+      btn.textContent = orig;
+      btn.disabled = false;
+      _phoneSelected.clear();
+      showToast(`✅ ${ok}件を「${newStatus}」に一括更新`);
+      renderPhoneCheck();
+      updateHeaderBadge();
+    });
+  });
+  el.querySelector('#phone-bulk-cancel')?.addEventListener('click', () => {
+    _phoneSelected.clear();
+    renderPhoneCheck();
   });
 
   _bindPhoneCheckRowEvents(el);
@@ -2951,7 +3025,10 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   // 表 layout:fixed なので幅は colgroup で制御。残り全部の幅を取る
   const memoCellHtml = `<td class="phone-memo-cell" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${escapeHtml(memo)}">${memo ? escapeHtml(_flattenMemoForDisplay(memo, 200)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>`;
 
-  return `<tr class="phone-row" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="border-bottom:1px solid var(--border)">
+  const rowKey = (d.name || '') + '|' + (d.applyDate || '');
+  const isChecked = _phoneSelected.has(rowKey);
+  return `<tr class="phone-row${isChecked?' selected':''}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-key="${escapeHtml(rowKey)}" style="border-bottom:1px solid var(--border);${isChecked?'background:#eff6ff':''}">
+    <td style="padding:5px 8px;text-align:center"><input type="checkbox" class="phone-row-check" data-key="${escapeHtml(rowKey)}" ${isChecked?'checked':''} style="cursor:pointer;width:14px;height:14px"></td>
     <td style="padding:5px 8px;font-size:11px;color:var(--text-sub);font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${adStr}</td>
     <td style="padding:5px 8px;font-size:12px;font-weight:700;color:#1d4ed8;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis"><span style="color:var(--text-sub);font-weight:500">${bdStr}</span> ${tstr}</td>
     <td style="padding:5px 8px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(name || '')}">${escapeHtml(name || '')}</td>
