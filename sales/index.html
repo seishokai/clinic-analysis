@@ -88,17 +88,28 @@
   /* Admin actions on card */
   .card-actions{
     position:absolute; top:6px; right:6px;
-    display:flex; gap:2px; opacity:0; transition:opacity .15s;
+    display:flex; gap:2px; opacity:.5; transition:opacity .15s;
     background:rgba(255,255,255,.95); border-radius:6px; padding:2px;
   }
   .tab-card:hover .card-actions{opacity:1}
+  /* タッチデバイスは常時表示 (ホバー無効) */
+  @media (hover: none){
+    .card-actions{opacity:1}
+  }
   .icon-btn{
-    width:26px; height:26px; border:none; background:transparent; cursor:pointer;
-    border-radius:4px; font-size:12px; color:var(--text-sub); padding:0;
+    width:30px; height:30px; border:none; background:transparent; cursor:pointer;
+    border-radius:4px; font-size:13px; color:var(--text-sub); padding:0;
     display:flex; align-items:center; justify-content:center; font-family:inherit;
   }
   .icon-btn:hover{background:rgba(0,0,0,.06); color:var(--text)}
   .icon-btn.danger:hover{background:#fee2e2; color:var(--danger)}
+
+  /* モバイル: 2カラム */
+  @media (max-width: 480px){
+    #tabs-tree{grid-template-columns:repeat(2, 1fr); gap:10px}
+    .tab-card{padding:18px 8px; min-height:72px; font-size:13px}
+    .tab-card .ic{font-size:18px}
+  }
 
   /* Add buttons */
   .add-card{
@@ -189,7 +200,7 @@
   <div id="empty" hidden>タブが登録されていません。</div>
   <div id="tabs-tree" hidden></div>
 
-  <button id="add-root-btn" class="admin-only add-card" hidden style="margin-top:20px;width:100%">＋ トップレベルにタブを追加</button>
+  <button id="add-root-btn" class="admin-only add-card" style="margin-top:20px;width:100%">＋ トップレベルにタブを追加</button>
 
   <div id="login-cta" hidden>
     タブの追加・編集には <button type="button" id="login-link">管理者ログイン</button> が必要です。
@@ -223,6 +234,10 @@
       <label class="checkbox">
         <input type="checkbox" id="form-highlight">
         ハイライト表示（黄色強調）
+      </label>
+      <label class="checkbox" id="continue-add-label">
+        <input type="checkbox" id="form-continue">
+        🔁 保存して続けて追加（連続作業用）
       </label>
 
       <div class="modal-actions">
@@ -553,6 +568,9 @@
         sel.appendChild(opt);
       });
     $('modal-delete').hidden = modalMode !== 'edit';
+    // 「続けて追加」チェックは新規追加時のみ表示
+    $('continue-add-label').hidden = modalMode === 'edit';
+    if (modalMode === 'edit') $('form-continue').checked = false;
     $('modal-overlay').hidden = false;
     setTimeout(() => $('form-label').focus(), 50);
   }
@@ -625,12 +643,24 @@
       }
       if (res.error) { toast('保存失敗: ' + res.error.message, true); return; }
       toast(modalMode === 'edit' ? '更新しました' : '追加しました');
-      closeModal();
+      // 続けて追加モード (新規追加時のみ): モーダルを閉じずにラベル/URL だけリセット
+      const continueAdd = modalMode === 'add' && $('form-continue')?.checked;
+      if (!continueAdd) closeModal();
       if (payload.parent_id) {
         expandedIds.add(payload.parent_id);
         localStorage.setItem('sales-expanded', JSON.stringify([...expandedIds]));
       }
       await loadTabs();
+      if (continueAdd) {
+        // 親タブと外部/ハイライトの設定はそのまま、ラベル/URL だけクリア
+        $('form-label').value = '';
+        $('form-url').value = '';
+        $('form-id').value = '';
+        modalNode = null;
+        modalMode = 'add';
+        $('modal-title').textContent = 'タブを追加 (連続)';
+        setTimeout(() => $('form-label').focus(), 50);
+      }
     } finally {
       submitBtn.disabled = false;
       submitBtn.textContent = origText;

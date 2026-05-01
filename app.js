@@ -2154,8 +2154,16 @@ function restoreLastView() {
 
 // === Navigation ===
 // === v261 ホームダッシュボード ===
-// v273: ホームダッシュボードの分析期間 (デフォルト = 今月)
-let _homeAnalysisRange = null; // null = thisMonth、{ fromYM, toYM, label } の形式
+// v273: ホームダッシュボードの分析期間 (デフォルト = 今月) — sessionStorage で永続化
+let _homeAnalysisRange = (() => {
+  try {
+    const saved = sessionStorage.getItem('home-analysis-range');
+    return saved ? JSON.parse(saved) : null;
+  } catch(_) { return null; }
+})();
+function _saveHomeRange() {
+  try { sessionStorage.setItem('home-analysis-range', _homeAnalysisRange ? JSON.stringify(_homeAnalysisRange) : ''); } catch(_){}
+}
 
 function renderHomeDashboard() {
   const el = document.getElementById('home-dashboard-content');
@@ -2505,6 +2513,7 @@ function renderHomeDashboard() {
       else if (preset === 'this') _homeAnalysisRange = { fromYM: ymOffset(0), toYM: ymOffset(0), label: '今月' };
       else if (preset === 'next') _homeAnalysisRange = { fromYM: ymOffset(1), toYM: ymOffset(1), label: '来月' };
       else if (preset === '3m') _homeAnalysisRange = { fromYM: ymOffset(-1), toYM: ymOffset(1), label: '前月〜来月' };
+      _saveHomeRange();
       renderHomeDashboard();
     });
   });
@@ -2518,6 +2527,7 @@ function renderHomeDashboard() {
       // 開始 > 終了なら入れ替え
       const [from, to] = f <= t ? [f, t] : [t, f];
       _homeAnalysisRange = { fromYM: from, toYM: to, label: null };
+      _saveHomeRange();
       renderHomeDashboard();
     }
   };
@@ -2530,11 +2540,27 @@ function switchBookingSub(subId) {
 }
 
 // === v262 電話前確認タブ ===
-let _phoneCheckState = {
-  period: 'all_future',  // v273: デフォルト「未来全部」(all_future / today / tomorrow / today_tomorrow)
-  facilities: [],  // v273: 医院複数選択 (空配列 = 全医院)
-  showCalled: true,  // v273: 確認済も含めて表示 (アクション後に行が消えないように)
-};
+// v273: sessionStorage で状態永続化 (リロード/タブ切替で消えない)
+let _phoneCheckState = (() => {
+  try {
+    const saved = JSON.parse(sessionStorage.getItem('phone-check-state') || 'null');
+    if (saved && typeof saved === 'object') {
+      return Object.assign({
+        period: 'all_future',
+        facilities: [],
+        showCalled: true,
+      }, saved);
+    }
+  } catch(_) {}
+  return {
+    period: 'all_future',
+    facilities: [],
+    showCalled: true,
+  };
+})();
+function _savePhoneCheckState() {
+  try { sessionStorage.setItem('phone-check-state', JSON.stringify(_phoneCheckState)); } catch(_){}
+}
 
 // v273: 既存の memo-modal close 検知用 setInterval をモジュールレベルで管理 (スタック防止)
 let _phoneMemoModalCheckInterval = null;
@@ -2696,6 +2722,7 @@ function renderPhoneCheck() {
   el.querySelectorAll('.phone-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       _phoneCheckState.period = btn.dataset.period;
+      _savePhoneCheckState();
       renderPhoneCheck();
     });
   });
@@ -2714,11 +2741,13 @@ function renderPhoneCheck() {
           _phoneCheckState.facilities.push(fac);
         }
       }
+      _savePhoneCheckState();
       renderPhoneCheck();
     });
   });
   el.querySelector('#phone-show-called')?.addEventListener('change', e => {
     _phoneCheckState.showCalled = e.target.checked;
+    _savePhoneCheckState();
     renderPhoneCheck();
   });
 
