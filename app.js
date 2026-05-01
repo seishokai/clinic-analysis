@@ -2303,6 +2303,18 @@ function renderHomeDashboard() {
   });
   const treatList = Object.keys(byTreatMonth).sort((a,b) => byTreatMonth[b].booking - byTreatMonth[a].booking);
 
+  // v273: 時間帯別予約分布 (選択期間)
+  const byHour = new Array(24).fill(0);
+  rangeRows.forEach(d => {
+    const tm = (d.bookDate || '').match(/(\d{1,2}):(\d{2})/);
+    if (tm) {
+      const h = parseInt(tm[1], 10);
+      if (h >= 0 && h <= 23) byHour[h]++;
+    }
+  });
+  const maxHour = Math.max(...byHour, 1);
+  const hourPeak = byHour.indexOf(maxHour);
+
   // 期間ラベル
   const rangeLabel = range.label || (range.fromYM === range.toYM ? ymToLabel(range.fromYM) : `${ymToLabel(range.fromYM)}〜${ymToLabel(range.toYM)}`);
   // 期間プリセットの判定
@@ -2466,6 +2478,28 @@ function renderHomeDashboard() {
             </div>`;
           }).join('')}
         </div>
+      </div>
+    ` : ''}
+
+    <!-- v273: 時間帯別予約分布 (バーチャート) -->
+    ${rangeRows.length > 0 ? `
+      <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px">⏰ ${escapeHtml(rangeLabel)} 時間帯別 予約分布
+          ${maxHour > 0 ? `<span style="font-size:11px;color:var(--text-sub);font-weight:500;margin-left:8px">ピーク: ${hourPeak}時 (${maxHour}件)</span>` : ''}
+        </div>
+        <div style="display:flex;gap:2px;align-items:flex-end;height:100px">
+          ${byHour.slice(7, 21).map((count, idx) => {
+            const hour = 7 + idx;
+            const pct = maxHour > 0 ? (count / maxHour * 100) : 0;
+            const isPeak = count === maxHour && count > 0;
+            return `<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;cursor:default" title="${hour}時: ${count}件">
+              <div style="font-size:9px;color:${count>0?'#1a1a1a':'transparent'};font-weight:600;margin-bottom:2px">${count||''}</div>
+              <div style="width:100%;height:${pct}%;min-height:${count>0?'4px':'0'};background:${isPeak?'#1d4ed8':count>0?'#93c5fd':'transparent'};border-radius:3px 3px 0 0;transition:height .3s"></div>
+              <div style="font-size:9px;color:var(--text-sub);margin-top:3px">${hour}</div>
+            </div>`;
+          }).join('')}
+        </div>
+        <div style="font-size:9px;color:var(--text-sub);text-align:center;margin-top:4px">時間帯 (7時〜20時)</div>
       </div>
     ` : ''}
 
