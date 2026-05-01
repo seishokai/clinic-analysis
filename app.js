@@ -2471,14 +2471,14 @@ function renderPhoneCheck() {
       <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow:hidden;overflow-x:auto">
         <table style="width:100%;border-collapse:collapse;font-size:12px;min-width:920px;table-layout:fixed">
           <colgroup>
-            <col style="width:48px">    <!-- 登録日 -->
-            <col style="width:80px">    <!-- 予約日時 -->
-            <col style="width:110px">   <!-- 名前 -->
-            <col style="width:60px">    <!-- 施術名 -->
-            <col style="width:60px">    <!-- 医院 -->
-            <col style="width:130px">   <!-- 連絡先 -->
-            <col style="width:110px">   <!-- プロモ -->
-            <col style="width:62px">    <!-- 状況 -->
+            <col style="width:54px">    <!-- 登録日 (05/01) -->
+            <col style="width:100px">   <!-- 予約日時 (05/23 11:30) ← 切れ防止 -->
+            <col style="width:120px">   <!-- 名前 -->
+            <col style="width:80px">    <!-- 施術名 (ゼロベニア初 等) -->
+            <col style="width:65px">    <!-- 医院 -->
+            <col style="width:135px">   <!-- 連絡先 (📞 + 11桁) -->
+            <col style="width:115px">   <!-- プロモ -->
+            <col style="width:70px">    <!-- 状況 -->
             <col>                       <!-- メモ (残り全部) -->
             <col style="width:180px">   <!-- アクション -->
           </colgroup>
