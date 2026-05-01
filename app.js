@@ -559,6 +559,21 @@ function parseDate(dateStr) {
   if (!m) return null;
   return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
 }
+// v273: 短縮形式 "M/D" にも対応する parseDate (parseDate より緩い判定)
+function parseDateLoose(dateStr) {
+  if (!dateStr) return null;
+  const s = String(dateStr);
+  let m = s.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+  if (m) return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
+  m = s.match(/^\s*(\d{1,2})\D+(\d{1,2})/);
+  if (m) {
+    const mo = parseInt(m[1])-1, da = parseInt(m[2]);
+    if (mo >= 0 && mo <= 11 && da >= 1 && da <= 31) {
+      return new Date(new Date().getFullYear(), mo, da);
+    }
+  }
+  return null;
+}
 function getYM(d) {
   const src = d.bookDate || d.applyDate;
   if (!src) return '';
@@ -2342,6 +2357,9 @@ function renderPhoneCheck() {
   // Bug fix: 再描画でスクロール位置がリセットされる問題 → 保存して復元
   const _scrollY = window.scrollY;
 
+  // Bug fix: parseDate は YYYY-MM-DD 形式のみ。短縮形式は parseDateLoose を使う
+  const _parseDateLoose = parseDateLoose;
+
   const data = Array.isArray(bookingsData) ? (getFilteredBookingsData ? getFilteredBookingsData() : bookingsData) : [];
   const now = new Date();
   const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
@@ -2362,7 +2380,7 @@ function renderPhoneCheck() {
 
   let rows = data.filter(d => {
     if (d.status === '除外' || d.status === 'キャンセル') return false;
-    const bd = parseDate(d.bookDate);
+    const bd = _parseDateLoose(d.bookDate);  // Bug fix: 短縮形式対応
     if (!isInPeriod(bd)) return false;
     // 医院フィルタ (空配列なら全医院)
     if (facSet.size > 0 && !facSet.has(normFac(d.facility))) return false;
@@ -2371,10 +2389,9 @@ function renderPhoneCheck() {
   });
 
   // v273: 登録日時 (applyDate) の降順 / 同登録日なら予約日時 (bookDate) 昇順
-  // (Bug fix: 文字列比較だと "5/30" < "5/7" になるため Date オブジェクトで比較)
+  // (Bug fix: 文字列比較だと "5/30" < "5/7" になるため Date オブジェクトで比較、短縮形式対応)
   const _toDateTime = (s) => {
-    if (!s) return 0;
-    const d = parseDate(s);
+    const d = _parseDateLoose(s);
     if (!d) return 0;
     const tm = String(s).match(/(\d{1,2}):(\d{2})/);
     if (tm) d.setHours(parseInt(tm[1], 10), parseInt(tm[2], 10));
@@ -2521,13 +2538,13 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     if (!date || isNaN(date.getTime())) return '';
     return `${String(date.getMonth() + 1).padStart(2, '0')}/${String(date.getDate()).padStart(2, '0')}`;
   };
-  // 予約日 (parseDate は日付のみ、時刻は別途抽出)
-  const bdDate = parseDate(d.bookDate);
+  // 予約日 (parseDateLoose で短縮形式対応、時刻は別途抽出)
+  const bdDate = parseDateLoose(d.bookDate);
   const bdStr = fmtMD(bdDate);
   const tm = (d.bookDate || '').match(/(\d{1,2}):(\d{2})/);
   const tstr = tm ? `${tm[1].padStart(2, '0')}:${tm[2]}` : '--:--';
   // 登録日
-  const adDate = parseDate(d.applyDate);
+  const adDate = parseDateLoose(d.applyDate);
   const adStr = fmtMD(adDate);
   // ステータス色 (Bug fix: 全ステータス網羅、未網羅は灰色 default で 未対応 を上書きしないように)
   const st = d.status || '未対応';
@@ -5343,7 +5360,7 @@ function closeMemoModal() {
   document.body.style.overflow = '';
   _memoTarget = null;
 }
-function saveMemoModal() {
+async function saveMemoModal() {
   if (!_memoTarget) return;
   const val = document.getElementById('memo-modal-text').value.trim();
   const memos = loadData('bk-memos', {});
@@ -5355,12 +5372,23 @@ function saveMemoModal() {
   }
   saveData('bk-memos', memos);
   if (_memoTarget.tdEl) {
-    _memoTarget.tdEl.innerHTML = val ? val.slice(0,6) + (val.length>6?'…':'') : '<span style="color:var(--text-muted)">+</span>';
+    // Bug fix: 6文字省略 → _flattenMemoForDisplay で 200文字、再描画と整合性
+    const flat = val ? (typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(val, 200) : val.slice(0,200)) : '';
+    _memoTarget.tdEl.innerHTML = val ? escapeHtml(flat) : '<span style="color:var(--text-muted)">+ メモ</span>';
     _memoTarget.tdEl.title = val;
+    // 視覚的にもメモ有無で背景切替
+    if (val) {
+      _memoTarget.tdEl.style.background = '#fff8e1';
+      _memoTarget.tdEl.style.borderColor = '#f9a825';
+    } else {
+      _memoTarget.tdEl.style.background = 'transparent';
+      _memoTarget.tdEl.style.borderColor = 'var(--border)';
+    }
   }
   // 予約一覧メモとBFメモを連動 (v273: 空時も bf_memo を上書きする — 削除を反映するため)
   const payload = { name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val, bf_memo: val };
-  safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+  // Bug fix: await して保存完了を確認
+  await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
   // BFライフサイクルキャッシュも同期 (空でも反映)
   if (bfLifecycleCache[_memoTarget.key]) {
     bfLifecycleCache[_memoTarget.key].bf_memo = val;
