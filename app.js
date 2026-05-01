@@ -2345,10 +2345,9 @@ function renderPhoneCheck() {
   const tomorrowEnd = new Date(todayEnd.getTime() + 24*3600*1000);
 
   // フィルタ条件
-  // v273: 荷電対象は未来の予約のみ — 既に過ぎた時刻 (bd < now) は除外
+  // v273: 今日中の過ぎた時刻も含めて表示 (今日の予約全件 + 明日の予約)
   const isInPeriod = (bd) => {
     if (!bd) return false;
-    if (bd < now) return false;  // 過去 (今より前の時刻) は荷電対象外
     if (_phoneCheckState.period === 'today') return bd >= todayStart && bd <= todayEnd;
     if (_phoneCheckState.period === 'tomorrow') return bd >= tomorrowStart && bd <= tomorrowEnd;
     return bd >= todayStart && bd <= tomorrowEnd;
