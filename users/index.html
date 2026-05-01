@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
-<title>ユーザー管理 / Aladdin</title>
+<title>ポータル ユーザー管理 / Aladdin</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap">
@@ -14,8 +14,7 @@
     --accent:#1a1a1a; --hi-bg:#fffbea; --hi-border:#d4a010; --hi-text:#b07800;
     --danger:#dc2626;
     --role-admin-bg:#ede9fe; --role-admin-fg:#6d28d9;
-    --role-staff-bg:#dbeafe; --role-staff-fg:#1d4ed8;
-    --role-agency-bg:#fef3c7; --role-agency-fg:#92400e;
+    --role-editor-bg:#dbeafe; --role-editor-fg:#1d4ed8;
   }
   *{box-sizing:border-box}
   html,body{margin:0;padding:0}
@@ -25,9 +24,8 @@
     -webkit-font-smoothing:antialiased;
   }
   [hidden]{display:none !important}
-  .wrap{max-width:1100px; margin:0 auto; padding:24px 20px 60px}
+  .wrap{max-width:920px; margin:0 auto; padding:24px 20px 60px}
 
-  /* Top */
   .top-bar{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px}
   .back-link{color:var(--text-sub); text-decoration:none}
   .back-link:hover{color:var(--text)}
@@ -36,9 +34,8 @@
   .badge.admin{background:#1a1a1a; color:#fff}
   .badge.guest{background:#e5e7eb; color:var(--text-sub)}
   .auth-btn{font-size:11px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text-sub); cursor:pointer; font-family:inherit}
-  .auth-btn:hover{background:var(--bg)}
 
-  header.brand-head{text-align:center; margin:32px 0 24px}
+  header.brand-head{text-align:center; margin:32px 0 8px}
   .brand{
     font-family:'Great Vibes', cursive; font-size:64px; line-height:1;
     background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);
@@ -46,86 +43,75 @@
     margin:0;
   }
   .subtitle{font-size:13px; letter-spacing:3px; color:var(--text-sub); margin-top:6px; text-transform:uppercase}
+  .scope-note{text-align:center; font-size:12px; color:var(--text-sub); margin:8px 0 24px; padding:0 20px}
+  .scope-note strong{color:var(--text); background:#fff7ed; padding:2px 8px; border-radius:6px; border:1px solid #fed7aa}
 
-  /* Permission gate */
   #denied{padding:48px 20px; text-align:center; background:#fff; border:1px solid var(--border); border-radius:12px}
   #denied h2{margin:0 0 12px; font-size:18px}
   #denied p{margin:0 0 16px; color:var(--text-sub); font-size:13px}
   #denied a{display:inline-block; padding:10px 20px; background:#1a1a1a; color:#fff; text-decoration:none; border-radius:8px; font-size:13px; font-weight:600}
 
-  /* Toolbar */
   .toolbar{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap}
   .stats{display:flex; align-items:center; gap:16px; font-size:13px; color:var(--text-sub); flex-wrap:wrap}
   .stats strong{color:var(--text); font-weight:700; margin-left:2px}
-  .stats .sep{color:var(--border)}
-  .worker-status{font-size:11px; padding:3px 8px; border-radius:999px}
-  .worker-status.up{background:#dcfce7; color:#15803d}
-  .worker-status.down{background:#fef3c7; color:#92400e}
 
-  .btn{padding:10px 16px; font-size:13px; font-weight:600; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text); cursor:pointer; font-family:inherit; transition:all .15s}
+  .btn{padding:10px 16px; font-size:13px; font-weight:600; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text); cursor:pointer; font-family:inherit}
   .btn:hover{background:var(--bg)}
   .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
   .btn.primary:hover{background:#000}
-  .btn.danger{color:var(--danger); border-color:#fecaca}
-  .btn.danger:hover{background:#fee2e2}
   .btn:disabled{opacity:.55; cursor:not-allowed}
 
-  /* Table */
   .table-wrap{background:#fff; border:1px solid var(--border); border-radius:12px; overflow:hidden}
   table{width:100%; border-collapse:collapse; font-size:13px}
   th,td{padding:12px 14px; text-align:left; border-bottom:1px solid var(--border)}
   th{background:#f9fafb; font-size:11px; font-weight:700; color:var(--text-sub); letter-spacing:1px; text-transform:uppercase; white-space:nowrap}
   tbody tr:last-child td{border-bottom:none}
   tbody tr:hover{background:#fafafa}
+  tbody tr.inactive{opacity:.55}
   td.actions{white-space:nowrap; text-align:right}
   td.actions .icon-btn{padding:5px 9px; font-size:11px; margin-left:4px; background:#fff; border:1px solid var(--border); border-radius:6px; cursor:pointer; color:var(--text-sub); font-family:inherit}
   td.actions .icon-btn:hover{background:var(--bg); color:var(--text)}
   td.actions .icon-btn.danger:hover{background:#fee2e2; color:var(--danger); border-color:#fecaca}
 
   .role-pill{display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; letter-spacing:.5px}
-  .role-pill.admin{background:var(--role-admin-bg); color:var(--role-admin-fg)}
-  .role-pill.staff_promo{background:var(--role-staff-bg); color:var(--role-staff-fg)}
-  .role-pill.agency{background:var(--role-agency-bg); color:var(--role-agency-fg)}
+  .role-pill.portal_admin{background:var(--role-admin-bg); color:var(--role-admin-fg)}
+  .role-pill.portal_editor{background:var(--role-editor-bg); color:var(--role-editor-fg)}
 
-  .promo-tags{display:flex; flex-wrap:wrap; gap:3px; max-width:280px}
-  .promo-tag{font-size:10px; padding:1px 6px; background:#f3f4f6; border-radius:4px; color:var(--text-sub); white-space:nowrap}
-  .promo-tag.wild{background:#fef3c7; color:#92400e}
+  .status-pill{display:inline-block; padding:2px 8px; border-radius:999px; font-size:10px; font-weight:600}
+  .status-pill.active{background:#dcfce7; color:#15803d}
+  .status-pill.inactive{background:#f3f4f6; color:#9ca3af}
 
   #loading,#empty{padding:40px; text-align:center; color:var(--text-sub); font-size:13px}
 
-  /* Modal */
   .modal-overlay{position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:1000; display:flex; align-items:center; justify-content:center; padding:20px}
   .modal-overlay[hidden]{display:none !important}
-  .modal{background:#fff; border-radius:14px; padding:24px; width:100%; max-width:520px; max-height:90vh; overflow-y:auto}
+  .modal{background:#fff; border-radius:14px; padding:24px; width:100%; max-width:480px; max-height:90vh; overflow-y:auto}
   .modal h2{margin:0 0 18px; font-size:17px; font-weight:700; letter-spacing:1px}
   .modal label{display:block; font-size:11px; font-weight:700; color:var(--text-sub); letter-spacing:1px; text-transform:uppercase; margin:14px 0 6px}
   .modal label.cb{display:flex; align-items:center; gap:8px; text-transform:none; letter-spacing:0; font-size:13px; color:var(--text); font-weight:500; cursor:pointer; margin-top:10px}
   .modal label.cb input{width:auto}
-  .modal input[type="text"], .modal input[type="email"], .modal input[type="password"], .modal select{
+  .modal input[type="text"], .modal input[type="email"], .modal select{
     width:100%; padding:11px 13px; font-size:14px; border:1px solid var(--border); border-radius:8px; outline:none; background:#fff; font-family:inherit;
   }
   .modal input:focus, .modal select:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+  .modal-hint{font-size:11px; color:var(--text-sub); margin-top:5px; line-height:1.5}
   .modal-actions{display:flex; gap:8px; margin-top:24px; flex-wrap:wrap}
   .modal-actions button{flex:1; min-width:90px; padding:11px 16px; font-size:13px; font-weight:600; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text); cursor:pointer; font-family:inherit}
-  .modal-actions button:hover{background:var(--bg)}
   .modal-actions .primary{background:var(--accent); color:#fff; border-color:var(--accent)}
   .modal-actions .primary:hover{background:#000}
   .modal-msg{font-size:12px; margin-top:10px; min-height:16px}
   .modal-msg.error{color:var(--danger)}
   .modal-msg.success{color:#059669}
 
-  /* Toast */
   #toast{position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#1a1a1a; color:#fff; padding:11px 18px; border-radius:8px; font-size:13px; z-index:2000; opacity:0; pointer-events:none; transition:opacity .2s; max-width:90vw}
   #toast.show{opacity:1}
   #toast.error{background:#dc2626}
 
-  /* Mobile */
   @media (max-width: 640px){
     .table-wrap{border:none; border-radius:0; margin:0 -20px}
     table{font-size:12px}
     th,td{padding:8px 10px}
-    th:nth-child(4),td:nth-child(4),
-    th:nth-child(5),td:nth-child(5){display:none}
+    th:nth-child(3),td:nth-child(3){display:none}
     .toolbar{flex-direction:column; align-items:stretch}
   }
 </style>
@@ -142,13 +128,17 @@
 
   <header class="brand-head">
     <h1 class="brand">Aladdin</h1>
-    <div class="subtitle">User Management</div>
+    <div class="subtitle">Portal User Management</div>
   </header>
+  <div class="scope-note">
+    管理対象: <strong>ポータル運用権限</strong>（/sales/ タブ編集 / /users/ 管理）<br>
+    主アプリ（予約・来院・売上）の権限管理は <a href="../?login" style="color:var(--text);text-decoration:underline">主アプリの「管理 → 権限管理」</a> から
+  </div>
 
   <!-- Permission denied -->
   <div id="denied" hidden>
-    <h2>🔒 管理者権限が必要です</h2>
-    <p>このページは admin 権限を持つアカウントでのみ利用できます。</p>
+    <h2>🔒 portal_admin 権限が必要です</h2>
+    <p id="denied-msg">このページは portal_admin 権限を持つアカウントでのみ利用できます。</p>
     <a href="../" id="denied-login"
        onclick="try{sessionStorage.setItem('after-login-url',location.pathname);}catch(_){}"
     >ポータルへ戻ってログイン</a>
@@ -159,32 +149,26 @@
     <div class="toolbar">
       <div class="stats">
         <span>合計 <strong id="stat-total">-</strong> 名</span>
-        <span class="sep">|</span>
-        <span>admin <strong id="stat-admin">-</strong></span>
-        <span class="sep">|</span>
-        <span>staff_promo <strong id="stat-staff">-</strong></span>
-        <span class="sep">|</span>
-        <span>agency <strong id="stat-agency">-</strong></span>
-        <span id="worker-status" class="worker-status down" hidden></span>
+        <span>portal_admin <strong id="stat-admin">-</strong></span>
+        <span>portal_editor <strong id="stat-editor">-</strong></span>
+        <span>有効 <strong id="stat-active">-</strong> / 全 <strong id="stat-all">-</strong></span>
       </div>
       <div style="display:flex; gap:8px">
         <button class="btn" id="btn-reload">🔄 再読み込み</button>
-        <button class="btn primary" id="btn-add">＋ 新規発行</button>
+        <button class="btn primary" id="btn-add">＋ 新規追加</button>
       </div>
     </div>
 
     <div id="loading" hidden>読み込み中…</div>
-    <div id="empty" hidden>アカウントがまだ発行されていません。</div>
+    <div id="empty" hidden>portal_users がまだ登録されていません。</div>
     <div class="table-wrap" id="table-wrap" hidden>
       <table>
         <thead>
           <tr>
-            <th>ID</th>
             <th>名前</th>
             <th>ロール</th>
-            <th>代理店</th>
             <th>メール</th>
-            <th>担当プロモ</th>
+            <th>状態</th>
             <th></th>
           </tr>
         </thead>
@@ -199,43 +183,41 @@
 <!-- Modal: Add / Edit -->
 <div id="modal-overlay" class="modal-overlay" hidden>
   <div class="modal">
-    <h2 id="modal-title">新規アカウント発行</h2>
+    <h2 id="modal-title">新規 portal_user 追加</h2>
     <form id="user-form">
       <input type="hidden" id="form-id">
-      <input type="hidden" id="form-uid">
 
       <label for="form-name">名前 *</label>
       <input type="text" id="form-name" required maxlength="60" placeholder="例: 田中 太郎">
 
-      <label for="form-email">メールアドレス *</label>
-      <input type="email" id="form-email" required placeholder="user@example.com">
+      <div id="add-only-fields">
+        <label for="form-email">メールアドレス</label>
+        <input type="email" id="form-email" placeholder="user@example.com">
 
-      <label for="form-password" id="form-password-label">初回パスワード *</label>
-      <input type="text" id="form-password" placeholder="8文字以上" autocomplete="off">
+        <label for="form-uuid">Supabase Auth User UUID *</label>
+        <input type="text" id="form-uuid" placeholder="00000000-0000-0000-0000-000000000000">
+        <div class="modal-hint">
+          まず <a href="https://supabase.com/dashboard/project/ndlfqrvoejwgqfdtghmg/auth/users" target="_blank" rel="noopener noreferrer">Supabase Auth ダッシュボード</a> で
+          ユーザーを作成し、表示される UUID をここに貼り付けてください。
+        </div>
+      </div>
 
       <label for="form-role">ロール *</label>
       <select id="form-role">
-        <option value="admin">admin（全権限）</option>
-        <option value="staff_promo" selected>staff_promo（社員・予約来院のみ）</option>
-        <option value="agency">agency（代理店・予約のみ）</option>
+        <option value="portal_admin">portal_admin（このページの管理 + /sales/ 編集）</option>
+        <option value="portal_editor">portal_editor（/sales/ 編集のみ）</option>
       </select>
 
-      <label for="form-agency">代理店名（任意）</label>
-      <input type="text" id="form-agency" maxlength="60" placeholder="例: 株式会社○○">
-
-      <label class="cb">
-        <input type="checkbox" id="form-promo-all">
-        全プロモ閲覧可（%）— off の場合は管理タブから個別設定
-      </label>
-      <label class="cb">
-        <input type="checkbox" id="form-pii">
-        個人情報を平文で表示（PII閲覧可）
+      <label class="cb" id="active-label" hidden>
+        <input type="checkbox" id="form-active" checked>
+        有効（OFFにすると無効化）
       </label>
 
       <div class="modal-msg" id="modal-msg"></div>
 
       <div class="modal-actions">
         <button type="button" id="modal-cancel">キャンセル</button>
+        <button type="button" id="modal-delete" class="danger" style="background:#fff;color:var(--danger);border-color:#fecaca" hidden>削除</button>
         <button type="submit" class="primary">保存</button>
       </div>
     </form>
@@ -247,20 +229,14 @@
 (async function(){
   const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
   const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
-  const AUTH_ADMIN_URL = 'https://seishokai-auth-admin.tkm-koike.workers.dev';
-  const LOGIN_URL = 'https://seishokai.github.io/clinic-analysis/?login';
-
   const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   const $ = id => document.getElementById(id);
   const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
-  let isAdmin = false;
-  let workerAvailable = false;
-  let accounts = [];
-  let editingId = null;
-  let editingUid = null;
+  let portalUsers = [];
+  let myUserId = null;
 
-  // ===== Toast =====
   function toast(msg, isError = false){
     const t = $('toast');
     t.textContent = msg;
@@ -269,106 +245,81 @@
     setTimeout(() => t.classList.remove('show'), 2400);
   }
 
-  // ===== JWT =====
-  async function getJwt(){
+  // ===== Auth =====
+  // portal_users をチェック (主アプリ accounts とは独立)
+  async function fetchAuthState(){
     try {
       const { data: { session } } = await sb.auth.getSession();
-      return session?.access_token || null;
-    } catch(_) { return null; }
-  }
-
-  async function callWorker(path, body){
-    const jwt = await getJwt();
-    if (!jwt) return { ok: false, error: '認証セッションがありません' };
-    try {
-      const res = await fetch(AUTH_ADMIN_URL + path, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + jwt },
-        body: JSON.stringify(body || {}),
-      });
-      const j = await res.json().catch(() => null);
-      if (!j) return { ok: false, error: 'Worker応答が不正 (status=' + res.status + ')' };
-      return j;
+      if (!session) return { isPortalAdmin: false, profile: null, hasMainAccount: false };
+      myUserId = session.user.id;
+      const [portalRes, mainRes] = await Promise.all([
+        sb.rpc('get_my_portal_user'),
+        sb.rpc('get_my_account'),
+      ]);
+      const portal = portalRes.data;
+      const main = mainRes.data;
+      const isPortalAdmin = portal && portal.role === 'portal_admin' && portal.is_active;
+      return { isPortalAdmin, profile: portal, mainProfile: main };
     } catch(e) {
-      return { ok: false, error: 'Worker接続失敗: ' + (e.message || e) };
+      console.warn('auth check failed', e);
+      return { isPortalAdmin: false, profile: null, mainProfile: null };
     }
   }
 
-  async function checkWorkerAlive(){
-    try {
-      const r = await fetch(AUTH_ADMIN_URL + '/auth-admin/create', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}',
-      });
-      return r.status === 401 || r.status === 400;
-    } catch(_) { return false; }
-  }
-
-  // ===== Auth =====
-  async function checkAuth(){
-    try {
-      const { data: { session } } = await sb.auth.getSession();
-      if (!session) return { isAdmin: false, profile: null };
-      const { data: profile, error } = await sb.rpc('get_my_account');
-      if (error || !profile) return { isAdmin: false, profile: null };
-      const adminFlag = profile.role === 'admin' || profile.account_type === 'admin';
-      return { isAdmin: adminFlag, profile };
-    } catch(_) { return { isAdmin: false, profile: null }; }
-  }
-
-  function setAuthUI(adminFlag, profile){
-    isAdmin = adminFlag;
+  function setAuthUI(isPortalAdmin, profile, mainProfile){
     const badge = $('auth-badge');
     const btn = $('auth-btn');
     if (profile) {
-      badge.textContent = adminFlag ? '👤 admin' : (profile.name || 'ログイン中');
-      badge.className = 'badge ' + (adminFlag ? 'admin' : 'guest');
+      badge.textContent = '👤 ' + (profile.role === 'portal_admin' ? 'portal_admin' : 'portal_editor');
+      badge.className = 'badge ' + (isPortalAdmin ? 'admin' : 'guest');
+      btn.textContent = 'ログアウト';
+      btn.onclick = async () => { await sb.auth.signOut(); location.href = '../'; };
+    } else if (mainProfile) {
+      // 主アプリにはログイン済みだが portal_user ではない
+      badge.textContent = '主アプリ ' + (mainProfile.role || 'user');
+      badge.className = 'badge guest';
       btn.textContent = 'ログアウト';
       btn.onclick = async () => { await sb.auth.signOut(); location.href = '../'; };
     } else {
       badge.textContent = 'ゲスト';
       badge.className = 'badge guest';
-      btn.textContent = '管理者ログイン';
-      btn.onclick = () => {
-        // ログイン後にこのページへ自動リダイレクト
-        try { sessionStorage.setItem('after-login-url', location.pathname); } catch(_){}
-        location.href = '../';
-      };
+      btn.hidden = true;
     }
     $('auth-area').hidden = false;
   }
 
   // ===== Data =====
-  async function loadAccounts(){
+  async function loadUsers(){
     $('loading').hidden = false;
     $('empty').hidden = true;
     $('table-wrap').hidden = true;
-    const { data, error } = await sb.rpc('admin_list_accounts_for_migration');
+    const { data, error } = await sb.rpc('portal_admin_list_users');
     $('loading').hidden = true;
     if (error) {
-      toast('読み込み失敗: ' + error.message, true);
+      const msg = (error.message || '') + ' ' + (error.details || '') + ' ' + (error.hint || '');
+      const isMissing = error.code === '42P01' || error.code === 'PGRST205'
+        || /relation .* does not exist/i.test(msg)
+        || /could not find the (function|table)/i.test(msg);
+      $('empty').textContent = isMissing
+        ? 'portal_users テーブルが未作成です。管理者は migrations/portal_users.sql を Supabase で実行してください。'
+        : '読み込みエラー: ' + (error.message || '');
       $('empty').hidden = false;
-      $('empty').textContent = 'エラー: ' + (error.message || '');
       return;
     }
-    accounts = Array.isArray(data) ? data : [];
+    portalUsers = Array.isArray(data) ? data : [];
     renderTable();
   }
 
   function renderTable(){
-    const total = accounts.length;
-    const adm = accounts.filter(a => a.role === 'admin').length;
-    const staff = accounts.filter(a => a.role === 'staff_promo').length;
-    const agency = accounts.filter(a => a.role === 'agency').length;
+    const total = portalUsers.length;
+    const adm = portalUsers.filter(u => u.role === 'portal_admin' && u.is_active).length;
+    const ed = portalUsers.filter(u => u.role === 'portal_editor' && u.is_active).length;
+    const active = portalUsers.filter(u => u.is_active).length;
     $('stat-total').textContent = total;
     $('stat-admin').textContent = adm;
-    $('stat-staff').textContent = staff;
-    $('stat-agency').textContent = agency;
-
-    const ws = $('worker-status');
-    ws.hidden = false;
-    ws.classList.toggle('up', workerAvailable);
-    ws.classList.toggle('down', !workerAvailable);
-    ws.textContent = workerAvailable ? '🟢 Worker稼働中' : '🟡 Worker未デプロイ';
+    $('stat-editor').textContent = ed;
+    $('stat-active').textContent = active;
+    $('stat-all').textContent = total;
 
     if (total === 0) {
       $('empty').hidden = false;
@@ -376,33 +327,19 @@
     }
     $('table-wrap').hidden = false;
     const tb = $('tbody');
-    tb.innerHTML = accounts.map(a => {
-      const promos = Array.isArray(a.allowed_promos) ? a.allowed_promos : [];
-      const promoHtml = promos.length === 0
-        ? '<span style="color:var(--text-sub);font-size:11px">-</span>'
-        : `<div class="promo-tags">${promos.map(p => `<span class="promo-tag${p==='%'?' wild':''}">${esc(p)}</span>`).join('')}</div>`;
-      const isProtected = a.role === 'admin';
-      const resetBtn = (workerAvailable && a.supabase_user_id)
-        ? `<button class="icon-btn" data-act="reset" data-id="${a.id}" data-uid="${esc(a.supabase_user_id)}" data-name="${esc(a.name||'')}">🔑 PW再発行</button>`
-        : '';
-      const shareBtn = !isProtected
-        ? `<button class="icon-btn" data-act="share" data-email="${esc(a.email||'')}">🔗 URL</button>`
-        : '';
-      const deleteBtn = isProtected
-        ? `<span style="font-size:10px;color:var(--text-sub)">保護</span>`
-        : `<button class="icon-btn danger" data-act="delete" data-id="${a.id}" data-uid="${esc(a.supabase_user_id||'')}" data-name="${esc(a.name||'')}">🗑</button>`;
-      return `<tr data-id="${a.id}">
-        <td style="color:var(--text-sub);font-size:11px">${a.id}</td>
-        <td><strong>${esc(a.name || '-')}</strong></td>
-        <td><span class="role-pill ${a.role}">${a.role}</span></td>
-        <td>${esc(a.agency || '-')}</td>
-        <td style="font-size:11px;color:var(--text-sub)">${esc(a.email || '-')}</td>
-        <td>${promoHtml}</td>
+    tb.innerHTML = portalUsers.map(u => {
+      const isMe = u.supabase_user_id === myUserId;
+      return `<tr class="${u.is_active ? '' : 'inactive'}" data-id="${esc(u.id)}">
+        <td>
+          <strong>${esc(u.name || '-')}</strong>
+          ${isMe ? '<span style="font-size:10px;color:var(--text-sub);margin-left:6px">(自分)</span>' : ''}
+        </td>
+        <td><span class="role-pill ${u.role}">${u.role}</span></td>
+        <td style="font-size:11px;color:var(--text-sub)">${esc(u.email || '-')}</td>
+        <td><span class="status-pill ${u.is_active ? 'active' : 'inactive'}">${u.is_active ? '有効' : '無効'}</span></td>
         <td class="actions">
-          <button class="icon-btn" data-act="edit" data-id="${a.id}">✏️ 編集</button>
-          ${resetBtn}
-          ${shareBtn}
-          ${deleteBtn}
+          <button class="icon-btn" data-act="edit" data-id="${esc(u.id)}">✏️ 編集</button>
+          ${isMe ? '' : `<button class="icon-btn danger" data-act="delete" data-id="${esc(u.id)}" data-name="${esc(u.name||'')}">🗑</button>`}
         </td>
       </tr>`;
     }).join('');
@@ -412,86 +349,53 @@
     });
   }
 
-  // ===== Actions =====
   async function handleAction(act, ds){
-    const acc = accounts.find(a => String(a.id) === String(ds.id));
-    if (act === 'edit') return openEditModal(acc);
-    if (act === 'reset') return resetPassword(ds.uid, ds.name);
-    if (act === 'delete') return deleteAccount(ds.id, ds.uid, ds.name);
-    if (act === 'share') return copyShareUrl(ds.email);
+    const u = portalUsers.find(x => String(x.id) === String(ds.id));
+    if (act === 'edit') return openEditModal(u);
+    if (act === 'delete') return deleteUser(ds.id, ds.name);
   }
 
-  async function resetPassword(uid, name){
-    const newPw = prompt(`「${name}」の新しいパスワードを入力してください（8文字以上）`);
-    if (!newPw) return;
-    if (newPw.length < 8) { toast('8文字以上', true); return; }
-    const r = await callWorker('/auth-admin/reset-password', { user_id: uid, new_password: newPw });
-    if (!r.ok) { toast('失敗: ' + (r.error || ''), true); return; }
-    await navigator.clipboard?.writeText(newPw).catch(()=>{});
-    toast(`✅ ${name}のパスワード再発行（クリップボードにコピー済）`);
-  }
-
-  async function deleteAccount(id, uid, name){
-    if (!confirm(`「${name}」を削除しますか？\n\nAuthユーザー＋accountsレコードの両方を完全削除します。`)) return;
-    if (!workerAvailable || !uid) {
-      const { error } = await sb.from('accounts').delete().eq('id', id);
-      if (error) { toast('失敗: ' + error.message, true); return; }
-      toast('✅ accounts のみ削除（Authユーザーは別途）');
-    } else {
-      const r = await callWorker('/auth-admin/delete', { user_id: uid, account_id: Number(id) });
-      if (!r.ok) { toast('失敗: ' + (r.error || ''), true); return; }
-      toast('✅ 削除しました');
-    }
-    await loadAccounts();
-  }
-
-  async function copyShareUrl(email){
-    const text = `ログインURL: ${LOGIN_URL}\nメール: ${email}`;
-    try {
-      await navigator.clipboard.writeText(text);
-      toast('✅ URLをコピーしました');
-    } catch(_) { toast('コピー失敗', true); }
+  async function deleteUser(id, name){
+    if (!confirm(`「${name}」を portal_users から削除しますか？\n\n（auth.users 自体は残ります。完全削除したい場合は Supabase Dashboard で別途削除してください）`)) return;
+    const { data, error } = await sb.rpc('portal_admin_delete_user', { p_id: id });
+    if (error) { toast('失敗: ' + error.message, true); return; }
+    if (data && data.ok === false) { toast('失敗: ' + (data.error || ''), true); return; }
+    toast('✅ 削除しました');
+    await loadUsers();
   }
 
   // ===== Modal =====
+  let editingId = null;
+
   function openAddModal(){
     editingId = null;
-    editingUid = null;
-    $('modal-title').textContent = '新規アカウント発行';
+    $('modal-title').textContent = '新規 portal_user 追加';
     $('form-id').value = '';
-    $('form-uid').value = '';
     $('form-name').value = '';
     $('form-email').value = '';
-    $('form-email').disabled = false;
-    $('form-password').value = generatePassword();
-    $('form-password').parentElement.style.display = 'block';
-    $('form-password-label').textContent = '初回パスワード *';
-    $('form-role').value = 'staff_promo';
-    $('form-agency').value = '';
-    $('form-promo-all').checked = false;
-    $('form-pii').checked = false;
+    $('form-uuid').value = '';
+    $('form-role').value = 'portal_admin';
+    $('add-only-fields').hidden = false;
+    $('active-label').hidden = true;
+    $('form-active').checked = true;
+    $('modal-delete').hidden = true;
     $('modal-msg').textContent = '';
     $('modal-overlay').hidden = false;
     setTimeout(() => $('form-name').focus(), 50);
   }
 
-  function openEditModal(acc){
-    if (!acc) return;
-    editingId = acc.id;
-    editingUid = acc.supabase_user_id || null;
-    $('modal-title').textContent = `編集: ${acc.name}`;
-    $('form-id').value = acc.id;
-    $('form-uid').value = acc.supabase_user_id || '';
-    $('form-name').value = acc.name || '';
-    $('form-email').value = acc.email || '';
-    $('form-email').disabled = true; // メール変更は Supabase Auth 側でしか不可
-    $('form-password').value = '';
-    $('form-password').parentElement.style.display = 'none'; // 編集ではPWは別途リセット
-    $('form-role').value = acc.role || 'staff_promo';
-    $('form-agency').value = acc.agency || '';
-    const promos = Array.isArray(acc.allowed_promos) ? acc.allowed_promos : [];
-    $('form-promo-all').checked = promos.includes('%');
-    $('form-pii').checked = !!acc.can_view_pii;
+  function openEditModal(u){
+    if (!u) return;
+    editingId = u.id;
+    $('modal-title').textContent = `編集: ${u.name}`;
+    $('form-id').value = u.id;
+    $('form-name').value = u.name || '';
+    $('form-role').value = u.role || 'portal_admin';
+    $('form-active').checked = !!u.is_active;
+    $('add-only-fields').hidden = true;
+    $('active-label').hidden = false;
+    // 自分自身は削除ボタン非表示 (RPCでも保護されてるが念の為)
+    $('modal-delete').hidden = (u.supabase_user_id === myUserId);
     $('modal-msg').textContent = '';
     $('modal-overlay').hidden = false;
     setTimeout(() => $('form-name').focus(), 50);
@@ -499,24 +403,18 @@
 
   function closeModal(){ $('modal-overlay').hidden = true; }
 
-  function generatePassword(){
-    const chars = 'abcdefghjkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-    return Array.from({length:12}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
-  }
-
-  // 役割別のデフォルトタブ
-  function defaultTabsForRole(role){
-    if (role === 'admin') return { bookings:true, kaiin:true, tc:true, sales:true, adbudget:true, admin:true };
-    if (role === 'staff_promo') return { bookings:true, kaiin:true, tc:false, sales:false, adbudget:false, admin:false };
-    return { bookings:true, kaiin:false, tc:false, sales:false, adbudget:false, admin:false };
-  }
-
   $('modal-cancel').onclick = closeModal;
   $('modal-overlay').onclick = (e) => { if (e.target === $('modal-overlay')) closeModal(); };
-
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && !$('modal-overlay').hidden) closeModal();
   });
+  $('modal-delete').onclick = async () => {
+    if (!editingId) return;
+    const u = portalUsers.find(x => x.id === editingId);
+    if (!u) return;
+    closeModal();
+    await deleteUser(u.id, u.name);
+  };
 
   $('user-form').onsubmit = async (e) => {
     e.preventDefault();
@@ -530,67 +428,38 @@
 
     try {
       const name = $('form-name').value.trim();
-      const email = $('form-email').value.trim();
       const role = $('form-role').value;
-      const agency = $('form-agency').value.trim();
-      const promoAll = $('form-promo-all').checked;
-      const canViewPII = $('form-pii').checked;
-      const allowed_promos = promoAll ? ['%'] : [];
-      const visible_tabs = defaultTabsForRole(role);
-
-      if (!name || !email) {
-        msg.textContent = '名前・メールは必須';
-        msg.className = 'modal-msg error';
-        return;
-      }
+      if (!name) { msg.textContent = '名前は必須'; msg.className = 'modal-msg error'; return; }
 
       if (editingId) {
         // === 編集 ===
-        const { data, error } = await sb.rpc('admin_update_account', {
-          p_id: Number(editingId),
-          p_name: name,
-          p_role: role,
-          p_agency: agency,
-          p_allowed_promos: allowed_promos.length ? allowed_promos : (promoAll ? ['%'] : null),
-          p_visible_tabs: visible_tabs,
-          p_can_view_pii: canViewPII,
+        const isActive = $('form-active').checked;
+        const { data, error } = await sb.rpc('portal_admin_update_user', {
+          p_id: editingId, p_name: name, p_role: role, p_is_active: isActive,
         });
-        if (error || (data && data.ok === false)) {
-          msg.textContent = 'エラー: ' + (error?.message || data?.error || '不明');
-          msg.className = 'modal-msg error';
-          return;
-        }
+        if (error) { msg.textContent = 'エラー: ' + error.message; msg.className = 'modal-msg error'; return; }
+        if (data && data.ok === false) { msg.textContent = 'エラー: ' + (data.error || ''); msg.className = 'modal-msg error'; return; }
         toast('✅ 更新しました');
         closeModal();
-        await loadAccounts();
+        await loadUsers();
       } else {
-        // === 新規発行 ===
-        const password = $('form-password').value;
-        if (!password || password.length < 8) {
-          msg.textContent = 'パスワードは8文字以上';
+        // === 新規追加 ===
+        const email = $('form-email').value.trim() || null;
+        const uuid = $('form-uuid').value.trim();
+        if (!uuid) { msg.textContent = 'UUID は必須（Supabase Dashboard で取得）'; msg.className = 'modal-msg error'; return; }
+        if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(uuid)) {
+          msg.textContent = 'UUID 形式が不正です';
           msg.className = 'modal-msg error';
           return;
         }
-        if (!workerAvailable) {
-          msg.textContent = 'Worker未デプロイのため1クリック発行できません。管理→権限管理タブをご利用ください。';
-          msg.className = 'modal-msg error';
-          return;
-        }
-        const r = await callWorker('/auth-admin/create', {
-          email, password, name, role, agency,
-          allowed_promos: allowed_promos.length ? allowed_promos : ['%'],
-          visible_tabs,
-          can_view_pii: canViewPII,
+        const { data, error } = await sb.rpc('portal_admin_create_user', {
+          p_user_uuid: uuid, p_email: email, p_name: name, p_role: role,
         });
-        if (!r.ok) {
-          msg.textContent = 'エラー: ' + (r.error || '不明');
-          msg.className = 'modal-msg error';
-          return;
-        }
-        await navigator.clipboard?.writeText(`Email: ${email}\nPassword: ${password}\nLogin: ${LOGIN_URL}`).catch(()=>{});
-        toast('✅ 発行しました（資格情報をクリップボードにコピー）');
+        if (error) { msg.textContent = 'エラー: ' + error.message; msg.className = 'modal-msg error'; return; }
+        if (data && data.ok === false) { msg.textContent = 'エラー: ' + (data.error || ''); msg.className = 'modal-msg error'; return; }
+        toast('✅ 追加しました');
         closeModal();
-        await loadAccounts();
+        await loadUsers();
       }
     } finally {
       submitBtn.disabled = false;
@@ -599,30 +468,29 @@
   };
 
   $('btn-add').onclick = openAddModal;
-  $('btn-reload').onclick = loadAccounts;
+  $('btn-reload').onclick = loadUsers;
 
-  // ===== Init (parallel) =====
-  const [authData, workerCheck] = await Promise.all([checkAuth(), checkWorkerAlive()]);
-  workerAvailable = workerCheck;
-  setAuthUI(authData.isAdmin, authData.profile);
+  // ===== Init =====
+  const authData = await fetchAuthState();
+  setAuthUI(authData.isPortalAdmin, authData.profile, authData.mainProfile);
 
-  if (!authData.isAdmin) {
-    // 未ログイン: denied を見せず、直接ポータル経由でログインへ送る
-    if (!authData.profile) {
+  if (!authData.isPortalAdmin) {
+    // 完全未ログイン → ポータルでログインフォームを開く
+    if (!authData.profile && !authData.mainProfile) {
       try { sessionStorage.setItem('after-login-url', location.pathname); } catch(_){}
       location.replace('../');
       return;
     }
-    // ログイン済みだが admin ではない: denied 表示
+    // 主アプリ admin だが portal_admin ではない 等 → 権限不足を表示
     $('denied').hidden = false;
-    $('auth-btn').hidden = true;
-    // メッセージも具体化
-    document.querySelector('#denied p').textContent =
-      `現在ログイン中のアカウント (${authData.profile.name || authData.profile.account_type || ''}) は admin 権限がありません。`;
+    if (authData.mainProfile) {
+      $('denied-msg').textContent =
+        `現在ログイン中のアカウント（${authData.mainProfile.name || authData.mainProfile.account_type || ''}）は portal_admin ではありません。\nportal_admin に追加してもらうか、別のアカウントでログインしてください。`;
+    }
     return;
   }
   $('main-ui').hidden = false;
-  await loadAccounts();
+  await loadUsers();
 })();
 </script>
 </body>
