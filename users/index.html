@@ -607,9 +607,18 @@
   setAuthUI(authData.isAdmin, authData.profile);
 
   if (!authData.isAdmin) {
+    // 未ログイン: denied を見せず、直接ポータル経由でログインへ送る
+    if (!authData.profile) {
+      try { sessionStorage.setItem('after-login-url', location.pathname); } catch(_){}
+      location.replace('../');
+      return;
+    }
+    // ログイン済みだが admin ではない: denied 表示
     $('denied').hidden = false;
-    // 権限不足ページでは右上のログインボタンを隠す (中央のCTAと重複するため)
     $('auth-btn').hidden = true;
+    // メッセージも具体化
+    document.querySelector('#denied p').textContent =
+      `現在ログイン中のアカウント (${authData.profile.name || authData.profile.account_type || ''}) は admin 権限がありません。`;
     return;
   }
   $('main-ui').hidden = false;
