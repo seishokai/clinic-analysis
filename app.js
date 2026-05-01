@@ -6756,18 +6756,39 @@ function getStatusesForTreatment(treatment) {
 }
 
 // 来院タブ「一覧」レンダラー (全治療タイプまとめて表示)
+// v273: 来院一覧の期間フィルタ状態 (デフォルト今月、来院日基準)
+let _kaiinAllPeriodState = { period: 'thisMonth' };
+
 async function renderKaiinAll(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
   // 全治療タイプの来院対象行を集計
-  const allRows = (bookingsData || []).filter(d => {
+  let allRows = (bookingsData || []).filter(d => {
     if (d.status === '除外') return false;
     const bd = parseDate(d.bookDate);
     if (bd && bd > todayEnd) return false;
     if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
     return true;
   });
+  // 期間フィルタ
+  const period = _kaiinAllPeriodState.period;
+  if (period) {
+    const ymOf = (d, useApply) => {
+      const src = useApply ? (d.applyDate||'') : (d.bookDate || d.applyDate || '');
+      const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
+      return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : '';
+    };
+    const now = new Date();
+    const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+    if (period === 'thisMonth') allRows = allRows.filter(d => ymOf(d, false) === ym);
+    else if (period === 'thisMonthApply') allRows = allRows.filter(d => ymOf(d, true) === ym);
+    else if (period === 'lastMonth') {
+      const last = new Date(now); last.setMonth(last.getMonth()-1);
+      const lym = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}`;
+      allRows = allRows.filter(d => ymOf(d, false) === lym);
+    }
+  }
   // 治療タイプ別カウント
   const byCat = {};
   allRows.forEach(d => {
@@ -6802,9 +6823,27 @@ async function renderKaiinAll(containerId) {
   const totalAmt = allRows.filter(d => d.status==='成約').reduce((s,d)=>s+Number(d.contractAmount||0),0);
   const totalRate = totalCount ? Math.round(totalContracted / totalCount * 100) : 0;
 
+  // 期間ラベル
+  const periodLabel = {
+    'thisMonth': '今月（来院日基準）',
+    'thisMonthApply': '今月（登録日基準）',
+    'lastMonth': '先月',
+    '': '全期間'
+  }[period] || '全期間';
+
   el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
+      <span style="font-size:11px;color:var(--text-sub);font-weight:600;letter-spacing:1px">期間</span>
+      <select id="kaiin-all-period" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit">
+        <option value="" ${period===''?'selected':''}>全期間</option>
+        <option value="thisMonth" ${period==='thisMonth'?'selected':''}>今月（来院日基準）</option>
+        <option value="thisMonthApply" ${period==='thisMonthApply'?'selected':''}>今月（登録日基準）</option>
+        <option value="lastMonth" ${period==='lastMonth'?'selected':''}>先月</option>
+      </select>
+      <span style="font-size:11px;color:var(--text-sub)">表示中: <strong style="color:var(--text)">${periodLabel}</strong></span>
+    </div>
     <div style="margin-bottom:14px;padding:14px;background:linear-gradient(135deg,#f9fafb 0%,#f3f4f6 100%);border-radius:10px;border:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">全治療合計</div>
+      <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">全治療合計（${escapeHtml(periodLabel)}）</div>
       <div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
         <div><span style="font-size:28px;font-weight:700;color:#111">${totalCount}</span><span style="font-size:12px;color:var(--text-sub);margin-left:3px">件</span></div>
         <div><span style="font-size:12px;color:var(--text-sub)">成約</span> <span style="font-size:18px;font-weight:700;color:#059669">${totalContracted}</span></div>
@@ -6818,6 +6857,12 @@ async function renderKaiinAll(containerId) {
     <div style="font-size:11px;color:var(--text-sub);text-align:center;padding:10px">
       ↑ 治療タイプをクリックで詳細一覧へ
     </div>`;
+
+  // 期間フィルタ変更で再描画
+  el.querySelector('#kaiin-all-period')?.addEventListener('change', (e) => {
+    _kaiinAllPeriodState.period = e.target.value;
+    renderKaiinAll(containerId);
+  });
 
   // カードクリック → 該当サブタブへ遷移
   el.querySelectorAll('.kaiin-all-card').forEach(card => {
