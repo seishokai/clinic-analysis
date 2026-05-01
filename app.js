@@ -2381,54 +2381,48 @@ function renderHomeDashboard() {
       ${weekCancel > 0 ? `<div style="margin-top:8px;font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</div>` : ''}
     </div>
 
-    <!-- v273: 選択期間の医院別 / 治療別 サマリー -->
+    <!-- v273: 選択期間の医院別 / 治療別 サマリー (来院タブと同じカード形式) -->
     ${facList.length > 0 ? `
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px">
-        <!-- 医院別 -->
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px">
-          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🏥 ${escapeHtml(rangeLabel)} 医院別</div>
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <thead><tr style="color:var(--text-sub);font-weight:600">
-              <th style="text-align:left;padding:3px 4px;font-weight:600">医院</th>
-              <th style="text-align:right;padding:3px 4px;font-weight:600">予約</th>
-              <th style="text-align:right;padding:3px 4px;font-weight:600">来院</th>
-              <th style="text-align:right;padding:3px 4px;font-weight:600">成約</th>
-            </tr></thead>
-            <tbody>
-              ${facList.map(f => {
-                const v = byFacMonth[f];
-                return `<tr style="border-top:1px solid #f3f4f6">
-                  <td style="padding:4px;text-align:left">${escapeHtml(f)}</td>
-                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#1d4ed8">${v.booking}</td>
-                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#0891b2">${v.visited}</td>
-                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#059669">${v.contracted}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
+      <!-- 医院別 -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px">🏥 ${escapeHtml(rangeLabel)} 医院別</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+          ${facList.map(f => {
+            const v = byFacMonth[f];
+            const visitRate = v.booking ? Math.round(v.visited/v.booking*100) : 0;
+            const decideRate = v.visited ? Math.round(v.contracted/v.visited*100) : 0;
+            const amt = rangeRows.filter(d => normFac(d.facility) === f && d.status === '成約').reduce((s,d)=>s+Number(d.contractAmount||0),0);
+            return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:#fff;transition:all .15s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#1d4ed8'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'">
+              <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">${escapeHtml(f)}</div>
+              <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+                <div><span style="font-size:22px;font-weight:700;color:#1a1a1a">${v.booking}</span><span style="font-size:11px;color:var(--text-sub);margin-left:3px">件</span></div>
+                <div style="font-size:11px;color:var(--text-sub)">来院 <span style="color:#1d4ed8;font-weight:700">${v.visited}</span> <span style="color:${visitRate>=70?'#059669':visitRate>=50?'#d97706':'#dc2626'}">(${visitRate}%)</span></div>
+                <div style="font-size:11px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:700">${v.contracted}</span> <span style="color:${decideRate>=40?'#059669':decideRate>=20?'#d97706':'#dc2626'}">(${decideRate}%)</span></div>
+                ${amt > 0 ? `<div style="font-size:11px;color:#0e7490;font-weight:700">${fmtYen(amt)}</div>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
         </div>
-        <!-- 治療別 -->
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px">
-          <div style="font-size:11px;color:var(--text-sub);font-weight:700;letter-spacing:1px;margin-bottom:8px">🦷 ${escapeHtml(rangeLabel)} 治療別</div>
-          <table style="width:100%;border-collapse:collapse;font-size:11px">
-            <thead><tr style="color:var(--text-sub);font-weight:600">
-              <th style="text-align:left;padding:3px 4px;font-weight:600">治療</th>
-              <th style="text-align:right;padding:3px 4px;font-weight:600">予約</th>
-              <th style="text-align:right;padding:3px 4px;font-weight:600">来院</th>
-              <th style="text-align:right;padding:3px 4px;font-weight:600">成約</th>
-            </tr></thead>
-            <tbody>
-              ${treatList.map(t => {
-                const v = byTreatMonth[t];
-                return `<tr style="border-top:1px solid #f3f4f6">
-                  <td style="padding:4px;text-align:left">${escapeHtml(t)}</td>
-                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#1d4ed8">${v.booking}</td>
-                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600;color:#0891b2">${v.visited}</td>
-                  <td style="padding:4px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;color:#059669">${v.contracted}</td>
-                </tr>`;
-              }).join('')}
-            </tbody>
-          </table>
+      </div>
+      <!-- 治療別 -->
+      <div style="margin-bottom:14px">
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px">🦷 ${escapeHtml(rangeLabel)} 治療別</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
+          ${treatList.map(t => {
+            const v = byTreatMonth[t];
+            const visitRate = v.booking ? Math.round(v.visited/v.booking*100) : 0;
+            const decideRate = v.visited ? Math.round(v.contracted/v.visited*100) : 0;
+            const amt = rangeRows.filter(d => (normSvc(d.service)||'-') === t && d.status === '成約').reduce((s,d)=>s+Number(d.contractAmount||0),0);
+            return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:#fff;transition:all .15s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#059669'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'">
+              <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">${escapeHtml(t)}</div>
+              <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
+                <div><span style="font-size:22px;font-weight:700;color:#1a1a1a">${v.booking}</span><span style="font-size:11px;color:var(--text-sub);margin-left:3px">件</span></div>
+                <div style="font-size:11px;color:var(--text-sub)">来院 <span style="color:#1d4ed8;font-weight:700">${v.visited}</span> <span style="color:${visitRate>=70?'#059669':visitRate>=50?'#d97706':'#dc2626'}">(${visitRate}%)</span></div>
+                <div style="font-size:11px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:700">${v.contracted}</span> <span style="color:${decideRate>=40?'#059669':decideRate>=20?'#d97706':'#dc2626'}">(${decideRate}%)</span></div>
+                ${amt > 0 ? `<div style="font-size:11px;color:#0e7490;font-weight:700">${fmtYen(amt)}</div>` : ''}
+              </div>
+            </div>`;
+          }).join('')}
         </div>
       </div>
     ` : ''}
