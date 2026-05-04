@@ -1501,8 +1501,16 @@ function setupEventListeners() {
     window._bkTodayFilter = false;
     window._bkDupFilter = false;
     window._bkDisplayLimit = 200;
+    // v288: 非表示にしたQuickチップも復元するか確認
+    try {
+      const hidden = JSON.parse(localStorage.getItem('bk-quick-promo-hidden') || '[]');
+      if (hidden.length > 0 && confirm(`非表示にした Quickチップ ${hidden.length}件 も全部復元しますか？\n(${hidden.slice(0,3).join(', ')}${hidden.length>3?'…':''})`)) {
+        localStorage.removeItem('bk-quick-promo-hidden');
+      }
+    } catch(_) {}
     if (typeof _refreshQuickBtns === 'function') _refreshQuickBtns();
     if (window._highlightBkFilters) window._highlightBkFilters();
+    if (typeof ensureBookingsFilters === 'function') ensureBookingsFilters();
     renderBookings();
   });
 
@@ -5120,9 +5128,21 @@ function populateBookingFilters() {
     return;
   }
   // クイックプロモボタン（上位5件 + カスタム保存チップ）
+  // v288: 自動top5にも × 削除(非表示) ボタン追加
+  const _loadHiddenAuto = () => {
+    try { return JSON.parse(localStorage.getItem('bk-quick-promo-hidden') || '[]'); } catch(_) { return []; }
+  };
+  const _saveHiddenAuto = (arr) => {
+    try { localStorage.setItem('bk-quick-promo-hidden', JSON.stringify(arr)); } catch(_) {}
+  };
+  const hiddenAuto = _loadHiddenAuto();
   const promoCounts = {};
   getFilteredBookingsData().forEach(d => { if (d.source) { promoCounts[d.source] = (promoCounts[d.source]||0) + 1; } });
-  const top5 = Object.entries(promoCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
+  // 非表示リストを除外して上位5件
+  const top5 = Object.entries(promoCounts)
+    .filter(([name]) => !hiddenAuto.includes(name))
+    .sort((a,b) => b[1]-a[1])
+    .slice(0, 5);
   // v285: ユーザー保存のカスタムチップ (複数プロモを1チップにまとめられる)
   const _loadCustomChips = () => {
     try { return JSON.parse(localStorage.getItem('bk-quick-promo-custom') || '[]'); } catch(_) { return []; }
@@ -5132,8 +5152,12 @@ function populateBookingFilters() {
   };
   const customChips = _loadCustomChips();
   if (quickEl) {
+    // v288: top5チップに × ボタンを統合 (グループラップ)
     const top5Html = top5.map(([name]) =>
-      `<button class="btn btn-outline bk-quick-promo" data-promo="${esc(name)}" style="font-size:10px;padding:3px 8px;min-height:24px">${esc(name.length > 18 ? name.slice(0,18)+'…' : name)}</button>`
+      `<span class="bk-quick-promo-wrap" style="display:inline-flex;align-items:center;gap:0;border:1px solid #cbd5e1;border-radius:14px;background:#fff;overflow:hidden">
+        <button class="bk-quick-promo" data-promo="${esc(name)}" style="font-size:10px;padding:3px 6px 3px 10px;min-height:24px;background:transparent;border:none;color:#475569;font-weight:500;cursor:pointer">${esc(name.length > 18 ? name.slice(0,18)+'…' : name)}</button>
+        <button class="bk-quick-promo-hide" data-promo="${esc(name)}" title="このチップを非表示" style="background:transparent;border:none;color:#94a3b8;font-size:11px;padding:2px 6px;cursor:pointer;border-left:1px solid #e2e8f0">×</button>
+      </span>`
     ).join('');
     const customHtml = customChips.map((chip, i) =>
       `<span class="bk-custom-chip-wrap" style="display:inline-flex;align-items:center;gap:0;border:1px solid #c084fc;border-radius:14px;background:#faf5ff;overflow:hidden">
@@ -5151,16 +5175,30 @@ function populateBookingFilters() {
         if (!promoSet) return;
         const val = btn.dataset.promo;
         const isActive = promoSet.has(val) && promoSet.size === 1;
-        quickEl.querySelectorAll('.bk-quick-promo').forEach(b => { b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; });
+        // 親ラップのスタイルをリセット
+        quickEl.querySelectorAll('.bk-quick-promo-wrap').forEach(w => { w.style.background = '#fff'; w.style.borderColor = '#cbd5e1'; });
+        quickEl.querySelectorAll('.bk-quick-promo').forEach(b => { b.style.color = '#475569'; });
         promoSet.clear();
         if (!isActive) {
           promoSet.add(val);
-          btn.style.background = '#dbeafe';
+          const wrap = btn.closest('.bk-quick-promo-wrap');
+          if (wrap) { wrap.style.background = '#dbeafe'; wrap.style.borderColor = '#93c5fd'; }
           btn.style.color = '#1d4ed8';
-          btn.style.borderColor = '#93c5fd';
         }
         window._bkDD.promo.updateLabel();
         renderBookings();
+      });
+    });
+    // v288: top5チップ × ボタン (非表示にする)
+    quickEl.querySelectorAll('.bk-quick-promo-hide').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const promo = btn.dataset.promo;
+        if (!promo) return;
+        if (!confirm(`「${promo}」を Quick から非表示にしますか？\n（後で「リセット」ボタンで全部復元できます）`)) return;
+        if (!hiddenAuto.includes(promo)) hiddenAuto.push(promo);
+        _saveHiddenAuto(hiddenAuto);
+        ensureBookingsFilters();
       });
     });
     // カスタムチップのクリック (保存した複数プロモを一括適用)
