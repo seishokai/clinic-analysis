@@ -5297,14 +5297,15 @@ function renderBookings() {
   // v277: 要対応カードは overdueCountStat を使う (active基準・排他的)
   const overdueCount = overdueCountStat;
 
+  // v277.1: 詳細説明を追加 (誰が見ても分かるように)
   document.getElementById('bk-stats').innerHTML = `
-    <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
-    <div class="stat-card" style="border-color:${overdueCount>0?'var(--red)':'var(--border)'}" title="未対応のうち予約日が過去 (期限切れ・急ぎ対応)"><span class="stat-label" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'}">要対応</span><span class="stat-num" style="color:${overdueCount>0?'var(--red)':'var(--text-main)'}">${overdueCount}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px">期限切れ</span></div>
-    <div class="stat-card" title="未対応のうち予約日が今日以降 (まだ余裕あり)"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px">期限内</span></div>
-    <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
-    <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
-    <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
-    <div class="stat-card"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span></div>
+    <div class="stat-card" title="フィルター済み予約数 (除外を除く)"><span class="stat-label">予約数</span><span class="stat-num">${total}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
+    <div class="stat-card" style="border-color:${overdueCount>0?'var(--red)':'var(--border)'}" title="予約日を過ぎてるのに未対応のまま。急いで電話・対応が必要"><span class="stat-label" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'}">要対応</span><span class="stat-num" style="color:${overdueCount>0?'var(--red)':'var(--text-main)'}">${overdueCount}</span><span class="stat-yoy" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'};font-size:10px;font-weight:600;line-height:1.3">予約日が過去<br>⚠ 急ぎ対応</span></div>
+    <div class="stat-card" title="未対応で予約日がまだ未来。期限内なので余裕がある"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">予約日がまだ未来<br>(期限内)</span></div>
+    <div class="stat-card" title="キャンセル済の予約"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">取消済</span></div>
+    <div class="stat-card" title="来院済 + 成約 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
+    <div class="stat-card" title="成約済の予約 (来院後に契約に至った件数)"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
+    <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
   `;
   // インセ金額は別途集計不要（各行で入力）
 
