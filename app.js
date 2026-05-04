@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v296';
+const APP_VERSION = 'v297';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2817,14 +2817,14 @@ let _phoneCheckState = (() => {
       return Object.assign({
         period: 'all_future',
         facilities: [],
-        showCalled: true,
+        showCalled: false,  // v297: デフォルトは未対応のみ表示
       }, saved);
     }
   } catch(_) {}
   return {
     period: 'all_future',
     facilities: [],
-    showCalled: true,
+    showCalled: false,  // v297: デフォルトは未対応のみ (確認OK等は隠す)
   };
 })();
 function _savePhoneCheckState() {
@@ -3166,10 +3166,37 @@ function renderPhoneCheck() {
 }
 
 // === v273: 電話モード (1件ずつ大表示) ===
+// v297: sessionStorage で位置を保存 (リロードしても続きから)
 let _callModeIdx = 0;
 let _callModeRows = [];
 let _callModeCanViewPII = false;
 let _callModeMemos = {};
+
+function _saveCallModeState() {
+  try {
+    sessionStorage.setItem('callMode-state', JSON.stringify({
+      idx: _callModeIdx,
+      keys: _callModeRows.map(d => (d.name||'')+'|'+(d.applyDate||'')),
+      timestamp: Date.now(),
+    }));
+  } catch(_){}
+}
+function _loadCallModeState() {
+  try {
+    const raw = sessionStorage.getItem('callMode-state');
+    if (!raw) return null;
+    const s = JSON.parse(raw);
+    // 24時間で破棄
+    if (!s.timestamp || (Date.now() - s.timestamp > 24*3600*1000)) {
+      sessionStorage.removeItem('callMode-state');
+      return null;
+    }
+    return s;
+  } catch(_) { return null; }
+}
+function _clearCallModeState() {
+  try { sessionStorage.removeItem('callMode-state'); } catch(_){}
+}
 
 function enterCallMode(rows, canViewPII, memos) {
   if (!rows || rows.length === 0) {
@@ -3179,9 +3206,28 @@ function enterCallMode(rows, canViewPII, memos) {
   _callModeRows = rows.slice();
   _callModeCanViewPII = canViewPII;
   _callModeMemos = memos || {};
-  // 最初の 未対応 から開始 (なければ先頭)
-  const firstPending = _callModeRows.findIndex(d => !d.status || d.status === '未対応');
-  _callModeIdx = firstPending >= 0 ? firstPending : 0;
+  // v297: 前回の続きから or 最初の未対応から
+  const saved = _loadCallModeState();
+  let resumeIdx = -1;
+  if (saved && Array.isArray(saved.keys)) {
+    // 同じ rows セットなら復帰
+    const curKeys = _callModeRows.map(d => (d.name||'')+'|'+(d.applyDate||''));
+    const overlap = saved.keys.filter(k => curKeys.includes(k)).length;
+    if (overlap > saved.keys.length * 0.7) { // 7割マッチで同セットと判定
+      const targetKey = saved.keys[saved.idx];
+      resumeIdx = curKeys.indexOf(targetKey);
+      if (resumeIdx >= 0 && confirm(`前回の続き(${resumeIdx+1}/${rows.length}件目)から再開しますか？\n「いいえ」で最初から。`)) {
+        _callModeIdx = resumeIdx;
+      } else {
+        resumeIdx = -1;
+      }
+    }
+  }
+  if (resumeIdx < 0) {
+    const firstPending = _callModeRows.findIndex(d => !d.status || d.status === '未対応');
+    _callModeIdx = firstPending >= 0 ? firstPending : 0;
+  }
+  _saveCallModeState();
 
   // 既存モーダル削除
   document.getElementById('call-mode-modal')?.remove();
@@ -3211,27 +3257,119 @@ function exitCallMode() {
 }
 
 function callModePrev() {
-  if (_callModeIdx > 0) { _callModeIdx--; renderCallMode(); }
+  if (_callModeIdx > 0) { _callModeIdx--; _saveCallModeState(); renderCallMode(); }
 }
 function callModeNext() {
-  if (_callModeIdx < _callModeRows.length - 1) { _callModeIdx++; renderCallMode(); }
-  else exitCallMode();
+  if (_callModeIdx < _callModeRows.length - 1) { _callModeIdx++; _saveCallModeState(); renderCallMode(); }
+  else { _clearCallModeState(); exitCallMode(); showToast('🎉 全件完了！お疲れさまでした'); }
 }
 
 async function callModeApplyStatus(newStatus) {
   const d = _callModeRows[_callModeIdx];
   if (!d) return;
+  // v297: 「予約日変更」は日付ピッカーを開いて新しい予約日を入力
+  if (newStatus === '予約日変更') {
+    const newDate = await _promptNewBookDate(d);
+    if (!newDate) return; // キャンセルされた
+    try {
+      await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+      const match = bookingsData.find(b => b.name === d.name && b.applyDate === d.applyDate);
+      if (match) { match.status = newStatus; match.bookDate = newDate; }
+      d.status = newStatus; d.bookDate = newDate;
+      _showBigToast(`📅 予約日を ${newDate} に変更しました`, '#7c3aed');
+      renderCallMode();   // 即時バッジ更新
+      setTimeout(() => callModeNext(), 600);
+    } catch(e) {
+      _showBigToast('保存エラー: ' + e.message, '#dc2626');
+    }
+    return;
+  }
   try {
     await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, status: newStatus }, options: { onConflict:'name,apply_date' } });
     const match = bookingsData.find(b => b.name === d.name && b.applyDate === d.applyDate);
     if (match) match.status = newStatus;
     d.status = newStatus;
-    showToast(`${d.name}: ${newStatus}`);
-    // 次へ自動進行
-    setTimeout(() => callModeNext(), 300);
+    // v297: 大きいトーストで保存完了を明示
+    const toastColor = newStatus === '確認OK' ? '#10b981'
+                     : newStatus === 'キャンセル' ? '#dc2626'
+                     : newStatus === '予約日変更' ? '#7c3aed'
+                     : newStatus === '未対応' ? '#6b7280'
+                     : '#f59e0b';
+    _showBigToast(`✓ ${_phoneStatusLabel(newStatus)}`, toastColor);
+    // 即時バッジ更新
+    renderCallMode();
+    // 次へ自動進行 (少し長めにして反映を見せる)
+    setTimeout(() => callModeNext(), 500);
   } catch(e) {
-    showToast('保存エラー: ' + e.message, true);
+    _showBigToast('保存エラー: ' + e.message, '#dc2626');
   }
+}
+
+// v297: 大きいトースト (画面中央上部・1.5秒)
+function _showBigToast(msg, color = '#10b981') {
+  let t = document.getElementById('big-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'big-toast';
+    t.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);padding:24px 36px;background:#fff;border-radius:16px;font-size:20px;font-weight:800;z-index:99999;box-shadow:0 8px 32px rgba(0,0,0,.3);text-align:center;min-width:240px;border:3px solid;transition:opacity .3s';
+    document.body.appendChild(t);
+  }
+  t.style.borderColor = color;
+  t.style.color = color;
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._hideTimer);
+  t._hideTimer = setTimeout(() => { t.style.opacity = '0'; }, 1300);
+}
+
+// v297: 予約日変更時の日付プロンプト (Promise)
+function _promptNewBookDate(d) {
+  return new Promise((resolve) => {
+    // 既存日付をデフォルトに
+    const m = (d.bookDate||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/);
+    let curDate = '', curTime = '10:00';
+    if (m) {
+      curDate = `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+      if (m[4] && m[5]) curTime = `${String(m[4]).padStart(2,'0')}:${m[5]}`;
+    }
+    const ov = document.createElement('div');
+    ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:99999;display:flex;align-items:center;justify-content:center;padding:16px';
+    const timeOpts = [];
+    for (let h = 9; h <= 21; h++) {
+      for (let mm = 0; mm < 60; mm += 30) {
+        if (h === 21 && mm > 0) break;
+        timeOpts.push(`${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
+      }
+    }
+    if (curTime && !timeOpts.includes(curTime)) timeOpts.unshift(curTime);
+    ov.innerHTML = `
+      <div style="background:#fff;padding:24px;border-radius:14px;width:100%;max-width:380px">
+        <div style="font-size:16px;font-weight:700;margin-bottom:14px;color:#1a1a1a">📅 新しい予約日時を入力</div>
+        <div style="font-size:11px;color:#666;margin-bottom:14px">現在: ${escapeHtml(d.bookDate||'-')}</div>
+        <div style="display:flex;gap:8px;margin-bottom:18px">
+          <input type="date" id="np-date" value="${curDate}" style="flex:1;padding:10px;font-size:14px;border:1px solid #d4d4d8;border-radius:8px">
+          <select id="np-time" style="padding:10px;font-size:14px;border:1px solid #d4d4d8;border-radius:8px;cursor:pointer">
+            ${timeOpts.map(t => `<option value="${t}" ${t===curTime?'selected':''}>${t}</option>`).join('')}
+          </select>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button id="np-cancel" style="flex:1;padding:11px;background:#f3f4f6;color:#6b7280;border:none;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer">キャンセル</button>
+          <button id="np-ok" style="flex:2;padding:11px;background:#7c3aed;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">変更を保存</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(ov);
+    setTimeout(() => ov.querySelector('#np-date').focus(), 50);
+    const cleanup = (val) => { ov.remove(); resolve(val); };
+    ov.querySelector('#np-cancel').onclick = () => cleanup(null);
+    ov.querySelector('#np-ok').onclick = () => {
+      const dv = ov.querySelector('#np-date').value;
+      const tv = ov.querySelector('#np-time').value;
+      if (!dv) { alert('日付を入力してください'); return; }
+      cleanup(`${dv} ${tv}`);
+    };
+    ov.addEventListener('click', (e) => { if (e.target === ov) cleanup(null); });
+  });
 }
 
 function renderCallMode() {
@@ -3283,12 +3421,16 @@ function renderCallMode() {
         <div style="margin-top:8px"><span style="display:inline-block;padding:4px 12px;border-radius:20px;font-size:12px;font-weight:700;background:${stClr.bg};color:${stClr.fg}">${st}</span></div>
       </div>
       ${_callModeCanViewPII && phone ? `
-        <a href="tel:${phoneDigits}" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:18px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;border-radius:14px;text-decoration:none;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;box-shadow:0 4px 16px rgba(16,185,129,.3);margin-bottom:16px">
+        <a href="tel:${phoneDigits}" style="display:flex;align-items:center;justify-content:center;gap:8px;padding:18px;background:linear-gradient(135deg,#10b981 0%,#059669 100%);color:#fff;border-radius:14px;text-decoration:none;font-size:22px;font-weight:800;font-variant-numeric:tabular-nums;box-shadow:0 4px 16px rgba(16,185,129,.3);margin-bottom:10px">
           <span style="font-size:24px">📞</span> ${escapeHtml(phone)}
         </a>
-      ` : '<div style="text-align:center;padding:18px;background:#f3f4f6;border-radius:12px;color:#888;margin-bottom:16px">電話番号 非公開</div>'}
+      ` : '<div style="text-align:center;padding:18px;background:#f3f4f6;border-radius:12px;color:#888;margin-bottom:10px">電話番号 非公開</div>'}
 
-      ${memo ? `<div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:10px 12px;border-radius:6px;font-size:12px;color:#92400e;line-height:1.6;white-space:pre-wrap;margin-bottom:16px">📝 ${escapeHtml(memo)}</div>` : ''}
+      <!-- v297: メモボタンを電話番号のすぐ下に移動 (通話中の入力を最速で) -->
+      <button id="cm-memo" style="width:100%;padding:13px;background:${memo?'#fef3c7':'#fffbeb'};color:#b45309;border:2px ${memo?'solid':'dashed'} #fcd34d;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:14px;text-align:left">
+        📝 メモ ${memo ? '<span style="font-size:11px;font-weight:500;color:#92400e">（記入済み・タップで編集）</span>' : '<span style="font-size:11px;font-weight:500;color:#a16207">（通話中ここにメモ）</span>'}
+        ${memo ? `<div style="margin-top:6px;padding:8px;background:#fff;border-radius:6px;font-size:12px;color:#92400e;line-height:1.5;white-space:pre-wrap;font-weight:400;max-height:120px;overflow:auto">${escapeHtml(memo)}</div>` : ''}
+      </button>
 
       <!-- v294: アクション (1〜3コール × 留守電有/無 + 確認OK + 予約日変更 + キャンセル) -->
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
@@ -3304,8 +3446,7 @@ function renderCallMode() {
         <button class="cm-act" data-st="予約日変更" style="padding:13px;background:#f5f3ff;color:#7c3aed;border:2px solid #d8b4fe;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📅 予約日変更</button>
         <button class="cm-act" data-st="キャンセル" style="padding:13px;background:#fee2e2;color:#b91c1c;border:2px solid #fca5a5;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">❌ キャンセル</button>
       </div>
-      <button id="cm-memo" style="width:100%;padding:11px;background:#fff8e1;color:#b45309;border:2px solid #fcd34d;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">📝 メモ</button>
-      <button class="cm-act" data-st="未対応" style="width:100%;padding:8px;background:transparent;color:#6b7280;border:1px solid #e5e7eb;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:14px">↻ 取り消し（未対応に戻す）</button>
+      <button class="cm-act" data-st="未対応" style="width:100%;padding:8px;background:transparent;color:#6b7280;border:1px solid #e5e7eb;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:14px;margin-top:6px">↻ 取り消し（未対応に戻す）</button>
 
       <!-- ナビゲーション -->
       <div style="display:flex;gap:8px;align-items:stretch">
@@ -3441,6 +3582,54 @@ function _phoneStatusLabel(st) {
   return st; // 予約日変更 / キャンセル など
 }
 
+// v297: 該当行だけ DOM 更新 (全テーブル再描画を避けてスクロール位置維持)
+function _updatePhoneRowInPlace(rowEl, d) {
+  if (!rowEl || !d) return;
+  // 状況バッジ更新
+  const stCell = rowEl.querySelector('td[data-label="状況"]');
+  if (stCell) {
+    const st = d.status || '未対応';
+    const stColors = {
+      '未対応':{bg:'#fee2e2',fg:'#dc2626'}, '確認済':{bg:'#dbeafe',fg:'#1d4ed8'}, '確認OK':{bg:'#dbeafe',fg:'#1d4ed8'},
+      '留守電':{bg:'#fef3c7',fg:'#92400e'}, '折り返し':{bg:'#f5f3ff',fg:'#7c3aed'},
+      '来院済':{bg:'#dbeafe',fg:'#1d4ed8'}, '成約':{bg:'#dcfce7',fg:'#15803d'},
+      '1コール留守電有':{bg:'#fef3c7',fg:'#92400e'}, '1コール留守電無':{bg:'#fffbeb',fg:'#92400e'},
+      '2コール留守電有':{bg:'#fed7aa',fg:'#9a3412'}, '2コール留守電無':{bg:'#ffedd5',fg:'#9a3412'},
+      '3コール留守電有':{bg:'#fecaca',fg:'#991b1b'}, '3コール留守電無':{bg:'#fee2e2',fg:'#991b1b'},
+      '予約日変更':{bg:'#f5f3ff',fg:'#7c3aed'}, 'キャンセル':{bg:'#fee2e2',fg:'#b91c1c'},
+    };
+    const c = stColors[st] || { bg:'#f3f4f6', fg:'#6b7280' };
+    stCell.innerHTML = `<span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${c.bg};color:${c.fg};white-space:nowrap" title="${escapeHtml(st)}">${escapeHtml(_phoneStatusLabel(st))}</span>`;
+  }
+  // アクション列のアクティブ状態を反映 (全ボタンリセット → 該当ボタンを active 化)
+  const actCell = rowEl.querySelector('td.row-actions');
+  if (actCell) {
+    actCell.querySelectorAll('.phone-status-btn').forEach(btn => {
+      const isActive = btn.dataset.st === d.status;
+      btn.style.cssText = isActive
+        ? btn.style.cssText.replace(/box-shadow[^;]+;?/, '') + 'box-shadow:0 0 0 2px #fbbf24'
+        : btn.style.cssText.replace(/box-shadow[^;]+;?/, '');
+      btn.disabled = false;
+    });
+  }
+  // 予約日セル (予約日変更時)
+  const bkCell = rowEl.querySelector('td[data-label="予約日時"]');
+  if (bkCell && d.bookDate) {
+    const bdDate = parseDateLoose(d.bookDate);
+    const fmtMD = (date) => date && !isNaN(date.getTime()) ? `${String(date.getMonth()+1).padStart(2,'0')}/${String(date.getDate()).padStart(2,'0')}` : '';
+    const tm = (d.bookDate||'').match(/(\d{1,2}):(\d{2})/);
+    const tstr = tm ? `${tm[1].padStart(2,'0')}:${tm[2]}` : '';
+    bkCell.innerHTML = `<span style="color:var(--text-sub);font-weight:500">${fmtMD(bdDate)}</span> ${tstr}`;
+  }
+  // showCalled が false で完了系ステータスになったら行を非表示
+  if (!_phoneCheckState.showCalled && (d.status === '確認OK' || d.status === '確認済' || d.status === '来院済' || d.status === '成約')) {
+    rowEl.style.transition = 'opacity .4s, transform .4s';
+    rowEl.style.opacity = '0';
+    rowEl.style.transform = 'translateX(20px)';
+    setTimeout(() => rowEl.remove(), 400);
+  }
+}
+
 // v273: 状況ボタンのレンダリング (現在のステータスはハイライト表示)
 function _phoneStatusBtn(targetSt, icon, title, bg, fg, border, currentSt) {
   const isActive = currentSt === targetSt;
@@ -3456,8 +3645,24 @@ function _bindPhoneCheckRowEvents(el) {
     const name = row.dataset.name;
     const apply = row.dataset.apply;
     row.querySelectorAll('.phone-status-btn').forEach(btn => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (ev) => {
         const newStatus = btn.dataset.st;
+        // v297: 「予約日変更」は行レベルでも日付ピッカーを開く
+        if (newStatus === '予約日変更') {
+          const dRow = bookingsData.find(b => b.name === name && b.applyDate === apply);
+          if (!dRow) return;
+          const newDate = await _promptNewBookDate(dRow);
+          if (!newDate) return;
+          try {
+            await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+            dRow.status = newStatus; dRow.bookDate = newDate;
+            _showBigToast(`📅 予約日を ${newDate} に変更しました`, '#7c3aed');
+            // v297: 該当行だけ更新 (全テーブル再描画を回避)
+            _updatePhoneRowInPlace(row, dRow);
+            updateHeaderBadge();
+          } catch(e) { _showBigToast('保存エラー: ' + e.message, '#dc2626'); }
+          return;
+        }
         const origText = btn.textContent;
         const origBg = btn.style.background;
         btn.disabled = true; btn.textContent = '…';
@@ -3473,12 +3678,17 @@ function _bindPhoneCheckRowEvents(el) {
             bkEx[key].editedStatus = newStatus;
             saveData('bk-extra', bkEx);
           } catch(_){}
-          showToast(`${name}: ${newStatus}に更新`);
-          renderPhoneCheck();
+          // v297: トーストを大きく表示
+          const toastColor = newStatus === '確認OK' ? '#10b981'
+                           : newStatus === 'キャンセル' ? '#dc2626'
+                           : newStatus === '未対応' ? '#6b7280'
+                           : '#f59e0b';
+          _showBigToast(`✓ ${name}: ${_phoneStatusLabel(newStatus)}`, toastColor);
+          // v297: 該当行だけ更新 (全テーブル再描画を回避してスクロール位置維持)
+          if (match) _updatePhoneRowInPlace(row, match);
           updateHeaderBadge();
         } catch(e) {
-          showToast('保存エラー: ' + e.message, true);
-          // Bug fix: エラー時にボタンの見た目を復元 (旧: disabled だけ戻して "..." のまま)
+          _showBigToast('保存エラー: ' + e.message, '#dc2626');
           btn.disabled = false;
           btn.textContent = origText;
           if (origBg) btn.style.background = origBg;
