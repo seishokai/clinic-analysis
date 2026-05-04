@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v292';
+const APP_VERSION = 'v293';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -17,6 +17,55 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', injectAppVersion);
 } else {
   injectAppVersion();
+}
+
+// === v293: app_settings テーブル経由で全ユーザー共有設定 ===
+// admin が変更すると agency / staff_promo にも反映される
+async function loadSharedSetting(key, fallback = null) {
+  try {
+    if (!sb) return fallback;
+    const { data, error } = await sb.from('app_settings').select('value').eq('key', key).maybeSingle();
+    if (error || !data) return fallback;
+    return data.value;
+  } catch (_) { return fallback; }
+}
+
+async function saveSharedSetting(key, value) {
+  try {
+    if (!sb) return false;
+    const updated_by = (sessionStorage.getItem('currentRole') || sessionStorage.getItem('role') || 'unknown');
+    const { error } = await sb.from('app_settings').upsert(
+      { key, value, updated_at: new Date().toISOString(), updated_by },
+      { onConflict: 'key' }
+    );
+    return !error;
+  } catch (_) { return false; }
+}
+
+// アプリ起動時に共有設定を取得 → localStorage にキャッシュ (同期描画用)
+async function syncSharedQuickChips() {
+  try {
+    const [hidden, custom] = await Promise.all([
+      loadSharedSetting('quick_promo_hidden', null),
+      loadSharedSetting('quick_promo_custom', null),
+    ]);
+    if (Array.isArray(hidden)) {
+      try { localStorage.setItem('bk-quick-promo-hidden', JSON.stringify(hidden)); } catch(_){}
+    }
+    if (Array.isArray(custom)) {
+      try { localStorage.setItem('bk-quick-promo-custom', JSON.stringify(custom)); } catch(_){}
+    }
+    // 既に画面が描画されていれば再描画
+    if (typeof ensureBookingsFilters === 'function' && document.getElementById('bk-quick-promos')) {
+      try { ensureBookingsFilters(); } catch(_){}
+    }
+  } catch(_){}
+}
+// 初回ロード時 + ログイン直後にも同期
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(syncSharedQuickChips, 800));
+} else {
+  setTimeout(syncSharedQuickChips, 800);
 }
 
 // === Supabase ===
@@ -5168,12 +5217,15 @@ function populateBookingFilters() {
     return;
   }
   // クイックプロモボタン（上位5件 + カスタム保存チップ）
-  // v288: 自動top5にも × 削除(非表示) ボタン追加
+  // v293: localStorage = キャッシュ / Supabase app_settings = 共有マスタ
+  // admin が変更 → 全ユーザー (agency/staff_promo) にも反映
   const _loadHiddenAuto = () => {
     try { return JSON.parse(localStorage.getItem('bk-quick-promo-hidden') || '[]'); } catch(_) { return []; }
   };
   const _saveHiddenAuto = (arr) => {
     try { localStorage.setItem('bk-quick-promo-hidden', JSON.stringify(arr)); } catch(_) {}
+    // サーバ同期 (失敗してもローカルは保存済み)
+    if (typeof saveSharedSetting === 'function') saveSharedSetting('quick_promo_hidden', arr);
   };
   const hiddenAuto = _loadHiddenAuto();
   const promoCounts = {};
@@ -5183,12 +5235,13 @@ function populateBookingFilters() {
     .filter(([name]) => !hiddenAuto.includes(name))
     .sort((a,b) => b[1]-a[1])
     .slice(0, 5);
-  // v285: ユーザー保存のカスタムチップ (複数プロモを1チップにまとめられる)
+  // v293: カスタムチップも Supabase 共有
   const _loadCustomChips = () => {
     try { return JSON.parse(localStorage.getItem('bk-quick-promo-custom') || '[]'); } catch(_) { return []; }
   };
   const _saveCustomChips = (arr) => {
     try { localStorage.setItem('bk-quick-promo-custom', JSON.stringify(arr)); } catch(_) {}
+    if (typeof saveSharedSetting === 'function') saveSharedSetting('quick_promo_custom', arr);
   };
   const customChips = _loadCustomChips();
   if (quickEl) {
