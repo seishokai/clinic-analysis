@@ -6891,8 +6891,17 @@ const IMPLANT_STATUSES_ORDERED = [
 const IMPLANT_TREATMENT_STAGES = ['P処置','C処置','CT/診断','ガイド印象','手術予定','治癒期間','印象','セット','完了'];
 // 来院済としてカウントするステータス (インプラントの治療ステージも含む)
 // v269: 検討中 も来院済として扱う (来院後の検討中であるため)
+// v283: 「来院済」は来院後の全状態を含む (BF治療段階・ローン審査・他治療決定 等)
+const BF_POST_VISIT_STAGES = [
+  'ローン審査中', 'ローン審査落',
+  '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
+  '印象待ち(治療無)', '印象待ち(治療有)',
+  '治療中', 'セット日確定待ち', 'セット待ち', 'セット完了'
+];
 function isVisitedStatus(s) {
-  return s === '来院済' || s === '検討中' || s === '成約' || IMPLANT_TREATMENT_STAGES.includes(s);
+  return s === '来院済' || s === '検討中' || s === '成約'
+      || IMPLANT_TREATMENT_STAGES.includes(s)
+      || BF_POST_VISIT_STAGES.includes(s);
 }
 // 成約済としてカウントするステータス (成約 + 治療継続ステージ)
 function isContractedStatus(s) {
