@@ -1509,7 +1509,7 @@ function setupEventListeners() {
       el.style.fontWeight = '';
     }
   };
-  ['bk-period','bk-month'].forEach(id => {
+  ['bk-period','bk-month','bk-sort'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.addEventListener('change', () => { highlightActiveFilter(el); renderBookings(); });
   });
@@ -5307,15 +5307,37 @@ function renderBookings() {
   // v264 ピン留めセット
   const pinnedSet = getPinnedBookings();
   const isPinned = (d) => pinnedSet.has(d.name + '|' + d.applyDate);
+  // v275: ソート選択 (デフォルト 申込日 DESC)
+  const _bkSortBy = (document.getElementById('bk-sort')?.value) || 'apply-desc';
+  const _bkStatusOrder = ['要対応','未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','成約','キャンセル','除外'];
+  const _bkStOrd = (s) => {
+    const i = _bkStatusOrder.indexOf(s || '未対応');
+    return i < 0 ? 999 : i;
+  };
+  const _bkApplyKey = (d) => {
+    const p = parseDate(d.applyDate); return (p && !isNaN(p)) ? p.getTime() : 0;
+  };
+  const _bkBookKey = (d) => {
+    const p = parseDate(d.bookDate); if (p && !isNaN(p)) return p.getTime();
+    const pa = parseDate(d.applyDate); return (pa && !isNaN(pa)) ? pa.getTime() : 0;
+  };
+  const _bkSortFn = (a, b) => {
+    if (_bkSortBy === 'apply-asc')  return _bkApplyKey(a) - _bkApplyKey(b);
+    if (_bkSortBy === 'book-desc')  return _bkBookKey(b) - _bkBookKey(a);
+    if (_bkSortBy === 'book-asc')   return _bkBookKey(a) - _bkBookKey(b);
+    if (_bkSortBy === 'status')     return _bkStOrd(a.status) - _bkStOrd(b.status) || _bkApplyKey(b) - _bkApplyKey(a);
+    if (_bkSortBy === 'name')       return (a.name||'').localeCompare(b.name||'','ja') || _bkApplyKey(b) - _bkApplyKey(a);
+    return _bkApplyKey(b) - _bkApplyKey(a); // apply-desc (default)
+  };
   // 重複モードの時は 正規化名+医院 でグルーピングして隣接表示
   const baseSorted = window._bkDupFilter
     ? [...filtered].sort((a, b) => {
         const ka = normName(a.name) + '|' + normFac(a.facility);
         const kb = normName(b.name) + '|' + normFac(b.facility);
         if (ka !== kb) return ka.localeCompare(kb);
-        return (b.applyDate || '').localeCompare(a.applyDate || '');
+        return _bkApplyKey(b) - _bkApplyKey(a);
       })
-    : [...filtered].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
+    : [...filtered].sort(_bkSortFn);
   // ピン留めを先頭へ
   const sorted = [...baseSorted].sort((a, b) => (isPinned(b) ? 1 : 0) - (isPinned(a) ? 1 : 0));
 
@@ -7567,12 +7589,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   if (!el) return;
   const statuses = getStatusesForTreatment(treatment);
   // カウント
+  // v275: インプラントは d.status を使う (bf_status ではない)
   const byStatus = {};
   statuses.forEach(s => byStatus[s.value] = 0);
   let noSt = 0;
   rows.forEach(d => {
-    const info = getBFInfo(d.name, d.applyDate) || {};
-    const st = info.bf_status;
+    const st = (treatment === 'インプラント')
+      ? (d.status || '')
+      : ((getBFInfo(d.name, d.applyDate) || {}).bf_status || '');
     if (st && byStatus[st] !== undefined) byStatus[st]++;
     else noSt++;
   });
@@ -7823,7 +7847,11 @@ function drawKaiinRows(treatment, rows, container) {
     return consultSet.has(c);
   });
   // ステータスフィルター (multi-select)
-  const getSt = (d) => (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
+  // v275: インプラントは d.status を使う (bf_status ではない)
+  const getSt = (d) => {
+    if (treatment === 'インプラント') return d.status || '';
+    return (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
+  };
   if (statusSet.size) {
     filtered = filtered.filter(d => {
       const s = getSt(d);
@@ -7846,13 +7874,15 @@ function drawKaiinRows(treatment, rows, container) {
   else filtered.sort((a,b) => bookKey(b) - bookKey(a));
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
   // サマリー数値もフィルター結果で更新
+  // v275: インプラントは d.status を使う
   (function updateSummary(){
     const byStatusF = {};
     statuses.forEach(s => byStatusF[s.value] = 0);
     let unsetF = 0;
     filtered.forEach(d => {
-      const info = getBFInfo(d.name, d.applyDate) || {};
-      const st = info.bf_status;
+      const st = (treatment === 'インプラント')
+        ? (d.status || '')
+        : ((getBFInfo(d.name, d.applyDate) || {}).bf_status || '');
       if (st && byStatusF[st] !== undefined) byStatusF[st]++; else unsetF++;
     });
     const elTotal = container.querySelector('.kaiin-count-total');

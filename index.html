@@ -590,6 +590,7 @@
           <span id="bk-contract-slot"></span>
           <select class="form-select" id="bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="thisMonth" selected>今月（予約日基準）</option><option value="thisMonthApply">今月（登録日基準）</option><option value="lastMonth">先月</option><option value="fiscal">今期</option></select>
           <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px">
+          <select class="form-select" id="bk-sort" style="width:auto;padding:6px 8px;font-size:11px" title="ソート"><option value="apply-desc" selected>申込日(新→古)</option><option value="apply-asc">申込日(古→新)</option><option value="book-desc">予約日(新→古)</option><option value="book-asc">予約日(古→新)</option><option value="status">状態順</option><option value="name">名前順</option></select>
           <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px">更新</button>
           <button class="btn btn-outline" id="bk-csv" style="min-height:30px;padding:6px 12px;font-size:11px">CSV</button>
           <button class="btn btn-outline bk-pdf-btn" id="bk-pdf" style="min-height:30px;padding:6px 12px;font-size:11px">📄 PDF出力</button>
@@ -1172,7 +1173,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=274"></script>
+  <script src="app.js?v=275"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
