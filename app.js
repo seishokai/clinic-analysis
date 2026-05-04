@@ -1443,31 +1443,41 @@ function setupEventListeners() {
   window._anAxis = 'promo';
 
   // Bookings filters
-  // Quick filter buttons
-  const resetQuickBtns = () => {
-    document.getElementById('bk-overdue-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px';
-    document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px';
+  // v280: 統一トグルボタン (ゴースト=OFF / ソリッド=ON が一目で分かる)
+  const _styleToggle = (btn, active, color, label, iconOff, iconOn) => {
+    if (!btn) return;
+    if (active) {
+      btn.style.cssText = `min-height:32px;padding:6px 14px;font-size:12px;background:${color};color:#fff;border:1.5px solid ${color};font-weight:700;border-radius:18px;box-shadow:0 2px 6px ${color}55;cursor:pointer`;
+      btn.innerHTML = `${iconOn} ${label}`;
+    } else {
+      btn.style.cssText = `min-height:32px;padding:6px 14px;font-size:12px;background:#fff;color:#999;border:1.5px solid #d4d4d8;font-weight:500;border-radius:18px;cursor:pointer`;
+      btn.innerHTML = `${iconOff} ${label}`;
+    }
   };
+  const _refreshQuickBtns = () => {
+    _styleToggle(document.getElementById('bk-overdue-btn'), !!window._bkProgressFilter, '#dc2626', '進捗(期限切れ)', '⏰', '✓');
+    _styleToggle(document.getElementById('bk-today-btn'),   !!window._bkTodayFilter,   '#1d4ed8', '今日予約',         '📅', '✓');
+    _styleToggle(document.getElementById('bk-dup-filter'),  !!window._bkDupFilter,     '#f59e0b', '重複',             '🔍', '✓');
+  };
+  // 初期化時に状態反映
+  _refreshQuickBtns();
+  window._refreshBkQuickBtns = _refreshQuickBtns;
   document.getElementById('bk-overdue-btn').addEventListener('click', () => {
-    const wasActive = window._bkProgressFilter;
-    resetQuickBtns();
-    window._bkProgressFilter = !wasActive;
-    window._bkTodayFilter = false;
+    window._bkProgressFilter = !window._bkProgressFilter;
     if (window._bkProgressFilter) {
-      document.getElementById('bk-overdue-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#dc2626;color:white;border:2px solid #dc2626;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(220,38,38,0.3)';
+      window._bkTodayFilter = false;
       if (window._bkDD?.status) { window._bkDD.status.selected.clear(); window._bkDD.status.updateLabel(); }
     }
+    _refreshQuickBtns();
     renderBookings();
   });
   document.getElementById('bk-today-btn').addEventListener('click', () => {
-    const wasActive = window._bkTodayFilter;
-    resetQuickBtns();
-    window._bkTodayFilter = !wasActive;
-    window._bkProgressFilter = false;
+    window._bkTodayFilter = !window._bkTodayFilter;
     if (window._bkTodayFilter) {
-      document.getElementById('bk-today-btn').style.cssText = 'min-height:34px;padding:6px 16px;font-size:12px;background:#1d4ed8;color:white;border:2px solid #1d4ed8;font-weight:700;border-radius:20px;box-shadow:0 2px 8px rgba(29,78,216,0.3)';
+      window._bkProgressFilter = false;
       if (window._bkDD?.status) { window._bkDD.status.selected.clear(); window._bkDD.status.updateLabel(); }
     }
+    _refreshQuickBtns();
     renderBookings();
   });
   document.getElementById('bk-reset').addEventListener('click', () => {
@@ -1477,13 +1487,18 @@ function setupEventListeners() {
       });
     }
     document.getElementById('bk-search').value = '';
-    document.getElementById('bk-period').value = '';
+    // v280: 期間を「今月」、月をクリアにリセット (デフォルト=今月)
+    document.getElementById('bk-period').value = 'thisMonth';
     document.getElementById('bk-month').value = '';
+    // ソートも初期値へ
+    const sortEl = document.getElementById('bk-sort');
+    if (sortEl) sortEl.value = 'apply-desc';
     window._bkDateFilter = null;
     window._bkProgressFilter = false;
     window._bkTodayFilter = false;
+    window._bkDupFilter = false;
     window._bkDisplayLimit = 200;
-    resetQuickBtns();
+    if (typeof _refreshQuickBtns === 'function') _refreshQuickBtns();
     if (window._highlightBkFilters) window._highlightBkFilters();
     renderBookings();
   });
@@ -1494,9 +1509,12 @@ function setupEventListeners() {
     clearTimeout(searchTimer);
     searchTimer = setTimeout(renderBookings, 300);
   });
+  // v280: デフォルト値も考慮して、本当にアクティブかどうかを判定
+  const _filterDefaults = { 'bk-sort': 'apply-desc', 'bk-period': 'thisMonth' };
   const highlightActiveFilter = (el) => {
     if (!el) return;
-    const hasVal = el.value && el.value !== '';
+    const def = _filterDefaults[el.id] || '';
+    const hasVal = el.value && el.value !== '' && el.value !== def;
     if (hasVal) {
       el.style.background = '#1d4ed8';
       el.style.color = '#fff';
@@ -1509,9 +1527,32 @@ function setupEventListeners() {
       el.style.fontWeight = '';
     }
   };
-  ['bk-period','bk-month','bk-sort'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.addEventListener('change', () => { highlightActiveFilter(el); renderBookings(); });
+  // v280: 期間 (bk-period) と 月 (bk-month) は互いに排他にする
+  // 両方指定すると AND になり 0件になりがち → どちらか片方のみ
+  document.getElementById('bk-period')?.addEventListener('change', () => {
+    const periodEl = document.getElementById('bk-period');
+    const monthEl = document.getElementById('bk-month');
+    if (periodEl.value && monthEl) {
+      monthEl.value = '';
+      highlightActiveFilter(monthEl);
+    }
+    highlightActiveFilter(periodEl);
+    renderBookings();
+  });
+  document.getElementById('bk-month')?.addEventListener('change', () => {
+    const periodEl = document.getElementById('bk-period');
+    const monthEl = document.getElementById('bk-month');
+    if (monthEl.value && periodEl) {
+      periodEl.value = '';
+      highlightActiveFilter(periodEl);
+    }
+    highlightActiveFilter(monthEl);
+    renderBookings();
+  });
+  document.getElementById('bk-sort')?.addEventListener('change', () => {
+    const el = document.getElementById('bk-sort');
+    highlightActiveFilter(el);
+    renderBookings();
   });
   // 検索欄も色付け
   document.getElementById('bk-search').addEventListener('input', () => highlightActiveFilter(document.getElementById('bk-search')));
@@ -1519,19 +1560,10 @@ function setupEventListeners() {
   document.getElementById('bk-refresh').addEventListener('click', loadBookings);
   // 除外も表示チェックボックス
   document.getElementById('bk-show-excluded')?.addEventListener('change', () => renderBookings());
-  // 重複フィルターボタン
+  // 重複フィルターボタン (v280: 統一トグルスタイル)
   document.getElementById('bk-dup-filter')?.addEventListener('click', () => {
     window._bkDupFilter = !window._bkDupFilter;
-    const btn = document.getElementById('bk-dup-filter');
-    if (window._bkDupFilter) {
-      btn.style.background = '#f59e0b';
-      btn.style.color = '#fff';
-      btn.innerHTML = '✓ 重複のみ';
-    } else {
-      btn.style.background = '#fef3c7';
-      btn.style.color = '#b45309';
-      btn.innerHTML = '🔍 重複';
-    }
+    if (typeof _refreshQuickBtns === 'function') _refreshQuickBtns();
     renderBookings();
   });
   document.getElementById('bk-csv').addEventListener('click', exportCSV);
