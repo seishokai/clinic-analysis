@@ -5099,7 +5099,8 @@ function populateBookingFilters() {
 function ensureBkMultiSelects() {
   if (window._bkDD) return;
   const triggerRedraw = () => { if (typeof renderBookings === 'function') renderBookings(); };
-  const statusList = ['要対応','未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','成約','キャンセル','除外'];
+  // v277: 「要対応」は派生状態 (未対応+期限切れ) なので状態フィルタから削除。進捗ボタンで絞り込み可能
+  const statusList = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル','除外'];
   const dd = {
     tool: createMultiSelectDropdown({ label:'ツール', options:[], selected:new Set(), onChange:triggerRedraw }),
     facility: createMultiSelectDropdown({ label:'医院', options:[], selected:new Set(), onChange:triggerRedraw }),
@@ -5266,14 +5267,19 @@ function renderBookings() {
 
   // Stats（除外は統計から除く）
   // v275: 表示と一致する effective status (_effSt) で集計
+  // v277: 要対応 と 未対応 を排他的に集計
+  //   要対応 = 未対応 で 予約日 < 今日 (期限切れ)
+  //   未対応 = 未対応 で 予約日 >= 今日 (まだ余裕あり) または 予約日なし
   const active = filtered.filter(d => _effSt(d) !== '除外');
   const total = active.length;
   const cancelled = active.filter(d => _effSt(d) === 'キャンセル').length;
-  const pending = active.filter(d => { const e = _effSt(d); return !e || e === '未対応'; }).length;
+  const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
+  const _isUnhandled = (d) => { const e = _effSt(d); return !e || e === '未対応'; };
+  const overdueCountStat = active.filter(d => { if (!_isUnhandled(d)) return false; const bd = parseDate(d.bookDate); return bd && bd < todayForRate; }).length;
+  const pending = active.filter(d => { if (!_isUnhandled(d)) return false; const bd = parseDate(d.bookDate); return !bd || bd >= todayForRate; }).length;
   const visited = active.filter(d => isVisitedStatus(_effSt(d))).length;
   const contracted = active.filter(d => _effSt(d) === '成約').length;
   // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
-  const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
   const pastBookings = active.filter(d => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; });
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt(d))).length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
@@ -5288,20 +5294,13 @@ function renderBookings() {
     if (amt) totalAmount += amt;
   });
 
-  // 未対応アラート数
-  // v275: 表示と一致する effective status で判定
-  const todayCheck = new Date(); todayCheck.setHours(0,0,0,0);
-  const overdueCount = filtered.filter(d => {
-    const eff = _effSt(d);
-    if (eff && eff !== '未対応') return false;
-    const bd = parseDate(d.bookDate);
-    return bd && bd < todayCheck;
-  }).length;
+  // v277: 要対応カードは overdueCountStat を使う (active基準・排他的)
+  const overdueCount = overdueCountStat;
 
   document.getElementById('bk-stats').innerHTML = `
     <div class="stat-card"><span class="stat-label">予約数</span><span class="stat-num">${total}</span></div>
-    ${overdueCount > 0 ? `<div class="stat-card" style="border-color:var(--red)"><span class="stat-label" style="color:var(--red)">要対応</span><span class="stat-num" style="color:var(--red)">${overdueCount}</span></div>` : ''}
-    <div class="stat-card"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span></div>
+    <div class="stat-card" style="border-color:${overdueCount>0?'var(--red)':'var(--border)'}" title="未対応のうち予約日が過去 (期限切れ・急ぎ対応)"><span class="stat-label" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'}">要対応</span><span class="stat-num" style="color:${overdueCount>0?'var(--red)':'var(--text-main)'}">${overdueCount}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px">期限切れ</span></div>
+    <div class="stat-card" title="未対応のうち予約日が今日以降 (まだ余裕あり)"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px">期限内</span></div>
     <div class="stat-card"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span></div>
     <div class="stat-card"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
     <div class="stat-card"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
