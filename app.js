@@ -1566,11 +1566,10 @@ function setupEventListeners() {
     if (typeof _refreshQuickBtns === 'function') _refreshQuickBtns();
     renderBookings();
   });
-  document.getElementById('bk-csv').addEventListener('click', exportCSV);
-  document.getElementById('bk-pdf')?.addEventListener('click', () => {
+  // v281: CSV/PDFを統合エクスポート (select)
+  const _exportPdf = () => {
     const prevLimit = window._bkDisplayLimit;
     const prevTitle = document.title;
-    // #8 PDF安全上限
     const SAFE_MAX = 1000;
     const total = (typeof bookingsData !== 'undefined' ? bookingsData : []).length;
     if (total > SAFE_MAX && !confirm(`${total}件あります。印刷はブラウザが停止する可能性があります。フィルタで絞り込むことを推奨。続行しますか?`)) return;
@@ -1586,7 +1585,20 @@ function setupEventListeners() {
         document.title = prevTitle;
       }
     );
+  };
+  document.getElementById('bk-export')?.addEventListener('change', (e) => {
+    const v = e.target.value;
+    if (v === 'csv') {
+      try { exportCSV(); } catch(err) { console.error(err); showToast?.('CSVエクスポート失敗', true); }
+    } else if (v === 'pdf') {
+      _exportPdf();
+    }
+    // 選択後に元に戻す
+    e.target.value = '';
   });
+  // 旧ID(bk-csv / bk-pdf) も互換維持 (古いキャッシュ対策)
+  document.getElementById('bk-csv')?.addEventListener('click', exportCSV);
+  document.getElementById('bk-pdf')?.addEventListener('click', _exportPdf);
 
   // Ad Budget
   document.getElementById('ad-save').addEventListener('click', saveAdBudget);

@@ -592,7 +592,6 @@
             <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">⚡ 絞込</span>
             <button class="btn" id="bk-overdue-btn" title="未対応で予約日を過ぎた急ぎ案件のみ表示">⏰ 進捗(期限切れ)</button>
             <button class="btn" id="bk-today-btn" title="今日予約のみ表示">📅 今日予約</button>
-            <button class="btn" id="bk-dup-filter" title="同じ名前+医院の組み合わせが2件以上ある重複予約のみ表示">🔍 重複</button>
             <input type="text" class="form-input" id="bk-search" placeholder="🔍 名前で検索" style="width:140px;padding:6px 10px;font-size:11px">
           </div>
           <!-- セクション3: 詳細フィルタ -->
@@ -604,6 +603,7 @@
             <span id="bk-service-slot" title="相談内容で絞り込み (BF/矯正/インプラント等)"></span>
             <span id="bk-contract-slot" title="成約商材で絞り込み"></span>
             <span id="bk-tool-slot" title="登録ツール(DX/手動/セレクト)で絞り込み"></span>
+            <button class="btn" id="bk-dup-filter" title="同じ名前+医院の組み合わせが2件以上ある重複予約のみ表示">🔍 重複チェック</button>
             <label style="display:inline-flex;align-items:center;gap:4px;font-size:11px;padding:5px 10px;cursor:pointer;white-space:nowrap;background:#fff;border:1px solid #d4d4d8;border-radius:14px"><input type="checkbox" id="bk-show-excluded"> 除外も表示</label>
             <div style="display:flex;gap:3px;flex-wrap:wrap;align-items:center" id="bk-quick-promos"></div>
           </div>
@@ -614,8 +614,11 @@
             <span style="flex:1"></span>
             <button class="btn btn-outline" id="bk-reset" style="min-height:30px;padding:6px 14px;font-size:11px;border-radius:18px" title="全フィルタをクリアして今月に戻す">🔄 リセット</button>
             <button class="btn btn-dark" id="bk-refresh" style="min-height:30px;padding:6px 12px;font-size:11px;border-radius:18px" title="最新データを取得">🔃 更新</button>
-            <button class="btn btn-outline" id="bk-csv" style="min-height:30px;padding:6px 12px;font-size:11px;border-radius:18px" title="CSV形式でダウンロード">📥 CSV</button>
-            <button class="btn btn-outline bk-pdf-btn" id="bk-pdf" style="min-height:30px;padding:6px 12px;font-size:11px;border-radius:18px" title="PDF形式で印刷・保存">📄 PDF</button>
+            <select class="form-select" id="bk-export" style="width:auto;padding:6px 10px;font-size:11px;border-radius:18px;border:1px solid #d4d4d8;background:#fff;cursor:pointer" title="CSV または PDF でエクスポート">
+              <option value="">📥 エクスポート</option>
+              <option value="csv">📊 CSV (Excel用)</option>
+              <option value="pdf">📄 PDF (印刷用)</option>
+            </select>
           </div>
         </div>
         <div class="card" style="padding:12px">
@@ -1193,7 +1196,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=280"></script>
+  <script src="app.js?v=281"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
