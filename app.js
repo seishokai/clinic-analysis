@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v290';
+const APP_VERSION = 'v291';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -5174,13 +5174,14 @@ function populateBookingFilters() {
         <button class="bk-quick-promo-hide" data-promo="${esc(name)}" title="このチップを非表示" style="background:transparent;border:none;color:#94a3b8;font-size:11px;padding:2px 6px;cursor:pointer;border-left:1px solid #e2e8f0">×</button>
       </span>`
     ).join('');
+    // v291: カスタムチップも自動top5と同じ見た目に統一 (絵文字なし、白背景、グレー枠)
     const customHtml = customChips.map((chip, i) =>
-      `<span class="bk-custom-chip-wrap" style="display:inline-flex;align-items:center;gap:0;border:1px solid #c084fc;border-radius:14px;background:#faf5ff;overflow:hidden">
-        <button class="btn bk-custom-chip" data-idx="${i}" title="${esc(chip.promos.join(', '))}" style="font-size:10px;padding:3px 6px 3px 10px;min-height:24px;background:transparent;border:none;color:#7c3aed;font-weight:600">⭐ ${esc(chip.label.length > 14 ? chip.label.slice(0,14)+'…' : chip.label)} <span style="font-size:9px;opacity:.7">(${chip.promos.length})</span></button>
-        <button class="bk-custom-chip-del" data-idx="${i}" title="このチップを削除" style="background:transparent;border:none;color:#a78bfa;font-size:11px;padding:2px 6px;cursor:pointer;border-left:1px solid #e9d5ff">×</button>
+      `<span class="bk-custom-chip-wrap" style="display:inline-flex;align-items:center;gap:0;border:1px solid #cbd5e1;border-radius:14px;background:#fff;overflow:hidden">
+        <button class="bk-custom-chip" data-idx="${i}" title="${esc(chip.promos.join(', '))}" style="font-size:10px;padding:3px 6px 3px 10px;min-height:24px;background:transparent;border:none;color:#475569;font-weight:500;cursor:pointer">${esc(chip.label.length > 14 ? chip.label.slice(0,14)+'…' : chip.label)} <span style="font-size:9px;opacity:.7">(${chip.promos.length})</span></button>
+        <button class="bk-custom-chip-del" data-idx="${i}" title="このチップを削除" style="background:transparent;border:none;color:#94a3b8;font-size:11px;padding:2px 6px;cursor:pointer;border-left:1px solid #e2e8f0">×</button>
       </span>`
     ).join('');
-    const addBtn = `<button class="btn bk-quick-add" title="現在のプロモ選択をクイックに追加" style="font-size:10px;padding:3px 10px;min-height:24px;background:#fff;color:#7c3aed;border:1px dashed #c084fc;border-radius:14px;font-weight:600">＋ 追加</button>`;
+    const addBtn = `<button class="bk-quick-add" title="現在のプロモ選択をクイックに追加" style="font-size:10px;padding:3px 10px;min-height:24px;background:#fff;color:#94a3b8;border:1px dashed #cbd5e1;border-radius:14px;font-weight:500;cursor:pointer">＋ 追加</button>`;
     quickEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px">Quick:</span>' + top5Html + customHtml + addBtn;
 
     // 既存top5チップのクリック
