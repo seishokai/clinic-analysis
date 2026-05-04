@@ -3753,7 +3753,7 @@ function setupBulkBookingActions() {
         <option value="">ステータスを選択…</option>
         <option value="確認済">✅ 確認済</option>
         <option value="後追いLINE済み">💬 後追いLINE済み</option>
-        <option value="予約連絡待ち">⏳ 予約連絡待ち</option>
+        <option value="予約連絡待ち">⏳ 次回予約連絡待ち</option>
         <option value="予約変更">📅 予約変更</option>
         <option value="来院済">🏥 来院済</option>
         <option value="キャンセル">❌ キャンセル</option>
@@ -5119,19 +5119,37 @@ function populateBookingFilters() {
     quickEl.style.display = 'none';
     return;
   }
-  // クイックプロモボタン（上位5件）
+  // クイックプロモボタン（上位5件 + カスタム保存チップ）
   const promoCounts = {};
   getFilteredBookingsData().forEach(d => { if (d.source) { promoCounts[d.source] = (promoCounts[d.source]||0) + 1; } });
   const top5 = Object.entries(promoCounts).sort((a,b) => b[1]-a[1]).slice(0, 5);
+  // v285: ユーザー保存のカスタムチップ (複数プロモを1チップにまとめられる)
+  const _loadCustomChips = () => {
+    try { return JSON.parse(localStorage.getItem('bk-quick-promo-custom') || '[]'); } catch(_) { return []; }
+  };
+  const _saveCustomChips = (arr) => {
+    try { localStorage.setItem('bk-quick-promo-custom', JSON.stringify(arr)); } catch(_) {}
+  };
+  const customChips = _loadCustomChips();
   if (quickEl) {
-    quickEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px">Quick:</span>' + top5.map(([name]) =>
-      `<button class="btn btn-outline bk-quick-promo" style="font-size:10px;padding:3px 8px;min-height:24px">${name.length > 18 ? name.slice(0,18)+'…' : name}</button>`
+    const top5Html = top5.map(([name]) =>
+      `<button class="btn btn-outline bk-quick-promo" data-promo="${esc(name)}" style="font-size:10px;padding:3px 8px;min-height:24px">${esc(name.length > 18 ? name.slice(0,18)+'…' : name)}</button>`
     ).join('');
-    quickEl.querySelectorAll('.bk-quick-promo').forEach((btn, i) => {
+    const customHtml = customChips.map((chip, i) =>
+      `<span class="bk-custom-chip-wrap" style="display:inline-flex;align-items:center;gap:0;border:1px solid #c084fc;border-radius:14px;background:#faf5ff;overflow:hidden">
+        <button class="btn bk-custom-chip" data-idx="${i}" title="${esc(chip.promos.join(', '))}" style="font-size:10px;padding:3px 6px 3px 10px;min-height:24px;background:transparent;border:none;color:#7c3aed;font-weight:600">⭐ ${esc(chip.label.length > 14 ? chip.label.slice(0,14)+'…' : chip.label)} <span style="font-size:9px;opacity:.7">(${chip.promos.length})</span></button>
+        <button class="bk-custom-chip-del" data-idx="${i}" title="このチップを削除" style="background:transparent;border:none;color:#a78bfa;font-size:11px;padding:2px 6px;cursor:pointer;border-left:1px solid #e9d5ff">×</button>
+      </span>`
+    ).join('');
+    const addBtn = `<button class="btn bk-quick-add" title="現在のプロモ選択をクイックに追加" style="font-size:10px;padding:3px 10px;min-height:24px;background:#fff;color:#7c3aed;border:1px dashed #c084fc;border-radius:14px;font-weight:600">＋ 追加</button>`;
+    quickEl.innerHTML = '<span style="font-size:11px;color:var(--text-muted);margin-right:4px">Quick:</span>' + top5Html + customHtml + addBtn;
+
+    // 既存top5チップのクリック
+    quickEl.querySelectorAll('.bk-quick-promo').forEach((btn) => {
       btn.addEventListener('click', () => {
         const promoSet = window._bkDD?.promo?.selected;
         if (!promoSet) return;
-        const val = top5[i][0];
+        const val = btn.dataset.promo;
         const isActive = promoSet.has(val) && promoSet.size === 1;
         quickEl.querySelectorAll('.bk-quick-promo').forEach(b => { b.style.background = ''; b.style.color = ''; b.style.borderColor = ''; });
         promoSet.clear();
@@ -5145,6 +5163,59 @@ function populateBookingFilters() {
         renderBookings();
       });
     });
+    // カスタムチップのクリック (保存した複数プロモを一括適用)
+    quickEl.querySelectorAll('.bk-custom-chip').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.idx);
+        const chip = customChips[idx];
+        if (!chip) return;
+        const promoSet = window._bkDD?.promo?.selected;
+        if (!promoSet) return;
+        // 全部一致してたらトグルでクリア、そうでなければ適用
+        const allMatch = chip.promos.every(p => promoSet.has(p)) && promoSet.size === chip.promos.length;
+        promoSet.clear();
+        if (!allMatch) chip.promos.forEach(p => promoSet.add(p));
+        window._bkDD.promo.updateLabel();
+        renderBookings();
+      });
+    });
+    // カスタムチップ削除
+    quickEl.querySelectorAll('.bk-custom-chip-del').forEach((btn) => {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const idx = parseInt(btn.dataset.idx);
+        const chip = customChips[idx];
+        if (!chip) return;
+        if (!confirm(`クイック「${chip.label}」を削除しますか？`)) return;
+        customChips.splice(idx, 1);
+        _saveCustomChips(customChips);
+        ensureBookingsFilters(); // 再描画
+      });
+    });
+    // ＋追加ボタン
+    quickEl.querySelector('.bk-quick-add')?.addEventListener('click', () => {
+      const promoSet = window._bkDD?.promo?.selected;
+      if (!promoSet || promoSet.size === 0) {
+        alert('保存するには、先にプロモフィルタで1つ以上選択してください。\n例: プロモドロップダウン → 検索「th」→ 全選択');
+        return;
+      }
+      const promos = [...promoSet];
+      const defaultLabel = promos.length === 1 ? promos[0] : (promos[0].split('_').slice(0,2).join('_') + ` 他${promos.length-1}件`);
+      const label = prompt(`このプロモ選択 (${promos.length}件) にチップ名を付けてください:`, defaultLabel);
+      if (!label || !label.trim()) return;
+      const trimmed = label.trim();
+      // 重複チェック
+      if (customChips.some(c => c.label === trimmed)) {
+        if (!confirm(`「${trimmed}」は既に存在します。上書きしますか？`)) return;
+        const idx = customChips.findIndex(c => c.label === trimmed);
+        customChips[idx] = { label: trimmed, promos };
+      } else {
+        customChips.push({ label: trimmed, promos });
+      }
+      _saveCustomChips(customChips);
+      ensureBookingsFilters();
+      showToast(`⭐ クイック「${trimmed}」を追加しました`);
+    });
   }
 }
 
@@ -5153,7 +5224,19 @@ function ensureBkMultiSelects() {
   if (window._bkDD) return;
   const triggerRedraw = () => { if (typeof renderBookings === 'function') renderBookings(); };
   // v277: 「要対応」は派生状態 (未対応+期限切れ) なので状態フィルタから削除。進捗ボタンで絞り込み可能
-  const statusList = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル','除外'];
+  // v285: 予約連絡待ち の表示は「次回予約連絡待ち」(来院後ステータスとして明確化)
+  const statusList = [
+    '未対応',
+    { value: '予約連絡待ち', label: '次回予約連絡待ち' },
+    '後追いLINE済み',
+    '確認済',
+    '予約変更',
+    '検討中',
+    '来院済',
+    '成約',
+    'キャンセル',
+    '除外'
+  ];
   const dd = {
     tool: createMultiSelectDropdown({ label:'ツール', options:[], selected:new Set(), onChange:triggerRedraw }),
     facility: createMultiSelectDropdown({ label:'医院', options:[], selected:new Set(), onChange:triggerRedraw }),
@@ -5326,25 +5409,45 @@ function renderBookings() {
   }
 
   // Stats（除外は統計から除く）
-  // v275: 表示と一致する effective status (_effSt) で集計
-  // v277: 要対応 と 未対応 を排他的に集計
-  // v283: 進行中 を追加して 予約数 = 要対応 + 未対応 + 進行中 + 来院済 + キャンセル
+  // v285: 数の整合性を保つ
+  //   過去予約(予約日<今日) で 来院していない人 → 全部キャンセルとしてカウント
+  //   ① 正式キャンセル: status=キャンセル
+  //   ② 未来店(過去要対応): status=未対応 で 予約日<今日 → 来なかった
+  //   ③ 未来店(過去進行中): status=確認済/連絡待ち/予約変更等 で 予約日<今日 → 来なかった
+  //   進行中 = 未来予約(予約日>=今日) で 確認済/連絡待ち等
+  //   未対応 = 未来予約(予約日>=今日) で 未対応/空
+  //   要対応 = ②  (内訳としてキャンセル件数の中に含めつつ別カウントも保持)
   const active = filtered.filter(d => _effSt(d) !== '除外');
   const total = active.length;
-  const cancelled = active.filter(d => _effSt(d) === 'キャンセル').length;
   const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
   const _isUnhandled = (d) => { const e = _effSt(d); return !e || e === '未対応'; };
-  const overdueCountStat = active.filter(d => { if (!_isUnhandled(d)) return false; const bd = parseDate(d.bookDate); return bd && bd < todayForRate; }).length;
-  const pending = active.filter(d => { if (!_isUnhandled(d)) return false; const bd = parseDate(d.bookDate); return !bd || bd >= todayForRate; }).length;
+  const _isPastBooking = (d) => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; };
+  const _isFutureBooking = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= todayForRate; };
+
   const visited = active.filter(d => isVisitedStatus(_effSt(d))).length;
   const contracted = active.filter(d => _effSt(d) === '成約').length;
-  // v283: 進行中 = 上記カテゴリーに該当しないアクティブ予約 (確認済/予約連絡待ち/後追いLINE済み/予約変更/治療中等)
+  // 正式キャンセル件数
+  const formalCancelled = active.filter(d => _effSt(d) === 'キャンセル').length;
+  // 未来店 = 過去予約 で 来院せず 正式キャンセルでもない
+  const noShow = active.filter(d => {
+    const eff = _effSt(d);
+    if (eff === 'キャンセル') return false;
+    if (isVisitedStatus(eff)) return false;
+    return _isPastBooking(d);
+  }).length;
+  // キャンセル(合計) = 正式キャンセル + 未来店
+  const cancelled = formalCancelled + noShow;
+  // 要対応 = 未来店のうち 未対応状態 (緊急度高)
+  const overdueCountStat = active.filter(d => _isUnhandled(d) && _isPastBooking(d)).length;
+  // 未対応 = 未来予約 + 未対応
+  const pending = active.filter(d => _isUnhandled(d) && _isFutureBooking(d)).length;
+  // 進行中 = 未来予約 + 進行中状態 (確認済/連絡待ち/予約変更等)
   const inProgress = active.filter(d => {
     const eff = _effSt(d);
-    if (_isUnhandled(d)) return false;          // 要対応/未対応
-    if (eff === 'キャンセル') return false;       // キャンセル
-    if (isVisitedStatus(eff)) return false;     // 来院済 (来院済+検討中+成約+治療段階)
-    return true;                                 // 残り = 進行中
+    if (_isUnhandled(d)) return false;
+    if (eff === 'キャンセル') return false;
+    if (isVisitedStatus(eff)) return false;
+    return _isFutureBooking(d);
   }).length;
   // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
   const pastBookings = active.filter(d => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; });
@@ -5364,14 +5467,15 @@ function renderBookings() {
   // v277: 要対応カードは overdueCountStat を使う (active基準・排他的)
   const overdueCount = overdueCountStat;
 
-  // v283: 進行中カードを追加して 予約数 = 要対応+未対応+進行中+来院済+キャンセル に
+  // v285: 数の整合性 → 予約数 = 要対応 + 未対応 + 進行中 + 来院済 + キャンセル(取消+未来店)
+  // 過去予約で来院せず正式キャンセルもしてない人は キャンセルカードの「未来店」内訳に
   document.getElementById('bk-stats').innerHTML = `
     <div class="stat-card" title="フィルター済み予約数 (除外を除く) = 要対応+未対応+進行中+来院済+キャンセル"><span class="stat-label">予約数</span><span class="stat-num">${total}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
-    <div class="stat-card" style="border-color:${overdueCount>0?'var(--red)':'var(--border)'}" title="予約日を過ぎてるのに未対応のまま。急いで電話・対応が必要"><span class="stat-label" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'}">要対応</span><span class="stat-num" style="color:${overdueCount>0?'var(--red)':'var(--text-main)'}">${overdueCount}</span><span class="stat-yoy" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'};font-size:10px;font-weight:600;line-height:1.3">予約日が過去<br>⚠ 急ぎ対応</span></div>
+    <div class="stat-card" style="border-color:${overdueCount>0?'var(--red)':'var(--border)'}" title="未対応のまま予約日が過ぎた急ぎ件数 (キャンセル内の未来店に含まれる)"><span class="stat-label" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'}">要対応</span><span class="stat-num" style="color:${overdueCount>0?'var(--red)':'var(--text-main)'}">${overdueCount}</span><span class="stat-yoy" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'};font-size:10px;font-weight:600;line-height:1.3">未対応のまま<br>予約日経過⚠</span></div>
     <div class="stat-card" title="未対応で予約日がまだ未来。期限内なので余裕がある"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">予約日がまだ未来<br>(期限内)</span></div>
-    <div class="stat-card" title="進行中 = 確認済/予約連絡待ち/後追いLINE済み/予約変更/治療段階など。来院前の対応中 or 来院後の治療中"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡待ち<br>等</span></div>
-    <div class="stat-card" title="キャンセル済の予約"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">取消済</span></div>
-    <div class="stat-card" title="来院済 = 来院済 + 検討中 + 成約 + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
+    <div class="stat-card" title="進行中 = 未来予約 で 確認済/後追いLINE済み/予約変更/治療段階など"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡待ち<br>(未来予約)</span></div>
+    <div class="stat-card" title="キャンセル合計 = 正式キャンセル + 未来店(来院せず連絡途絶/予約日経過)"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
+    <div class="stat-card" title="来院済 = 来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
     <div class="stat-card" title="成約済の予約 (来院後に契約に至った件数。来院済の内数)"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
     <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
   `;
@@ -5472,7 +5576,7 @@ function renderBookings() {
     if (s === '来院済') return '<span class="badge badge-warning">来院済</span>';
     if (s === '成約') return '<span class="badge badge-success">成約</span>';
     if (s === '確認済') return '<span class="badge badge-default" style="border-color:#6366f1;color:#6366f1">確認済</span>';
-    if (s === '予約連絡待ち') return '<span class="badge badge-default" style="border-color:#a855f7;color:#7c3aed;background:#f5f3ff">予約連絡待ち</span>';
+    if (s === '予約連絡待ち') return '<span class="badge badge-default" style="border-color:#a855f7;color:#7c3aed;background:#f5f3ff" title="来院後、次回予約の連絡待ち">次回予約連絡待ち</span>';
     if (s === '後追いLINE済み') return '<span class="badge badge-default" style="border-color:#06b6d4;color:#0891b2;background:#ecfeff">後追いLINE済み</span>';
     if (s === '予約変更') return '<span class="badge badge-default" style="border-color:#f59e0b;color:#b45309;background:#fef3c7">予約変更</span>';
     return `<span class="badge badge-default">${esc(s)}</span>`;
@@ -5561,7 +5665,7 @@ function renderBookings() {
       </select>`;
     })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='後追いLINE済み'?'background:#ecfeff;color:#0891b2;border-color:#06b6d4':d.status==='予約変更'?'background:#fef3c7;color:#b45309;border-color:#f59e0b':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
-      <option ${d.status==='予約連絡待ち'?'selected':''}>予約連絡待ち</option>
+      <option value="予約連絡待ち" ${d.status==='予約連絡待ち'?'selected':''}>次回予約連絡待ち</option>
       <option ${d.status==='留守電'?'selected':''}>留守電</option>
       <option ${d.status==='折り返し'?'selected':''}>折り返し</option>
       <option ${d.status==='後追いLINE済み'?'selected':''}>後追いLINE済み</option>
@@ -6899,7 +7003,8 @@ const BF_POST_VISIT_STAGES = [
   '治療中', 'セット日確定待ち', 'セット待ち', 'セット完了'
 ];
 function isVisitedStatus(s) {
-  return s === '来院済' || s === '検討中' || s === '成約'
+  // v285: 予約連絡待ち は来院後 (次回予約連絡待ち) なので来院済扱い
+  return s === '来院済' || s === '検討中' || s === '成約' || s === '予約連絡待ち'
       || IMPLANT_TREATMENT_STAGES.includes(s)
       || BF_POST_VISIT_STAGES.includes(s);
 }
