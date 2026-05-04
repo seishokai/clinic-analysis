@@ -914,6 +914,8 @@ function getFilteredBookingsData() {
 }
 function _hasPromoRestriction() {
   if (currentRole === 'admin') return false;
+  // v273: agency ロールも全予約・来店を表示 (PIIマスクは継続)
+  if (currentRole === 'agency') return false;
   if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
     return !currentAllowedPromos.includes('%');
   }
