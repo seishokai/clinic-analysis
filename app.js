@@ -5132,6 +5132,14 @@ function renderBookings() {
   const contractSet = dd.contract?.selected || new Set();
   const monthFilter = document.getElementById('bk-month').value;
 
+  // v275: 表示と統計を一致させる effective status (BF予約は bf_status 優先)
+  const _effSt = (d) => {
+    if (isBFBooking(d)) {
+      const bfst = (getBFInfo(d.name, d.applyDate) || {}).bf_status;
+      return bfst || d.status || '';
+    }
+    return d.status || '';
+  };
   let filtered = bookingsData;
   if (searchVal) filtered = filtered.filter(d => d.name && d.name.toLowerCase().includes(searchVal));
   if (toolSet.size) filtered = filtered.filter(d => toolSet.has(d.tool));
@@ -5162,15 +5170,17 @@ function renderBookings() {
   if (statusSet.size) {
     const td = new Date(); td.setHours(0,0,0,0);
     filtered = filtered.filter(d => {
-      const s = d.status || '未対応';
+      // v275: 表示と一致する effective status を使う
+      const eff = _effSt(d);
+      const s = eff || '未対応';
       for (const sel of statusSet) {
         if (sel === '要対応') {
-          if ((!d.status || d.status === '未対応')) {
+          if (!eff || eff === '未対応') {
             const bd = parseDate(d.bookDate);
             if (bd && bd < td) return true;
           }
         } else if (sel === '未対応') {
-          if (!d.status || d.status === '未対応') return true;
+          if (!eff || eff === '未対応') return true;
         } else if (s === sel) return true;
       }
       return false;
@@ -5255,16 +5265,17 @@ function renderBookings() {
   }
 
   // Stats（除外は統計から除く）
-  const active = filtered.filter(d => d.status !== '除外');
+  // v275: 表示と一致する effective status (_effSt) で集計
+  const active = filtered.filter(d => _effSt(d) !== '除外');
   const total = active.length;
-  const cancelled = active.filter(d => d.status === 'キャンセル').length;
-  const pending = active.filter(d => !d.status || d.status === '未対応').length;
-  const visited = active.filter(d => isVisitedStatus(d.status)).length;
-  const contracted = active.filter(d => d.status === '成約').length;
+  const cancelled = active.filter(d => _effSt(d) === 'キャンセル').length;
+  const pending = active.filter(d => { const e = _effSt(d); return !e || e === '未対応'; }).length;
+  const visited = active.filter(d => isVisitedStatus(_effSt(d))).length;
+  const contracted = active.filter(d => _effSt(d) === '成約').length;
   // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
   const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
   const pastBookings = active.filter(d => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; });
-  const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status)).length;
+  const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt(d))).length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
   // 成約金額集計（フィルター済みデータから）
@@ -5278,9 +5289,11 @@ function renderBookings() {
   });
 
   // 未対応アラート数
+  // v275: 表示と一致する effective status で判定
   const todayCheck = new Date(); todayCheck.setHours(0,0,0,0);
   const overdueCount = filtered.filter(d => {
-    if (d.status && d.status !== '未対応') return false;
+    const eff = _effSt(d);
+    if (eff && eff !== '未対応') return false;
     const bd = parseDate(d.bookDate);
     return bd && bd < todayCheck;
   }).length;
@@ -5309,7 +5322,8 @@ function renderBookings() {
   const isPinned = (d) => pinnedSet.has(d.name + '|' + d.applyDate);
   // v275: ソート選択 (デフォルト 申込日 DESC)
   const _bkSortBy = (document.getElementById('bk-sort')?.value) || 'apply-desc';
-  const _bkStatusOrder = ['要対応','未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','成約','キャンセル','除外'];
+  // 表示と一致する状態順 (BF含む全ステータスを優先度順)
+  const _bkStatusOrder = ['要対応','未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','離脱','ローン審査中','ローン審査落','矯正決定(BF保留)','ラブリエ決定(BF保留)','インプラント決定(BF保留)','印象待ち(治療無)','印象待ち(治療有)','治療中','セット日確定待ち','セット待ち','セット完了','キャンセル','除外'];
   const _bkStOrd = (s) => {
     const i = _bkStatusOrder.indexOf(s || '未対応');
     return i < 0 ? 999 : i;
@@ -5325,7 +5339,7 @@ function renderBookings() {
     if (_bkSortBy === 'apply-asc')  return _bkApplyKey(a) - _bkApplyKey(b);
     if (_bkSortBy === 'book-desc')  return _bkBookKey(b) - _bkBookKey(a);
     if (_bkSortBy === 'book-asc')   return _bkBookKey(a) - _bkBookKey(b);
-    if (_bkSortBy === 'status')     return _bkStOrd(a.status) - _bkStOrd(b.status) || _bkApplyKey(b) - _bkApplyKey(a);
+    if (_bkSortBy === 'status')     return _bkStOrd(_effSt(a)) - _bkStOrd(_effSt(b)) || _bkApplyKey(b) - _bkApplyKey(a);
     if (_bkSortBy === 'name')       return (a.name||'').localeCompare(b.name||'','ja') || _bkApplyKey(b) - _bkApplyKey(a);
     return _bkApplyKey(b) - _bkApplyKey(a); // apply-desc (default)
   };
