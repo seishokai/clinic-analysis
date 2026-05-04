@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v293';
+const APP_VERSION = 'v294';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2867,12 +2867,16 @@ function renderPhoneCheck() {
     if (!isInPeriod(bd)) return false;
     // 医院フィルタ (空配列なら全医院)
     if (facSet.size > 0 && !facSet.has(normFac(d.facility))) return false;
-    if (!_phoneCheckState.showCalled && (d.status === '確認済' || d.status === '来院済' || d.status === '成約')) return false;
-    // v273: 統計バッジ絞り込み
+    // v294: showCalled=false の時は完了系 (確認OK/来院済/成約) を除外
+    if (!_phoneCheckState.showCalled && (d.status === '確認済' || d.status === '確認OK' || d.status === '来院済' || d.status === '成約')) return false;
+    // v273+v294: 統計バッジ絞り込み
     if (_phoneCheckState.statusFilter) {
       const sf = _phoneCheckState.statusFilter;
       if (sf === '未対応') {
         if (d.status && d.status !== '未対応') return false;
+      } else if (sf === 'called') {
+        // 「電話済」 = 1〜3コール × 留守電有/無
+        if (!/^[1-3]コール留守電(有|無)$/.test(d.status||'')) return false;
       } else {
         if (d.status !== sf) return false;
       }
@@ -2898,11 +2902,17 @@ function renderPhoneCheck() {
 
   // 医院リスト作成
   const allFacs = [...new Set(data.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
+  // v294: 新しいステータス体系 (1〜3コール×留守電有無 + 確認OK + 予約日変更 + キャンセル)
+  const _isCalledStat = (s) => s && /^[1-3]コール留守電(有|無)$/.test(s);
   const stats = {
     total: rows.length,
     pending: rows.filter(d => !d.status || d.status === '未対応').length,
-    rusu:  rows.filter(d => d.status === '留守電').length,
-    cb:    rows.filter(d => d.status === '折り返し').length,
+    called: rows.filter(d => _isCalledStat(d.status)).length,
+    confirmed: rows.filter(d => d.status === '確認OK' || d.status === '確認済').length,
+    rescheduled: rows.filter(d => d.status === '予約日変更').length,
+    // 旧互換 (留守電/折り返し も残データ用)
+    rusu: rows.filter(d => d.status === '留守電' || _isCalledStat(d.status)).length,
+    cb:   rows.filter(d => d.status === '折り返し').length,
   };
 
   const canViewPII = !_isPII_MaskNeeded();
@@ -2922,12 +2932,13 @@ function renderPhoneCheck() {
       </button>
     </div>
 
-    <!-- 統計バッジ (クリックで該当ステータスのみ絞り込み) -->
+    <!-- v294: 統計バッジ (新ステータス体系) -->
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px">
-      <button class="phone-stat-btn" data-stat="all"     style="padding:6px 12px;background:${!_phoneCheckState.statusFilter?'#1a1a1a':'#fef3c7'};color:${!_phoneCheckState.statusFilter?'#fff':'#b45309'};border:1px solid ${!_phoneCheckState.statusFilter?'#1a1a1a':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">対象 ${stats.total}件</button>
-      <button class="phone-stat-btn" data-stat="未対応"   style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='未対応'?'#dc2626':'#fee2e2'};color:${_phoneCheckState.statusFilter==='未対応'?'#fff':'#dc2626'};border:1px solid ${_phoneCheckState.statusFilter==='未対応'?'#dc2626':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">未対応 ${stats.pending}件</button>
-      <button class="phone-stat-btn" data-stat="留守電"   style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='留守電'?'#92400e':'#fef3c7'};color:${_phoneCheckState.statusFilter==='留守電'?'#fff':'#92400e'};border:1px solid ${_phoneCheckState.statusFilter==='留守電'?'#92400e':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">留守電 ${stats.rusu}件</button>
-      <button class="phone-stat-btn" data-stat="折り返し" style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='折り返し'?'#7c3aed':'#f5f3ff'};color:${_phoneCheckState.statusFilter==='折り返し'?'#fff':'#7c3aed'};border:1px solid ${_phoneCheckState.statusFilter==='折り返し'?'#7c3aed':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">折り返し ${stats.cb}件</button>
+      <button class="phone-stat-btn" data-stat="all"      style="padding:6px 12px;background:${!_phoneCheckState.statusFilter?'#1a1a1a':'#f3f4f6'};color:${!_phoneCheckState.statusFilter?'#fff':'#374151'};border:1px solid ${!_phoneCheckState.statusFilter?'#1a1a1a':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">対象 ${stats.total}件</button>
+      <button class="phone-stat-btn" data-stat="未対応"    style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='未対応'?'#dc2626':'#fee2e2'};color:${_phoneCheckState.statusFilter==='未対応'?'#fff':'#dc2626'};border:1px solid ${_phoneCheckState.statusFilter==='未対応'?'#dc2626':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">未対応 ${stats.pending}件</button>
+      <button class="phone-stat-btn" data-stat="called"   style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='called'?'#92400e':'#fef3c7'};color:${_phoneCheckState.statusFilter==='called'?'#fff':'#92400e'};border:1px solid ${_phoneCheckState.statusFilter==='called'?'#92400e':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit" title="1〜3コール (留守電有/無)">電話済 ${stats.called}件</button>
+      <button class="phone-stat-btn" data-stat="確認OK"   style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='確認OK'?'#1d4ed8':'#dbeafe'};color:${_phoneCheckState.statusFilter==='確認OK'?'#fff':'#1d4ed8'};border:1px solid ${_phoneCheckState.statusFilter==='確認OK'?'#1d4ed8':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✅ 確認OK ${stats.confirmed}件</button>
+      <button class="phone-stat-btn" data-stat="予約日変更" style="padding:6px 12px;background:${_phoneCheckState.statusFilter==='予約日変更'?'#7c3aed':'#f5f3ff'};color:${_phoneCheckState.statusFilter==='予約日変更'?'#fff':'#7c3aed'};border:1px solid ${_phoneCheckState.statusFilter==='予約日変更'?'#7c3aed':'transparent'};border-radius:14px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">📅 変更 ${stats.rescheduled}件</button>
     </div>
 
     <!-- フィルタ -->
@@ -3245,6 +3256,12 @@ function renderCallMode() {
     '未対応':{bg:'#fee2e2',fg:'#dc2626'}, '確認済':{bg:'#dbeafe',fg:'#1d4ed8'},
     '留守電':{bg:'#fef3c7',fg:'#92400e'}, '折り返し':{bg:'#f5f3ff',fg:'#7c3aed'},
     '来院済':{bg:'#dbeafe',fg:'#1d4ed8'}, '成約':{bg:'#dcfce7',fg:'#15803d'},
+    // v294: 1〜3コール × 留守電有/無 + 確認OK + 予約日変更
+    '1コール留守電有':{bg:'#fef3c7',fg:'#92400e'}, '1コール留守電無':{bg:'#fffbeb',fg:'#92400e'},
+    '2コール留守電有':{bg:'#fed7aa',fg:'#9a3412'}, '2コール留守電無':{bg:'#ffedd5',fg:'#9a3412'},
+    '3コール留守電有':{bg:'#fecaca',fg:'#991b1b'}, '3コール留守電無':{bg:'#fee2e2',fg:'#991b1b'},
+    '確認OK':{bg:'#dbeafe',fg:'#1d4ed8'}, '予約日変更':{bg:'#f5f3ff',fg:'#7c3aed'},
+    'キャンセル':{bg:'#fee2e2',fg:'#b91c1c'},
   };
   const stClr = stColors[st] || { bg:'#f3f4f6', fg:'#6b7280' };
   const name = _callModeCanViewPII ? d.name : maskName(d.name);
@@ -3273,14 +3290,22 @@ function renderCallMode() {
 
       ${memo ? `<div style="background:#fffbeb;border-left:4px solid #f59e0b;padding:10px 12px;border-radius:6px;font-size:12px;color:#92400e;line-height:1.6;white-space:pre-wrap;margin-bottom:16px">📝 ${escapeHtml(memo)}</div>` : ''}
 
-      <!-- アクション -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
-        <button class="cm-act" data-st="確認済" style="padding:14px;background:#dbeafe;color:#1d4ed8;border:2px solid #bfdbfe;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✅ 確認済</button>
-        <button class="cm-act" data-st="留守電" style="padding:14px;background:#fef3c7;color:#92400e;border:2px solid #fcd34d;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">🎤 留守電</button>
-        <button class="cm-act" data-st="折り返し" style="padding:14px;background:#f5f3ff;color:#7c3aed;border:2px solid #d8b4fe;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">↩ 折り返し</button>
-        <button id="cm-memo" style="padding:14px;background:#fff8e1;color:#b45309;border:2px solid #fcd34d;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📝 メモ</button>
+      <!-- v294: アクション (1〜3コール × 留守電有/無 + 確認OK + 予約日変更 + キャンセル) -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:8px">
+        <button class="cm-act" data-st="1コール留守電有" style="padding:11px;background:#fef3c7;color:#92400e;border:2px solid #fcd34d;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📞1 🎤 留守電有</button>
+        <button class="cm-act" data-st="1コール留守電無" style="padding:11px;background:#fffbeb;color:#92400e;border:2px solid #fde68a;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📞1 ✗ 留守電無</button>
+        <button class="cm-act" data-st="2コール留守電有" style="padding:11px;background:#fed7aa;color:#9a3412;border:2px solid #fdba74;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📞2 🎤 留守電有</button>
+        <button class="cm-act" data-st="2コール留守電無" style="padding:11px;background:#ffedd5;color:#9a3412;border:2px solid #fed7aa;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📞2 ✗ 留守電無</button>
+        <button class="cm-act" data-st="3コール留守電有" style="padding:11px;background:#fecaca;color:#991b1b;border:2px solid #fca5a5;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📞3 🎤 留守電有</button>
+        <button class="cm-act" data-st="3コール留守電無" style="padding:11px;background:#fee2e2;color:#991b1b;border:2px solid #fecaca;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📞3 ✗ 留守電無</button>
       </div>
-      <button class="cm-act" data-st="未対応" style="width:100%;padding:10px;background:transparent;color:#6b7280;border:1px solid #e5e7eb;border-radius:10px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:14px">↻ 取り消し（未対応に戻す）</button>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:8px">
+        <button class="cm-act" data-st="確認OK" style="padding:13px;background:#dbeafe;color:#1d4ed8;border:2px solid #bfdbfe;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">✅ 確認OK</button>
+        <button class="cm-act" data-st="予約日変更" style="padding:13px;background:#f5f3ff;color:#7c3aed;border:2px solid #d8b4fe;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">📅 予約日変更</button>
+        <button class="cm-act" data-st="キャンセル" style="padding:13px;background:#fee2e2;color:#b91c1c;border:2px solid #fca5a5;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">❌ キャンセル</button>
+      </div>
+      <button id="cm-memo" style="width:100%;padding:11px;background:#fff8e1;color:#b45309;border:2px solid #fcd34d;border-radius:10px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">📝 メモ</button>
+      <button class="cm-act" data-st="未対応" style="width:100%;padding:8px;background:transparent;color:#6b7280;border:1px solid #e5e7eb;border-radius:10px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;margin-bottom:14px">↻ 取り消し（未対応に戻す）</button>
 
       <!-- ナビゲーション -->
       <div style="display:flex;gap:8px;align-items:stretch">
