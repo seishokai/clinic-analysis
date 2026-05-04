@@ -1490,6 +1490,9 @@ function setupEventListeners() {
     // v280: 期間を「今月」、月をクリアにリセット (デフォルト=今月)
     document.getElementById('bk-period').value = 'thisMonth';
     document.getElementById('bk-month').value = '';
+    // v283: 基準も予約日にリセット
+    const basisEl = document.getElementById('bk-basis');
+    if (basisEl) basisEl.value = 'book';
     // ソートも初期値へ
     const sortEl = document.getElementById('bk-sort');
     if (sortEl) sortEl.value = 'apply-desc';
@@ -1510,7 +1513,7 @@ function setupEventListeners() {
     searchTimer = setTimeout(renderBookings, 300);
   });
   // v280: デフォルト値も考慮して、本当にアクティブかどうかを判定
-  const _filterDefaults = { 'bk-sort': 'apply-desc', 'bk-period': 'thisMonth' };
+  const _filterDefaults = { 'bk-sort': 'apply-desc', 'bk-period': 'thisMonth', 'bk-basis': 'book' };
   const highlightActiveFilter = (el) => {
     if (!el) return;
     const def = _filterDefaults[el.id] || '';
@@ -1551,6 +1554,12 @@ function setupEventListeners() {
   });
   document.getElementById('bk-sort')?.addEventListener('change', () => {
     const el = document.getElementById('bk-sort');
+    highlightActiveFilter(el);
+    renderBookings();
+  });
+  // v283: 基準セレクター (予約日/登録日)
+  document.getElementById('bk-basis')?.addEventListener('change', () => {
+    const el = document.getElementById('bk-basis');
     highlightActiveFilter(el);
     renderBookings();
   });
@@ -5233,33 +5242,40 @@ function renderBookings() {
   }
   if (contractSet.size) filtered = filtered.filter(d => contractSet.has(d.contractService));
   // 期間フィルター
-  // v273: 予約日基準 (デフォルト) と 登録日基準 (申込) を選べるように
+  // v283: 期間 (今月/先月/今期/月指定) と 基準 (予約日/登録日) を独立に選択可
   const periodFilter = document.getElementById('bk-period')?.value || '';
+  const basisFilter = document.getElementById('bk-basis')?.value || 'book'; // 'book' or 'apply'
+  const useApply = basisFilter === 'apply';
+  const ymOf = (d) => {
+    const src = useApply ? (d.applyDate || '') : (d.bookDate || d.applyDate || '');
+    const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
+    return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : '';
+  };
   if (periodFilter) {
-    const ymOf = (d, useApply) => {
-      const src = useApply ? (d.applyDate || '') : (d.bookDate || d.applyDate || '');
-      const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
-      return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : '';
-    };
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
     if (periodFilter === 'thisMonth') {
-      // 予約日基準で今月
-      filtered = filtered.filter(d => ymOf(d, false) === ym);
+      filtered = filtered.filter(d => ymOf(d) === ym);
     } else if (periodFilter === 'thisMonthApply') {
-      // 登録日基準で今月
-      filtered = filtered.filter(d => ymOf(d, true) === ym);
+      // v283: 旧形式の互換 (basis=apply で thisMonth と同じ)
+      const useApplyLegacy = (dd) => {
+        const src = dd.applyDate || '';
+        const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
+        return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : '';
+      };
+      filtered = filtered.filter(d => useApplyLegacy(d) === ym);
     } else if (periodFilter === 'lastMonth') {
       const last = new Date(now); last.setMonth(last.getMonth()-1);
       const lym = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}`;
-      filtered = filtered.filter(d => ymOf(d, false) === lym);
+      filtered = filtered.filter(d => ymOf(d) === lym);
     } else if (periodFilter === 'fiscal') {
       const fy = now.getMonth() >= 6 ? now.getFullYear() : now.getFullYear()-1;
-      filtered = filtered.filter(d => ymOf(d, false) >= fy+'-07');
+      filtered = filtered.filter(d => ymOf(d) >= fy+'-07');
     }
   }
   if (monthFilter) {
-    filtered = filtered.filter(d => getYM(d) === monthFilter);
+    // v283: 月指定も基準に従う
+    filtered = filtered.filter(d => ymOf(d) === monthFilter);
   }
   // 除外非表示 (「除外も表示」チェックがOFFなら除外行を隠す)
   const showExcluded = document.getElementById('bk-show-excluded')?.checked;
@@ -5312,8 +5328,7 @@ function renderBookings() {
   // Stats（除外は統計から除く）
   // v275: 表示と一致する effective status (_effSt) で集計
   // v277: 要対応 と 未対応 を排他的に集計
-  //   要対応 = 未対応 で 予約日 < 今日 (期限切れ)
-  //   未対応 = 未対応 で 予約日 >= 今日 (まだ余裕あり) または 予約日なし
+  // v283: 進行中 を追加して 予約数 = 要対応 + 未対応 + 進行中 + 来院済 + キャンセル
   const active = filtered.filter(d => _effSt(d) !== '除外');
   const total = active.length;
   const cancelled = active.filter(d => _effSt(d) === 'キャンセル').length;
@@ -5323,6 +5338,14 @@ function renderBookings() {
   const pending = active.filter(d => { if (!_isUnhandled(d)) return false; const bd = parseDate(d.bookDate); return !bd || bd >= todayForRate; }).length;
   const visited = active.filter(d => isVisitedStatus(_effSt(d))).length;
   const contracted = active.filter(d => _effSt(d) === '成約').length;
+  // v283: 進行中 = 上記カテゴリーに該当しないアクティブ予約 (確認済/予約連絡待ち/後追いLINE済み/予約変更/治療中等)
+  const inProgress = active.filter(d => {
+    const eff = _effSt(d);
+    if (_isUnhandled(d)) return false;          // 要対応/未対応
+    if (eff === 'キャンセル') return false;       // キャンセル
+    if (isVisitedStatus(eff)) return false;     // 来院済 (来院済+検討中+成約+治療段階)
+    return true;                                 // 残り = 進行中
+  }).length;
   // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
   const pastBookings = active.filter(d => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; });
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt(d))).length;
@@ -5341,14 +5364,15 @@ function renderBookings() {
   // v277: 要対応カードは overdueCountStat を使う (active基準・排他的)
   const overdueCount = overdueCountStat;
 
-  // v277.1: 詳細説明を追加 (誰が見ても分かるように)
+  // v283: 進行中カードを追加して 予約数 = 要対応+未対応+進行中+来院済+キャンセル に
   document.getElementById('bk-stats').innerHTML = `
-    <div class="stat-card" title="フィルター済み予約数 (除外を除く)"><span class="stat-label">予約数</span><span class="stat-num">${total}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
+    <div class="stat-card" title="フィルター済み予約数 (除外を除く) = 要対応+未対応+進行中+来院済+キャンセル"><span class="stat-label">予約数</span><span class="stat-num">${total}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
     <div class="stat-card" style="border-color:${overdueCount>0?'var(--red)':'var(--border)'}" title="予約日を過ぎてるのに未対応のまま。急いで電話・対応が必要"><span class="stat-label" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'}">要対応</span><span class="stat-num" style="color:${overdueCount>0?'var(--red)':'var(--text-main)'}">${overdueCount}</span><span class="stat-yoy" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'};font-size:10px;font-weight:600;line-height:1.3">予約日が過去<br>⚠ 急ぎ対応</span></div>
     <div class="stat-card" title="未対応で予約日がまだ未来。期限内なので余裕がある"><span class="stat-label">未対応</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">予約日がまだ未来<br>(期限内)</span></div>
+    <div class="stat-card" title="進行中 = 確認済/予約連絡待ち/後追いLINE済み/予約変更/治療段階など。来院前の対応中 or 来院後の治療中"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡待ち<br>等</span></div>
     <div class="stat-card" title="キャンセル済の予約"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">取消済</span></div>
-    <div class="stat-card" title="来院済 + 成約 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
-    <div class="stat-card" title="成約済の予約 (来院後に契約に至った件数)"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
+    <div class="stat-card" title="来院済 = 来院済 + 検討中 + 成約 + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
+    <div class="stat-card" title="成約済の予約 (来院後に契約に至った件数。来院済の内数)"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
     <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
   `;
   // インセ金額は別途集計不要（各行で入力）
@@ -5357,31 +5381,33 @@ function renderBookings() {
   const memoData = loadData('bk-memos', {});
   filtered.forEach(d => { const key = d.name+'|'+d.applyDate; d._memo = memoData[key] || ''; });
 
-  // v278.1: 「いつのデータか」を分かりやすく表示
+  // v283: 「いつのデータか」を分かりやすく表示 (基準セレクター対応)
   const _now = new Date();
   let _periodLabel = '';
   let _periodSub = '';
+  // 基準ラベル (予約日 or 登録日)
+  const _basisLabel = useApply ? '登録日基準' : '予約日基準';
   if (monthFilter) {
-    // 月指定 (YYYY-MM)
     const mm = monthFilter.match(/(\d{4})-(\d{2})/);
     if (mm) {
       _periodLabel = `${mm[1]}年${parseInt(mm[2])}月`;
-      _periodSub = '予約日基準';
+      _periodSub = _basisLabel;
     }
   } else if (periodFilter === 'thisMonth') {
     _periodLabel = `${_now.getFullYear()}年${_now.getMonth()+1}月`;
-    _periodSub = '予約日基準';
+    _periodSub = _basisLabel;
   } else if (periodFilter === 'thisMonthApply') {
+    // 旧形式の互換
     _periodLabel = `${_now.getFullYear()}年${_now.getMonth()+1}月`;
     _periodSub = '登録日基準';
   } else if (periodFilter === 'lastMonth') {
     const last = new Date(_now); last.setMonth(last.getMonth()-1);
     _periodLabel = `${last.getFullYear()}年${last.getMonth()+1}月`;
-    _periodSub = '予約日基準';
+    _periodSub = _basisLabel;
   } else if (periodFilter === 'fiscal') {
     const fy = _now.getMonth() >= 6 ? _now.getFullYear() : _now.getFullYear()-1;
     _periodLabel = `${fy}年7月～${fy+1}年6月`;
-    _periodSub = '今期(予約日基準)';
+    _periodSub = `今期(${_basisLabel})`;
   } else {
     _periodLabel = '全期間';
     _periodSub = '指定なし';

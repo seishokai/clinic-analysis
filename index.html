@@ -583,9 +583,15 @@
           <!-- セクション1: 期間 (いつのデータを見るか) -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
             <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">📅 期間</span>
-            <select class="form-select" id="bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">全期間</option><option value="thisMonth" selected>今月（予約日基準）</option><option value="thisMonthApply">今月（登録日基準）</option><option value="lastMonth">先月</option><option value="fiscal">今期</option></select>
+            <select class="form-select" id="bk-period" style="width:auto;padding:6px 8px;font-size:11px" title="表示する期間"><option value="">全期間</option><option value="thisMonth" selected>今月</option><option value="lastMonth">先月</option><option value="fiscal">今期</option></select>
             <input type="month" class="form-input" id="bk-month" style="width:auto;padding:6px 8px;font-size:11px" title="月を直接指定（期間ドロップダウンと排他）">
-            <span style="font-size:9px;color:#999;margin-left:6px">※どちらか片方のみ</span>
+            <span style="font-size:9px;color:#999;margin:0 4px">×</span>
+            <span style="font-size:10px;color:#666;font-weight:600">基準:</span>
+            <select class="form-select" id="bk-basis" style="width:auto;padding:6px 8px;font-size:11px" title="期間/月をどちらの日付で絞るか">
+              <option value="book" selected>📅 予約日基準</option>
+              <option value="apply">📝 登録日基準</option>
+            </select>
+            <span style="font-size:9px;color:#999;margin-left:6px">※期間と月はどちらか片方のみ</span>
           </div>
           <!-- セクション2: クイック絞り込み (ワンタップで絞れる) -->
           <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
@@ -1196,7 +1202,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=282"></script>
+  <script src="app.js?v=283"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
