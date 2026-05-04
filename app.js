@@ -5700,7 +5700,7 @@ function renderBookings() {
       const bfStyle = curBf ? `background:${bfColor}22;color:${bfColor};border-color:${bfColor};font-weight:600` : '';
       return `<select class="form-select bk-bfstatus-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;width:100%;max-width:115px;text-align:center;${bfStyle}">
         <option value="">${d.status==='未対応'?'未対応':(d.status==='確認済'?'確認済':(d.status==='キャンセル'?'キャンセル':'未設定'))}</option>
-        ${BF_STATUSES.map(s => `<option ${curBf===s.value?'selected':''}>${esc(s.value)}</option>`).join('')}
+        ${BF_STATUSES.map(s => { const lbl = s.value === '予約連絡待ち' ? '次回予約連絡待ち' : s.value; return `<option value="${esc(s.value)}" ${curBf===s.value?'selected':''}>${esc(lbl)}</option>`; }).join('')}
       </select>`;
     })() : `<select class="form-select bk-status-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;padding:2px 4px;min-width:70px;text-align:center;${d.status==='来院済'?'background:#dbeafe;color:#1d4ed8':d.status==='成約'?'background:#dcfce7;color:#15803d':d.status==='キャンセル'?'background:#fee2e2;color:#b91c1c':d.status==='確認済'?'background:#f3e8ff;color:#7c3aed':d.status==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed;border-color:#a855f7':d.status==='後追いLINE済み'?'background:#ecfeff;color:#0891b2;border-color:#06b6d4':d.status==='予約変更'?'background:#fef3c7;color:#b45309;border-color:#f59e0b':d.status==='除外'?'background:#f5f5f5;color:#9ca3af':''}">
       <option ${(!d.status||d.status==='未対応')?'selected':''}>未対応</option>
@@ -7340,7 +7340,7 @@ async function renderBFLifecycle() {
 
   // フィルター選択肢
   const stSel = document.getElementById('bf-lc-filter-status');
-  if (stSel) stSel.innerHTML = '<option value="">BFステータス:全て</option><option value="__none">未設定</option>' + BF_STATUSES.map(s => `<option value="${s.value}">${s.value}</option>`).join('');
+  if (stSel) stSel.innerHTML = '<option value="">BFステータス:全て</option><option value="__none">未設定</option>' + BF_STATUSES.map(s => { const lbl = s.value === '予約連絡待ち' ? '次回予約連絡待ち' : s.value; return `<option value="${s.value}">${lbl}</option>`; }).join('');
   const csFacSel = document.getElementById('bf-lc-filter-fac');
   // 配列保存されたCS医院を個別に展開
   const csFacSet = new Set();
@@ -8079,7 +8079,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const csfacDD = createMultiSelectDropdown({ label: 'CS医院', options: csFacOpts, selected: state.csfac, onChange: triggerRedraw });
   const setfacDD = createMultiSelectDropdown({ label: 'セット医院', options: setFacOpts, selected: state.setfac, onChange: triggerRedraw });
   const consultDD = createMultiSelectDropdown({ label: '相談', options: CONSULT_TYPES, selected: state.consult, onChange: triggerRedraw });
-  const statusOpts = [...statusValues.map(v => ({ value: v, label: v })), { value: '__UNSET__', label: '未設定' }];
+  const statusOpts = [...statusValues.map(v => ({ value: v, label: v === '予約連絡待ち' ? '次回予約連絡待ち' : v })), { value: '__UNSET__', label: '未設定' }];
   const statusDD = createMultiSelectDropdown({ label: 'ｽﾃｰﾀｽ', options: statusOpts, selected: state.status, onChange: triggerRedraw });
 
   const filterScopeInit = el.closest('[id^="sub-kaiin-"]') || el;
@@ -8288,7 +8288,7 @@ function drawKaiinRows(treatment, rows, container) {
       </select></td>
       <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;width:100%;${stRound};appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M6 9l6 6 6-6&quot;/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px;padding-right:24px">
         <option value="">未設定</option>
-        ${statuses.map(s => `<option ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
+        ${statuses.map(s => { const lbl = s.value === '予約連絡待ち' ? '次回予約連絡待ち' : s.value; return `<option value="${esc(s.value)}" ${st===s.value?'selected':''}>${esc(lbl)}</option>`; }).join('')}
       </select></td>
       <td style="position:relative"><button type="button" class="kaiin-next-date-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${nextDate}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;cursor:pointer;${nextDateStyle}">${nextDate?nextDate.substring(5).replace('-','/'):'年/月/日'}</button><input type="date" class="kaiin-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${nextDate}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"></td>
       ${treatment === 'BF' ? `<td><select class="kaiin-setfac-sel kaiin-plain-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:none;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center;color:${setFac?'var(--text)':'var(--text-muted)'}">
@@ -8642,7 +8642,7 @@ function drawBFLifecycleTable(bfRows) {
       </select></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_status" style="font-size:10px;padding:2px 4px;border-radius:4px;width:100%;${stStyle}">
         <option value="">未設定</option>
-        ${BF_STATUSES.map(s => `<option style="color:#111;background:#fff" ${st===s.value?'selected':''}>${s.value}</option>`).join('')}
+        ${BF_STATUSES.map(s => { const lbl = s.value === '予約連絡待ち' ? '次回予約連絡待ち' : s.value; return `<option value="${esc(s.value)}" style="color:#111;background:#fff" ${st===s.value?'selected':''}>${esc(lbl)}</option>`; }).join('')}
       </select></td>
       <td><select class="bf-lc-field" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_set_facility" style="font-size:10px;padding:2px 4px;width:100%">${BF_SET_FACS.map(f => `<option ${(info.bf_set_facility||'')===f?'selected':''}>${f}</option>`).join('')}</select></td>
       <td><input type="text" inputmode="numeric" class="bf-lc-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():(info.contract_amount?Number(info.contract_amount).toLocaleString():'')}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums"></td>
