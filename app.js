@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v294';
+const APP_VERSION = 'v295';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3405,15 +3405,40 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     <td data-label="医院" style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(fac)}</td>
     <td data-label="連絡先" style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td data-label="プロモ" style="padding:5px 8px;font-size:10px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
-    <td data-label="状況" style="padding:5px 8px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap">${st}</span></td>
+    <td data-label="状況" style="padding:5px 8px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap" title="${escapeHtml(st)}">${escapeHtml(_phoneStatusLabel(st))}</span></td>
     ${memoCellHtml.replace(/<td /, '<td data-label="メモ" ')}
-    <td class="row-actions" data-label="" style="padding:6px 10px;text-align:left;white-space:nowrap">
-      ${_phoneStatusBtn('確認済',   '✅', '確認済',     '#dbeafe', '#1d4ed8', '#bfdbfe', st)}
-      ${_phoneStatusBtn('留守電',   '🎤', '留守電',     '#fef3c7', '#92400e', '#fcd34d', st)}
-      ${_phoneStatusBtn('折り返し', '↩',  '折り返し',   '#f5f3ff', '#7c3aed', '#d8b4fe', st)}
-      ${_phoneStatusBtn('未対応',   '↻',  '取り消し (未対応に戻す)', '#f3f4f6', '#6b7280', '#e5e7eb', st)}
+    <td class="row-actions" data-label="" style="padding:6px 8px;text-align:left;white-space:nowrap">
+      <!-- v294: 1〜3コール × 有/無 (コンパクトアイコン) -->
+      <span style="display:inline-flex;gap:2px;margin-right:4px;border:1px solid #fde68a;border-radius:6px;padding:1px;background:#fffbeb">
+        ${_phoneStatusBtn('1コール留守電有', '1🎤', '1コール 留守電有', '#fef3c7', '#92400e', '#fcd34d', st)}
+        ${_phoneStatusBtn('1コール留守電無', '1✗',  '1コール 留守電無', '#fffbeb', '#92400e', '#fde68a', st)}
+        ${_phoneStatusBtn('2コール留守電有', '2🎤', '2コール 留守電有', '#fed7aa', '#9a3412', '#fdba74', st)}
+        ${_phoneStatusBtn('2コール留守電無', '2✗',  '2コール 留守電無', '#ffedd5', '#9a3412', '#fed7aa', st)}
+        ${_phoneStatusBtn('3コール留守電有', '3🎤', '3コール 留守電有', '#fecaca', '#991b1b', '#fca5a5', st)}
+        ${_phoneStatusBtn('3コール留守電無', '3✗',  '3コール 留守電無', '#fee2e2', '#991b1b', '#fecaca', st)}
+      </span>
+      <!-- 結果 -->
+      ${_phoneStatusBtn('確認OK',     '✅', '前確OK',     '#dbeafe', '#1d4ed8', '#bfdbfe', st)}
+      ${_phoneStatusBtn('予約日変更', '📅', '予約日変更', '#f5f3ff', '#7c3aed', '#d8b4fe', st)}
+      ${_phoneStatusBtn('キャンセル', '❌', 'キャンセル', '#fee2e2', '#b91c1c', '#fca5a5', st)}
+      ${_phoneStatusBtn('未対応',     '↻',  '取り消し (未対応に戻す)', '#f3f4f6', '#6b7280', '#e5e7eb', st)}
     </td>
   </tr>`;
+}
+
+// v294: 状況ラベル変換 (ステータス値 → 表示文字列)
+//  未対応 → 前確未対応  /  1-3コール×有無 → 前確とれず  /  確認OK → 前確OK
+function _phoneStatusLabel(st) {
+  if (!st || st === '未対応') return '前確未対応';
+  if (st === '確認OK' || st === '確認済') return '前確OK';
+  if (/^[1-3]コール留守電(有|無)$/.test(st)) {
+    // コール回数と有無を要約: 1🎤 / 2✗ など
+    const m = st.match(/^([1-3])コール留守電(有|無)$/);
+    return `前確${m[1]}回${m[2]==='有'?'🎤':'✗'}`;
+  }
+  if (st === '留守電') return '前確とれず';   // 旧データ互換
+  if (st === '折り返し') return '折返待ち';   // 旧データ互換
+  return st; // 予約日変更 / キャンセル など
 }
 
 // v273: 状況ボタンのレンダリング (現在のステータスはハイライト表示)
