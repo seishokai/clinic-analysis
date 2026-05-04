@@ -1,8 +1,23 @@
+// === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
+const APP_VERSION = 'v290';
+
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 const esc = escapeHtml; // 短縮エイリアス (innerHTML展開・属性値両対応)
+
+// === DOM準備後にバージョンを画面の各所に注入 ===
+function injectAppVersion() {
+  document.querySelectorAll('.app-version-tag').forEach(el => {
+    el.textContent = APP_VERSION;
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', injectAppVersion);
+} else {
+  injectAppVersion();
+}
 
 // === Supabase ===
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
