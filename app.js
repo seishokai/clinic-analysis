@@ -5313,7 +5313,48 @@ function renderBookings() {
   const memoData = loadData('bk-memos', {});
   filtered.forEach(d => { const key = d.name+'|'+d.applyDate; d._memo = memoData[key] || ''; });
 
-  document.getElementById('bk-count').textContent = `${filtered.length}件`;
+  // v278.1: 「いつのデータか」を分かりやすく表示
+  const _now = new Date();
+  let _periodLabel = '';
+  let _periodSub = '';
+  if (monthFilter) {
+    // 月指定 (YYYY-MM)
+    const mm = monthFilter.match(/(\d{4})-(\d{2})/);
+    if (mm) {
+      _periodLabel = `${mm[1]}年${parseInt(mm[2])}月`;
+      _periodSub = '予約日基準';
+    }
+  } else if (periodFilter === 'thisMonth') {
+    _periodLabel = `${_now.getFullYear()}年${_now.getMonth()+1}月`;
+    _periodSub = '予約日基準';
+  } else if (periodFilter === 'thisMonthApply') {
+    _periodLabel = `${_now.getFullYear()}年${_now.getMonth()+1}月`;
+    _periodSub = '登録日基準';
+  } else if (periodFilter === 'lastMonth') {
+    const last = new Date(_now); last.setMonth(last.getMonth()-1);
+    _periodLabel = `${last.getFullYear()}年${last.getMonth()+1}月`;
+    _periodSub = '予約日基準';
+  } else if (periodFilter === 'fiscal') {
+    const fy = _now.getMonth() >= 6 ? _now.getFullYear() : _now.getFullYear()-1;
+    _periodLabel = `${fy}年7月～${fy+1}年6月`;
+    _periodSub = '今期(予約日基準)';
+  } else {
+    _periodLabel = '全期間';
+    _periodSub = '指定なし';
+  }
+  // 進捗・今日予約フィルタが効いてる時は追記
+  if (window._bkProgressFilter) _periodSub += ' / 進捗(期限切れ)';
+  if (window._bkTodayFilter) _periodSub += ' / 今日予約のみ';
+
+  // 期間バナー (ステータスカード上部)
+  const _bannerEl = document.getElementById('bk-period-banner');
+  if (_bannerEl) {
+    _bannerEl.innerHTML = `<span style="font-size:11px;color:var(--text-sub);font-weight:500">📅 表示中の期間:</span>
+      <span style="font-size:14px;font-weight:700;color:#1a1a1a">${_periodLabel}</span>
+      <span style="font-size:11px;color:var(--text-sub)">(${_periodSub})</span>
+      <span style="font-size:11px;color:var(--text-sub);margin-left:auto">${filtered.length}件 表示</span>`;
+  }
+  document.getElementById('bk-count').innerHTML = `${filtered.length}件 <span style="font-size:11px;color:var(--text-sub);font-weight:400;margin-left:4px">📅 ${_periodLabel} (${_periodSub})</span>`;
 
   // Table
   const tbody = document.getElementById('bk-tbody');
