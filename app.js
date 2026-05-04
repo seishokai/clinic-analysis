@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v291';
+const APP_VERSION = 'v292';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -969,11 +969,12 @@ function applyRoleUI() {
   if (admin) return;
 
   // visible_tabs が取れていない場合はロール既定にフォールバック (既存互換)
+  // v292: agency にも analytics を見せる (デフォルト)
   const vt = (currentVisibleTabs && typeof currentVisibleTabs === 'object')
     ? currentVisibleTabs
     : (isAgencyRole()
-        ? { bookings: true, kaiin: false, tc: false, sales: false, adbudget: false, admin: false }
-        : { bookings: true, kaiin: true,  tc: false, sales: false, adbudget: false, admin: false });
+        ? { bookings: true, kaiin: true,  analytics: true,  tc: false, sales: false, adbudget: false, admin: false }
+        : { bookings: true, kaiin: true,  analytics: true,  tc: false, sales: false, adbudget: false, admin: false });
 
   document.querySelectorAll('.desktop-nav .nav-btn, .bottom-nav-btn').forEach(b => {
     const v = b.dataset.view;
@@ -2141,9 +2142,11 @@ function showApp() {
       span.textContent = customName + ' でログイン中';
       header.querySelector('.nav-spacer').after(span);
     }
-    // 個別発行アカウントはサブタブを全部非表示
-    const bkSubNav = document.getElementById('bk-sub-nav');
-    if (bkSubNav) bkSubNav.style.display = 'none';
+    // 個別発行アカウントはサブタブを非表示 (ただし v292: agency は admin と同じUIを見せる)
+    if (!isAgencyRole()) {
+      const bkSubNav = document.getElementById('bk-sub-nav');
+      if (bkSubNav) bkSubNav.style.display = 'none';
+    }
   }
 
   // userRole / promoFilter は下位処理 (フィルタリング等) で参照するため必ずセット
@@ -2183,10 +2186,11 @@ function restoreLastView() {
     }
 
     // ロールごとに許可されたビューしか復元しない (Phase 6: currentRole ベース)
+    // v292: 全ロールで analytics 解放 + agency も kaiin/analytics 見せる
     const isAllowed = (v) => {
-      if (isAdminRole()) return ['bookings','kaiin','tc','adbudget','admin','sales'].includes(v);
-      if (isStaffPromoRole()) return ['bookings','kaiin'].includes(v);
-      if (isAgencyRole()) return v === 'bookings';
+      if (isAdminRole()) return ['bookings','kaiin','analytics','tc','adbudget','admin','sales'].includes(v);
+      if (isStaffPromoRole()) return ['bookings','kaiin','analytics'].includes(v);
+      if (isAgencyRole()) return ['bookings','kaiin','analytics'].includes(v);
       return v === 'bookings';
     };
 
@@ -2241,6 +2245,23 @@ let _homeAnalysisRange = (() => {
 })();
 function _saveHomeRange() {
   try { sessionStorage.setItem('home-analysis-range', _homeAnalysisRange ? JSON.stringify(_homeAnalysisRange) : ''); } catch(_){}
+}
+
+// v292: 分析タブ用 (ホームダッシュボードと同じコンテンツを #analytics-dashboard-content に表示)
+function renderAnalyticsDashboard() {
+  const home = document.getElementById('home-dashboard-content');
+  const ana  = document.getElementById('analytics-dashboard-content');
+  if (!ana) return;
+  // ホーム側を一度描画 → クローンして分析タブにも反映
+  if (typeof renderHomeDashboardCore === 'function') {
+    renderHomeDashboardCore(ana);
+  } else {
+    // フォールバック: 既存の renderHomeDashboard を借用してクローン
+    renderHomeDashboard();
+    if (home && home.innerHTML.trim()) {
+      ana.innerHTML = home.innerHTML;
+    }
+  }
 }
 
 function renderHomeDashboard() {
@@ -3502,6 +3523,10 @@ function switchView(view) {
   const titles = {tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
   try { sessionStorage.setItem('lastView', view); } catch(_){}
+  // v292: 分析タブ切替時に分析ダッシュボードを描画
+  if (view === 'analytics') {
+    setTimeout(() => { if (typeof renderAnalyticsDashboard === 'function') renderAnalyticsDashboard(); }, 50);
+  }
   // 管理タブ切替時: 権限管理を自動で表示
   if (view === 'admin') {
     const activeAdmSub = document.querySelector('#view-admin .sub-nav-btn.active')?.dataset.sub || 'adm-auth-migration';
@@ -5136,9 +5161,9 @@ function populateBookingFilters() {
   dd.contract.setOptions(contractServices);
   // status/contract は固定options (ensureBkMultiSelects で一度だけセット)
 
-  // プロモ・カスタムユーザーはQuick行を非表示
+  // プロモ・カスタムユーザーはQuick行を非表示 (ただし v292: agency は表示)
   const quickEl = document.getElementById('bk-quick-promos');
-  if (quickEl && (userRole === 'promo' || userRole === 'custom' || _hasPromoRestriction())) {
+  if (quickEl && !isAgencyRole() && (userRole === 'promo' || userRole === 'custom' || _hasPromoRestriction())) {
     quickEl.style.display = 'none';
     return;
   }

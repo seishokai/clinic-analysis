@@ -262,7 +262,7 @@
   <!-- Login -->
   <div id="login-screen" class="login-screen">
     <!-- v290: バージョン表示 (右下、薄く) -->
-    <div class="app-version-tag" style="position:fixed;bottom:8px;right:12px;font-size:10px;color:#bbb;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:1">v291</div>
+    <div class="app-version-tag" style="position:fixed;bottom:8px;right:12px;font-size:10px;color:#bbb;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:1">v292</div>
     <div class="login-card">
       <div class="login-logo">
         <h1 class="brand-script">Aladdin</h1>
@@ -421,6 +421,7 @@
       <nav class="desktop-nav">
         <button class="nav-btn active" data-view="bookings">予約</button>
         <button class="nav-btn" data-view="kaiin">来院</button>
+        <button class="nav-btn" data-view="analytics">分析</button>
         <button class="nav-btn" data-view="tc">TC</button>
         <button class="nav-btn" data-view="sales">売上</button>
         <button class="nav-btn" data-view="adbudget">広告</button>
@@ -431,7 +432,7 @@
       <button class="btn-logout" id="refresh-btn" style="margin-right:6px;padding:6px 12px;font-size:12px" title="最新データを取得 (Ctrl+R はページ全体再読込)">🔄 更新</button>
       <button class="btn-logout" id="logout-btn">ログアウト</button>
       <!-- v290: バージョン表示 (ヘッダー右上、薄く) -->
-      <span class="app-version-tag" style="margin-left:8px;font-size:10px;color:#bbb;font-family:monospace;letter-spacing:1px;user-select:none;align-self:center" title="アプリバージョン">v291</span>
+      <span class="app-version-tag" style="margin-left:8px;font-size:10px;color:#bbb;font-family:monospace;letter-spacing:1px;user-select:none;align-self:center" title="アプリバージョン">v292</span>
     </header>
 
     <!-- Bottom Nav (mobile) -->
@@ -443,6 +444,10 @@
       <button class="bottom-nav-btn" data-view="kaiin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
         <span>来院</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="analytics">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18M7 14l4-4 4 4 5-5"/></svg>
+        <span>分析</span>
       </button>
       <button class="bottom-nav-btn" data-view="tc">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><path d="M14 2v6h6M16 13H8M16 17H8M10 9H8"/></svg>
@@ -912,6 +917,15 @@
       <div id="sub-kaiin-other" hidden><div class="page-header"><h2>その他 来院管理</h2></div><div id="kaiin-other-content"></div></div>
     </main>
 
+    <!-- ==================== 分析 (v292) ==================== -->
+    <main id="view-analytics" class="view view-wide" hidden>
+      <div style="padding:12px">
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:6px">📊 分析ダッシュボード</h2>
+        <p style="font-size:11px;color:var(--text-sub);margin-bottom:12px">期間別KPI / 医院別 / 治療別 の集計を一覧で確認できます。</p>
+        <div id="analytics-dashboard-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
+      </div>
+    </main>
+
     <!-- ==================== TC ==================== -->
     <main id="view-tc" class="view" hidden>
       <div class="sub-nav">
@@ -1206,7 +1220,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=291"></script>
+  <script src="app.js?v=292"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
