@@ -5859,38 +5859,81 @@ function renderBookings() {
       td.addEventListener('click', () => openRowEditModal(td.dataset.name, td.dataset.apply));
     });
 
-    // 予約日クリックで変更（インライン入力）
+    // v282: 予約日クリックで変更 (カレンダー + 時間プルダウン)
     tbody.querySelectorAll('.bk-edit-date').forEach(td => {
       td.addEventListener('click', () => {
         const idx = parseInt(td.dataset.idx);
         const d = sorted[idx];
-        if (!d || td.querySelector('input')) return;
-        const orig = td.textContent.trim();
-        const input = document.createElement('input');
-        input.type = 'text';
-        input.value = d.bookDate || '';
-        input.style.cssText = 'font-size:10px;width:100px;padding:2px 4px;border:1px solid var(--accent);border-radius:4px';
-        input.placeholder = '例: 2026/4/20 15:00';
-        td.innerHTML = '';
-        td.appendChild(input);
-        input.focus();
-        input.select();
-        const save = () => {
-          const newDate = input.value.trim();
-          if (newDate && newDate !== d.bookDate) {
-            d.bookDate = newDate;
-            td.innerHTML = fmtBookDate(newDate);
-            showToast('予約日を変更しました');
-            (async () => {
-              const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, book_date: newDate }, options: { onConflict:'name,apply_date' } });
-              if (res && res.ok === false) showToast('⚠ 予約日保存に失敗。再送信します', true);
-            })();
-          } else {
-            td.innerHTML = orig;
+        if (!d || td.querySelector('input,select')) return;
+        const orig = td.innerHTML;
+        // 既存 bookDate をパース (YYYY-MM-DD と HH:MM に分解)
+        const cur = d.bookDate || '';
+        let curDate = '', curTime = '';
+        const m = cur.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})(?:\s+(\d{1,2}):(\d{2}))?/);
+        if (m) {
+          curDate = `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+          if (m[4] && m[5]) curTime = `${String(m[4]).padStart(2,'0')}:${m[5]}`;
+        }
+        // 時間プルダウン (9:00〜21:00 を30分刻み + 現在時間が範囲外なら追加)
+        const timeOpts = [];
+        for (let h = 9; h <= 21; h++) {
+          for (let mm = 0; mm < 60; mm += 30) {
+            if (h === 21 && mm > 0) break;
+            timeOpts.push(`${String(h).padStart(2,'0')}:${String(mm).padStart(2,'0')}`);
           }
+        }
+        if (curTime && !timeOpts.includes(curTime)) timeOpts.unshift(curTime);
+
+        // UI 構築
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'display:inline-flex;gap:3px;align-items:center;flex-wrap:wrap';
+        const dateInp = document.createElement('input');
+        dateInp.type = 'date';
+        dateInp.value = curDate;
+        dateInp.style.cssText = 'font-size:10px;padding:2px 4px;border:1px solid var(--accent);border-radius:4px;width:120px';
+        const timeSel = document.createElement('select');
+        timeSel.style.cssText = 'font-size:10px;padding:2px 4px;border:1px solid var(--accent);border-radius:4px;width:auto;cursor:pointer';
+        timeSel.innerHTML = '<option value="">--:--</option>' + timeOpts.map(t => `<option value="${t}" ${t===curTime?'selected':''}>${t}</option>`).join('');
+        const okBtn = document.createElement('button');
+        okBtn.textContent = '✓';
+        okBtn.title = '保存';
+        okBtn.style.cssText = 'font-size:11px;padding:2px 6px;background:#10b981;color:#fff;border:none;border-radius:3px;cursor:pointer;font-weight:700';
+        const cancelBtn = document.createElement('button');
+        cancelBtn.textContent = '✗';
+        cancelBtn.title = 'キャンセル';
+        cancelBtn.style.cssText = 'font-size:11px;padding:2px 6px;background:#9ca3af;color:#fff;border:none;border-radius:3px;cursor:pointer';
+        wrap.append(dateInp, timeSel, okBtn, cancelBtn);
+        td.innerHTML = '';
+        td.appendChild(wrap);
+        dateInp.focus();
+
+        const cancel = () => { td.innerHTML = orig; };
+        const save = () => {
+          const dv = dateInp.value;
+          const tv = timeSel.value;
+          if (!dv) { cancel(); return; }
+          // YYYY-MM-DD HH:MM 形式で保存
+          const newDate = tv ? `${dv} ${tv}` : dv;
+          if (newDate === d.bookDate) { cancel(); return; }
+          d.bookDate = newDate;
+          td.innerHTML = fmtBookDate(newDate);
+          showToast('予約日を変更しました');
+          (async () => {
+            const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+            if (res && res.ok === false) showToast('⚠ 予約日保存に失敗。再送信します', true);
+          })();
         };
-        input.addEventListener('blur', save);
-        input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); input.blur(); } if (e.key === 'Escape') { input.value = d.bookDate || ''; input.blur(); } });
+        okBtn.addEventListener('click', (e) => { e.stopPropagation(); save(); });
+        cancelBtn.addEventListener('click', (e) => { e.stopPropagation(); cancel(); });
+        // Enter で保存、Esc でキャンセル
+        [dateInp, timeSel].forEach(el => {
+          el.addEventListener('keydown', e => {
+            if (e.key === 'Enter') { e.preventDefault(); save(); }
+            else if (e.key === 'Escape') { e.preventDefault(); cancel(); }
+          });
+        });
+        // セル外クリックでキャンセル防止のためバブリング止める
+        wrap.addEventListener('click', e => e.stopPropagation());
       });
     });
 
