@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v316';
+const APP_VERSION = 'v317';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2307,6 +2307,13 @@ let _homeAnalysisRange = (() => {
 function _saveHomeRange() {
   try { sessionStorage.setItem('home-analysis-range', _homeAnalysisRange ? JSON.stringify(_homeAnalysisRange) : ''); } catch(_){}
 }
+// v316: ホーム/分析タブの基準切替 ('book' = 予約日基準 / 'apply' = 登録日基準)
+let _homeAnalysisBasis = (() => {
+  try { return sessionStorage.getItem('home-analysis-basis') || 'book'; } catch(_) { return 'book'; }
+})();
+function _saveHomeBasis() {
+  try { sessionStorage.setItem('home-analysis-basis', _homeAnalysisBasis); } catch(_){}
+}
 
 // v292: 分析タブ用 (ホームダッシュボードと同じコンテンツを #analytics-dashboard-content に表示)
 function renderAnalyticsDashboard() {
@@ -2351,11 +2358,12 @@ function renderHomeDashboard() {
     return `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
   };
   const range = _homeAnalysisRange || { fromYM: thisMonth, toYM: thisMonth, label: '今月' };
-  // 期間内に含まれる行 (bookDate ベース)
+  // v316: 基準に応じて bookDate (予約日) or applyDate (登録日) で判定
   const inRange = (d) => {
-    const bd = (d.bookDate || '');
-    if (!bd) return false;
-    const m = bd.match(/(\d{4})\D+(\d{1,2})/);
+    const useApply = _homeAnalysisBasis === 'apply';
+    const src = useApply ? (d.applyDate || '') : (d.bookDate || '');
+    if (!src) return false;
+    const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
     if (!m) return false;
     const ym = `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}`;
     return ym >= range.fromYM && ym <= range.toYM;
@@ -2544,8 +2552,15 @@ function renderHomeDashboard() {
     <!-- v273 期間分析: クイック選択 + カスタム範囲 + KPI -->
     <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
-        <div style="font-size:13px;font-weight:700;color:#1a1a1a">📊 期間分析: <span style="color:#1d4ed8">${escapeHtml(rangeLabel)}</span></div>
-        <div style="font-size:10px;color:var(--text-sub)">予約日基準 / 来院率=来院÷予約 / 決定率=成約÷来院</div>
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a">📊 期間分析: <span style="color:#1d4ed8">${escapeHtml(rangeLabel)}</span> <span style="font-size:11px;color:#7c3aed;font-weight:600">${_homeAnalysisBasis==='apply'?'(登録日基準)':'(予約日基準)'}</span></div>
+        <div style="font-size:10px;color:var(--text-sub)">来院率=来院÷予約 / 決定率=成約÷来院</div>
+      </div>
+      <!-- v316: 基準切替トグル + 期間セレクター -->
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;padding:8px;background:#fef9c3;border-radius:8px;border:1px solid #fde68a">
+        <span style="font-size:11px;color:#92400e;font-weight:700;letter-spacing:1px;margin-right:4px">基準</span>
+        <button class="home-basis-btn" data-basis="book" style="padding:5px 14px;font-size:11px;border:1px solid ${_homeAnalysisBasis==='book'?'#1d4ed8':'var(--border)'};background:${_homeAnalysisBasis==='book'?'#1d4ed8':'#fff'};color:${_homeAnalysisBasis==='book'?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit" title="予約日(来院予定日)が期間内">📅 予約日基準</button>
+        <button class="home-basis-btn" data-basis="apply" style="padding:5px 14px;font-size:11px;border:1px solid ${_homeAnalysisBasis==='apply'?'#7c3aed':'var(--border)'};background:${_homeAnalysisBasis==='apply'?'#7c3aed':'#fff'};color:${_homeAnalysisBasis==='apply'?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit" title="申込登録日が期間内 (今月どれだけ予約が入ったか)">📝 登録日基準</button>
+        <span style="font-size:10px;color:#92400e;margin-left:4px">${_homeAnalysisBasis==='apply' ? '※ 今月登録された予約 (来院日が来月でもOK)' : '※ 今月来院予定の予約'}</span>
       </div>
       <!-- 期間セレクター -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:8px;background:#f9fafb;border-radius:8px">
@@ -2805,6 +2820,17 @@ function renderHomeDashboard() {
       else if (preset === '3m') _homeAnalysisRange = { fromYM: ymOffset(-1), toYM: ymOffset(1), label: '前月〜来月' };
       _saveHomeRange();
       renderHomeDashboard();
+      // v316: 分析タブも同期更新
+      if (typeof renderAnalyticsDashboard === 'function') renderAnalyticsDashboard();
+    });
+  });
+  // v316: 基準切替ボタン (予約日基準/登録日基準)
+  el.querySelectorAll('.home-basis-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _homeAnalysisBasis = btn.dataset.basis === 'apply' ? 'apply' : 'book';
+      _saveHomeBasis();
+      renderHomeDashboard();
+      if (typeof renderAnalyticsDashboard === 'function') renderAnalyticsDashboard();
     });
   });
   // カスタム期間 (input type=month) の変更
