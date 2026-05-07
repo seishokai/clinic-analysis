@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v302';
+const APP_VERSION = 'v303';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2879,13 +2879,17 @@ function _renderAvailabilityContent(container, data) {
         ? '<span class="badge badge-success">✓ 全医院 枠開放済み</span>'
         : '<span class="badge badge-default">データなし</span>');
 
+  const srcUrl = data.source || 'https://reserve.shareconnect.co.jp/?r=u5iewf&treatment_ids=1766627271947';
+
   container.innerHTML = `
     <div style="padding:12px">
       <div class="card" style="margin-bottom:12px;padding:12px">
-        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text-sub)">
+        <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text-sub)">
           <div>${summaryBadge}</div>
           <div>📅 確認範囲: <strong>${range}</strong>（14〜30日後）</div>
           <div>🔄 最終確認: <strong>${lastUpd}</strong></div>
+          <span style="flex:1"></span>
+          <a href="${srcUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:linear-gradient(135deg,#dc2626 0%,#ef4444 100%);color:#fff;font-weight:700;font-size:12px;border-radius:18px;text-decoration:none;box-shadow:0 2px 6px rgba(220,38,38,0.25);white-space:nowrap" title="shareconnect 予約サイトを新しいタブで開く">🔗 予約サイトを開く →</a>
         </div>
       </div>
       <div class="card" style="padding:12px">
