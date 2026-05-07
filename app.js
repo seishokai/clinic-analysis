@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v315';
+const APP_VERSION = 'v316';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6280,21 +6280,13 @@ function renderBookings() {
     const rowStyle = dupStyle + (d.status==='除外' ? 'background:#f5f5f5;opacity:0.4;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#f8f8f8;color:#9ca3af' : (!d.status||d.status==='未対応') ? 'background:#fff5f5' : '');
     return `<tr style="${rowStyle}" data-bk-name="${esc(d.name)}" data-bk-apply="${esc(d.applyDate)}">
     <td class="bk-select-col" style="text-align:center;padding:4px">${isAdmin?`<input type="checkbox" class="bk-row-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;width:14px;height:14px;margin:0">`:''}</td>
-    <!-- v303: 申込→予約 統合カラム (DXバッジ + 申込日 + 予約日) -->
-    <td style="font-size:10px;line-height:1.4;text-align:left;white-space:nowrap;padding:4px 8px">
-      <div style="display:flex;flex-direction:column;gap:2px">
-        <div style="display:flex;align-items:center;gap:5px">
-          <span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'ｾﾚｸﾄ':'DX'}</span>
-          <span style="color:var(--text-sub);font-size:10px">${fmtApplyDate(d.applyDate)}</span>
-        </div>
-        <div ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで予約日変更" style="cursor:pointer;text-decoration:underline dotted;font-weight:600;color:#1d4ed8;font-size:11px"`:'style="font-weight:600;color:#1d4ed8;font-size:11px"'}>
-          ${esc(fmtBookDate(d.bookDate))}
-        </div>
-      </div>
+    <!-- v303: 申込→予約 統合カラム (DXバッジ + 申込日 + 予約日) / v316: 1行表示 -->
+    <td style="font-size:10px;text-align:left;white-space:nowrap;padding:4px 6px">
+      <span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px;margin-right:4px">${d.tool==='セレクト'?'ｾﾚｸﾄ':'DX'}</span><span style="color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</span> <span style="color:var(--text-muted);margin:0 2px">→</span> <span ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで予約日変更" style="cursor:pointer;text-decoration:underline dotted;font-weight:600;color:#1d4ed8"`:'style="font-weight:600;color:#1d4ed8"'}>${esc(fmtBookDate(d.bookDate))}</span>
     </td>
-    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">
-      <button type="button" class="bk-pin-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${pinned?'ピン解除':'ピン留め'}" style="background:none;border:none;cursor:pointer;padding:0 4px 0 0;font-size:13px;line-height:1;color:${pinned?'#f59e0b':'#d1d5db'};vertical-align:middle">${pinned?'★':'☆'}</button><span ${isAdmin?`class="bk-row-edit" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="クリックで編集" style="cursor:pointer;text-decoration:underline dotted"`:''}>${esc(maskName(d.name))}</span></td>
-    <td style="font-size:10px;white-space:nowrap">${esc(normSvc(d.service))}</td>
+    <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left;padding-right:2px;max-width:130px;overflow:hidden;text-overflow:ellipsis">
+      <button type="button" class="bk-pin-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${pinned?'ピン解除':'ピン留め'}" style="background:none;border:none;cursor:pointer;padding:0 3px 0 0;font-size:13px;line-height:1;color:${pinned?'#f59e0b':'#d1d5db'};vertical-align:middle">${pinned?'★':'☆'}</button><span ${isAdmin?`class="bk-row-edit" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="クリックで編集" style="cursor:pointer;text-decoration:underline dotted"`:''}>${esc(maskName(d.name))}</span></td>
+    <td style="font-size:10px;white-space:nowrap;padding-left:2px">${esc(normSvc(d.service))}</td>
     <td style="font-size:10px;white-space:nowrap">${esc(normFac(d.facility))}</td>
     <!-- v303: 連絡先 統合カラム (電話 + メール) -->
     <td style="font-size:10px;line-height:1.4;text-align:left;padding:4px 8px;max-width:140px">
