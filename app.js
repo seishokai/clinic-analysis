@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v297';
+const APP_VERSION = 'v298';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1266,6 +1266,7 @@ function setupEventListeners() {
       }
       if (sub === 'bk-analysis' && bookingsData.length > 0) renderAnalysis();
       if (sub === 'bk-apply' && bookingsData.length > 0) renderApplyAnalysis('today');
+      if (sub === 'bk-availability') { if (typeof renderAvailability === 'function') renderAvailability(); }
       if (sub === 'bk-bf') {
         if (!bfUnlocked) { unlockBF(); } else { renderBF('all'); }
         // デフォルトで「セット進捗」を表示
@@ -2833,6 +2834,126 @@ function _savePhoneCheckState() {
 
 // v273: 既存の memo-modal close 検知用 setInterval をモジュールレベルで管理 (スタック防止)
 let _phoneMemoModalCheckInterval = null;
+
+// ==================== 予約枠確認 (v298) ====================
+// shareconnect の予約ページを GitHub Actions + Playwright で毎朝チェック
+// 結果は data/reservation-status.json に保存される
+async function _fetchAvailabilityData() {
+  try {
+    const r = await fetch('./data/reservation-status.json?t=' + Date.now());
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error('availability fetch error:', e);
+    return null;
+  }
+}
+
+async function renderAvailability() {
+  const el = document.getElementById('bk-availability-content');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div>';
+  const data = await _fetchAvailabilityData();
+  if (!data) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#b91c1c">データ取得に失敗しました。<br><span style="font-size:11px;color:var(--text-sub)">data/reservation-status.json が存在しないか、ネットワークエラーの可能性があります</span></div>';
+    return;
+  }
+  _renderAvailabilityContent(el, data);
+  updateAvailabilityBadge(data);
+}
+
+function _renderAvailabilityContent(container, data) {
+  const lastUpd = data.lastUpdated
+    ? new Date(data.lastUpdated).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' })
+    : '-';
+  const range = (data.checkRangeFrom && data.checkRangeTo)
+    ? `${data.checkRangeFrom} 〜 ${data.checkRangeTo}`
+    : '-';
+  const clinics = Array.isArray(data.clinics) ? data.clinics : [];
+  const alertCount = clinics.filter(c => !c.available).length;
+  const summaryBadge = alertCount > 0
+    ? `<span class="badge badge-danger">⚠️ ${alertCount}医院が枠未開放</span>`
+    : (clinics.length > 0
+        ? '<span class="badge badge-success">✓ 全医院 枠開放済み</span>'
+        : '<span class="badge badge-default">データなし</span>');
+
+  container.innerHTML = `
+    <div style="padding:12px">
+      <div class="card" style="margin-bottom:12px;padding:12px">
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text-sub)">
+          <div>${summaryBadge}</div>
+          <div>📅 確認範囲: <strong>${range}</strong>（14〜30日後）</div>
+          <div>🔄 最終確認: <strong>${lastUpd}</strong></div>
+        </div>
+      </div>
+      <div class="card" style="padding:12px">
+        <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:10px">医院別予約枠状況（矯正相談）</div>
+        <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+          ${clinics.length ? clinics.map(_renderAvailabilityRow).join('') : '<div style="color:var(--text-sub);padding:20px;text-align:center;grid-column:1/-1">データなし</div>'}
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:center">
+        ※ 毎朝7時に自動更新 / shareconnect 矯正相談枠を14〜30日後の範囲でチェック
+      </div>
+    </div>
+  `;
+}
+
+function _formatAvailDate(s) {
+  if (!s) return '';
+  const m = String(s).match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${parseInt(m[2],10)}/${parseInt(m[3],10)}` : s;
+}
+
+function _renderAvailabilityRow(clinic) {
+  const isAlert = !clinic.available;
+  const slotCount = clinic.totalSlots || 0;
+  const days = clinic.availableDays || 0;
+  const latest = _formatAvailDate(clinic.latestDate);
+  const bgColor = isAlert ? '#fef2f2' : '#fff';
+  const accentColor = isAlert ? '#dc2626' : '#10b981';
+  const borderColor = isAlert ? '#fecaca' : '#e5e7eb';
+  const statusIcon = isAlert ? '⚠️' : '✓';
+  const statusColor = isAlert ? '#b91c1c' : '#15803d';
+  const statusLabel = isAlert ? '枠なし' : '枠あり';
+  const slotColor = isAlert ? '#b91c1c' : '#1a1a1a';
+  return `
+    <div style="background:${bgColor};border:1px solid ${borderColor};border-top:4px solid ${accentColor};border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:110px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div style="font-weight:700;font-size:13px;color:#1a1a1a;line-height:1.2">${clinic.name || '-'}</div>
+        <div style="font-size:10px;font-weight:700;color:${statusColor};white-space:nowrap">${statusIcon} ${statusLabel}</div>
+      </div>
+      <div style="display:flex;align-items:baseline;gap:4px;margin-top:2px">
+        <div style="font-size:26px;font-weight:700;color:${slotColor};line-height:1">${slotCount}</div>
+        <div style="font-size:11px;color:var(--text-sub);font-weight:600">枠</div>
+        <div style="font-size:10px;color:var(--text-muted);margin-left:6px">/ ${days}日分</div>
+      </div>
+      <div style="font-size:11px;color:var(--text-sub);margin-top:auto;padding-top:4px;border-top:1px dashed ${borderColor}">
+        ${latest ? `最終: <strong style="color:#1a1a1a">${latest}</strong>` : '<span style="color:#b91c1c">予約枠なし</span>'}
+      </div>
+    </div>
+  `;
+}
+
+function updateAvailabilityBadge(data) {
+  const badge = document.getElementById('bk-availability-badge');
+  if (!badge) return;
+  const alertCount = (data && Array.isArray(data.clinics))
+    ? data.clinics.filter(c => !c.available).length
+    : 0;
+  if (alertCount > 0) {
+    badge.style.display = 'inline-block';
+    badge.textContent = alertCount;
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// 起動時にバッジ状態を更新（タブを開かなくてもアラート表示される）
+async function loadAvailabilityBadgeOnInit() {
+  const data = await _fetchAvailabilityData();
+  if (data) updateAvailabilityBadge(data);
+}
 
 function renderPhoneCheck() {
   const el = document.getElementById('phone-check-content');

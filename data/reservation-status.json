@@ -1,0 +1,98 @@
+{
+  "lastUpdated": "2026-05-07T07:00:00+09:00",
+  "checkRangeFrom": "2026-05-21",
+  "checkRangeTo": "2026-06-06",
+  "treatment": "矯正相談",
+  "source": "https://reserve.shareconnect.co.jp/?r=u5iewf",
+  "note": "サンプルデータ（v298 PoC用）。GitHub Actions で本番データに置き換わります",
+  "clinics": [
+    {
+      "name": "BF銀座",
+      "available": true,
+      "availableDays": 18,
+      "totalSlots": 156,
+      "earliestDate": "2026-05-21",
+      "latestDate": "2026-06-06"
+    },
+    {
+      "name": "エスカ",
+      "available": false,
+      "availableDays": 0,
+      "totalSlots": 0,
+      "earliestDate": null,
+      "latestDate": null
+    },
+    {
+      "name": "アール",
+      "available": true,
+      "availableDays": 12,
+      "totalSlots": 98,
+      "earliestDate": "2026-05-22",
+      "latestDate": "2026-06-04"
+    },
+    {
+      "name": "ウィズ",
+      "available": true,
+      "availableDays": 15,
+      "totalSlots": 121,
+      "earliestDate": "2026-05-21",
+      "latestDate": "2026-06-06"
+    },
+    {
+      "name": "ルミナス",
+      "available": true,
+      "availableDays": 8,
+      "totalSlots": 64,
+      "earliestDate": "2026-05-25",
+      "latestDate": "2026-06-02"
+    },
+    {
+      "name": "茶屋",
+      "available": false,
+      "availableDays": 0,
+      "totalSlots": 0,
+      "earliestDate": null,
+      "latestDate": null
+    },
+    {
+      "name": "知立",
+      "available": true,
+      "availableDays": 10,
+      "totalSlots": 82,
+      "earliestDate": "2026-05-23",
+      "latestDate": "2026-05-30"
+    },
+    {
+      "name": "小牧",
+      "available": true,
+      "availableDays": 14,
+      "totalSlots": 104,
+      "earliestDate": "2026-05-21",
+      "latestDate": "2026-06-05"
+    },
+    {
+      "name": "八事",
+      "available": true,
+      "availableDays": 9,
+      "totalSlots": 72,
+      "earliestDate": "2026-05-24",
+      "latestDate": "2026-06-01"
+    },
+    {
+      "name": "大森",
+      "available": true,
+      "availableDays": 16,
+      "totalSlots": 134,
+      "earliestDate": "2026-05-21",
+      "latestDate": "2026-06-06"
+    },
+    {
+      "name": "京都",
+      "available": true,
+      "availableDays": 11,
+      "totalSlots": 89,
+      "earliestDate": "2026-05-22",
+      "latestDate": "2026-06-03"
+    }
+  ]
+}

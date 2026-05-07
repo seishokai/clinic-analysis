@@ -59,6 +59,17 @@
       `setupSessionTimeout()` を `showApp()` から呼ぶ、`_clearSessionTimeout()` を `logout()` で呼ぶ
 - [ ] **20. 2要素認証 (2FA)** 🟢 / 工数: 中〜大
 
+## 🆕 新機能（v298〜）
+
+- [~] **21. 予約枠確認タブ（自動監視）** 🔴🔴 v298 (Phase 1A完了)
+      予約タブ > 📅 予約枠確認 サブタブ。shareconnect 各医院の矯正相談枠を自動監視。
+      14〜30日後に枠ゼロの医院があれば赤カード + サブタブに 🔴 バッジ表示。
+      - Phase 1A: ✅ UI（カードグリッド表示・サンプルJSON） v298
+      - Phase 1B: ⏳ Playwright で1医院PoC（scripts/check-slots.js）
+      - Phase 1C: ⏳ GitHub Actions cron 毎朝7時（.github/workflows/monitor.yml）
+      - Phase 2: ⏳ 全11医院展開
+      - Phase 3: ⏳ Gmail 通知（未開放あればメール送信）
+
 ---
 
 ## 💡 おすすめ進め方
