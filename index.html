@@ -639,9 +639,9 @@
         </div>
         <div class="card" style="padding:12px">
           <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)">読み込み中...</span></div>
-          <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto;width:100%">
-            <table class="data-table compact" id="bk-table" style="width:100%;min-width:100%">
-              <thead><tr><th class="bk-select-col" style="width:32px;text-align:center;padding:4px"><input type="checkbox" id="bk-select-all" title="全選択" style="cursor:pointer;width:14px;height:14px;margin:0"></th><th style="width:90px;text-align:left" title="申込日 / 予約日時 / ツール">申込→予約</th><th style="width:110px;text-align:left">名前</th><th style="width:50px">相談</th><th style="width:75px">医院</th><th style="width:140px" title="電話 / メール">連絡先</th><th style="width:100px">流入元</th><th style="width:90px">状態</th><th style="width:90px">次回予定</th><th style="width:55px">メモ</th><th style="width:55px">成約</th><th style="width:90px">金額(税抜)</th><th title="入金月 / インセ月 / インセ額">経理</th><th style="width:75px">請求</th><th style="width:38px"></th></tr></thead>
+          <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
+            <table class="data-table compact" id="bk-table" style="width:100%;table-layout:auto">
+              <thead><tr><th class="bk-select-col" style="width:32px;text-align:center;padding:4px"><input type="checkbox" id="bk-select-all" title="全選択" style="cursor:pointer;width:14px;height:14px;margin:0"></th><th style="text-align:left" title="申込日 / 予約日時 / ツール">申込→予約</th><th style="text-align:left">名前</th><th>相談</th><th>医院</th><th title="電話 / メール">連絡先</th><th>流入元</th><th>状態</th><th>次回予定</th><th>メモ</th><th>成約</th><th>金額(税抜)</th><th title="入金月 / インセ月 / インセ額">経理</th><th>請求</th><th style="width:36px"></th></tr></thead>
               <tbody id="bk-tbody"></tbody>
             </table>
           </div>
@@ -1224,7 +1224,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=314"></script>
+  <script src="app.js?v=315"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

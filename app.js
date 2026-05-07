@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v314';
+const APP_VERSION = 'v315';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6377,32 +6377,27 @@ function renderBookings() {
     </select>` : esc(d.contractService || '-')}</td>
     <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contractAmount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:90px;text-align:right;font-variant-numeric:tabular-nums;${d.status==='成約'&&!Number(d.contractAmount)?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':''}">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
     <!-- v303: 経理 統合カラム (入金月 + インセ月 + インセ税抜) -->
-    <td style="position:relative;padding:4px 8px;text-align:left">
-      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
-        ${isAdmin ? (() => {
-          const pm = d.paymentMonth||''; const pmLbl = pm ? pm.substring(2).replace('-','/') : 'YY/MM';
-          const im = d.incentiveMonth||''; const imLbl = im ? im.substring(2).replace('-','/') : 'YY/MM';
-          return `
-          <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-sub)">
-            <span style="width:24px">入金</span>
-            <button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" data-iso="${esc(pm)}" style="font-size:9px;padding:1px 4px;flex:1;background:#fff;border:1px solid var(--border);border-radius:3px;cursor:pointer;${pm?'':'color:var(--text-muted)'}">${esc(pmLbl)}</button>
+    <!-- v315: 1行水平レイアウトで一覧性UP -->
+    <td style="position:relative;padding:4px 6px;text-align:left;white-space:nowrap">
+      ${isAdmin ? (() => {
+        const pm = d.paymentMonth||''; const pmLbl = pm ? pm.substring(2).replace('-','/') : '－';
+        const im = d.incentiveMonth||''; const imLbl = im ? im.substring(2).replace('-','/') : '－';
+        return `<div style="display:inline-flex;align-items:center;gap:6px;font-size:10px;color:var(--text-sub)">
+          <span title="入金月" style="display:inline-flex;align-items:center;gap:2px"><span style="font-size:9px">入</span>
+            <button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" data-iso="${esc(pm)}" style="font-size:10px;padding:1px 5px;background:#fff;border:1px solid var(--border);border-radius:3px;cursor:pointer;min-width:38px;${pm?'':'color:var(--text-muted)'}">${esc(pmLbl)}</button>
             <input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" value="${esc(pm)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
-          </div>
-          <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-sub)">
-            <span style="width:24px">ｲﾝｾ</span>
-            <button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" data-iso="${esc(im)}" style="font-size:9px;padding:1px 4px;flex:1;background:#fff;border:1px solid var(--border);border-radius:3px;cursor:pointer;${im?'':'color:var(--text-muted)'}">${esc(imLbl)}</button>
+          </span>
+          <span title="ｲﾝｾﾝﾃｨﾌﾞ月" style="display:inline-flex;align-items:center;gap:2px"><span style="font-size:9px">ｲ</span>
+            <button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" data-iso="${esc(im)}" style="font-size:10px;padding:1px 5px;background:#fff;border:1px solid var(--border);border-radius:3px;cursor:pointer;min-width:38px;${im?'':'color:var(--text-muted)'}">${esc(imLbl)}</button>
             <input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" value="${esc(im)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
-          </div>
-          <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-sub)">
-            <span style="width:24px">金額</span>
-            <input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:1px 4px;flex:1;text-align:right;font-variant-numeric:tabular-nums;border:1px solid var(--border);border-radius:3px">
-          </div>`;
-        })() : `
-          <div style="font-size:10px"><span style="color:var(--text-sub)">入金:</span> ${esc(d.paymentMonth || '-')}</div>
-          <div style="font-size:10px"><span style="color:var(--text-sub)">ｲﾝｾ:</span> ${esc(d.incentiveMonth || '-')}</div>
-          <div style="font-size:10px"><span style="color:var(--text-sub)">金額:</span> ${d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-'}</div>
-        `}
-      </div>
+          </span>
+          <span title="ｲﾝｾﾝﾃｨﾌﾞ金額(税抜)" style="display:inline-flex;align-items:center;gap:2px"><span style="font-size:9px">¥</span>
+            <input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:1px 4px;width:60px;text-align:right;font-variant-numeric:tabular-nums;border:1px solid var(--border);border-radius:3px">
+          </span>
+        </div>`;
+      })() : `
+        <span style="font-size:10px;color:var(--text-sub)">入${esc(d.paymentMonth || '-')} / ｲ${esc(d.incentiveMonth || '-')} / ${d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-'}</span>
+      `}
     </td>
     <td style="text-align:center;white-space:nowrap">${(() => {
       const paid = d.incentivePaid === true;
