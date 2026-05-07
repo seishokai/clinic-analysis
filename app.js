@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v311';
+const APP_VERSION = 'v312';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2664,7 +2664,18 @@ function renderHomeDashboard() {
     ` : ''}
 
     <!-- v273: 医院 × 治療 クロス集計 (個人名は出さず数字のみ) -->
-    ${facList.length > 0 && treatList.length > 0 ? (() => {
+    <!-- v312: 11医院を常時表示 (フィルタで0件になっても行を出す) -->
+    ${treatList.length > 0 ? (() => {
+      // 11医院を常時表示するための正規化済みリスト
+      const STANDARD_FACILITIES = ['BF銀座','大森','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','京都'];
+      const allFacSet = new Set([...STANDARD_FACILITIES, ...Object.keys(byFacMonth)]);
+      const crossFacList = [...allFacSet].sort((a,b) => {
+        const ba = (byFacMonth[a]||{}).booking || 0;
+        const bb = (byFacMonth[b]||{}).booking || 0;
+        if (bb !== ba) return bb - ba;
+        return STANDARD_FACILITIES.indexOf(a) - STANDARD_FACILITIES.indexOf(b);
+      });
+
       // 各医院 × 各治療 の予約 / 来院 / 成約 件数
       const cross = {};
       rangeRows.forEach(d => {
@@ -2687,7 +2698,7 @@ function renderHomeDashboard() {
       // 行/列の合計
       const colTotal = (t) => {
         const r = { booking:0, visited:0, contracted:0 };
-        facList.forEach(f => {
+        crossFacList.forEach(f => {
           const v = cross[f + '|' + t];
           if (v) { r.booking+=v.booking; r.visited+=v.visited; r.contracted+=v.contracted; }
         });
@@ -2713,12 +2724,12 @@ function renderHomeDashboard() {
               </tr>
             </thead>
             <tbody>
-              ${facList.map(f => {
+              ${crossFacList.map(f => {
                 const tot = rowTotal(f);
                 return `<tr style="border-top:1px solid #f3f4f6">
                   <td style="padding:8px;text-align:left;font-weight:600;background:#fff;position:sticky;left:0">${escapeHtml(f)}</td>
                   ${treatList.map(t => `<td style="padding:6px;text-align:center;border-left:1px solid #f3f4f6">${cellHtml(f, t)}</td>`).join('')}
-                  <td style="padding:8px;text-align:center;background:#f9fafb;font-weight:700;color:#1a1a1a">
+                  <td style="padding:8px;text-align:center;background:#f9fafb;font-weight:700;color:${tot.booking === 0 ? '#9ca3af' : '#1a1a1a'}">
                     <div style="font-size:14px">${tot.booking}</div>
                     <div style="font-size:9px;color:var(--text-sub)">来 <span style="color:#1d4ed8">${tot.visited}</span>/約 <span style="color:#059669">${tot.contracted}</span></div>
                   </td>
