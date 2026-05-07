@@ -26,6 +26,7 @@ const TREATMENT_NAME = '矯正無料相談';
 const PER_CLINIC_TIMEOUT_MS = 60000;
 
 // shareconnect 上の正式名称と Aladdin 表記のマッピング
+// 注: シフト未登録の医院は shareconnect から非表示になるので、エラー = 緊急アラート
 const CLINICS = [
   { name: 'BF銀座',   match: 'BF銀座歯科' },
   { name: '大森',     match: '大森駅ファミリー歯科' },
@@ -33,11 +34,11 @@ const CLINICS = [
   { name: 'アール',   match: '名駅アール歯科' },
   { name: 'ウィズ',   match: '名古屋ウィズ歯科' },
   { name: 'ルミナス', match: '名古屋ルミナス歯科' },
+  { name: '茶屋',     match: '茶屋' },  // shareconnect上の正式名称TBD、シフト復活時に確認
   { name: '小牧',     match: 'ワイズ歯科矯正歯科＋KIDS' },
   { name: '知立',     match: 'アピタ知立ファミリー歯科' },
   { name: '八事',     match: '名古屋やごと歯科' },
   { name: '京都',     match: '京都河原町スマイルデザイン歯科' },
-  // ※ 茶屋: shareconnect 未登録のため監視対象外
 ];
 
 // ==================== Utils ====================
@@ -194,7 +195,7 @@ async function checkClinic(page, clinic, args, range) {
 
   // 1. 医院クリック
   const hit = await clickClinic(page, clinic.match);
-  if (!hit) throw new Error(`医院ボタン未検出: ${clinic.match}`);
+  if (!hit) throw new Error(`医院非表示（シフト未登録の可能性）`);
   if (args.debug) console.log(`  ✓ 医院選択: ${hit}`);
   await page.waitForTimeout(800);
 
@@ -260,15 +261,16 @@ async function main() {
   console.log(`URL: ${BASE_URL}`);
 
   const browser = await chromium.launch({ headless: !args.headed });
-  const ctx = await browser.newContext({
-    viewport: { width: 1280, height: 900 },
-    userAgent: 'Mozilla/5.0 (compatible; SeishokaiSlotMonitor/1.0; +https://seishokai.github.io/clinic-analysis/)',
-  });
-  const page = await ctx.newPage();
-  page.setDefaultTimeout(PER_CLINIC_TIMEOUT_MS);
 
   const clinics = [];
   for (const clinic of targets) {
+    // 医院ごとに独立コンテキスト (Firestore のセッション状態リーク防止)
+    const ctx = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      userAgent: 'Mozilla/5.0 (compatible; SeishokaiSlotMonitor/1.0; +https://seishokai.github.io/clinic-analysis/)',
+    });
+    const page = await ctx.newPage();
+    page.setDefaultTimeout(PER_CLINIC_TIMEOUT_MS);
     try {
       const data = await checkClinic(page, clinic, args, range);
       clinics.push(data);
@@ -283,6 +285,8 @@ async function main() {
         latestDate: null,
         error: e.message,
       });
+    } finally {
+      await ctx.close().catch(()=>{});
     }
   }
 

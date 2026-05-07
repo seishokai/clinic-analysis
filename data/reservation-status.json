@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-05-07T00:40:30.318Z",
+  "lastUpdated": "2026-05-07T00:58:29.425Z",
   "checkRangeFrom": "2026-05-21",
   "checkRangeTo": "2026-06-06",
   "treatment": "矯正無料相談",
@@ -52,6 +52,15 @@
       "totalSlots": 7,
       "earliestDate": "2026-05-21",
       "latestDate": "2026-05-29"
+    },
+    {
+      "name": "茶屋",
+      "available": false,
+      "availableDays": 0,
+      "totalSlots": 0,
+      "earliestDate": null,
+      "latestDate": null,
+      "error": "医院非表示（シフト未登録の可能性）"
     },
     {
       "name": "小牧",

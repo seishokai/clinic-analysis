@@ -2907,6 +2907,7 @@ function _formatAvailDate(s) {
 
 function _renderAvailabilityRow(clinic) {
   const isAlert = !clinic.available;
+  const hasError = !!clinic.error;
   const slotCount = clinic.totalSlots || 0;
   const days = clinic.availableDays || 0;
   const latest = _formatAvailDate(clinic.latestDate);
@@ -2915,8 +2916,16 @@ function _renderAvailabilityRow(clinic) {
   const borderColor = isAlert ? '#fecaca' : '#e5e7eb';
   const statusIcon = isAlert ? '⚠️' : '✓';
   const statusColor = isAlert ? '#b91c1c' : '#15803d';
-  const statusLabel = isAlert ? '枠なし' : '枠あり';
+  const statusLabel = hasError ? '要確認' : (isAlert ? '枠なし' : '枠あり');
   const slotColor = isAlert ? '#b91c1c' : '#1a1a1a';
+  let bottomHtml;
+  if (hasError) {
+    bottomHtml = `<span style="color:#b91c1c;font-weight:600">⚠ ${clinic.error}</span>`;
+  } else if (latest) {
+    bottomHtml = `最終: <strong style="color:#1a1a1a">${latest}</strong>`;
+  } else {
+    bottomHtml = '<span style="color:#b91c1c">予約枠なし</span>';
+  }
   return `
     <div style="background:${bgColor};border:1px solid ${borderColor};border-top:4px solid ${accentColor};border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:110px">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
@@ -2929,7 +2938,7 @@ function _renderAvailabilityRow(clinic) {
         <div style="font-size:10px;color:var(--text-muted);margin-left:6px">/ ${days}日分</div>
       </div>
       <div style="font-size:11px;color:var(--text-sub);margin-top:auto;padding-top:4px;border-top:1px dashed ${borderColor}">
-        ${latest ? `最終: <strong style="color:#1a1a1a">${latest}</strong>` : '<span style="color:#b91c1c">予約枠なし</span>'}
+        ${bottomHtml}
       </div>
     </div>
   `;
