@@ -22,7 +22,7 @@
     background:var(--bg); color:var(--text); line-height:1.5;
     -webkit-font-smoothing:antialiased;
   }
-  .wrap{max-width:1100px; margin:0 auto; padding:24px 20px 60px}
+  .wrap{max-width:1280px; margin:0 auto; padding:24px 24px 80px}
 
   /* Top bar */
   .top-bar{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; font-size:12px}
@@ -35,55 +35,98 @@
   .auth-btn{font-size:11px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text-sub); cursor:pointer; font-family:inherit}
   .auth-btn:hover{background:var(--bg); color:var(--text)}
 
-  header.brand-head{text-align:center; margin:32px 0 28px}
+  /* v300: Dental Connect風ヘッダー */
+  header.brand-head{text-align:center; margin:36px 0 12px}
   .brand{
-    font-family:'Great Vibes', cursive; font-size:64px; line-height:1;
+    font-family:'Great Vibes', cursive; font-size:54px; line-height:1;
     background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);
     -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
     margin:0;
   }
-  .subtitle{font-size:13px; letter-spacing:3px; color:var(--text-sub); margin-top:6px; text-transform:uppercase}
+  .subtitle{font-size:12px; letter-spacing:4px; color:var(--text-sub); margin-top:8px; text-transform:uppercase}
+  .page-title{
+    text-align:center; margin:48px 0 8px; font-size:36px; font-weight:300;
+    letter-spacing:8px; color:#1a1a1a;
+  }
+  .page-subtitle{
+    text-align:center; font-size:11px; letter-spacing:4px;
+    color:var(--text-sub); text-transform:uppercase; margin-bottom:36px;
+  }
 
-  /* Grid layout */
-  #tabs-tree{display:grid; grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); gap:14px}
-  .node{display:flex; flex-direction:column; gap:8px}
-  .node.is-group{grid-column:1/-1}                    /* Group spans full row to allow sub-grid below */
+  /* v300: メイングリッド (Dental Connect 風 4カラム) */
+  #tabs-tree{
+    display:grid;
+    grid-template-columns:repeat(4, 1fr);
+    gap:18px;
+  }
+  @media (max-width: 1100px){ #tabs-tree{grid-template-columns:repeat(3,1fr)} }
+  @media (max-width: 800px){ #tabs-tree{grid-template-columns:repeat(2,1fr)} }
+  @media (max-width: 480px){ #tabs-tree{grid-template-columns:repeat(2,1fr); gap:10px} }
 
-  /* Card */
+  .node{display:flex; flex-direction:column; gap:10px}
+  .node.is-group{grid-column:1/-1}
+
+  /* v300: 大きいカード (Dental Connect 風) */
   .tab-card{
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    padding:28px 14px; min-height:88px;
-    background:#fff; border:1px solid var(--border); border-radius:14px;
+    display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
+    padding:24px 22px; min-height:140px;
+    background:#fff; border:1px solid var(--border); border-radius:18px;
     cursor:pointer; text-decoration:none; color:var(--text);
-    transition:all .15s; font-family:inherit; font-size:14px; font-weight:600;
-    text-align:center; gap:6px;
-    position:relative;
+    transition:all .2s; font-family:inherit;
+    text-align:left; gap:14px;
+    position:relative; overflow:hidden;
   }
   .tab-card:hover{
-    transform:translateY(-2px); box-shadow:0 6px 16px rgba(0,0,0,.08);
-    border-color:var(--accent);
+    transform:translateY(-3px); box-shadow:0 12px 28px rgba(0,0,0,.08);
+    border-color:#d4d4d8;
   }
   .tab-card.highlight{
     background:linear-gradient(135deg, var(--hi-bg) 0%, #fff 100%);
     border-color:var(--hi-border);
-    color:var(--hi-text);
   }
-  .tab-card .ic{font-size:22px; line-height:1}
-  .tab-card .lbl{font-size:14px; line-height:1.3; word-break:break-word}
-  .tab-card .meta{font-size:10px; color:var(--text-sub); font-weight:500; letter-spacing:1px}
-  .tab-card .toggle-arrow{font-size:11px; color:var(--text-sub); transition:transform .15s}
+  /* 装飾用パステル円 (右上に薄く) */
+  .tab-card::after{
+    content:''; position:absolute; top:-30px; right:-30px; width:120px; height:120px;
+    border-radius:50%; background:var(--accent-color, #f0f0f0); opacity:.18;
+    transition:transform .3s; pointer-events:none;
+  }
+  .tab-card:hover::after{transform:scale(1.15)}
+
+  /* アイコンの色付き四角 */
+  .tab-card .icon-square{
+    width:48px; height:48px; border-radius:12px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--accent-bg, #f0f9ff); color:var(--accent-color, #3b82f6);
+    font-size:24px; flex-shrink:0;
+    position:relative; z-index:1;
+  }
+  .tab-card .lbl{
+    font-size:24px; font-weight:800; line-height:1.2; word-break:break-word;
+    color:#1a1a1a; position:relative; z-index:1;
+  }
+  .tab-card .meta{
+    font-size:11px; color:var(--text-sub); font-weight:500;
+    letter-spacing:.3px; position:relative; z-index:1;
+  }
+  .tab-card .toggle-arrow{font-size:11px; color:var(--text-sub); transition:transform .15s; margin-left:6px}
   .node.expanded .tab-card .toggle-arrow{transform:rotate(180deg)}
 
-  /* Sub-grid for group children */
+  /* サブグリッド (展開時) */
   .node-children{
     display:none;
-    grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
-    gap:8px;
-    padding:12px; background:#f9fafb; border-radius:12px;
+    grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
+    gap:10px;
+    padding:14px; background:#f9fafb; border-radius:14px;
     border:1px dashed var(--border);
   }
   .node.expanded > .node-children{display:grid}
-  .node-children .tab-card{padding:18px 10px; min-height:60px; font-size:12px}
+  .node-children .tab-card{
+    padding:14px 16px; min-height:64px; gap:8px;
+  }
+  .node-children .tab-card::after{display:none}
+  .node-children .tab-card .icon-square{width:32px; height:32px; font-size:16px; border-radius:8px}
+  .node-children .tab-card .lbl{font-size:14px; font-weight:700}
+  .node-children .tab-card .meta{font-size:10px}
 
   /* Admin actions on card */
   .card-actions{
@@ -195,6 +238,10 @@
     <h1 class="brand">Aladdin</h1>
     <div class="subtitle">Sales Portal</div>
   </header>
+
+  <!-- v300: Dental Connect 風タイトルセクション -->
+  <div class="page-title">HOME</div>
+  <div class="page-subtitle">SELECT WHAT YOU'D LIKE TO DO</div>
 
   <div id="loading">読み込み中…</div>
   <div id="empty" hidden>タブが登録されていません。</div>
@@ -448,6 +495,59 @@
     return attach('ROOT');
   }
 
+  // ===== v300: アイコン+色 自動判定 =====
+  // ラベルから絵文字アイコンとパステルカラー(背景, 文字色)を返す
+  function getCardStyle(label, isGroup) {
+    const l = String(label || '').toLowerCase();
+    // パステル色プリセット (Dental Connect 風)
+    const palette = {
+      blue:   { bg:'#dbeafe', fg:'#3b82f6' },
+      mint:   { bg:'#d1fae5', fg:'#10b981' },
+      red:    { bg:'#fee2e2', fg:'#ef4444' },
+      orange: { bg:'#ffedd5', fg:'#f97316' },
+      purple: { bg:'#ede9fe', fg:'#8b5cf6' },
+      pink:   { bg:'#fce7f3', fg:'#ec4899' },
+      yellow: { bg:'#fef3c7', fg:'#f59e0b' },
+      gray:   { bg:'#f3f4f6', fg:'#6b7280' },
+      teal:   { bg:'#ccfbf1', fg:'#14b8a6' },
+      indigo: { bg:'#e0e7ff', fg:'#6366f1' },
+    };
+    // キーワード → アイコン+色
+    const map = [
+      { kw:['動画','研修','training','study'], ic:'🎬', c:'red' },
+      { kw:['q&a','qa','質問','faq'], ic:'❓', c:'blue' },
+      { kw:['矯正','ortho','インビザ'], ic:'🦷', c:'mint' },
+      { kw:['ドクター','医師','doctor','シフト'], ic:'👨‍⚕️', c:'blue' },
+      { kw:['口コミ','review','レビュー'], ic:'⭐', c:'yellow' },
+      { kw:['seo','検索','google','site'], ic:'🔍', c:'mint' },
+      { kw:['ローン','支払','金融','dental','loan'], ic:'💰', c:'orange' },
+      { kw:['pbm','インセン','ボーナス'], ic:'🎯', c:'purple' },
+      { kw:['カウセ','counseling','問診'], ic:'💬', c:'indigo' },
+      { kw:['広告','ad','マーケ'], ic:'📢', c:'red' },
+      { kw:['予約','booking','reservation'], ic:'📅', c:'blue' },
+      { kw:['営業','sales','取引'], ic:'💼', c:'teal' },
+      { kw:['注文','order'], ic:'📋', c:'blue' },
+      { kw:['発注','purchase','仕入'], ic:'🚚', c:'mint' },
+      { kw:['請求','支払','invoice'], ic:'💴', c:'red' },
+      { kw:['在庫','stock','inventory'], ic:'📦', c:'orange' },
+      { kw:['マスター','master','設定','setting'], ic:'⚙️', c:'gray' },
+      { kw:['納品','delivery'], ic:'📥', c:'mint' },
+      { kw:['売上','revenue'], ic:'💹', c:'mint' },
+      { kw:['ホーム','home','top'], ic:'🏠', c:'gray' },
+      { kw:['ダッシュ','dashboard'], ic:'📊', c:'teal' },
+    ];
+    let icon = isGroup ? '📁' : '✨';
+    let color = palette.gray;
+    for (const m of map) {
+      if (m.kw.some(k => l.includes(k))) {
+        icon = m.ic;
+        color = palette[m.c] || palette.gray;
+        break;
+      }
+    }
+    return { icon, bg: color.bg, fg: color.fg };
+  }
+
   // ===== Render (Grid layout) =====
   function renderTree(){
     const root = $('tabs-tree');
@@ -466,13 +566,18 @@
     if (isGroup && top) wrap.classList.add('is-group');
     if (expandedIds.has(node.id)) wrap.classList.add('expanded');
 
+    // v300: アイコン+色を自動判定
+    const style = getCardStyle(node.label, isGroup);
+
     let card;
     if (isGroup) {
       card = document.createElement('button');
       card.type = 'button';
       card.className = 'tab-card' + (node.highlight ? ' highlight' : '');
+      card.style.setProperty('--accent-bg', style.bg);
+      card.style.setProperty('--accent-color', style.fg);
       card.innerHTML = `
-        <div class="ic">📁</div>
+        <div class="icon-square">${style.icon}</div>
         <div class="lbl">${esc(node.label)}</div>
         <div class="meta">${node.children.length}項目 <span class="toggle-arrow">▾</span></div>
       `;
@@ -483,11 +588,14 @@
     } else {
       card = document.createElement('a');
       card.className = 'tab-card' + (node.highlight ? ' highlight' : '');
+      card.style.setProperty('--accent-bg', style.bg);
+      card.style.setProperty('--accent-color', style.fg);
       card.href = node.url;
       if (node.external) { card.target = '_blank'; card.rel = 'noopener noreferrer'; }
       card.innerHTML = `
+        <div class="icon-square">${style.icon}</div>
         <div class="lbl">${esc(node.label)}</div>
-        ${node.external ? '<div class="meta">外部リンク ↗</div>' : ''}
+        <div class="meta">${node.external ? '外部リンク ↗' : 'クリックで開く →'}</div>
       `;
     }
 
@@ -715,7 +823,7 @@
   await loadTabs();
 })();
 </script>
-<!-- v297: バージョン表示 (全ページ共通) -->
-<div style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v297</div>
+<!-- v300: バージョン表示 (全ページ共通) -->
+<div style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v300</div>
 </body>
 </html>
