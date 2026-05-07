@@ -1,0 +1,19 @@
+# Node
+node_modules/
+package-lock.json
+.npm-install*.log
+
+# Playwright
+.debug-screenshots/
+playwright-report/
+test-results/
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+
+# Local env (本番secrets は GitHub Secrets で管理)
+.env
+.env.local

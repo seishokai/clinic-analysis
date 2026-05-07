@@ -1,0 +1,14 @@
+{
+  "name": "clinic-analysis-monitor",
+  "version": "1.0.0",
+  "description": "予約枠確認 monitor (Playwright + GitHub Actions). 本体のSPAとは独立した運用ツール。",
+  "private": true,
+  "scripts": {
+    "check": "node scripts/check-slots.js",
+    "check:one": "node scripts/check-slots.js --only=BF銀座",
+    "check:debug": "DEBUG=1 node scripts/check-slots.js --headed --only=BF銀座"
+  },
+  "devDependencies": {
+    "playwright": "^1.59.1"
+  }
+}
