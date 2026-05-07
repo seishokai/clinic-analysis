@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v303';
+const APP_VERSION = 'v304';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2880,6 +2880,8 @@ function _renderAvailabilityContent(container, data) {
         : '<span class="badge badge-default">データなし</span>');
 
   const srcUrl = data.source || 'https://reserve.shareconnect.co.jp/?r=u5iewf&treatment_ids=1766627271947';
+  const adminUrl = 'https://reserve.shareconnect.co.jp/admin/shift';
+  const ghActionsUrl = 'https://github.com/seishokai/clinic-analysis/actions/workflows/monitor.yml';
 
   container.innerHTML = `
     <div style="padding:12px">
@@ -2889,6 +2891,9 @@ function _renderAvailabilityContent(container, data) {
           <div>📅 確認範囲: <strong>${range}</strong>（14〜30日後）</div>
           <div>🔄 最終確認: <strong>${lastUpd}</strong></div>
           <span style="flex:1"></span>
+          <button id="bk-availability-refresh" onclick="_refreshAvailability()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;cursor:pointer;white-space:nowrap" title="表示を再読込（最新の自動更新結果を反映）">🔄 更新</button>
+          <a href="${ghActionsUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;text-decoration:none;white-space:nowrap" title="今すぐ shareconnect 再チェックを実行（GitHub Actions の Run workflow をクリック、約4分）">🔁 手動チェック</a>
+          <a href="${adminUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;text-decoration:none;white-space:nowrap" title="shareconnect のシフト管理画面を新しいタブで開く">⚙️ シフト管理</a>
           <a href="${srcUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:linear-gradient(135deg,#dc2626 0%,#ef4444 100%);color:#fff;font-weight:700;font-size:12px;border-radius:18px;text-decoration:none;box-shadow:0 2px 6px rgba(220,38,38,0.25);white-space:nowrap" title="shareconnect 予約サイトを新しいタブで開く">🔗 予約サイトを開く →</a>
         </div>
       </div>
@@ -2968,6 +2973,26 @@ function updateAvailabilityBadge(data) {
 async function loadAvailabilityBadgeOnInit() {
   const data = await _fetchAvailabilityData();
   if (data) updateAvailabilityBadge(data);
+}
+
+// 「🔄 更新」ボタンから呼ぶ。data/reservation-status.json を再フェッチして表示更新
+async function _refreshAvailability() {
+  const btn = document.getElementById('bk-availability-refresh');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ 更新中...'; }
+  try {
+    await renderAvailability();
+    if (typeof showToast === 'function') {
+      showToast('予約枠データを再読込しました');
+    }
+  } catch (e) {
+    if (typeof showToast === 'function') {
+      showToast('再読込に失敗: ' + e.message, true);
+    }
+  } finally {
+    // renderAvailability() で innerHTML を書き換えるためボタン参照は再取得
+    const newBtn = document.getElementById('bk-availability-refresh');
+    if (newBtn) { newBtn.disabled = false; }
+  }
 }
 
 function renderPhoneCheck() {
