@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v309';
+const APP_VERSION = 'v310';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3010,7 +3010,11 @@ async function triggerAvailabilityRecheck() {
     _pollAvailabilityStatus(btn, origText, Date.now());
   } catch (e) {
     console.error('triggerAvailabilityRecheck error:', e);
-    showToast('再チェック起動失敗: ' + e.message, true);
+    // Workerが未デプロイの場合は GitHub Actions を直接開いて手動実行してもらう
+    showToast('Worker未デプロイ。GitHub Actionsを開きます（緑「Run workflow」をクリック）', true);
+    setTimeout(() => {
+      window.open('https://github.com/seishokai/clinic-analysis/actions/workflows/monitor.yml', '_blank', 'noopener');
+    }, 800);
     btn.disabled = false;
     btn.textContent = origText;
   }
