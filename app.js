@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v308';
+const APP_VERSION = 'v309';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2889,7 +2889,7 @@ function _renderAvailabilityContent(container, data) {
         : '<span class="badge badge-default">データなし</span>');
 
   const srcUrl = data.source || 'https://reserve.shareconnect.co.jp/?r=u5iewf&treatment_ids=1766627271947';
-  const adminUrl = 'https://reserve.shareconnect.co.jp/admin/shift';
+  const adminUrl = 'https://reserve.shareconnect.co.jp/admin/dashboard';
   container.innerHTML = `
     <div style="padding:12px">
       <div class="card" style="margin-bottom:12px;padding:12px">
@@ -2899,7 +2899,7 @@ function _renderAvailabilityContent(container, data) {
           <div>🔄 最終確認: <strong>${lastUpd}</strong></div>
           <span style="flex:1"></span>
           <button id="bk-availability-trigger" onclick="triggerAvailabilityRecheck()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;cursor:pointer;white-space:nowrap" title="今すぐ shareconnect から最新データを取得（自動で約4分後に画面更新）">🔁 今すぐ再チェック</button>
-          <a href="${adminUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;text-decoration:none;white-space:nowrap" title="shareconnect のシフト管理画面を新しいタブで開く">⚙️ シフト管理</a>
+          <a href="${adminUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;text-decoration:none;white-space:nowrap" title="shareconnect の予約管理画面（管理ダッシュボード）を新しいタブで開く">⚙️ 予約管理</a>
           <a href="${srcUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:linear-gradient(135deg,#dc2626 0%,#ef4444 100%);color:#fff;font-weight:700;font-size:12px;border-radius:18px;text-decoration:none;box-shadow:0 2px 6px rgba(220,38,38,0.25);white-space:nowrap" title="shareconnect 予約サイトを新しいタブで開く">🔗 予約サイトを開く →</a>
         </div>
       </div>
