@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v305';
+const APP_VERSION = 'v306';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1204,6 +1204,15 @@ function setupEventListeners() {
       try { setupRealtime(); } catch(_){}
       // 保存キューがあれば即処理
       try { processQueue(true); } catch(_){}
+      // v305: 予約枠確認JSONも再フェッチ + バッジ更新（表示中なら再描画）
+      try {
+        const avEl = document.getElementById('sub-bk-availability');
+        if (avEl && !avEl.hidden && typeof renderAvailability === 'function') {
+          renderAvailability();
+        } else if (typeof loadAvailabilityBadgeOnInit === 'function') {
+          loadAvailabilityBadgeOnInit();
+        }
+      } catch(_){}
       // 現在表示中のビューを再描画
       if (currentView === 'bookings') {
         if (typeof renderBookings === 'function') renderBookings();
