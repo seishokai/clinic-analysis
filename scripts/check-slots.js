@@ -184,6 +184,35 @@ async function clickNextMonth(page) {
   });
 }
 
+// 日付をクリックして、その日の時間枠ボタン数を数える
+async function clickDateAndCountTimeSlots(page, day) {
+  // 該当日のアクティブな日付ボタンをクリック
+  const clicked = await page.evaluate((d) => {
+    const buttons = Array.from(document.querySelectorAll('button'));
+    for (const b of buttons) {
+      if (/aspect-square/.test(b.className || '') && (b.innerText || '').trim() === String(d) && !b.disabled) {
+        b.scrollIntoView({ block: 'center' });
+        b.click();
+        return true;
+      }
+    }
+    return false;
+  }, day);
+  if (!clicked) return 0;
+
+  // 時間枠が描画されるのを待つ (遅い場合あり)
+  await page.waitForTimeout(800);
+
+  // 時間枠ボタン (09:30 形式) を数える
+  return await page.evaluate(() => {
+    const buttons = Array.from(document.querySelectorAll('button'));
+    return buttons.filter(b => {
+      const t = (b.innerText || '').trim();
+      return /^\d{1,2}:\d{2}$/.test(t) && !b.disabled;
+    }).length;
+  });
+}
+
 async function checkClinic(page, clinic, args, range) {
   console.log(`\n[${clinic.name}] チェック開始 (${clinic.match})`);
   const startTime = Date.now();
@@ -210,38 +239,63 @@ async function checkClinic(page, clinic, args, range) {
   await page.waitForTimeout(800);
   await snap(page, args, `${clinic.name}_2_calendar`);
 
-  // 4. 当月読み取り
+  // 4. 当月読み取り → 範囲内の日付をクリックして時間枠数カウント
+  const slotsByDate = {};
+  let totalSlots = 0;
+  const datesInRange = [];
+
   const m1 = await readCurrentMonth(page);
   if (!m1) throw new Error('月ヘッダ未検出');
   const month1Avail = await readCalendarAvailability(page, m1.year, m1.month);
   if (args.debug) console.log(`  ${m1.year}年${m1.month}月: 利用可能 ${month1Avail.length}日`);
 
+  for (const date of month1Avail) {
+    if (!inRange(date, range)) continue;
+    const slots = await clickDateAndCountTimeSlots(page, date.getDate());
+    const dateStr = ymd(date);
+    slotsByDate[dateStr] = slots;
+    if (slots > 0) {
+      totalSlots += slots;
+      datesInRange.push(date);
+    }
+    if (args.debug) console.log(`    ${dateStr}: ${slots}枠`);
+  }
+
   // 5. 翌月へ進んで読み取り (range が翌月にまたがる場合)
-  let month2Avail = [];
   if (await clickNextMonth(page)) {
     await page.waitForTimeout(2000);
     const m2 = await readCurrentMonth(page);
     if (m2) {
-      month2Avail = await readCalendarAvailability(page, m2.year, m2.month);
+      const month2Avail = await readCalendarAvailability(page, m2.year, m2.month);
       if (args.debug) console.log(`  ${m2.year}年${m2.month}月: 利用可能 ${month2Avail.length}日`);
+      for (const date of month2Avail) {
+        if (!inRange(date, range)) continue;
+        const slots = await clickDateAndCountTimeSlots(page, date.getDate());
+        const dateStr = ymd(date);
+        slotsByDate[dateStr] = slots;
+        if (slots > 0) {
+          totalSlots += slots;
+          datesInRange.push(date);
+        }
+        if (args.debug) console.log(`    ${dateStr}: ${slots}枠`);
+      }
     }
     await snap(page, args, `${clinic.name}_3_next_month`);
   }
 
-  // 6. range で絞り込み
-  const all = [...month1Avail, ...month2Avail].sort((a, b) => a - b);
-  const inRangeDates = all.filter(d => inRange(d, range));
+  datesInRange.sort((a, b) => a - b);
 
   const elapsed = Date.now() - startTime;
-  console.log(`  ⏱ ${elapsed}ms / 範囲内空き: ${inRangeDates.length}日`);
+  console.log(`  ⏱ ${elapsed}ms / 範囲内: ${datesInRange.length}日 / ${totalSlots}枠`);
 
   return {
     name: clinic.name,
-    available: inRangeDates.length > 0,
-    availableDays: inRangeDates.length,
-    totalSlots: inRangeDates.length, // PoC: 日数を slot 数として代用 (時間帯 × 日数の取得は次フェーズ)
-    earliestDate: inRangeDates[0] ? ymd(inRangeDates[0]) : null,
-    latestDate: inRangeDates[inRangeDates.length - 1] ? ymd(inRangeDates[inRangeDates.length - 1]) : null,
+    available: datesInRange.length > 0,
+    availableDays: datesInRange.length,
+    totalSlots,
+    earliestDate: datesInRange[0] ? ymd(datesInRange[0]) : null,
+    latestDate: datesInRange[datesInRange.length - 1] ? ymd(datesInRange[datesInRange.length - 1]) : null,
+    slotsByDate, // 日別の時間枠数 (将来の詳細表示用)
   };
 }
 
