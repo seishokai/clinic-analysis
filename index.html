@@ -641,7 +641,7 @@
           <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">予約一覧 <span id="bk-count" style="font-weight:400;color:var(--text-muted)">読み込み中...</span></div>
           <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto">
             <table class="data-table compact" id="bk-table">
-              <thead><tr><th class="bk-select-col" style="width:32px;text-align:center;padding:4px"><input type="checkbox" id="bk-select-all" title="全選択" style="cursor:pointer;width:14px;height:14px;margin:0"></th><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>相談</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>流入元</th><th>状態</th><th>次回予定</th><th>メモ</th><th>成約</th><th>金額（税抜）</th><th>入金月</th><th>インセ月</th><th>インセ（税抜）</th><th>請求</th><th></th></tr></thead>
+              <thead><tr><th class="bk-select-col" style="width:32px;text-align:center;padding:4px"><input type="checkbox" id="bk-select-all" title="全選択" style="cursor:pointer;width:14px;height:14px;margin:0"></th><th style="text-align:left" title="申込日 / 予約日時 / ツール">申込→予約</th><th style="text-align:left">名前</th><th>相談</th><th>医院</th><th title="電話 / メール">連絡先</th><th>流入元</th><th>状態</th><th>次回予定</th><th>メモ</th><th>成約</th><th>金額(税抜)</th><th title="入金月 / インセ月 / インセ額">経理</th><th>請求</th><th></th></tr></thead>
               <tbody id="bk-tbody"></tbody>
             </table>
           </div>
@@ -1224,7 +1224,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=310"></script>
+  <script src="app.js?v=311"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

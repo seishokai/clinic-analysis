@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v310';
+const APP_VERSION = 'v311';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6269,16 +6269,29 @@ function renderBookings() {
     const rowStyle = dupStyle + (d.status==='除外' ? 'background:#f5f5f5;opacity:0.4;text-decoration:line-through' : d.status==='成約' ? 'background:#f0fdf4' : d.status==='来院済' ? 'background:#eff6ff' : d.status==='キャンセル' ? 'background:#f8f8f8;color:#9ca3af' : (!d.status||d.status==='未対応') ? 'background:#fff5f5' : '');
     return `<tr style="${rowStyle}" data-bk-name="${esc(d.name)}" data-bk-apply="${esc(d.applyDate)}">
     <td class="bk-select-col" style="text-align:center;padding:4px">${isAdmin?`<input type="checkbox" class="bk-row-select" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;width:14px;height:14px;margin:0">`:''}</td>
-    <td style="white-space:nowrap;font-size:9px"><span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'セレクト':'DX'}</span></td>
-    <td style="white-space:nowrap;font-size:10px;color:var(--text-sub)">${fmtApplyDate(d.applyDate)}</td>
-    <td style="white-space:nowrap;font-size:10px;${isAdmin?'cursor:pointer;text-decoration:underline dotted':''}" ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで変更"`:''}>
-      ${esc(fmtBookDate(d.bookDate))}</td>
+    <!-- v303: 申込→予約 統合カラム (DXバッジ + 申込日 + 予約日) -->
+    <td style="font-size:10px;line-height:1.4;text-align:left;white-space:nowrap;padding:4px 8px">
+      <div style="display:flex;flex-direction:column;gap:2px">
+        <div style="display:flex;align-items:center;gap:5px">
+          <span class="badge ${d.tool==='セレクト'?'badge-warning':'badge-default'}" style="font-size:8px;padding:1px 4px">${d.tool==='セレクト'?'ｾﾚｸﾄ':'DX'}</span>
+          <span style="color:var(--text-sub);font-size:10px">${fmtApplyDate(d.applyDate)}</span>
+        </div>
+        <div ${isAdmin?`class="bk-edit-date" data-idx="${idx}" title="クリックで予約日変更" style="cursor:pointer;text-decoration:underline dotted;font-weight:600;color:#1d4ed8;font-size:11px"`:'style="font-weight:600;color:#1d4ed8;font-size:11px"'}>
+          ${esc(fmtBookDate(d.bookDate))}
+        </div>
+      </div>
+    </td>
     <td style="white-space:nowrap;font-size:11px;font-weight:500;text-align:left">
       <button type="button" class="bk-pin-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${pinned?'ピン解除':'ピン留め'}" style="background:none;border:none;cursor:pointer;padding:0 4px 0 0;font-size:13px;line-height:1;color:${pinned?'#f59e0b':'#d1d5db'};vertical-align:middle">${pinned?'★':'☆'}</button><span ${isAdmin?`class="bk-row-edit" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="クリックで編集" style="cursor:pointer;text-decoration:underline dotted"`:''}>${esc(maskName(d.name))}</span></td>
     <td style="font-size:10px;white-space:nowrap">${esc(normSvc(d.service))}</td>
     <td style="font-size:10px;white-space:nowrap">${esc(normFac(d.facility))}</td>
-    <td style="font-size:10px;white-space:nowrap">${isAdmin ? esc(fmtPhone(d.phone)) : esc(maskPhone(d.phone) || '-')}</td>
-    <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;max-width:90px;overflow:hidden;text-overflow:ellipsis;text-align:left">${isAdmin ? esc(d.email || '-') : esc(maskEmail(d.email) || '-')}</td>
+    <!-- v303: 連絡先 統合カラム (電話 + メール) -->
+    <td style="font-size:10px;line-height:1.4;text-align:left;padding:4px 8px;max-width:140px">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        <div style="white-space:nowrap;color:#1a1a1a">${isAdmin ? esc(fmtPhone(d.phone)) : esc(maskPhone(d.phone) || '-')}</div>
+        <div style="font-size:9px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px" title="${esc(d.email||'')}">${isAdmin ? esc(d.email || '-') : esc(maskEmail(d.email) || '-')}</div>
+      </div>
+    </td>
     <td style="font-size:9px;color:var(--text-muted);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">${esc(d.source || '-')}</td>
     <td style="text-align:center">${isAdmin ? (isBFBooking(d) ? (() => {
       const info = getBFInfo(d.name, d.applyDate) || {};
@@ -6352,9 +6365,34 @@ function renderBookings() {
       <option ${d.contractService==='ｲﾝﾌﾟﾗﾝﾄ'?'selected':''}>ｲﾝﾌﾟﾗﾝﾄ</option>
     </select>` : esc(d.contractService || '-')}</td>
     <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contractAmount" value="${d.contractAmount?Number(d.contractAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:90px;text-align:right;font-variant-numeric:tabular-nums;${d.status==='成約'&&!Number(d.contractAmount)?'background:#fee2e2;color:#b91c1c;border-color:#ef4444;animation:pulse-red 2s ease-in-out infinite':''}">` : (d.contractAmount ? '¥'+fmt(d.contractAmount) : '-')}</td>
-    <td style="position:relative">${isAdmin ? (() => { const v = d.paymentMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" data-iso="${esc(v)}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${esc(lbl)}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" value="${esc(v)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`; })() : esc(d.paymentMonth || '-')}</td>
-    <td style="position:relative">${isAdmin ? (() => { const v = d.incentiveMonth||''; const lbl = v ? v.substring(2).replace('-','/') : 'YY/MM'; return `<button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" data-iso="${esc(v)}" style="font-size:10px;padding:3px 6px;width:64px;background:#fff;border:1px solid var(--border);border-radius:4px;cursor:pointer;${v?'':'color:var(--text-muted)'}">${esc(lbl)}</button><input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" value="${esc(v)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`; })() : esc(d.incentiveMonth || '-')}</td>
-    <td>${isAdmin ? `<input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:11px;padding:2px 6px;width:80px;text-align:right;font-variant-numeric:tabular-nums">` : (d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-')}</td>
+    <!-- v303: 経理 統合カラム (入金月 + インセ月 + インセ税抜) -->
+    <td style="position:relative;padding:4px 8px;text-align:left">
+      <div style="display:flex;flex-direction:column;gap:2px;min-width:0">
+        ${isAdmin ? (() => {
+          const pm = d.paymentMonth||''; const pmLbl = pm ? pm.substring(2).replace('-','/') : 'YY/MM';
+          const im = d.incentiveMonth||''; const imLbl = im ? im.substring(2).replace('-','/') : 'YY/MM';
+          return `
+          <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-sub)">
+            <span style="width:24px">入金</span>
+            <button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" data-iso="${esc(pm)}" style="font-size:9px;padding:1px 4px;flex:1;background:#fff;border:1px solid var(--border);border-radius:3px;cursor:pointer;${pm?'':'color:var(--text-muted)'}">${esc(pmLbl)}</button>
+            <input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="paymentMonth" value="${esc(pm)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
+          </div>
+          <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-sub)">
+            <span style="width:24px">ｲﾝｾ</span>
+            <button type="button" class="bk-month-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" data-iso="${esc(im)}" style="font-size:9px;padding:1px 4px;flex:1;background:#fff;border:1px solid var(--border);border-radius:3px;cursor:pointer;${im?'':'color:var(--text-muted)'}">${esc(imLbl)}</button>
+            <input type="month" class="bk-month-hidden bk-field-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveMonth" value="${esc(im)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
+          </div>
+          <div style="display:flex;align-items:center;gap:3px;font-size:9px;color:var(--text-sub)">
+            <span style="width:24px">金額</span>
+            <input type="text" inputmode="numeric" class="form-input bk-field-input bk-amt-input" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="incentiveAmount" value="${d.incentiveAmount?Number(d.incentiveAmount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:1px 4px;flex:1;text-align:right;font-variant-numeric:tabular-nums;border:1px solid var(--border);border-radius:3px">
+          </div>`;
+        })() : `
+          <div style="font-size:10px"><span style="color:var(--text-sub)">入金:</span> ${esc(d.paymentMonth || '-')}</div>
+          <div style="font-size:10px"><span style="color:var(--text-sub)">ｲﾝｾ:</span> ${esc(d.incentiveMonth || '-')}</div>
+          <div style="font-size:10px"><span style="color:var(--text-sub)">金額:</span> ${d.incentiveAmount ? '¥'+fmt(d.incentiveAmount) : '-'}</div>
+        `}
+      </div>
+    </td>
     <td style="text-align:center;white-space:nowrap">${(() => {
       const paid = d.incentivePaid === true;
       const dateStr = d.paidAt ? (() => { const dt = new Date(d.paidAt); return isNaN(dt) ? '' : `${dt.getFullYear()}/${String(dt.getMonth()+1).padStart(2,'0')}/${String(dt.getDate()).padStart(2,'0')}`; })() : '';
