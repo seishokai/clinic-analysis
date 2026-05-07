@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v307';
+const APP_VERSION = 'v308';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2890,8 +2890,6 @@ function _renderAvailabilityContent(container, data) {
 
   const srcUrl = data.source || 'https://reserve.shareconnect.co.jp/?r=u5iewf&treatment_ids=1766627271947';
   const adminUrl = 'https://reserve.shareconnect.co.jp/admin/shift';
-  const ghActionsUrl = 'https://github.com/seishokai/clinic-analysis/actions/workflows/monitor.yml';
-
   container.innerHTML = `
     <div style="padding:12px">
       <div class="card" style="margin-bottom:12px;padding:12px">
@@ -2900,7 +2898,7 @@ function _renderAvailabilityContent(container, data) {
           <div>📅 確認範囲: <strong>${range}</strong>（14〜30日後）</div>
           <div>🔄 最終確認: <strong>${lastUpd}</strong></div>
           <span style="flex:1"></span>
-          <a href="${ghActionsUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;text-decoration:none;white-space:nowrap" title="今すぐ shareconnect から最新データを取得（開いたGitHub画面で『Run workflow』緑ボタンをクリック → 約4分後に上の『更新』を押す）">🔁 今すぐ再チェック</a>
+          <button id="bk-availability-trigger" onclick="triggerAvailabilityRecheck()" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;cursor:pointer;white-space:nowrap" title="今すぐ shareconnect から最新データを取得（自動で約4分後に画面更新）">🔁 今すぐ再チェック</button>
           <a href="${adminUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:4px;padding:6px 12px;background:#fff;color:#1a1a1a;font-weight:600;font-size:12px;border:1px solid var(--border);border-radius:18px;text-decoration:none;white-space:nowrap" title="shareconnect のシフト管理画面を新しいタブで開く">⚙️ シフト管理</a>
           <a href="${srcUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-flex;align-items:center;gap:6px;padding:6px 14px;background:linear-gradient(135deg,#dc2626 0%,#ef4444 100%);color:#fff;font-weight:700;font-size:12px;border-radius:18px;text-decoration:none;box-shadow:0 2px 6px rgba(220,38,38,0.25);white-space:nowrap" title="shareconnect 予約サイトを新しいタブで開く">🔗 予約サイトを開く →</a>
         </div>
@@ -2981,6 +2979,87 @@ function updateAvailabilityBadge(data) {
 async function loadAvailabilityBadgeOnInit() {
   const data = await _fetchAvailabilityData();
   if (data) updateAvailabilityBadge(data);
+}
+
+// 「🔁 今すぐ再チェック」ボタンから呼ぶ
+// Cloudflare Worker → GitHub Actions workflow_dispatch を起動 → ポーリングで完了検知
+const _AVAILABILITY_TRIGGER_URL = 'https://seishokai-trigger-monitor.tkm-koike.workers.dev';
+let _availabilityPollTimer = null;
+
+async function triggerAvailabilityRecheck() {
+  const btn = document.getElementById('bk-availability-trigger');
+  if (!btn) return;
+  if (btn.disabled) return;
+
+  const origText = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = '⏳ 起動中...';
+
+  try {
+    const r = await fetch(`${_AVAILABILITY_TRIGGER_URL}/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}',
+    });
+    const d = await r.json().catch(() => ({}));
+    if (!r.ok || !d.ok) {
+      throw new Error(d.error || `HTTP ${r.status}`);
+    }
+    showToast('再チェック起動！4分ほどで完了します');
+    btn.textContent = '⏳ チェック中... (約4分)';
+    _pollAvailabilityStatus(btn, origText, Date.now());
+  } catch (e) {
+    console.error('triggerAvailabilityRecheck error:', e);
+    showToast('再チェック起動失敗: ' + e.message, true);
+    btn.disabled = false;
+    btn.textContent = origText;
+  }
+}
+
+async function _pollAvailabilityStatus(btn, origText, triggeredAt) {
+  // 30秒間隔で /status を見る。最大8分でタイムアウト
+  if (_availabilityPollTimer) clearTimeout(_availabilityPollTimer);
+  const MAX_MS = 8 * 60 * 1000;
+  const INTERVAL_MS = 30 * 1000;
+
+  const tick = async () => {
+    if (Date.now() - triggeredAt > MAX_MS) {
+      showToast('完了確認タイムアウト。手動で「更新」を押して下さい', true);
+      btn.disabled = false;
+      btn.textContent = origText;
+      return;
+    }
+    try {
+      const r = await fetch(`${_AVAILABILITY_TRIGGER_URL}/status`);
+      const d = await r.json().catch(() => ({}));
+      if (d.ok && d.status === 'completed' && d.event === 'workflow_dispatch') {
+        // updated_at が trigger 後なら確実に該当の run
+        const upd = d.updated_at ? new Date(d.updated_at).getTime() : 0;
+        if (upd >= triggeredAt - 60000) {
+          // 完了！データ再取得
+          if (typeof renderAvailability === 'function') {
+            await renderAvailability();
+          } else if (typeof loadAvailabilityBadgeOnInit === 'function') {
+            await loadAvailabilityBadgeOnInit();
+          }
+          if (d.conclusion === 'success') {
+            showToast('再チェック完了！最新データに更新しました');
+          } else {
+            showToast(`再チェック ${d.conclusion || '失敗'}: ${d.html_url || ''}`, true);
+          }
+          btn.disabled = false;
+          btn.textContent = origText;
+          return;
+        }
+      }
+    } catch (e) {
+      // ポーリング失敗は静かにリトライ
+      console.warn('availability status poll failed:', e);
+    }
+    _availabilityPollTimer = setTimeout(tick, INTERVAL_MS);
+  };
+  // 初回は40秒後から (起動から完了まで最低数十秒かかる)
+  _availabilityPollTimer = setTimeout(tick, 40000);
 }
 
 
