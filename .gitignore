@@ -1,7 +1,7 @@
 # Node
 node_modules/
-package-lock.json
 .npm-install*.log
+# package-lock.json は GitHub Actions の npm ci 用に commit する
 
 # Playwright
 .debug-screenshots/
