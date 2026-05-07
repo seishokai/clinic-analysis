@@ -35,7 +35,7 @@
   .auth-btn{font-size:11px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text-sub); cursor:pointer; font-family:inherit}
   .auth-btn:hover{background:var(--bg); color:var(--text)}
 
-  /* v300: Dental Connect風ヘッダー */
+  /* v301: Dental Connect風ヘッダー */
   header.brand-head{text-align:center; margin:36px 0 12px}
   .brand{
     font-family:'Great Vibes', cursive; font-size:54px; line-height:1;
@@ -53,7 +53,7 @@
     color:var(--text-sub); text-transform:uppercase; margin-bottom:36px;
   }
 
-  /* v300: メイングリッド (Dental Connect 風 4カラム) */
+  /* v301: メイングリッド (Dental Connect 風 4カラム) */
   #tabs-tree{
     display:grid;
     grid-template-columns:repeat(4, 1fr);
@@ -64,9 +64,10 @@
   @media (max-width: 480px){ #tabs-tree{grid-template-columns:repeat(2,1fr); gap:10px} }
 
   .node{display:flex; flex-direction:column; gap:10px}
-  .node.is-group{grid-column:1/-1}
+  /* v301: グループも普通のカードサイズ。子はモーダルで表示 */
+  /* .node.is-group{grid-column:1/-1} ← v301で削除 */
 
-  /* v300: 大きいカード (Dental Connect 風) */
+  /* v301: 大きいカード (Dental Connect 風) */
   .tab-card{
     display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start;
     padding:24px 22px; min-height:140px;
@@ -111,22 +112,54 @@
   .tab-card .toggle-arrow{font-size:11px; color:var(--text-sub); transition:transform .15s; margin-left:6px}
   .node.expanded .tab-card .toggle-arrow{transform:rotate(180deg)}
 
-  /* サブグリッド (展開時) */
-  .node-children{
-    display:none;
-    grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));
-    gap:10px;
-    padding:14px; background:#f9fafb; border-radius:14px;
-    border:1px dashed var(--border);
+  /* v301: サブグリッドはモーダル内に表示 (インライン展開は廃止) */
+  .node-children{ display:none !important; }
+
+  /* v301: グループモーダル (クリックでサブが出てくる) */
+  .group-modal-overlay{
+    position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:2000;
+    display:none; align-items:center; justify-content:center; padding:20px;
+    backdrop-filter:blur(3px);
   }
-  .node.expanded > .node-children{display:grid}
-  .node-children .tab-card{
-    padding:14px 16px; min-height:64px; gap:8px;
+  .group-modal-overlay.show{ display:flex; }
+  .group-modal{
+    background:#fff; border-radius:20px; padding:28px 24px 24px;
+    width:100%; max-width:680px; max-height:88vh; overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.25);
+    animation:gmFadeIn .25s ease;
   }
-  .node-children .tab-card::after{display:none}
-  .node-children .tab-card .icon-square{width:32px; height:32px; font-size:16px; border-radius:8px}
-  .node-children .tab-card .lbl{font-size:14px; font-weight:700}
-  .node-children .tab-card .meta{font-size:10px}
+  @keyframes gmFadeIn{
+    from{opacity:0; transform:translateY(20px)}
+    to  {opacity:1; transform:translateY(0)}
+  }
+  .group-modal-header{
+    display:flex; align-items:center; gap:14px; margin-bottom:20px;
+    padding-bottom:16px; border-bottom:1px solid var(--border);
+  }
+  .group-modal-icon{
+    width:52px; height:52px; border-radius:14px;
+    display:flex; align-items:center; justify-content:center;
+    font-size:26px; flex-shrink:0;
+  }
+  .group-modal-title{font-size:22px; font-weight:800; flex:1; color:#1a1a1a}
+  .group-modal-close{
+    background:#f3f4f6; border:none; width:36px; height:36px; border-radius:50%;
+    cursor:pointer; font-size:20px; color:#6b7280; padding:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .group-modal-close:hover{ background:#e5e7eb; color:#1a1a1a; }
+  .group-modal-grid{
+    display:grid; grid-template-columns:repeat(2, 1fr); gap:12px;
+  }
+  @media (max-width:480px){ .group-modal-grid{grid-template-columns:1fr} }
+  .group-modal-grid .tab-card{
+    padding:18px 18px; min-height:96px; gap:10px;
+  }
+  .group-modal-grid .tab-card .icon-square{
+    width:40px; height:40px; font-size:20px; border-radius:10px;
+  }
+  .group-modal-grid .tab-card .lbl{ font-size:17px; font-weight:700; }
+  .group-modal-grid .tab-card .meta{ font-size:10px; }
 
   /* Admin actions on card */
   .card-actions{
@@ -239,7 +272,7 @@
     <div class="subtitle">Sales Portal</div>
   </header>
 
-  <!-- v300: Dental Connect 風タイトルセクション -->
+  <!-- v301: Dental Connect 風タイトルセクション -->
   <div class="page-title">HOME</div>
   <div class="page-subtitle">SELECT WHAT YOU'D LIKE TO DO</div>
 
@@ -255,6 +288,18 @@
 </div>
 
 <div id="toast"></div>
+
+<!-- v301: グループ展開モーダル (クリックでサブカードが出てくる) -->
+<div id="group-modal" class="group-modal-overlay">
+  <div class="group-modal">
+    <div class="group-modal-header">
+      <div class="group-modal-icon" id="gm-icon"></div>
+      <div class="group-modal-title" id="gm-title"></div>
+      <button type="button" class="group-modal-close" id="gm-close" aria-label="閉じる">×</button>
+    </div>
+    <div class="group-modal-grid" id="gm-grid"></div>
+  </div>
+</div>
 
 <!-- Edit / Add Modal -->
 <div id="modal-overlay" class="modal-overlay" hidden>
@@ -495,7 +540,7 @@
     return attach('ROOT');
   }
 
-  // ===== v300: アイコン+色 自動判定 =====
+  // ===== v301: アイコン+色 自動判定 =====
   // ラベルから絵文字アイコンとパステルカラー(背景, 文字色)を返す
   function getCardStyle(label, isGroup) {
     const l = String(label || '').toLowerCase();
@@ -563,10 +608,9 @@
 
     const hasChildren = node.children && node.children.length > 0;
     const isGroup = !node.url || hasChildren;
-    if (isGroup && top) wrap.classList.add('is-group');
-    if (expandedIds.has(node.id)) wrap.classList.add('expanded');
+    // v301: グループの全幅指定は廃止 (普通のカードサイズに)
 
-    // v300: アイコン+色を自動判定
+    // v301: アイコン+色を自動判定
     const style = getCardStyle(node.label, isGroup);
 
     let card;
@@ -576,14 +620,16 @@
       card.className = 'tab-card' + (node.highlight ? ' highlight' : '');
       card.style.setProperty('--accent-bg', style.bg);
       card.style.setProperty('--accent-color', style.fg);
+      const childCount = (node.children||[]).length;
       card.innerHTML = `
         <div class="icon-square">${style.icon}</div>
         <div class="lbl">${esc(node.label)}</div>
-        <div class="meta">${node.children.length}項目 <span class="toggle-arrow">▾</span></div>
+        <div class="meta">${childCount}項目 ▸ クリックで一覧</div>
       `;
+      // v301: クリックでモーダル表示 (インライン展開はやめる)
       card.onclick = (e) => {
         if (e.target.closest('.card-actions')) return;
-        toggleNode(node.id, wrap);
+        openGroupModal(node);
       };
     } else {
       card = document.createElement('a');
@@ -634,6 +680,68 @@
 
     return wrap;
   }
+
+  // v301: グループ展開モーダル
+  function openGroupModal(node){
+    const ov = $('group-modal');
+    const style = getCardStyle(node.label, true);
+    const iconEl = $('gm-icon');
+    iconEl.textContent = style.icon;
+    iconEl.style.background = style.bg;
+    iconEl.style.color = style.fg;
+    $('gm-title').textContent = node.label;
+
+    const grid = $('gm-grid');
+    grid.innerHTML = '';
+    (node.children || []).forEach(child => {
+      const cstyle = getCardStyle(child.label, false);
+      const isLink = !!child.url;
+      const card = document.createElement(isLink ? 'a' : 'button');
+      card.className = 'tab-card' + (child.highlight ? ' highlight' : '');
+      card.style.setProperty('--accent-bg', cstyle.bg);
+      card.style.setProperty('--accent-color', cstyle.fg);
+      if (isLink) {
+        card.href = child.url;
+        if (child.external) { card.target = '_blank'; card.rel = 'noopener noreferrer'; }
+      } else {
+        card.type = 'button';
+        // 子もグループなら、再度モーダル展開
+        card.onclick = () => openGroupModal(child);
+      }
+      card.innerHTML = `
+        <div class="icon-square">${cstyle.icon}</div>
+        <div class="lbl">${esc(child.label)}</div>
+        <div class="meta">${child.external ? '外部リンク ↗' : (child.url ? '開く →' : '一覧 →')}</div>
+      `;
+      grid.appendChild(card);
+    });
+    // 管理者なら追加ボタン
+    if (isAdmin) {
+      const addBtn = document.createElement('button');
+      addBtn.className = 'add-card add-child-card admin-only';
+      addBtn.type = 'button';
+      addBtn.textContent = '＋ サブタブを追加';
+      addBtn.style.cssText = 'padding:14px;min-height:64px;font-size:12px;border:2px dashed #d4d4d8;border-radius:14px;background:transparent;color:#6b7280;cursor:pointer';
+      addBtn.onclick = () => {
+        closeGroupModal();
+        openModal({ parent_id: node.id });
+      };
+      grid.appendChild(addBtn);
+    }
+    ov.classList.add('show');
+    document.body.style.overflow = 'hidden';
+  }
+  function closeGroupModal(){
+    const ov = $('group-modal');
+    ov.classList.remove('show');
+    document.body.style.overflow = '';
+  }
+  // 閉じるイベント (×ボタン / 背景クリック / Esc)
+  $('gm-close').onclick = closeGroupModal;
+  $('group-modal').onclick = (e) => { if (e.target === $('group-modal')) closeGroupModal(); };
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && $('group-modal').classList.contains('show')) closeGroupModal();
+  });
 
   function toggleNode(id, el){
     const expanded = el.classList.toggle('expanded');
@@ -823,7 +931,7 @@
   await loadTabs();
 })();
 </script>
-<!-- v300: バージョン表示 (全ページ共通) -->
-<div style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v300</div>
+<!-- v301: バージョン表示 (全ページ共通) -->
+<div style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v301</div>
 </body>
 </html>
