@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v298';
+const APP_VERSION = 'v299';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2168,6 +2168,8 @@ function showApp() {
   // v261: ヘッダーバッジ + プルリフレッシュ 初期化 (1度だけ)
   try { setupHeaderBadge(); } catch(_){}
   try { setupPullRefresh(); } catch(_){}
+  // v299: 予約枠確認サブタブのアラートバッジを起動時に更新
+  try { loadAvailabilityBadgeOnInit(); } catch(_){}
   // v261: データ読込後にホームダッシュボード描画
   setTimeout(() => { try { renderHomeDashboard(); } catch(_){} }, 800);
   setTimeout(() => { try { renderHomeDashboard(); } catch(_){} }, 2500);

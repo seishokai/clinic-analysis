@@ -61,14 +61,20 @@
 
 ## 🆕 新機能（v298〜）
 
-- [~] **21. 予約枠確認タブ（自動監視）** 🔴🔴 v298 (Phase 1A完了)
-      予約タブ > 📅 予約枠確認 サブタブ。shareconnect 各医院の矯正相談枠を自動監視。
+- [~] **21. 予約枠確認タブ（自動監視）** 🔴🔴 v298 (Phase 1完了)
+      予約タブ > 📅 予約枠確認 サブタブ。shareconnect 各医院の矯正無料相談枠を自動監視。
       14〜30日後に枠ゼロの医院があれば赤カード + サブタブに 🔴 バッジ表示。
-      - Phase 1A: ✅ UI（カードグリッド表示・サンプルJSON） v298
-      - Phase 1B: ⏳ Playwright で1医院PoC（scripts/check-slots.js）
-      - Phase 1C: ⏳ GitHub Actions cron 毎朝7時（.github/workflows/monitor.yml）
-      - Phase 2: ⏳ 全11医院展開
+      - Phase 1A: ✅ UI（カードグリッド表示） v298
+      - Phase 1B: ✅ Playwright スクレイピング（scripts/check-slots.js, 全11医院）
+      - Phase 1C: ✅ GitHub Actions 毎朝7:00 JST（.github/workflows/monitor.yml）
+      - Phase 2: ⏳ 時間帯別空き枠数の取得（現状は日数のみ）
       - Phase 3: ⏳ Gmail 通知（未開放あればメール送信）
+
+      実装メモ:
+      - 矯正無料相談 治療ID: `1766627271947`
+      - シフト未登録の医院は shareconnect から消える → 「医院非表示」エラーで検知
+      - Firestore 接続のため `networkidle` 不可、各医院ごとに新 context 必須
+      - 茶屋 = 現在シフト未登録のためアラート対象（正式名称は復活時に判明）
 
 ---
 
