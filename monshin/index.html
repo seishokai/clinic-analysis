@@ -396,7 +396,7 @@
 
 <header>
   <h1>事前問診票</h1>
-  <div class="sub">ご来院前のご記入をお願いいたします（所要約3分）</div>
+  <div class="sub" id="header-sub">ご来院前のご記入をお願いいたします</div>
 </header>
 
 <main id="app">
@@ -448,7 +448,7 @@
 <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- 治療別テンプレート -->
-<script src="./templates.js?v=3"></script>
+<script src="./templates.js?v=4"></script>
 
 <script>
 // =====================================================================
@@ -553,6 +553,13 @@ function renderForm(template, params, booking) {
 
   const sections = [...(template.sections || [])];
   if (template.includeCommonMedical) sections.push(...COMMON_MEDICAL_FIELDS);
+
+  // 質問数を計算 (showWhen でデフォルト非表示の任意設問は除外しないシンプル版)
+  const totalFields = sections.reduce((sum, s) => sum + (s.fields || []).length, 0);
+  const headerSub = document.getElementById('header-sub');
+  if (headerSub) {
+    headerSub.textContent = `全${totalFields}問・所要時間約1分`;
+  }
 
   const html = `
     <div class="card">

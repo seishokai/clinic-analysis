@@ -137,10 +137,15 @@ CREATE OR REPLACE FUNCTION mq_normalize_date(d TEXT) RETURNS TEXT
   LANGUAGE plpgsql IMMUTABLE AS $$
 DECLARE
   result DATE;
+  cleaned TEXT;
 BEGIN
   IF d IS NULL OR TRIM(d) = '' THEN RETURN NULL; END IF;
+  -- スラッシュをハイフンに統一 (2026/4/17 → 2026-4-17)
+  cleaned := REPLACE(TRIM(d), '/', '-');
+  -- 時刻部分を除去 (2026-4-17 10:00 → 2026-4-17)
+  cleaned := SPLIT_PART(cleaned, ' ', 1);
   BEGIN
-    result := REPLACE(TRIM(d), '/', '-')::DATE;
+    result := cleaned::DATE;
     RETURN result::TEXT;
   EXCEPTION WHEN OTHERS THEN
     RETURN d;
