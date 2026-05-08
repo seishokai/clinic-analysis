@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v318';
+const APP_VERSION = 'v319';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2307,6 +2307,94 @@ let _homeAnalysisRange = (() => {
 function _saveHomeRange() {
   try { sessionStorage.setItem('home-analysis-range', _homeAnalysisRange ? JSON.stringify(_homeAnalysisRange) : ''); } catch(_){}
 }
+// v318: 「その他プロモ」内訳モーダル
+function _openOtherPromoModal(facKey) {
+  const data = window._otherPromosData;
+  if (!data || !Array.isArray(data.otherPromos) || data.otherPromos.length === 0) return;
+  const { otherPromos, matrix, facListSorted } = data;
+  const facLabel = facKey === '__ALL__' ? '全医院' : facKey;
+
+  // 各プロモの件数を集計 (指定医院 or 全医院)
+  const rows = otherPromos.map(p => {
+    let booking = 0, visited = 0, contracted = 0;
+    if (facKey === '__ALL__') {
+      facListSorted.forEach(f => {
+        const v = matrix[f]?.[p];
+        if (v) { booking += v.booking; visited += v.visited; contracted += v.contracted; }
+      });
+    } else {
+      const v = matrix[facKey]?.[p];
+      if (v) { booking = v.booking; visited = v.visited; contracted = v.contracted; }
+    }
+    return { promo: p, booking, visited, contracted };
+  }).filter(r => r.booking > 0)
+    .sort((a, b) => b.booking - a.booking);
+
+  const total = rows.reduce((acc, r) => {
+    acc.booking += r.booking; acc.visited += r.visited; acc.contracted += r.contracted;
+    return acc;
+  }, { booking:0, visited:0, contracted:0 });
+
+  // 既存モーダルがあれば削除
+  document.getElementById('other-promo-modal')?.remove();
+  const ov = document.createElement('div');
+  ov.id = 'other-promo-modal';
+  ov.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px';
+  const _basisLbl = (typeof _homeAnalysisBasis !== 'undefined' && _homeAnalysisBasis === 'apply') ? '登録数' : '予約数';
+  ov.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:20px 24px;width:100%;max-width:520px;max-height:85vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.25)">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid #e5e7eb">
+        <div>
+          <div style="font-size:17px;font-weight:800;color:#1a1a1a">📋 ${escapeHtml(facLabel)} の「その他」内訳</div>
+          <div style="font-size:11px;color:var(--text-sub);margin-top:2px">${_basisLbl} 合計 <strong style="color:#1d4ed8">${total.booking}</strong>件 / 来院 ${total.visited} / 成約 ${total.contracted}</div>
+        </div>
+        <button id="opm-close" style="background:#f3f4f6;border:none;width:32px;height:32px;border-radius:50%;cursor:pointer;font-size:18px;color:#6b7280;display:flex;align-items:center;justify-content:center">×</button>
+      </div>
+      ${rows.length === 0 ? `
+        <div style="text-align:center;padding:32px;color:var(--text-sub);font-size:13px">この医院には「その他」プロモの登録がありません</div>
+      ` : `
+        <table style="width:100%;border-collapse:collapse;font-size:12px">
+          <thead>
+            <tr>
+              <th style="text-align:left;padding:8px;background:#f9fafb;border-bottom:2px solid #e5e7eb;font-size:10px;color:var(--text-sub)">プロモコード</th>
+              <th style="text-align:right;padding:8px;background:#f9fafb;border-bottom:2px solid #e5e7eb;font-size:10px;color:var(--text-sub);width:60px">${_basisLbl}</th>
+              <th style="text-align:right;padding:8px;background:#f9fafb;border-bottom:2px solid #e5e7eb;font-size:10px;color:#1d4ed8;width:60px">来院</th>
+              <th style="text-align:right;padding:8px;background:#f9fafb;border-bottom:2px solid #e5e7eb;font-size:10px;color:#059669;width:60px">成約</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map((r, i) => `
+              <tr>
+                <td style="padding:7px 8px;border-bottom:1px solid #f3f4f6;color:#1a1a1a;word-break:break-all">
+                  <span style="display:inline-block;width:18px;color:var(--text-sub);font-size:10px">${i+1}.</span>${escapeHtml(r.promo)}
+                </td>
+                <td style="text-align:right;padding:7px 8px;border-bottom:1px solid #f3f4f6;font-variant-numeric:tabular-nums;font-weight:700;color:#1a1a1a">${r.booking}</td>
+                <td style="text-align:right;padding:7px 8px;border-bottom:1px solid #f3f4f6;font-variant-numeric:tabular-nums;color:#1d4ed8">${r.visited}</td>
+                <td style="text-align:right;padding:7px 8px;border-bottom:1px solid #f3f4f6;font-variant-numeric:tabular-nums;color:#059669;font-weight:${r.contracted>0?'700':'400'}">${r.contracted}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+          <tfoot>
+            <tr style="background:#1f2937;color:#fff">
+              <td style="padding:10px 8px;font-weight:800">合計</td>
+              <td style="text-align:right;padding:10px 8px;font-variant-numeric:tabular-nums;font-weight:800">${total.booking}</td>
+              <td style="text-align:right;padding:10px 8px;font-variant-numeric:tabular-nums">${total.visited}</td>
+              <td style="text-align:right;padding:10px 8px;font-variant-numeric:tabular-nums">${total.contracted}</td>
+            </tr>
+          </tfoot>
+        </table>
+      `}
+      <div style="margin-top:14px;font-size:10px;color:var(--text-sub);text-align:center">クリック外 / Esc で閉じる</div>
+    </div>
+  `;
+  document.body.appendChild(ov);
+  const close = () => { ov.remove(); document.removeEventListener('keydown', onKey); };
+  ov.querySelector('#opm-close').onclick = close;
+  ov.addEventListener('click', (e) => { if (e.target === ov) close(); });
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+  document.addEventListener('keydown', onKey);
+}
+
 // v316: ホーム/分析タブの基準切替 ('book' = 予約日基準 / 'apply' = 登録日基準)
 let _homeAnalysisBasis = (() => {
   try { return sessionStorage.getItem('home-analysis-basis') || 'book'; } catch(_) { return 'book'; }
@@ -2670,6 +2758,8 @@ function renderHomeDashboard() {
           }
           return matrix[f]?.[p] || { booking:0, visited:0, contracted:0 };
         };
+        // v318: 「その他」の中身を window に格納してモーダル展開できるようにする
+        window._otherPromosData = { otherPromos, matrix, facListSorted };
         const _basisLbl = _homeAnalysisBasis === 'apply' ? '登録数' : '予約数';
         return `
         <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;overflow-x:auto">
@@ -2682,8 +2772,11 @@ function renderHomeDashboard() {
               <tr>
                 <th style="text-align:left;padding:6px 8px;background:#f9fafb;border-bottom:2px solid var(--border);position:sticky;left:0;z-index:1;min-width:90px">医院＼プロモ</th>
                 ${showPromos.map(p => {
-                  const lbl = p === '__OTHER__' ? `その他${otherPromos.length}件` : (p.length > 14 ? p.slice(0,14)+'…' : p);
-                  return `<th style="text-align:center;padding:6px 8px;background:#f9fafb;border-bottom:2px solid var(--border);font-size:10px;font-weight:600;white-space:nowrap" title="${escapeHtml(p === '__OTHER__' ? otherPromos.join(', ') : p)}">${escapeHtml(lbl)}</th>`;
+                  if (p === '__OTHER__') {
+                    return `<th class="cross-other-header" style="text-align:center;padding:6px 8px;background:#fef3c7;border-bottom:2px solid var(--border);font-size:10px;font-weight:600;white-space:nowrap;cursor:pointer;color:#92400e;text-decoration:underline" title="クリックで内訳表示">📋 その他${otherPromos.length}件</th>`;
+                  }
+                  const lbl = p.length > 14 ? p.slice(0,14)+'…' : p;
+                  return `<th style="text-align:center;padding:6px 8px;background:#f9fafb;border-bottom:2px solid var(--border);font-size:10px;font-weight:600;white-space:nowrap" title="${escapeHtml(p)}">${escapeHtml(lbl)}</th>`;
                 }).join('')}
                 <th style="text-align:center;padding:6px 8px;background:#1f2937;color:#fff;border-bottom:2px solid var(--border);font-weight:700">合計</th>
               </tr>
@@ -2695,9 +2788,19 @@ function renderHomeDashboard() {
                   <td style="padding:6px 8px;font-weight:700;border-bottom:1px solid var(--border);background:#f9fafb;position:sticky;left:0;white-space:nowrap">${escapeHtml(f)}</td>
                   ${showPromos.map(p => {
                     const v = cellVal(f, p);
-                    if (v.booking === 0) return '<td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:#d1d5db">-</td>';
-                    return `<td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums">
-                      <div style="font-weight:700;color:#1a1a1a">${v.booking}</div>
+                    const isOther = p === '__OTHER__';
+                    if (v.booking === 0) {
+                      const baseStyle = 'text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:#d1d5db';
+                      return isOther
+                        ? `<td class="cross-other-cell" data-fac="${escapeHtml(f)}" style="${baseStyle};background:#fffbeb;cursor:pointer">-</td>`
+                        : `<td style="${baseStyle}">-</td>`;
+                    }
+                    const cellStyle = isOther
+                      ? 'text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;background:#fffbeb;cursor:pointer'
+                      : 'text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums';
+                    const clickAttr = isOther ? `class="cross-other-cell" data-fac="${escapeHtml(f)}" title="クリックで内訳表示"` : '';
+                    return `<td ${clickAttr} style="${cellStyle}">
+                      <div style="font-weight:700;color:#1a1a1a">${v.booking}${isOther?' 🔍':''}</div>
                       <div style="font-size:9px;color:var(--text-sub)">${v.visited}<span style="color:#059669"> / ${v.contracted}</span></div>
                     </td>`;
                   }).join('')}
@@ -2711,14 +2814,20 @@ function renderHomeDashboard() {
               <tr style="background:#1f2937;color:#fff">
                 <td style="padding:8px;font-weight:800;position:sticky;left:0;background:#1f2937">合計</td>
                 ${showPromos.map(p => {
+                  const isOther = p === '__OTHER__';
                   const total = facListSorted.reduce((acc, f) => {
                     const v = cellVal(f, p);
                     acc.booking += v.booking; acc.visited += v.visited; acc.contracted += v.contracted;
                     return acc;
                   }, { booking:0, visited:0, contracted:0 });
-                  if (total.booking === 0) return '<td style="text-align:center;padding:8px;color:#9ca3af">-</td>';
-                  return `<td style="text-align:center;padding:8px;font-variant-numeric:tabular-nums">
-                    <div style="font-weight:800">${total.booking}</div>
+                  if (total.booking === 0) {
+                    return isOther
+                      ? `<td class="cross-other-cell" data-fac="__ALL__" style="text-align:center;padding:8px;color:#9ca3af;cursor:pointer;background:#3f4b5b">-</td>`
+                      : `<td style="text-align:center;padding:8px;color:#9ca3af">-</td>`;
+                  }
+                  const clickAttr = isOther ? `class="cross-other-cell" data-fac="__ALL__" style="text-align:center;padding:8px;font-variant-numeric:tabular-nums;cursor:pointer;background:#3f4b5b" title="全医院その他の内訳"` : `style="text-align:center;padding:8px;font-variant-numeric:tabular-nums"`;
+                  return `<td ${clickAttr}>
+                    <div style="font-weight:800">${total.booking}${isOther?' 🔍':''}</div>
                     <div style="font-size:9px;color:#d1d5db">${total.visited} / ${total.contracted}</div>
                   </td>`;
                 }).join('')}
@@ -2729,7 +2838,7 @@ function renderHomeDashboard() {
               </tr>
             </tbody>
           </table>
-          <div style="font-size:10px;color:var(--text-sub);margin-top:6px">※ 数字: ${_basisLbl} / 来院数 / 成約数</div>
+          <div style="font-size:10px;color:var(--text-sub);margin-top:6px">※ 数字: ${_basisLbl} / 来院数 / 成約数  •  📋 「その他」をクリックで内訳表示</div>
         </div>`;
       })()}
 
@@ -2931,6 +3040,13 @@ function renderHomeDashboard() {
       _saveHomeBasis();
       renderHomeDashboard();
       if (typeof renderAnalyticsDashboard === 'function') renderAnalyticsDashboard();
+    });
+  });
+  // v318: 「その他」セル/ヘッダクリックで内訳モーダル表示
+  el.querySelectorAll('.cross-other-cell, .cross-other-header').forEach(elm => {
+    elm.addEventListener('click', () => {
+      const fac = elm.dataset.fac || '__ALL__';   // ヘッダクリック時は全医院
+      _openOtherPromoModal(fac);
     });
   });
   // カスタム期間 (input type=month) の変更
