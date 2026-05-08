@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v321';
+const APP_VERSION = 'v322';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13378,7 +13378,7 @@ function showMonshinDetail(row) {
     ${fmtJSON(row.common_answers)}
     ${row.upload_files && row.upload_files.length ? `<h4 style="margin:20px 0 8px;font-size:14px">添付ファイル</h4><div>${row.upload_files.map(f => `<div>${escapeHtml(JSON.stringify(f))}</div>`).join('')}</div>` : ''}
   `;
-  modal.hidden = false;
+  modal.style.display = 'flex';
 }
 
 async function renderMonshin() {
@@ -13414,10 +13414,10 @@ function bindMonshinEvents() {
   // 詳細モーダル閉じる
   document.getElementById('mq-detail-close')?.addEventListener('click', () => {
     const m = document.getElementById('mq-detail-modal');
-    if (m) m.hidden = true;
+    if (m) m.style.display = 'none';
   });
   document.getElementById('mq-detail-modal')?.addEventListener('click', e => {
-    if (e.target.id === 'mq-detail-modal') e.target.hidden = true;
+    if (e.target.id === 'mq-detail-modal') e.target.style.display = 'none';
   });
 
   // メール用URLコピー
