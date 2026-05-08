@@ -242,36 +242,62 @@
 
   /* 治療選択画面 (フォールバック) */
   .treatment-select {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
     margin-top: 8px;
   }
   .treatment-card {
-    border: 1.5px solid var(--border);
-    border-radius: 16px;
-    padding: 24px 16px;
-    text-align: center;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 18px 22px;
+    text-align: left;
     background: #fff;
     cursor: pointer;
-    transition: all 0.18s ease;
-    font-weight: 600;
+    transition: all 0.15s ease;
     color: var(--text);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    font-family: inherit;
   }
   .treatment-card:hover {
     border-color: var(--primary);
     background: var(--primary-tint);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow);
   }
-  .treatment-card .icon {
-    font-size: 32px;
-    display: block;
-    margin-bottom: 8px;
+  .treatment-card:active { transform: scale(0.99); }
+  .treatment-card .label-block {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    flex: 1;
+    min-width: 0;
   }
   .treatment-card .name {
-    font-size: 15px;
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--text);
     line-height: 1.4;
+    letter-spacing: 0.01em;
+  }
+  .treatment-card .sub {
+    font-size: 12px;
+    color: var(--text-sub);
+    line-height: 1.4;
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+  .treatment-card .arrow {
+    color: var(--text-mute);
+    font-size: 18px;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+    font-weight: 300;
+  }
+  .treatment-card:hover .arrow {
+    color: var(--primary);
+    transform: translateX(2px);
   }
 
   /* 患者情報サマリー */
@@ -413,12 +439,48 @@
     <h2>ご予約内容を選択してください</h2>
     <p class="section-desc">該当するご相談内容をタップしてください</p>
     <div class="treatment-select" id="treatmentSelect">
-      <button class="treatment-card" data-treatment="kyosei"><span class="icon">😁</span><span class="name">矯正相談</span></button>
-      <button class="treatment-card" data-treatment="bf"><span class="icon">✨</span><span class="name">ブラックフィルム<br>/ ラミネート</span></button>
-      <button class="treatment-card" data-treatment="implant"><span class="icon">🦷</span><span class="name">インプラント</span></button>
-      <button class="treatment-card" data-treatment="whitening"><span class="icon">💎</span><span class="name">ホワイトニング</span></button>
-      <button class="treatment-card" data-treatment="laburie"><span class="icon">💖</span><span class="name">ラブリエ</span></button>
-      <button class="treatment-card" data-treatment="general"><span class="icon">📋</span><span class="name">一般診療<br>/ その他</span></button>
+      <button class="treatment-card" data-treatment="kyosei">
+        <span class="label-block">
+          <span class="name">矯正相談</span>
+          <span class="sub">歯並び・噛み合わせ</span>
+        </span>
+        <span class="arrow">›</span>
+      </button>
+      <button class="treatment-card" data-treatment="bf">
+        <span class="label-block">
+          <span class="name">ブラックフィルム / ラミネート</span>
+          <span class="sub">短期間で前歯を美しく</span>
+        </span>
+        <span class="arrow">›</span>
+      </button>
+      <button class="treatment-card" data-treatment="implant">
+        <span class="label-block">
+          <span class="name">インプラント</span>
+          <span class="sub">歯を失った方へ</span>
+        </span>
+        <span class="arrow">›</span>
+      </button>
+      <button class="treatment-card" data-treatment="whitening">
+        <span class="label-block">
+          <span class="name">ホワイトニング</span>
+          <span class="sub">歯を白く明るく</span>
+        </span>
+        <span class="arrow">›</span>
+      </button>
+      <button class="treatment-card" data-treatment="laburie">
+        <span class="label-block">
+          <span class="name">ラブリエ</span>
+          <span class="sub">自費補綴</span>
+        </span>
+        <span class="arrow">›</span>
+      </button>
+      <button class="treatment-card" data-treatment="general">
+        <span class="label-block">
+          <span class="name">一般診療・その他</span>
+          <span class="sub">むし歯・歯周病・定期検診など</span>
+        </span>
+        <span class="arrow">›</span>
+      </button>
     </div>
   </div>
 
