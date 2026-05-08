@@ -99,7 +99,7 @@ const KYOSEI_TEMPLATE = {
   title: '矯正相談 事前問診票',
   description:
     'ご来院前に、いくつかご質問にお答えください。スタッフ・ドクターが事前に内容を把握し、当日のご相談がスムーズになります。',
-  includeCommonMedical: true,
+  includeCommonMedical: false,
   sections: [
     {
       id: 'kyosei_consultation',
@@ -227,11 +227,11 @@ const STUB_FIELDS = [
   },
 ];
 
-const BF_TEMPLATE        = { treatment: 'bf',        title: 'ブラックフィルム相談 事前問診票',     includeCommonMedical: true, sections: STUB_FIELDS };
-const IMPLANT_TEMPLATE   = { treatment: 'implant',   title: 'インプラント相談 事前問診票',         includeCommonMedical: true, sections: STUB_FIELDS };
-const WHITENING_TEMPLATE = { treatment: 'whitening', title: 'ホワイトニング相談 事前問診票',       includeCommonMedical: true, sections: STUB_FIELDS };
-const LABURIE_TEMPLATE   = { treatment: 'laburie',   title: 'ラブリエ相談 事前問診票',             includeCommonMedical: true, sections: STUB_FIELDS };
-const GENERAL_TEMPLATE   = { treatment: 'general',   title: '事前問診票',                           includeCommonMedical: true, sections: STUB_FIELDS };
+const BF_TEMPLATE        = { treatment: 'bf',        title: 'ブラックフィルム相談 事前問診票',     includeCommonMedical: false, sections: STUB_FIELDS };
+const IMPLANT_TEMPLATE   = { treatment: 'implant',   title: 'インプラント相談 事前問診票',         includeCommonMedical: false, sections: STUB_FIELDS };
+const WHITENING_TEMPLATE = { treatment: 'whitening', title: 'ホワイトニング相談 事前問診票',       includeCommonMedical: false, sections: STUB_FIELDS };
+const LABURIE_TEMPLATE   = { treatment: 'laburie',   title: 'ラブリエ相談 事前問診票',             includeCommonMedical: false, sections: STUB_FIELDS };
+const GENERAL_TEMPLATE   = { treatment: 'general',   title: '事前問診票',                           includeCommonMedical: false, sections: STUB_FIELDS };
 
 const TEMPLATES = {
   kyosei:    KYOSEI_TEMPLATE,

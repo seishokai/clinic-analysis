@@ -166,55 +166,66 @@ SET search_path = public
 AS $$
 DECLARE
   v_target_date TEXT;
-  v_clinic_pattern TEXT;
+  v_clinic_clean TEXT;
+  v_name_clean TEXT;
   v_record RECORD;
 BEGIN
-  v_target_date := mq_normalize_date(p_book_date);
-  v_clinic_pattern := '%' || COALESCE(NULLIF(TRIM(p_clinic), ''), '_NEVER_') || '%';
+  v_target_date  := mq_normalize_date(p_book_date);
+  v_clinic_clean := COALESCE(NULLIF(TRIM(p_clinic), ''), '');
+  v_name_clean   := REPLACE(TRIM(COALESCE(p_name, '')), ' ', '');
 
-  -- 厳密検索 (TRIM 名 + 正規化日付)
-  SELECT name, service, facility, source, apply_date, book_date
-    INTO v_record
+  -- Strategy 1: 名前完全一致 (空白除去) + 日付一致
+  SELECT name, service, facility, source, apply_date, book_date INTO v_record
     FROM manual_bookings
-    WHERE TRIM(name) = TRIM(p_name)
+    WHERE REPLACE(name, ' ', '') = v_name_clean
       AND mq_normalize_date(book_date) = v_target_date
-    ORDER BY created_at DESC
-    LIMIT 1;
+    ORDER BY created_at DESC LIMIT 1;
+  IF FOUND THEN
+    RETURN jsonb_build_object('found', true, 'matched_by', 'exact_name_date',
+      'name', v_record.name, 'service', v_record.service,
+      'facility', v_record.facility, 'source', v_record.source,
+      'apply_date', v_record.apply_date, 'book_date', v_record.book_date);
+  END IF;
 
-  -- 部分一致 (空白ゆらぎ吸収)
-  IF NOT FOUND THEN
-    SELECT name, service, facility, source, apply_date, book_date
-      INTO v_record
+  -- Strategy 2: 名前部分一致 (双方向 substring) + 日付一致
+  IF v_name_clean <> '' THEN
+    SELECT name, service, facility, source, apply_date, book_date INTO v_record
       FROM manual_bookings
-      WHERE REPLACE(name, ' ', '') = REPLACE(TRIM(p_name), ' ', '')
+      WHERE (REPLACE(name, ' ', '') ILIKE '%' || v_name_clean || '%'
+          OR v_name_clean ILIKE '%' || REPLACE(name, ' ', '') || '%')
         AND mq_normalize_date(book_date) = v_target_date
-      ORDER BY created_at DESC
-      LIMIT 1;
+      ORDER BY created_at DESC LIMIT 1;
+    IF FOUND THEN
+      RETURN jsonb_build_object('found', true, 'matched_by', 'partial_name_date',
+        'name', v_record.name, 'service', v_record.service,
+        'facility', v_record.facility, 'source', v_record.source,
+        'apply_date', v_record.apply_date, 'book_date', v_record.book_date);
+    END IF;
   END IF;
 
-  -- name + clinic フォールバック
-  IF NOT FOUND THEN
-    SELECT name, service, facility, source, apply_date, book_date
-      INTO v_record
+  -- Strategy 3: 名前部分一致 + 医院部分一致 (双方向 substring) ← 日付不一致をカバー
+  IF v_name_clean <> '' AND v_clinic_clean <> '' THEN
+    SELECT name, service, facility, source, apply_date, book_date INTO v_record
       FROM manual_bookings
-      WHERE REPLACE(name, ' ', '') = REPLACE(TRIM(p_name), ' ', '')
-        AND facility ILIKE v_clinic_pattern
-      ORDER BY created_at DESC
-      LIMIT 1;
+      WHERE (REPLACE(name, ' ', '') ILIKE '%' || v_name_clean || '%'
+          OR v_name_clean ILIKE '%' || REPLACE(name, ' ', '') || '%')
+        AND (facility ILIKE '%' || v_clinic_clean || '%'
+          OR v_clinic_clean ILIKE '%' || facility || '%')
+      ORDER BY created_at DESC LIMIT 1;
+    IF FOUND THEN
+      RETURN jsonb_build_object('found', true, 'matched_by', 'partial_name_clinic',
+        'name', v_record.name, 'service', v_record.service,
+        'facility', v_record.facility, 'source', v_record.source,
+        'apply_date', v_record.apply_date, 'book_date', v_record.book_date);
+    END IF;
   END IF;
 
-  IF NOT FOUND THEN
-    RETURN jsonb_build_object('found', false, 'reason', 'no_matching_booking');
-  END IF;
-
+  -- 見つからなかった場合は診断情報を返す (デバッグしやすくするため)
   RETURN jsonb_build_object(
-    'found', true,
-    'name', v_record.name,
-    'service', v_record.service,
-    'facility', v_record.facility,
-    'source', v_record.source,
-    'apply_date', v_record.apply_date,
-    'book_date', v_record.book_date
+    'found', false, 'reason', 'no_matching_booking',
+    'p_name', p_name, 'p_book_date', p_book_date, 'p_clinic', p_clinic,
+    'v_target_date', v_target_date, 'v_name_clean', v_name_clean,
+    'v_clinic_clean', v_clinic_clean
   );
 END;
 $$;
