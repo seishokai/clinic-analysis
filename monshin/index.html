@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex,nofollow" />
+<title>事前問診票 | 清翔会</title>
+<style>
+  :root {
+    --bg: #f6f7f9;
+    --card: #ffffff;
+    --text: #1f2937;
+    --text-sub: #6b7280;
+    --primary: #06c755;        /* LINE グリーン */
+    --primary-dark: #05a845;
+    --accent: #2563eb;
+    --border: #e5e7eb;
+    --error: #dc2626;
+    --warn: #f59e0b;
+    --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    font-size: 16px;
+    line-height: 1.6;
+    padding-bottom: 80px;
+  }
+  header {
+    background: #fff;
+    border-bottom: 1px solid var(--border);
+    padding: 16px;
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 { font-size: 17px; margin: 0; font-weight: 700; }
+  header .sub { font-size: 12px; color: var(--text-sub); margin-top: 4px; }
+  main { max-width: 640px; margin: 0 auto; padding: 16px; }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 16px;
+    margin-bottom: 16px;
+    box-shadow: var(--shadow);
+  }
+  .card h2 {
+    font-size: 16px;
+    margin: 0 0 4px 0;
+    color: var(--text);
+    border-left: 4px solid var(--primary);
+    padding-left: 10px;
+    line-height: 1.4;
+  }
+  .card .section-desc { font-size: 13px; color: var(--text-sub); margin: 0 0 16px 0; }
+  .field { margin-bottom: 18px; }
+  .field:last-child { margin-bottom: 0; }
+  .field label.label {
+    display: block;
+    font-weight: 600;
+    font-size: 14px;
+    margin-bottom: 6px;
+    color: var(--text);
+  }
+  .field .req {
+    color: var(--error);
+    font-size: 11px;
+    margin-left: 6px;
+    background: #fee;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-weight: 600;
+  }
+  .field .opt {
+    color: var(--text-sub);
+    font-size: 11px;
+    margin-left: 6px;
+  }
+  .field .desc { font-size: 12px; color: var(--text-sub); margin-bottom: 8px; line-height: 1.5; }
+
+  input[type=text], input[type=number], input[type=tel], input[type=email],
+  input[type=date], textarea, select {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    font-size: 16px;
+    background: #fff;
+    color: var(--text);
+    font-family: inherit;
+  }
+  textarea { min-height: 96px; resize: vertical; }
+  input:focus, textarea:focus, select:focus {
+    outline: none;
+    border-color: var(--primary);
+    box-shadow: 0 0 0 3px rgba(6, 199, 85, 0.15);
+  }
+
+  /* ラジオ・チェックボックス: タップしやすいカード型 */
+  .options { display: flex; flex-direction: column; gap: 8px; }
+  .options.inline { flex-direction: row; flex-wrap: wrap; }
+  .options.inline label.opt-item { flex: 1 1 auto; }
+  label.opt-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    background: #fff;
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.1s;
+  }
+  label.opt-item input { width: 20px; height: 20px; flex-shrink: 0; accent-color: var(--primary); }
+  label.opt-item.checked {
+    background: rgba(6, 199, 85, 0.08);
+    border-color: var(--primary);
+  }
+  label.opt-item .opt-text { font-size: 15px; }
+
+  /* スマートルーター中の表示 */
+  .loader { text-align: center; padding: 60px 20px; }
+  .loader .spinner {
+    width: 40px; height: 40px;
+    border: 4px solid #eee;
+    border-top-color: var(--primary);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .loader p { color: var(--text-sub); font-size: 14px; }
+
+  /* 治療選択画面 (フォールバック) */
+  .treatment-select { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .treatment-card {
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 12px;
+    text-align: center;
+    background: #fff;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-weight: 600;
+  }
+  .treatment-card:hover, .treatment-card:active {
+    border-color: var(--primary);
+    background: rgba(6, 199, 85, 0.05);
+    transform: translateY(-1px);
+  }
+  .treatment-card .icon { font-size: 28px; display: block; margin-bottom: 6px; }
+  .treatment-card .name { font-size: 14px; }
+
+  /* 患者情報サマリー */
+  .info-summary {
+    background: #fffbe6;
+    border: 1px solid #fde68a;
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 13px;
+    margin-bottom: 16px;
+  }
+  .info-summary .row { display: flex; gap: 8px; margin-bottom: 4px; }
+  .info-summary .row:last-child { margin-bottom: 0; }
+  .info-summary .key { color: var(--text-sub); width: 70px; flex-shrink: 0; }
+  .info-summary .val { font-weight: 600; }
+
+  /* 送信ボタン */
+  .submit-bar {
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    background: #fff;
+    border-top: 1px solid var(--border);
+    padding: 12px 16px;
+    box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+    z-index: 50;
+  }
+  .submit-bar .inner { max-width: 640px; margin: 0 auto; }
+  button.submit-btn {
+    width: 100%;
+    background: var(--primary);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    box-shadow: var(--shadow);
+  }
+  button.submit-btn:hover { background: var(--primary-dark); }
+  button.submit-btn:disabled { background: #d1d5db; cursor: not-allowed; }
+
+  /* エラー表示 */
+  .field.error input, .field.error textarea, .field.error select { border-color: var(--error); }
+  .field.error label.opt-item { border-color: var(--error); }
+  .field-error-msg { color: var(--error); font-size: 12px; margin-top: 4px; }
+
+  /* 完了画面 */
+  .thanks {
+    text-align: center;
+    padding: 40px 20px;
+  }
+  .thanks .icon { font-size: 64px; margin-bottom: 16px; }
+  .thanks h2 { font-size: 20px; margin: 0 0 8px; border: none; padding: 0; }
+  .thanks p { color: var(--text-sub); }
+
+  /* その他自由記入欄 */
+  .other-input { margin-top: 6px; }
+
+  /* 「お名前」など固定表示 */
+  .readonly-input {
+    background: #f3f4f6 !important;
+    color: var(--text-sub);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>事前問診票</h1>
+  <div class="sub">ご来院前のご記入をお願いいたします（所要約3分）</div>
+</header>
+
+<main id="app">
+  <!-- スマートルーター中 -->
+  <div id="screen-loading" class="card">
+    <div class="loader">
+      <div class="spinner"></div>
+      <p>ご予約内容を確認しています...</p>
+    </div>
+  </div>
+
+  <!-- フォールバック: 治療選択 -->
+  <div id="screen-select" class="card" style="display:none">
+    <h2>ご予約内容を選択してください</h2>
+    <p class="section-desc">該当するご相談内容をタップしてください</p>
+    <div class="treatment-select" id="treatmentSelect">
+      <button class="treatment-card" data-treatment="kyosei"><span class="icon">😁</span><span class="name">矯正相談</span></button>
+      <button class="treatment-card" data-treatment="bf"><span class="icon">✨</span><span class="name">ブラックフィルム<br>/ ラミネート</span></button>
+      <button class="treatment-card" data-treatment="implant"><span class="icon">🦷</span><span class="name">インプラント</span></button>
+      <button class="treatment-card" data-treatment="whitening"><span class="icon">💎</span><span class="name">ホワイトニング</span></button>
+      <button class="treatment-card" data-treatment="laburie"><span class="icon">💖</span><span class="name">ラブリエ</span></button>
+      <button class="treatment-card" data-treatment="general"><span class="icon">📋</span><span class="name">一般診療<br>/ その他</span></button>
+    </div>
+  </div>
+
+  <!-- 入力フォーム -->
+  <div id="screen-form" style="display:none"></div>
+
+  <!-- 完了 -->
+  <div id="screen-thanks" class="card thanks" style="display:none">
+    <div class="icon">🎉</div>
+    <h2>ご記入ありがとうございました</h2>
+    <p>ご来院お待ちしております。<br>当日のご相談がスムーズになります。</p>
+  </div>
+
+  <!-- エラー -->
+  <div id="screen-error" class="card" style="display:none">
+    <h2 style="border-color:var(--error)">エラー</h2>
+    <p id="errorMsg" style="color:var(--error)"></p>
+  </div>
+</main>
+
+<div class="submit-bar" id="submitBar" style="display:none">
+  <div class="inner">
+    <button class="submit-btn" id="submitBtn">送信する</button>
+  </div>
+</div>
+
+<!-- Supabase JS -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<!-- 治療別テンプレート -->
+<script src="./templates.js?v=1"></script>
+
+<script>
+// =====================================================================
+// 設定
+// =====================================================================
+const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// =====================================================================
+// URL パラメータ取得
+// =====================================================================
+function getParams() {
+  const u = new URL(location.href);
+  const get = k => u.searchParams.get(k) || '';
+  return {
+    treatment: get('treatment').trim(),
+    name: get('name').trim(),
+    clinic: get('clinic').trim(),
+    date: get('date').trim(),
+    time: get('time').trim(),
+    email: get('email').trim(),
+    phone: get('phone').trim(),
+    raw: Object.fromEntries(u.searchParams.entries()),
+  };
+}
+
+// '2026/5/19' or '2026-05-19' → 'YYYY-MM-DD'
+function normalizeDate(s) {
+  if (!s) return '';
+  const m = s.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (!m) return s;
+  return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+}
+
+// =====================================================================
+// スマートルーター: Supabase RPC で治療種別を判定
+// =====================================================================
+async function smartRouteTreatment(params) {
+  // 1. URL に treatment があれば最優先
+  const fromUrl = detectTreatment(params.treatment);
+  if (fromUrl) return { resolvedTreatment: fromUrl, via: 'url_param', booking: null };
+
+  // 2. RPC で manual_bookings から検索
+  if (params.name && params.date) {
+    try {
+      const { data, error } = await sb.rpc('lookup_questionnaire_treatment', {
+        p_name: params.name,
+        p_book_date: normalizeDate(params.date),
+        p_clinic: params.clinic,
+      });
+      if (error) {
+        console.warn('[lookup RPC error]', error);
+      } else if (data && data.found) {
+        // service / source の順で判定
+        const t = detectTreatment(data.service) || detectTreatment(data.source);
+        if (t) return { resolvedTreatment: t, via: 'smart_router', booking: data };
+      }
+    } catch(e) {
+      console.warn('[smart router exception]', e);
+    }
+  }
+
+  // 3. ヒットしない → フォールバック
+  return { resolvedTreatment: null, via: 'fallback_select', booking: null };
+}
+
+// =====================================================================
+// レンダリング
+// =====================================================================
+const screens = {
+  loading: document.getElementById('screen-loading'),
+  select:  document.getElementById('screen-select'),
+  form:    document.getElementById('screen-form'),
+  thanks:  document.getElementById('screen-thanks'),
+  error:   document.getElementById('screen-error'),
+};
+function showScreen(name) {
+  Object.entries(screens).forEach(([k, el]) => { el.style.display = (k === name) ? '' : 'none'; });
+  document.getElementById('submitBar').style.display = (name === 'form') ? '' : 'none';
+}
+
+function escapeHtml(s) {
+  return String(s ?? '').replace(/[&<>"']/g, c => ({
+    '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'
+  })[c]);
+}
+
+function interpolate(text, params) {
+  if (!text) return '';
+  return text.replace(/\{clinic_name\}/g, params.clinic || 'クリニック');
+}
+
+let currentTemplate = null;
+let currentParams   = null;
+let currentBooking  = null;
+
+function renderForm(template, params, booking) {
+  currentTemplate = template;
+  currentParams   = params;
+  currentBooking  = booking;
+
+  const sections = [...(template.sections || [])];
+  if (template.includeCommonMedical) sections.push(...COMMON_MEDICAL_FIELDS);
+
+  const html = `
+    <div class="card">
+      <h2>${escapeHtml(template.title)}</h2>
+      ${template.description ? `<p class="section-desc">${escapeHtml(template.description)}</p>` : ''}
+      <div class="info-summary">
+        <div class="row"><span class="key">お名前</span><span class="val">${escapeHtml(params.name || '-')}</span></div>
+        <div class="row"><span class="key">医院</span><span class="val">${escapeHtml(params.clinic || '-')}</span></div>
+        <div class="row"><span class="key">予約日時</span><span class="val">${escapeHtml(params.date || '-')} ${escapeHtml(params.time || '')}</span></div>
+      </div>
+    </div>
+    ${sections.map(sec => renderSection(sec, params)).join('')}
+  `;
+  screens.form.innerHTML = html;
+  showScreen('form');
+  attachFieldListeners();
+}
+
+function renderSection(sec, params) {
+  return `
+    <div class="card" data-section="${escapeHtml(sec.id)}">
+      <h2>${escapeHtml(sec.title)}</h2>
+      ${sec.description ? `<p class="section-desc">${escapeHtml(sec.description)}</p>` : ''}
+      ${(sec.fields || []).map(f => renderField(f, params)).join('')}
+    </div>
+  `;
+}
+
+function renderField(f, params) {
+  const label = interpolate(f.label, params);
+  const desc = f.description ? `<div class="desc">${escapeHtml(f.description)}</div>` : '';
+  const reqBadge = f.required ? '<span class="req">必須</span>' : '<span class="opt">任意</span>';
+  const showWhenAttr = f.showWhen
+    ? `data-showwhen-field="${escapeHtml(f.showWhen.field)}" data-showwhen-equals="${escapeHtml(Array.isArray(f.showWhen.equals) ? f.showWhen.equals.join('|') : f.showWhen.equals)}"`
+    : '';
+  let inner;
+  switch (f.type) {
+    case 'textarea':
+      inner = `<textarea name="${f.name}" ${f.required ? 'required' : ''} placeholder="${escapeHtml(f.placeholder || '')}"></textarea>`;
+      break;
+    case 'number':
+      inner = `<input type="number" name="${f.name}" ${f.required ? 'required' : ''}
+                 ${f.min !== undefined ? `min="${f.min}"` : ''}
+                 ${f.max !== undefined ? `max="${f.max}"` : ''}
+                 ${f.step !== undefined ? `step="${f.step}"` : ''}
+                 placeholder="${escapeHtml(f.placeholder || '')}"
+                 inputmode="numeric" />`;
+      break;
+    case 'tel':
+      inner = `<input type="tel" name="${f.name}" ${f.required ? 'required' : ''} placeholder="${escapeHtml(f.placeholder || '')}" />`;
+      break;
+    case 'email':
+      inner = `<input type="email" name="${f.name}" ${f.required ? 'required' : ''} placeholder="${escapeHtml(f.placeholder || '')}" />`;
+      break;
+    case 'date':
+      inner = `<input type="date" name="${f.name}" ${f.required ? 'required' : ''} />`;
+      break;
+    case 'radio':
+      inner = `<div class="options">${(f.options || []).map((o, i) => `
+        <label class="opt-item">
+          <input type="radio" name="${f.name}" value="${escapeHtml(o.value)}" ${f.required && i === -1 ? 'required' : ''} />
+          <span class="opt-text">${escapeHtml(o.label)}</span>
+        </label>`).join('')}
+      </div>`;
+      break;
+    case 'checkbox':
+      inner = `<div class="options">${(f.options || []).map(o => `
+        <label class="opt-item">
+          <input type="checkbox" name="${f.name}" value="${escapeHtml(o.value)}" />
+          <span class="opt-text">${escapeHtml(o.label)}</span>
+        </label>`).join('')}
+        ${f.allowOther ? `
+          <label class="opt-item">
+            <input type="checkbox" name="${f.name}" value="__other__" data-other-toggle="${f.name}" />
+            <span class="opt-text">その他</span>
+          </label>
+          <input type="text" class="other-input" name="${f.name}__other" placeholder="その他の内容をご記入ください" style="display:none" />
+        ` : ''}
+      </div>`;
+      break;
+    case 'select':
+      inner = `<select name="${f.name}" ${f.required ? 'required' : ''}>
+        <option value="">選択してください</option>
+        ${(f.options || []).map(o => `<option value="${escapeHtml(o.value)}">${escapeHtml(o.label)}</option>`).join('')}
+      </select>`;
+      break;
+    default:
+      inner = `<input type="text" name="${f.name}" ${f.required ? 'required' : ''} placeholder="${escapeHtml(f.placeholder || '')}" />`;
+  }
+  return `
+    <div class="field" data-field="${f.name}" ${showWhenAttr}>
+      <label class="label">${escapeHtml(label)}${reqBadge}</label>
+      ${desc}
+      ${inner}
+    </div>
+  `;
+}
+
+function attachFieldListeners() {
+  // チェック / ラジオ の選択状態をカード型に反映
+  screens.form.querySelectorAll('input[type=radio], input[type=checkbox]').forEach(input => {
+    input.addEventListener('change', () => {
+      // ラジオは name 単位で全部更新
+      if (input.type === 'radio') {
+        screens.form.querySelectorAll(`input[type=radio][name="${input.name}"]`).forEach(r => {
+          r.closest('label.opt-item').classList.toggle('checked', r.checked);
+        });
+      } else {
+        input.closest('label.opt-item').classList.toggle('checked', input.checked);
+      }
+      // showWhen 評価
+      evaluateShowWhen();
+      // その他トグル
+      const otherKey = input.dataset.otherToggle;
+      if (otherKey) {
+        const other = screens.form.querySelector(`input[name="${otherKey}__other"]`);
+        if (other) other.style.display = input.checked ? '' : 'none';
+      }
+    });
+  });
+  evaluateShowWhen();
+}
+
+function evaluateShowWhen() {
+  screens.form.querySelectorAll('[data-showwhen-field]').forEach(div => {
+    const field = div.dataset.showwhenField;
+    const equalsRaw = div.dataset.showwhenEquals;
+    const equalsList = String(equalsRaw).split('|');
+    // ラジオの選択値
+    const checked = screens.form.querySelector(`input[name="${field}"]:checked`);
+    const val = checked ? checked.value : '';
+    div.style.display = equalsList.includes(val) ? '' : 'none';
+  });
+}
+
+// =====================================================================
+// 送信
+// =====================================================================
+async function submitForm() {
+  if (!currentTemplate) return;
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = true;
+  submitBtn.textContent = '送信中...';
+
+  try {
+    const sections = [...(currentTemplate.sections || [])];
+    if (currentTemplate.includeCommonMedical) sections.push(...COMMON_MEDICAL_FIELDS);
+
+    const treatmentAnswers = {};
+    const commonAnswers    = {};
+    const errors           = [];
+
+    for (const sec of sections) {
+      const isCommon = sec.id === 'common_medical';
+      for (const f of sec.fields) {
+        // 表示中のみ対象
+        const div = screens.form.querySelector(`[data-field="${f.name}"]`);
+        if (!div || div.style.display === 'none') continue;
+
+        let val;
+        if (f.type === 'checkbox') {
+          val = Array.from(screens.form.querySelectorAll(`input[name="${f.name}"]:checked`)).map(i => i.value);
+          // その他自由記入を結合
+          const otherInput = screens.form.querySelector(`input[name="${f.name}__other"]`);
+          if (otherInput && val.includes('__other__')) {
+            val = val.filter(v => v !== '__other__');
+            if (otherInput.value.trim()) val.push('other:' + otherInput.value.trim());
+          }
+          if (f.required && val.length === 0) errors.push({ field: f.name, msg: '選択してください' });
+        } else if (f.type === 'radio') {
+          const checked = screens.form.querySelector(`input[name="${f.name}"]:checked`);
+          val = checked ? checked.value : '';
+          if (f.required && !val) errors.push({ field: f.name, msg: '選択してください' });
+        } else {
+          const el = screens.form.querySelector(`[name="${f.name}"]`);
+          val = el ? el.value : '';
+          if (f.required && !String(val).trim()) errors.push({ field: f.name, msg: '入力してください' });
+        }
+        if (isCommon) commonAnswers[f.name]    = val;
+        else          treatmentAnswers[f.name] = val;
+      }
+    }
+
+    // エラーハイライト
+    screens.form.querySelectorAll('.field').forEach(d => d.classList.remove('error'));
+    screens.form.querySelectorAll('.field-error-msg').forEach(d => d.remove());
+    if (errors.length) {
+      errors.forEach(({ field, msg }) => {
+        const div = screens.form.querySelector(`[data-field="${field}"]`);
+        if (!div) return;
+        div.classList.add('error');
+        const m = document.createElement('div');
+        m.className = 'field-error-msg';
+        m.textContent = msg;
+        div.appendChild(m);
+      });
+      // 最初のエラーへスクロール
+      const firstErr = screens.form.querySelector('.field.error');
+      if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+
+    // INSERT
+    const payload = {
+      treatment: currentTemplate.treatment,
+      patient_name: currentParams.name || null,
+      patient_email: currentParams.email || null,
+      patient_phone: currentParams.phone || null,
+      clinic_name: currentParams.clinic || null,
+      booking_book_date: normalizeDate(currentParams.date) || null,
+      booking_book_time: currentParams.time || null,
+      common_answers: commonAnswers,
+      treatment_answers: treatmentAnswers,
+      upload_files: [],
+      user_agent: navigator.userAgent.slice(0, 500),
+      source: 'shareconnect_email',
+      resolved_via: routerResolvedVia,
+      raw_url_params: currentParams.raw,
+    };
+
+    const { error } = await sb.from('medical_questionnaires').insert(payload);
+    if (error) {
+      console.error(error);
+      alert('送信に失敗しました: ' + (error.message || JSON.stringify(error)));
+      submitBtn.disabled = false;
+      submitBtn.textContent = '送信する';
+      return;
+    }
+
+    showScreen('thanks');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  } catch (e) {
+    console.error(e);
+    alert('エラー: ' + e.message);
+    submitBtn.disabled = false;
+    submitBtn.textContent = '送信する';
+  }
+}
+
+// =====================================================================
+// 起動
+// =====================================================================
+let routerResolvedVia = '';
+
+(async function init() {
+  const params = getParams();
+  console.log('[monshin] params', params);
+
+  // 名前等が無い場合はエラー画面 (悪意あるアクセス対策)
+  // ただし開発時に直接開けるよう、name 必須は緩めにする
+  if (!params.name && !params.treatment) {
+    // テスト時はフォールバック画面を出す
+    routerResolvedVia = 'no_params_dev_fallback';
+    showScreen('select');
+  } else {
+    showScreen('loading');
+    const { resolvedTreatment, via, booking } = await smartRouteTreatment(params);
+    routerResolvedVia = via;
+    if (resolvedTreatment && TEMPLATES[resolvedTreatment]) {
+      renderForm(TEMPLATES[resolvedTreatment], params, booking);
+    } else {
+      showScreen('select');
+    }
+  }
+
+  // 治療選択 ボタン
+  document.getElementById('treatmentSelect').addEventListener('click', e => {
+    const card = e.target.closest('.treatment-card');
+    if (!card) return;
+    const t = card.dataset.treatment;
+    if (TEMPLATES[t]) {
+      routerResolvedVia = (routerResolvedVia || '') + '+manual_select';
+      renderForm(TEMPLATES[t], params, null);
+    }
+  });
+
+  // 送信ボタン
+  document.getElementById('submitBtn').addEventListener('click', submitForm);
+})();
+</script>
+
+</body>
+</html>

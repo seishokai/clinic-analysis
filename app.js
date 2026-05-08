@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v319';
+const APP_VERSION = 'v320';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4315,7 +4315,7 @@ function switchView(view) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
   window.scrollTo(0, 0);
-  const titles = {tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
+  const titles = {tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
   try { sessionStorage.setItem('lastView', view); } catch(_){}
   // v292: 分析タブ切替時に分析ダッシュボードを描画
@@ -4328,6 +4328,10 @@ function switchView(view) {
     if (activeAdmSub === 'adm-auth-migration') {
       setTimeout(() => { if (typeof renderAuthMigration === 'function') renderAuthMigration(); }, 50);
     }
+  }
+  // 問診票タブ切替時の初期化
+  if (view === 'monshin') {
+    setTimeout(() => { if (typeof renderMonshin === 'function') renderMonshin(); }, 50);
   }
   // 来院タブ切替時にアクティブなサブの再描画
   if (view === 'kaiin') {
@@ -4344,11 +4348,12 @@ function switchView(view) {
 
 // === v264 キーボードショートカット ===
 function setupKeyboardShortcuts() {
-  const VIEWS = ['bookings', 'kaiin', 'tc', 'sales', 'adbudget', 'admin'];
-  const VIEW_LABELS = { bookings:'予約', kaiin:'来院', tc:'TC', sales:'売上', adbudget:'広告', admin:'管理' };
+  const VIEWS = ['bookings', 'kaiin', 'monshin', 'tc', 'sales', 'adbudget', 'admin'];
+  const VIEW_LABELS = { bookings:'予約', kaiin:'来院', monshin:'問診票', tc:'TC', sales:'売上', adbudget:'広告', admin:'管理' };
   const SEARCH_TARGETS = {
     bookings: ['bk-search', 'ps-name', 'fac-search', 'bf-lc-search'],
     kaiin: ['fac-search', 'bk-search'],
+    monshin: ['mq-search'],
     tc: [],
     sales: [],
     adbudget: [],
@@ -13171,3 +13176,259 @@ function printTable(beforeFn, afterFn) {
     }, 500);
   }, 100);
 }
+
+
+// =============================================================
+// v320: 問診票 (medical_questionnaires) ビュー
+// =============================================================
+const MONSHIN_TREATMENT_LABELS = {
+  kyosei:    '矯正',
+  bf:        'BF/ラミネート',
+  implant:   'インプラント',
+  whitening: 'ホワイトニング',
+  laburie:   'ラブリエ',
+  general:   '一般',
+};
+const MONSHIN_TREATMENT_COLORS = {
+  kyosei:    '#06c755',
+  bf:        '#1f2937',
+  implant:   '#2563eb',
+  whitening: '#f59e0b',
+  laburie:   '#ec4899',
+  general:   '#6b7280',
+};
+
+let monshinData = [];           // medical_questionnaires + v_booking_with_questionnaire 結合済み
+let monshinClinicFilter = '__all__';
+
+async function loadMonshinData() {
+  try {
+    // 問診票本体
+    const { data: questionnaires, error: e1 } = await sb
+      .from('medical_questionnaires')
+      .select('*')
+      .order('submitted_at', { ascending: false });
+    if (e1) {
+      console.warn('[monshin] questionnaires load error', e1);
+      return [];
+    }
+
+    // 紐付け状態を判定するため manual_bookings から名前+日付セットを引く
+    const names = [...new Set((questionnaires || []).map(q => (q.patient_name || '').replace(/\s/g, '')).filter(Boolean))];
+    let bookings = [];
+    if (names.length) {
+      const { data: bk } = await sb
+        .from('manual_bookings')
+        .select('name, book_date, apply_date, facility, service, source, status, email, phone');
+      bookings = bk || [];
+    }
+
+    return (questionnaires || []).map(q => {
+      const qn = (q.patient_name || '').replace(/\s/g, '');
+      const qd = q.booking_book_date;
+      const matched = bookings.find(b => (b.name || '').replace(/\s/g, '') === qn && b.book_date === qd);
+      return {
+        ...q,
+        _matched_booking: matched || null,
+        _is_linked: !!matched,
+      };
+    });
+  } catch (e) {
+    console.error('[monshin] load exception', e);
+    return [];
+  }
+}
+
+function renderMonshinStats(rows) {
+  const total = rows.length;
+  const now   = Date.now();
+  const days7 = rows.filter(r => new Date(r.submitted_at).getTime() > now - 7 * 86400000).length;
+  const days30 = rows.filter(r => new Date(r.submitted_at).getTime() > now - 30 * 86400000).length;
+  const linked = rows.filter(r => r._is_linked).length;
+  const linkRate = total ? Math.round(linked / total * 100) : 0;
+  const html = `
+    <div class="stat-card"><div class="stat-label">総件数</div><div class="stat-value">${total}</div></div>
+    <div class="stat-card"><div class="stat-label">過去7日</div><div class="stat-value">${days7}</div></div>
+    <div class="stat-card"><div class="stat-label">過去30日</div><div class="stat-value">${days30}</div></div>
+    <div class="stat-card"><div class="stat-label">予約紐付け率</div><div class="stat-value">${linkRate}%</div><div class="stat-sub">${linked}/${total}</div></div>
+  `;
+  document.getElementById('mq-stats').innerHTML = html;
+}
+
+function renderMonshinClinicTabs(rows) {
+  const counts = {};
+  rows.forEach(r => {
+    const c = r.clinic_name || '(不明)';
+    counts[c] = (counts[c] || 0) + 1;
+  });
+  const clinics = Object.keys(counts).sort();
+  const tabs = document.getElementById('mq-clinic-tabs');
+  if (!tabs) return;
+  // 既存の動的タブを削除 (全医院だけ残す)
+  tabs.querySelectorAll('button[data-mq-clinic]:not([data-mq-clinic="__all__"])').forEach(b => b.remove());
+  clinics.forEach(c => {
+    const b = document.createElement('button');
+    b.className = 'sub-nav-btn';
+    b.dataset.mqClinic = c;
+    b.textContent = `${c} (${counts[c]})`;
+    if (c === monshinClinicFilter) b.classList.add('active');
+    tabs.appendChild(b);
+  });
+  // 全医院の件数も
+  const allBtn = tabs.querySelector('button[data-mq-clinic="__all__"]');
+  if (allBtn) allBtn.textContent = `全医院 (${rows.length})`;
+}
+
+function applyMonshinFilters() {
+  const treatment = document.getElementById('mq-filter-treatment')?.value || '';
+  const status    = document.getElementById('mq-filter-status')?.value || '';
+  const q         = (document.getElementById('mq-search')?.value || '').trim().toLowerCase();
+  const clinic    = monshinClinicFilter;
+
+  let rows = monshinData.slice();
+  if (clinic && clinic !== '__all__') {
+    rows = rows.filter(r => (r.clinic_name || '(不明)') === clinic);
+  }
+  if (treatment) rows = rows.filter(r => r.treatment === treatment);
+  if (status === 'linked')   rows = rows.filter(r => r._is_linked);
+  if (status === 'unlinked') rows = rows.filter(r => !r._is_linked);
+  if (q) {
+    rows = rows.filter(r =>
+      (r.patient_name || '').toLowerCase().includes(q) ||
+      (r.patient_email || '').toLowerCase().includes(q) ||
+      (r.patient_phone || '').toLowerCase().includes(q)
+    );
+  }
+  return rows;
+}
+
+function renderMonshinTable() {
+  const rows = applyMonshinFilters();
+  const tbody = document.getElementById('mq-tbody');
+  const cnt = document.getElementById('mq-result-count');
+  if (cnt) cnt.textContent = rows.length + '件';
+  if (!tbody) return;
+  if (!rows.length) {
+    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-sub)">該当する問診票がありません</td></tr>';
+    return;
+  }
+  tbody.innerHTML = rows.map(r => {
+    const submitted = r.submitted_at ? new Date(r.submitted_at).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-';
+    const tLabel = MONSHIN_TREATMENT_LABELS[r.treatment] || r.treatment || '-';
+    const tColor = MONSHIN_TREATMENT_COLORS[r.treatment] || '#6b7280';
+    const linkedBadge = r._is_linked
+      ? '<span style="color:#059669;font-weight:600;font-size:11px">✓ 紐付済</span>'
+      : '<span style="color:#dc2626;font-weight:600;font-size:11px">✗ 未紐付</span>';
+    const via = r.resolved_via || '-';
+    const viaShort = via.includes('smart_router') ? '🤖 自動' : via.includes('url_param') ? '🔗 URL' : via.includes('manual_select') ? '👆 選択' : via.includes('fallback') ? '📋 選択' : via;
+    const contact = [r.patient_email, r.patient_phone].filter(Boolean).join(' / ');
+    return `
+      <tr>
+        <td style="font-size:11px;white-space:nowrap">${escapeHtml(submitted)}</td>
+        <td><span style="background:${tColor};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${escapeHtml(tLabel)}</span></td>
+        <td style="text-align:left;font-weight:600">${escapeHtml(r.patient_name || '-')}</td>
+        <td style="font-size:11px">${escapeHtml(r.clinic_name || '(不明)')}</td>
+        <td style="font-size:11px;white-space:nowrap">${escapeHtml(r.booking_book_date || '-')} ${escapeHtml(r.booking_book_time || '')}</td>
+        <td style="text-align:center">${linkedBadge}</td>
+        <td style="font-size:10px;color:var(--text-sub)">${escapeHtml(contact || '-')}</td>
+        <td style="font-size:10px;color:var(--text-sub)">${escapeHtml(viaShort)}</td>
+        <td><button class="btn btn-outline mq-detail-btn" data-id="${r.id}" style="font-size:10px;padding:3px 8px;min-height:24px">詳細</button></td>
+      </tr>
+    `;
+  }).join('');
+
+  // 詳細ボタンのリスナー
+  tbody.querySelectorAll('.mq-detail-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = Number(btn.dataset.id);
+      const row = monshinData.find(r => r.id === id);
+      if (row) showMonshinDetail(row);
+    });
+  });
+}
+
+function showMonshinDetail(row) {
+  const modal = document.getElementById('mq-detail-modal');
+  const title = document.getElementById('mq-detail-title');
+  const body  = document.getElementById('mq-detail-body');
+  if (!modal || !body) return;
+
+  const tLabel = MONSHIN_TREATMENT_LABELS[row.treatment] || row.treatment;
+  if (title) title.textContent = `${tLabel} 問診票 - ${row.patient_name || ''}`;
+
+  const fmtJSON = (obj) => {
+    if (!obj || typeof obj !== 'object' || Object.keys(obj).length === 0) return '<div style="color:var(--text-sub);font-style:italic">回答なし</div>';
+    return Object.entries(obj).map(([k, v]) => {
+      const valStr = Array.isArray(v) ? v.join(', ') : (v ?? '');
+      return `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px dashed #eee"><div style="font-size:12px;color:var(--text-sub);flex:0 0 180px">${escapeHtml(k)}</div><div style="font-size:13px;flex:1;word-break:break-word">${escapeHtml(String(valStr) || '-')}</div></div>`;
+    }).join('');
+  };
+
+  body.innerHTML = `
+    <div style="margin-bottom:16px;font-size:12px;color:var(--text-sub)">
+      提出日時: ${row.submitted_at ? new Date(row.submitted_at).toLocaleString('ja-JP') : '-'}<br>
+      医院: ${escapeHtml(row.clinic_name || '-')} / 予約日: ${escapeHtml(row.booking_book_date || '-')} ${escapeHtml(row.booking_book_time || '')}<br>
+      連絡先: ${escapeHtml(row.patient_email || '-')} / ${escapeHtml(row.patient_phone || '-')}<br>
+      判定経路: ${escapeHtml(row.resolved_via || '-')}<br>
+      ${row._is_linked ? '<span style="color:#059669">✓ 予約と紐付け済み</span>' : '<span style="color:#dc2626">✗ 予約と未紐付け (名前 or 予約日が一致せず)</span>'}
+    </div>
+    <h4 style="margin:16px 0 8px;font-size:14px;border-left:3px solid #06c755;padding-left:8px">治療別の回答</h4>
+    ${fmtJSON(row.treatment_answers)}
+    <h4 style="margin:20px 0 8px;font-size:14px;border-left:3px solid #f59e0b;padding-left:8px">医療情報</h4>
+    ${fmtJSON(row.common_answers)}
+    ${row.upload_files && row.upload_files.length ? `<h4 style="margin:20px 0 8px;font-size:14px">添付ファイル</h4><div>${row.upload_files.map(f => `<div>${escapeHtml(JSON.stringify(f))}</div>`).join('')}</div>` : ''}
+  `;
+  modal.hidden = false;
+}
+
+async function renderMonshin() {
+  bindMonshinEvents();
+  const tbody = document.getElementById('mq-tbody');
+  if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>';
+  monshinData = await loadMonshinData();
+  renderMonshinStats(monshinData);
+  renderMonshinClinicTabs(monshinData);
+  renderMonshinTable();
+}
+
+// イベントバインド (1回だけ)
+let monshinBound = false;
+function bindMonshinEvents() {
+  if (monshinBound) return;
+  monshinBound = true;
+
+  document.getElementById('mq-refresh')?.addEventListener('click', renderMonshin);
+  document.getElementById('mq-filter-treatment')?.addEventListener('change', renderMonshinTable);
+  document.getElementById('mq-filter-status')?.addEventListener('change', renderMonshinTable);
+  document.getElementById('mq-search')?.addEventListener('input', renderMonshinTable);
+
+  // 医院サブタブクリック (event delegation)
+  document.getElementById('mq-clinic-tabs')?.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-mq-clinic]');
+    if (!btn) return;
+    monshinClinicFilter = btn.dataset.mqClinic;
+    document.querySelectorAll('#mq-clinic-tabs .sub-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.mqClinic === monshinClinicFilter));
+    renderMonshinTable();
+  });
+
+  // 詳細モーダル閉じる
+  document.getElementById('mq-detail-close')?.addEventListener('click', () => {
+    const m = document.getElementById('mq-detail-modal');
+    if (m) m.hidden = true;
+  });
+  document.getElementById('mq-detail-modal')?.addEventListener('click', e => {
+    if (e.target.id === 'mq-detail-modal') e.target.hidden = true;
+  });
+
+  // メール用URLコピー
+  document.getElementById('mq-copy-url')?.addEventListener('click', () => {
+    const baseUrl = location.origin + location.pathname.replace(/\/index\.html.*$|\/$/, '') + '/monshin/';
+    const template = `${baseUrl}?name={name}&clinic={clinicName}&date={date}&time={time}&email={email}&phone={phone}`;
+    navigator.clipboard.writeText(template).then(() => {
+      alert('shareconnect メール用 URL をコピーしました\n\n' + template + '\n\n※ メール本文の好きな位置に貼り付けてください');
+    }).catch(() => {
+      prompt('以下をコピーしてください', template);
+    });
+  });
+}
+
