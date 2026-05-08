@@ -510,7 +510,7 @@
 <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- 治療別テンプレート -->
-<script src="./templates.js?v=5"></script>
+<script src="./templates.js?v=6"></script>
 
 <script>
 // =====================================================================
@@ -547,108 +547,14 @@ function normalizeDate(s) {
 }
 
 // =====================================================================
-// CSV パーサ (Google Sheets gviz CSV 用)
-// =====================================================================
-function parseCSVLine(line) {
-  const result = [];
-  let current = '';
-  let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const c = line[i];
-    if (c === '"') { inQuotes = !inQuotes; }
-    else if (c === ',' && !inQuotes) { result.push(current.trim()); current = ''; }
-    else { current += c; }
-  }
-  result.push(current.trim());
-  return result;
-}
-
-// 1度取得した CSV をキャッシュ (連打対策)
-let _sheetCache = null;
-async function fetchSheetBookings() {
-  if (_sheetCache) return _sheetCache;
-  const SHEET_ID = '10misKpAtMitwIagGDUoMvQS7U9pfEQ0ODxG8A7DLzaQ';
-  // 元データ シート
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=%E5%85%83%E3%83%87%E3%83%BC%E3%82%BF`;
-  try {
-    const csv = await fetch(url).then(r => r.text());
-    const lines = csv.split('\n');
-    const rows = [];
-    for (let i = 1; i < lines.length; i++) {
-      const cols = parseCSVLine(lines[i]);
-      if (cols.length < 5 || !cols[2]) continue;
-      rows.push({
-        applyDate: cols[0] || '',
-        bookDate: cols[1] || '',
-        name: cols[2] || '',
-        service: cols[3] || '',
-        facility: cols[4] || '',
-        email: cols[5] || '',
-        phone: cols[6] || '',
-        source: cols[7] || '',
-      });
-    }
-    _sheetCache = rows;
-    console.log('[monshin] sheet rows loaded:', rows.length);
-    return rows;
-  } catch (e) {
-    console.warn('[monshin] sheet fetch failed', e);
-    return [];
-  }
-}
-
-// シート上の book_date を YYYY-MM-DD に正規化
-function normalizeSheetDate(d) {
-  if (!d) return '';
-  // '2026/4/17 10:00' → '2026-04-17'
-  const cleaned = String(d).replace(/\//g, '-').split(' ')[0];
-  const m = cleaned.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
-  if (!m) return cleaned;
-  return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
-}
-
-function findMatchInSheet(rows, params) {
-  if (!rows || !rows.length) return null;
-  const targetDate = normalizeDate(params.date);
-  const targetNameClean = (params.name || '').replace(/\s/g, '').trim();
-  if (!targetNameClean || !targetDate) return null;
-
-  // Strategy 1: 名前 + 日付 完全一致 (空白除去)
-  let m = rows.find(r => {
-    const rName = (r.name || '').replace(/\s/g, '');
-    return rName === targetNameClean && normalizeSheetDate(r.bookDate) === targetDate;
-  });
-  if (m) return { ...m, _matched_by: 'sheet_exact_name_date' };
-
-  // Strategy 2: 部分一致 (双方向) + 日付一致
-  m = rows.find(r => {
-    const rName = (r.name || '').replace(/\s/g, '');
-    if (normalizeSheetDate(r.bookDate) !== targetDate) return false;
-    return rName.includes(targetNameClean) || targetNameClean.includes(rName);
-  });
-  if (m) return { ...m, _matched_by: 'sheet_partial_name_date' };
-
-  // Strategy 3: 名前部分一致のみ (日付ずれ吸収)
-  if (params.clinic) {
-    m = rows.find(r => {
-      const rName = (r.name || '').replace(/\s/g, '');
-      const rFac = r.facility || '';
-      const nameMatch = rName.includes(targetNameClean) || targetNameClean.includes(rName);
-      const clinicMatch = (params.clinic || '').includes(rFac) || rFac.includes(params.clinic || '');
-      return nameMatch && clinicMatch;
-    });
-    if (m) return { ...m, _matched_by: 'sheet_partial_name_clinic' };
-  }
-
-  return null;
-}
-
-// =====================================================================
-// スマートルーター: 多段マッチング
+// スマートルーター
 //   1. URL の treatment パラメータ (最優先)
-//   2. Supabase manual_bookings (手動入力ぶん)
-//   3. Google Sheets 元データ (shareconnect 同期ぶん) ← ★主力
-//   4. フォールバック (患者が選択)
+//   2. Supabase RPC (manual_bookings + 同期データ)
+//   3. フォールバック (患者が選択)
+//
+// ※ 以前は Google Sheets を直接 fetch する B方式 を実装していたが、
+//   フォームのソースに Sheets ID が露出して、誰でも全患者データを
+//   ダウンロード可能になるプライバシー上の重大な問題があるため廃止。
 // =====================================================================
 async function smartRouteTreatment(params) {
   // 1. URL 指定優先
@@ -659,7 +565,7 @@ async function smartRouteTreatment(params) {
     return { resolvedTreatment: null, via: 'no_params', booking: null };
   }
 
-  // 2. Supabase RPC (manual_bookings)
+  // 2. Supabase RPC で照会
   try {
     const { data, error } = await sb.rpc('lookup_questionnaire_treatment', {
       p_name: params.name,
@@ -672,17 +578,7 @@ async function smartRouteTreatment(params) {
     }
   } catch(e) { console.warn('[supabase rpc exception]', e); }
 
-  // 3. Google Sheets 元データ (shareconnect の本流)
-  try {
-    const rows = await fetchSheetBookings();
-    const match = findMatchInSheet(rows, params);
-    if (match) {
-      const t = detectTreatment(match.service) || detectTreatment(match.source);
-      if (t) return { resolvedTreatment: t, via: 'smart_router_sheet:' + match._matched_by, booking: match };
-    }
-  } catch(e) { console.warn('[sheet fetch exception]', e); }
-
-  // 4. ヒットしない → フォールバック
+  // 3. ヒットしない → フォールバック (患者に治療種別を選んでもらう)
   return { resolvedTreatment: null, via: 'fallback_select', booking: null };
 }
 
