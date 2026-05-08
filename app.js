@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v317';
+const APP_VERSION = 'v318';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2633,6 +2633,106 @@ function renderHomeDashboard() {
           }).join('')}
         </div>
       </div>
+      <!-- v317: 医院×プロモ クロス集計表 -->
+      ${(() => {
+        // 医院×プロモのマトリックス
+        const matrix = {};   // matrix[fac][promo] = { booking, visited, contracted }
+        const promoSet = new Set();
+        rangeRows.forEach(d => {
+          const f = normFac(d.facility) || '-';
+          const p = (d.source || '(無し)').trim() || '(無し)';
+          promoSet.add(p);
+          if (!matrix[f]) matrix[f] = {};
+          if (!matrix[f][p]) matrix[f][p] = { booking: 0, visited: 0, contracted: 0 };
+          matrix[f][p].booking++;
+          if (isVisited(d.status)) matrix[f][p].visited++;
+          if (d.status === '成約') matrix[f][p].contracted++;
+        });
+        // プロモを件数順でソート (上位10 + その他)
+        const promoCount = {};
+        rangeRows.forEach(d => {
+          const p = (d.source || '(無し)').trim() || '(無し)';
+          promoCount[p] = (promoCount[p] || 0) + 1;
+        });
+        const sortedPromos = Object.keys(promoCount).sort((a,b) => promoCount[b] - promoCount[a]);
+        const topPromos = sortedPromos.slice(0, 10);
+        const otherPromos = sortedPromos.slice(10);
+        const showPromos = otherPromos.length > 0 ? [...topPromos, '__OTHER__'] : topPromos;
+        const facListSorted = facList.length > 0 ? facList : Object.keys(matrix);
+        if (facListSorted.length === 0 || sortedPromos.length === 0) return '';
+        const cellVal = (f, p) => {
+          if (p === '__OTHER__') {
+            return otherPromos.reduce((acc, pp) => {
+              const v = matrix[f]?.[pp];
+              if (v) { acc.booking += v.booking; acc.visited += v.visited; acc.contracted += v.contracted; }
+              return acc;
+            }, { booking:0, visited:0, contracted:0 });
+          }
+          return matrix[f]?.[p] || { booking:0, visited:0, contracted:0 };
+        };
+        const _basisLbl = _homeAnalysisBasis === 'apply' ? '登録数' : '予約数';
+        return `
+        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;overflow-x:auto">
+          <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+            🎯 ${escapeHtml(rangeLabel)} 医院×プロモ別 ${_basisLbl}
+            <span style="font-size:10px;color:var(--text-sub);font-weight:500">(数字 = 件数 / 来院 / 成約)</span>
+          </div>
+          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px">
+            <thead>
+              <tr>
+                <th style="text-align:left;padding:6px 8px;background:#f9fafb;border-bottom:2px solid var(--border);position:sticky;left:0;z-index:1;min-width:90px">医院＼プロモ</th>
+                ${showPromos.map(p => {
+                  const lbl = p === '__OTHER__' ? `その他${otherPromos.length}件` : (p.length > 14 ? p.slice(0,14)+'…' : p);
+                  return `<th style="text-align:center;padding:6px 8px;background:#f9fafb;border-bottom:2px solid var(--border);font-size:10px;font-weight:600;white-space:nowrap" title="${escapeHtml(p === '__OTHER__' ? otherPromos.join(', ') : p)}">${escapeHtml(lbl)}</th>`;
+                }).join('')}
+                <th style="text-align:center;padding:6px 8px;background:#1f2937;color:#fff;border-bottom:2px solid var(--border);font-weight:700">合計</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${facListSorted.map(f => {
+                const facTotal = byFacMonth[f] || { booking:0, visited:0, contracted:0 };
+                return `<tr>
+                  <td style="padding:6px 8px;font-weight:700;border-bottom:1px solid var(--border);background:#f9fafb;position:sticky;left:0;white-space:nowrap">${escapeHtml(f)}</td>
+                  ${showPromos.map(p => {
+                    const v = cellVal(f, p);
+                    if (v.booking === 0) return '<td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:#d1d5db">-</td>';
+                    return `<td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums">
+                      <div style="font-weight:700;color:#1a1a1a">${v.booking}</div>
+                      <div style="font-size:9px;color:var(--text-sub)">${v.visited}<span style="color:#059669"> / ${v.contracted}</span></div>
+                    </td>`;
+                  }).join('')}
+                  <td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);background:#f0f9ff;font-variant-numeric:tabular-nums">
+                    <div style="font-weight:800;color:#1d4ed8;font-size:13px">${facTotal.booking}</div>
+                    <div style="font-size:9px;color:var(--text-sub)">${facTotal.visited}<span style="color:#059669"> / ${facTotal.contracted}</span></div>
+                  </td>
+                </tr>`;
+              }).join('')}
+              <!-- 合計行 -->
+              <tr style="background:#1f2937;color:#fff">
+                <td style="padding:8px;font-weight:800;position:sticky;left:0;background:#1f2937">合計</td>
+                ${showPromos.map(p => {
+                  const total = facListSorted.reduce((acc, f) => {
+                    const v = cellVal(f, p);
+                    acc.booking += v.booking; acc.visited += v.visited; acc.contracted += v.contracted;
+                    return acc;
+                  }, { booking:0, visited:0, contracted:0 });
+                  if (total.booking === 0) return '<td style="text-align:center;padding:8px;color:#9ca3af">-</td>';
+                  return `<td style="text-align:center;padding:8px;font-variant-numeric:tabular-nums">
+                    <div style="font-weight:800">${total.booking}</div>
+                    <div style="font-size:9px;color:#d1d5db">${total.visited} / ${total.contracted}</div>
+                  </td>`;
+                }).join('')}
+                <td style="text-align:center;padding:8px;background:#0f172a;font-variant-numeric:tabular-nums">
+                  <div style="font-weight:800;font-size:14px">${rangeRows.length}</div>
+                  <div style="font-size:9px;color:#d1d5db">${rangeRows.filter(d=>isVisited(d.status)).length} / ${rangeRows.filter(d=>d.status==='成約').length}</div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <div style="font-size:10px;color:var(--text-sub);margin-top:6px">※ 数字: ${_basisLbl} / 来院数 / 成約数</div>
+        </div>`;
+      })()}
+
       <!-- 治療別 -->
       <div style="margin-bottom:14px">
         <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px">🦷 ${escapeHtml(rangeLabel)} 治療別</div>
