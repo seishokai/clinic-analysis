@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v343';
+const APP_VERSION = 'v344';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8874,8 +8874,8 @@ async function renderKaiinAll(containerId) {
     </div>
     <div class="card" style="padding:10px">
       <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">来院一覧 <span style="font-weight:400;color:var(--text-muted)">${totalCount}件</span></div>
-      <div class="data-table-wrap" style="max-height:calc(100vh - 360px);overflow-y:auto">
-        <table class="data-table compact" style="width:100%">
+      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - 360px);overflow-y:auto">
+        <table class="data-table compact kaiin-all-list-table" style="width:100%">
           <thead><tr>
             <th style="text-align:left">来院日</th>
             <th style="text-align:left">名前</th>
@@ -8906,15 +8906,15 @@ async function renderKaiinAll(containerId) {
                 const contractSvc = d.contractService || '';
                 const amt = _amt(d);
                 return `<tr>
-                  <td style="font-size:11px;white-space:nowrap">${escapeHtml(d.bookDate || '-')}</td>
-                  <td style="font-size:11px;font-weight:600">${escapeHtml(d.name || '-')}</td>
-                  <td style="font-size:11px;text-align:center">${escapeHtml(cat)}</td>
-                  <td style="font-size:11px;text-align:center">${escapeHtml(fac)}</td>
-                  <td style="font-size:10px;text-align:center">${escapeHtml(promo)}</td>
-                  <td style="font-size:11px;text-align:center;color:${stColor};font-weight:600">${escapeHtml(st)}</td>
-                  <td style="font-size:10px;text-align:center;color:var(--text-sub)">${escapeHtml(nextDate || '-')}</td>
-                  <td style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
-                  <td style="font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${amt ? '¥' + fmt(amt) : '-'}</td>
+                  <td data-label="来院日" style="font-size:11px;white-space:nowrap">${escapeHtml(d.bookDate || '-')}</td>
+                  <td data-label="名前" style="font-size:11px;font-weight:600">${escapeHtml(d.name || '-')}</td>
+                  <td data-label="治療" style="font-size:11px;text-align:center">${escapeHtml(cat)}</td>
+                  <td data-label="医院" style="font-size:11px;text-align:center">${escapeHtml(fac)}</td>
+                  <td data-label="プロモ" style="font-size:10px;text-align:center">${escapeHtml(promo)}</td>
+                  <td data-label="状態" style="font-size:11px;text-align:center;color:${stColor};font-weight:600">${escapeHtml(st)}</td>
+                  <td data-label="次回予定" style="font-size:10px;text-align:center;color:var(--text-sub)">${escapeHtml(nextDate || '-')}</td>
+                  <td data-label="成約商材" style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
+                  <td data-label="金額" style="font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${amt ? '¥' + fmt(amt) : '-'}</td>
                 </tr>`;
               }).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
           </tbody>

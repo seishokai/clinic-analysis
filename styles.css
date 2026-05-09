@@ -1072,3 +1072,54 @@ body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   /* 印刷中は「さらに表示」ボタン行などを非表示 */
   tr td[colspan] button { display: none !important; }
 }
+
+/* ===== 来院一覧テーブル: 携帯ではカード表示に変身 ===== */
+@media (max-width: 768px) {
+  .kaiin-all-list-table thead { display: none; }
+  .kaiin-all-list-table, .kaiin-all-list-table tbody, .kaiin-all-list-table tr, .kaiin-all-list-table td { display: block; width: 100%; box-sizing: border-box; }
+  .kaiin-all-list-table tr {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    margin-bottom: 8px;
+    padding: 8px 10px;
+    background: #fff;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .kaiin-all-list-table td {
+    border: none;
+    padding: 3px 0;
+    text-align: left !important;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px !important;
+  }
+  .kaiin-all-list-table td::before {
+    content: attr(data-label);
+    font-size: 10px;
+    color: var(--text-sub);
+    font-weight: 600;
+    flex: 0 0 70px;
+  }
+  /* 名前は強調 (上段に大きく) */
+  .kaiin-all-list-table td[data-label="名前"] {
+    font-size: 15px !important;
+    font-weight: 700 !important;
+    border-bottom: 1px dashed var(--border);
+    padding-bottom: 6px;
+    margin-bottom: 4px;
+  }
+  .kaiin-all-list-table td[data-label="名前"]::before { font-size: 11px; }
+  /* 金額も右寄せ太字で目立たせる */
+  .kaiin-all-list-table td[data-label="金額"] {
+    font-weight: 700 !important;
+    color: #111;
+  }
+  /* 該当なし行は中央寄せ */
+  .kaiin-all-list-table td[colspan] {
+    text-align: center !important;
+    justify-content: center;
+  }
+  .kaiin-all-list-table td[colspan]::before { display: none; }
+}
