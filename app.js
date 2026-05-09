@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v340';
+const APP_VERSION = 'v341';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8661,14 +8661,23 @@ function getStatusesForTreatment(treatment) {
 
 // 来院タブ「一覧」レンダラー (全治療タイプまとめて表示)
 // v273: 来院一覧の期間フィルタ状態 (デフォルト今月、来院日基準)
-let _kaiinAllPeriodState = { period: 'thisMonth' };
+let _kaiinAllPeriodState = {
+  period: 'thisMonth',
+  search: '',
+  tool: new Set(),
+  facility: new Set(),
+  promo: new Set(),
+  service: new Set(),
+  status: new Set(),
+};
+let _kaiinAllDD = null;
 
 async function renderKaiinAll(containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
   const todayEnd = new Date(); todayEnd.setHours(23,59,59,999);
   // 全治療タイプの来院対象行を集計
-  let allRows = (bookingsData || []).filter(d => {
+  let baseRows = (bookingsData || []).filter(d => {
     if (d.status === '除外') return false;
     const bd = parseDate(d.bookDate);
     if (bd && bd > todayEnd) return false;
@@ -8685,24 +8694,40 @@ async function renderKaiinAll(containerId) {
     };
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    if (period === 'thisMonth') allRows = allRows.filter(d => ymOf(d, false) === ym);
-    else if (period === 'thisMonthApply') allRows = allRows.filter(d => ymOf(d, true) === ym);
+    if (period === 'thisMonth') baseRows = baseRows.filter(d => ymOf(d, false) === ym);
+    else if (period === 'thisMonthApply') baseRows = baseRows.filter(d => ymOf(d, true) === ym);
     else if (period === 'lastMonth') {
       const last = new Date(now); last.setMonth(last.getMonth()-1);
       const lym = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}`;
-      allRows = allRows.filter(d => ymOf(d, false) === lym);
+      baseRows = baseRows.filter(d => ymOf(d, false) === lym);
     }
   }
+  // 一覧フィルタ (予約管理と同じ操作系)
+  const state = _kaiinAllPeriodState;
+  let allRows = baseRows;
+  if (state.search) {
+    const s = state.search.toLowerCase();
+    allRows = allRows.filter(d => d.name && d.name.toLowerCase().includes(s));
+  }
+  if (state.tool.size) allRows = allRows.filter(d => state.tool.has(d.tool));
+  if (state.facility.size) allRows = allRows.filter(d => state.facility.has(normFac(d.facility)));
+  if (state.promo.size) allRows = allRows.filter(d => state.promo.has(d.source));
+  if (state.service.size) allRows = allRows.filter(d => state.service.has(normSvc(d.service)));
+  if (state.status.size) allRows = allRows.filter(d => state.status.has(d.status || '__未設定__'));
   // 治療タイプ別カウント
+  // 金額は status 不問・bk-extra 優先で合算 (予約管理と同じ集計)
+  const _bkExtra = loadData('bk-extra', {});
+  const _amt = (d) => {
+    const ex = _bkExtra[d.name + '|' + d.applyDate] || {};
+    return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+  };
   const byCat = {};
   allRows.forEach(d => {
     const cat = getTreatmentCategory(d) || 'その他';
     if (!byCat[cat]) byCat[cat] = { count: 0, contracted: 0, contractAmt: 0 };
     byCat[cat].count++;
-    if (d.status === '成約') {
-      byCat[cat].contracted++;
-      byCat[cat].contractAmt += Number(d.contractAmount || 0);
-    }
+    if (d.status === '成約') byCat[cat].contracted++;
+    byCat[cat].contractAmt += _amt(d);
   });
   const catOrder = ['BF','矯正','インプラント','ラブリエ','自費補綴','自費根治','ホワイトニング','リップアート','ティースジュエリー','その他'];
   const subNavMap = {'BF':'kaiin-bf','矯正':'kaiin-kyosei','インプラント':'kaiin-implant','ラブリエ':'kaiin-labrie','自費補綴':'kaiin-hotetsu','自費根治':'kaiin-konchi','ホワイトニング':'kaiin-whitening','リップアート':'kaiin-lipart','ティースジュエリー':'kaiin-jewelry','その他':'kaiin-other'};
@@ -8724,7 +8749,7 @@ async function renderKaiinAll(containerId) {
     }).join('');
   const totalCount = allRows.length;
   const totalContracted = allRows.filter(d => d.status==='成約').length;
-  const totalAmt = allRows.filter(d => d.status==='成約').reduce((s,d)=>s+Number(d.contractAmount||0),0);
+  const totalAmt = allRows.reduce((s, d) => s + _amt(d), 0);
   const totalRate = totalCount ? Math.round(totalContracted / totalCount * 100) : 0;
 
   // 期間ラベル
@@ -8736,15 +8761,21 @@ async function renderKaiinAll(containerId) {
   }[period] || '全期間';
 
   el.innerHTML = `
-    <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
-      <span style="font-size:11px;color:var(--text-sub);font-weight:600;letter-spacing:1px">期間</span>
-      <select id="kaiin-all-period" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;cursor:pointer;font-family:inherit">
-        <option value="" ${period===''?'selected':''}>全期間</option>
-        <option value="thisMonth" ${period==='thisMonth'?'selected':''}>今月（来院日基準）</option>
-        <option value="thisMonthApply" ${period==='thisMonthApply'?'selected':''}>今月（登録日基準）</option>
-        <option value="lastMonth" ${period==='lastMonth'?'selected':''}>先月</option>
+    <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:6px 8px;background:var(--card);border:1px solid var(--border);border-radius:6px">
+      <input type="text" id="kaiin-all-search" placeholder="🔍 名前検索" value="${escapeHtml(state.search || '')}" style="width:140px;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px">
+      <select id="kaiin-all-period" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;font-family:inherit;width:auto">
+        <option value="" ${period===''?'selected':''}>期間: 全期間</option>
+        <option value="thisMonth" ${period==='thisMonth'?'selected':''}>期間: 今月（来院日基準）</option>
+        <option value="thisMonthApply" ${period==='thisMonthApply'?'selected':''}>期間: 今月（登録日基準）</option>
+        <option value="lastMonth" ${period==='lastMonth'?'selected':''}>期間: 先月</option>
       </select>
-      <span style="font-size:11px;color:var(--text-sub)">表示中: <strong style="color:var(--text)">${periodLabel}</strong></span>
+      <span class="kaiin-all-tool-slot"></span>
+      <span class="kaiin-all-facility-slot"></span>
+      <span class="kaiin-all-promo-slot"></span>
+      <span class="kaiin-all-service-slot"></span>
+      <span class="kaiin-all-status-slot"></span>
+      <button id="kaiin-all-reset" class="btn btn-outline" style="font-size:11px;padding:5px 10px;min-height:28px">クリア</button>
+      <span style="font-size:11px;color:var(--text-sub);margin-left:auto">表示中: <strong style="color:var(--text)">${periodLabel}</strong></span>
     </div>
     <div style="margin-bottom:14px;padding:14px;background:linear-gradient(135deg,#f9fafb 0%,#f3f4f6 100%);border-radius:10px;border:1px solid var(--border)">
       <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">全治療合計（${escapeHtml(periodLabel)}）</div>
@@ -8765,6 +8796,61 @@ async function renderKaiinAll(containerId) {
   // 期間フィルタ変更で再描画
   el.querySelector('#kaiin-all-period')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.period = e.target.value;
+    renderKaiinAll(containerId);
+  });
+
+  // === マルチセレクトフィルター初期化 (baseRows から選択肢を抽出) ===
+  const triggerRedraw = () => renderKaiinAll(containerId);
+  const toolOpts = ['DXHUB','セレクト','手動'];
+  const facilityOpts = [...new Set(baseRows.map(d => normFac(d.facility)).filter(Boolean))].sort();
+  const promoCounts = {};
+  baseRows.forEach(d => { if (d.source && d.source.trim() && d.source.trim() !== '?') promoCounts[d.source] = (promoCounts[d.source]||0) + 1; });
+  const promoOpts = Object.keys(promoCounts).sort((a,b) => promoCounts[b]-promoCounts[a]).map(p => ({ value: p, label: `${p} (${promoCounts[p]})` }));
+  const serviceOpts = [...new Set(baseRows.map(d => normSvc(d.service)).filter(Boolean))].sort();
+  const statusOpts = [
+    '未対応',
+    { value: '予約連絡待ち', label: '次回予約連絡待ち' },
+    '後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル',
+    { value: '__未設定__', label: '未設定' },
+  ];
+
+  const toolDD = createMultiSelectDropdown({ label: 'ツール', options: toolOpts, selected: state.tool, onChange: triggerRedraw });
+  const facDD = createMultiSelectDropdown({ label: '医院', options: facilityOpts, selected: state.facility, onChange: triggerRedraw });
+  const promoDD = createMultiSelectDropdown({ label: 'プロモ', options: promoOpts, selected: state.promo, onChange: triggerRedraw });
+  const svcDD = createMultiSelectDropdown({ label: '相談', options: serviceOpts, selected: state.service, onChange: triggerRedraw });
+  const statusDD = createMultiSelectDropdown({ label: 'ｽﾃｰﾀｽ', options: statusOpts, selected: state.status, onChange: triggerRedraw });
+
+  const fillSlot = (sel, dd) => { const s = el.querySelector(sel); if (s) s.replaceWith(dd.buttonElement); };
+  fillSlot('.kaiin-all-tool-slot', toolDD);
+  fillSlot('.kaiin-all-facility-slot', facDD);
+  fillSlot('.kaiin-all-promo-slot', promoDD);
+  fillSlot('.kaiin-all-service-slot', svcDD);
+  fillSlot('.kaiin-all-status-slot', statusDD);
+  _kaiinAllDD = { tool: toolDD, facility: facDD, promo: promoDD, service: svcDD, status: statusDD };
+
+  // 検索ボックス (debounce)
+  const searchEl = el.querySelector('#kaiin-all-search');
+  if (searchEl) {
+    let _t;
+    searchEl.addEventListener('input', (e) => {
+      clearTimeout(_t);
+      _t = setTimeout(() => {
+        _kaiinAllPeriodState.search = e.target.value;
+        renderKaiinAll(containerId);
+      }, 250);
+    });
+    // フォーカスを保持 (再描画後)
+    if (state.search) { searchEl.focus(); searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length); }
+  }
+
+  // クリアボタン
+  el.querySelector('#kaiin-all-reset')?.addEventListener('click', () => {
+    _kaiinAllPeriodState.search = '';
+    _kaiinAllPeriodState.tool.clear();
+    _kaiinAllPeriodState.facility.clear();
+    _kaiinAllPeriodState.promo.clear();
+    _kaiinAllPeriodState.service.clear();
+    _kaiinAllPeriodState.status.clear();
     renderKaiinAll(containerId);
   });
 
