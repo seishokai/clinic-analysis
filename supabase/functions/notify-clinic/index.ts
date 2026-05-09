@@ -5,12 +5,14 @@
 //   1. medical_questionnaires に新規 INSERT があると Database Webhook が呼ぶ
 //   2. このファンクションは payload.record から問診票内容を抽出
 //   3. 医院別メアドを resolveClinicEmail() で解決
-//   4. Resend API でメール送信
+//   4. Brevo HTTP API でメール送信 (UTF-8 完全対応)
 //
 // 環境変数 (Supabase Edge Function Secrets):
-//   RESEND_API_KEY: Resend ダッシュボードで取得した API キー (re_xxx)
-//   FROM_EMAIL:     送信元メアド (例: onboarding@resend.dev or noreply@yourdomain.com)
-//   FALLBACK_TO_EMAIL: マップに無い医院の届け先 (例: seishokai.office@gmail.com)
+//   BREVO_API_KEY:      Brevo の API キー (xkeysib-xxxx...)
+//                       https://app.brevo.com/settings/keys/api で生成
+//   SENDER_EMAIL:       送信元メアド (Brevo で認証済み、例: seishokai.office@gmail.com)
+//   SENDER_NAME:        送信者表示名 (例: 清翔会 事前問診票)
+//   FALLBACK_TO_EMAIL:  マップに無い医院の届け先
 //
 // デプロイ:
 //   supabase functions deploy notify-clinic --no-verify-jwt
@@ -23,9 +25,10 @@
 
 import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
 
-const RESEND_API_KEY     = Deno.env.get('RESEND_API_KEY') || '';
-const FROM_EMAIL         = Deno.env.get('FROM_EMAIL')     || 'onboarding@resend.dev';
-const FALLBACK_TO_EMAIL  = Deno.env.get('FALLBACK_TO_EMAIL') || 'seishokai.office@gmail.com';
+const BREVO_API_KEY      = Deno.env.get('BREVO_API_KEY')      || '';
+const SENDER_EMAIL       = Deno.env.get('SENDER_EMAIL')       || 'seishokai.office@gmail.com';
+const SENDER_NAME        = Deno.env.get('SENDER_NAME')        || '清翔会 事前問診票';
+const FALLBACK_TO_EMAIL  = Deno.env.get('FALLBACK_TO_EMAIL')  || 'seishokai.office@gmail.com';
 const APP_URL            = 'https://seishokai.github.io/clinic-analysis/';
 
 // =====================================================================
@@ -206,33 +209,57 @@ ${APP_URL}
 }
 
 // =====================================================================
-// Resend API でメール送信
+// HTML エスケープ
 // =====================================================================
-async function sendViaResend(to: string, subject: string, body: string): Promise<{ ok: boolean; id?: string; error?: unknown }> {
-  if (!RESEND_API_KEY) {
-    return { ok: false, error: 'RESEND_API_KEY が設定されていません' };
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+// =====================================================================
+// Brevo HTTP API でメール送信
+// =====================================================================
+async function sendViaBrevo(to: string, subject: string, body: string): Promise<{ ok: boolean; id?: string; error?: unknown }> {
+  if (!BREVO_API_KEY) {
+    return { ok: false, error: 'BREVO_API_KEY が未設定' };
   }
+
+  // body を HTML にラップ (改行を維持)
+  const htmlBody = `<!DOCTYPE html><html><head><meta charset="UTF-8"></head><body>
+<pre style="font-family: -apple-system, 'Segoe UI', 'Hiragino Sans', sans-serif; white-space: pre-wrap; font-size: 14px; line-height: 1.6; margin: 0;">${escapeHtml(body)}</pre>
+</body></html>`;
+
   try {
-    const res = await fetch('https://api.resend.com/emails', {
+    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
+        'accept': 'application/json',
+        'api-key': BREVO_API_KEY,
+        'content-type': 'application/json',
       },
       body: JSON.stringify({
-        from: `清翔会 事前問診票 <${FROM_EMAIL}>`,
-        to: [to],
-        subject,
-        text: body,
+        sender: {
+          name: SENDER_NAME,
+          email: SENDER_EMAIL,
+        },
+        to: [{ email: to }],
+        subject: subject,
+        htmlContent: htmlBody,
+        textContent: body,
       }),
     });
+
     const data = await res.json();
     if (!res.ok) {
       return { ok: false, error: data };
     }
-    return { ok: true, id: data.id };
+    return { ok: true, id: data.messageId || `brevo_${Date.now()}` };
   } catch (e) {
-    return { ok: false, error: String(e) };
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
   }
 }
 
@@ -266,10 +293,19 @@ serve(async (req) => {
     const to = resolveClinicEmail(clinicName);
     const { subject, body } = buildEmail(record as Record<string, unknown>);
 
-    const result = await sendViaResend(to, subject, body);
+    // デバッグ: 送信先確認
+    console.log('[notify-clinic] SEND:', {
+      clinicName,
+      resolved_to: to,
+      subject,
+      brevo_key_set: !!BREVO_API_KEY,
+      sender_email: SENDER_EMAIL,
+    });
+
+    const result = await sendViaBrevo(to, subject, body);
 
     if (!result.ok) {
-      console.error('[notify-clinic] Resend error:', result.error);
+      console.error('[notify-clinic] Brevo error:', result.error);
       return new Response(JSON.stringify({
         ok: false,
         to,
