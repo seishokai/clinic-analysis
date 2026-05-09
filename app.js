@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v342';
+const APP_VERSION = 'v343';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8832,20 +8832,19 @@ async function renderKaiinAll(containerId) {
     <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">📅 期間</span>
-        <select id="kaiin-all-period" class="form-select" style="width:auto;padding:6px 8px;font-size:11px" title="表示する期間">
-          <option value="" ${!period?'selected':''}>全期間</option>
-          <option value="thisMonth" ${period==='thisMonth'?'selected':''}>今月</option>
-          <option value="lastMonth" ${period==='lastMonth'?'selected':''}>先月</option>
-          <option value="fiscal" ${period==='fiscal'?'selected':''}>今期</option>
-        </select>
-        <input type="month" id="kaiin-all-month" class="form-input" value="${escapeHtml(month||'')}" style="width:auto;padding:6px 8px;font-size:11px" title="月を直接指定（期間ドロップダウンと排他）">
+        ${(() => {
+          const isPb = (v) => !month && period === v;
+          const btn = (v, l) => `<button class="kaiin-all-period-btn" data-period="${v}" style="padding:5px 12px;font-size:11px;border-radius:14px;border:1px solid ${isPb(v)?'#1d4ed8':'#d4d4d8'};background:${isPb(v)?'#1d4ed8':'#fff'};color:${isPb(v)?'#fff':'#475569'};font-weight:${isPb(v)?'700':'500'};cursor:pointer;min-height:28px">${l}</button>`;
+          return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
+        })()}
+        <span style="font-size:10px;color:#999;margin:0 4px">|</span>
+        <input type="month" id="kaiin-all-month" class="form-input" value="${escapeHtml(month||'')}" style="width:auto;padding:6px 8px;font-size:11px" title="月を直接指定（ボタンと排他）" placeholder="月指定">
         <span style="font-size:9px;color:#999;margin:0 4px">×</span>
         <span style="font-size:10px;color:#666;font-weight:600">基準:</span>
         <select id="kaiin-all-basis" class="form-select" style="width:auto;padding:6px 8px;font-size:11px" title="期間/月をどちらの日付で絞るか">
           <option value="book" ${basis==='book'?'selected':''}>📅 来院日基準</option>
           <option value="apply" ${basis==='apply'?'selected':''}>📝 登録日基準</option>
         </select>
-        <span style="font-size:9px;color:#999;margin-left:6px">※期間と月はどちらか片方のみ</span>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">⚡ 絞込</span>
@@ -8867,18 +8866,69 @@ async function renderKaiinAll(containerId) {
         <button id="kaiin-all-reset" class="btn btn-outline" style="min-height:30px;padding:6px 14px;font-size:11px;border-radius:18px" title="全フィルタをクリアして今月に戻す">🔄 リセット</button>
       </div>
     </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px">
+    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px">
       ${catCards}
     </div>
-    <div style="font-size:11px;color:var(--text-sub);text-align:center;padding:10px">
+    <div style="font-size:11px;color:var(--text-sub);text-align:center;padding:6px;margin-bottom:10px">
       ↑ 治療タイプをクリックで詳細一覧へ
+    </div>
+    <div class="card" style="padding:10px">
+      <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">来院一覧 <span style="font-weight:400;color:var(--text-muted)">${totalCount}件</span></div>
+      <div class="data-table-wrap" style="max-height:calc(100vh - 360px);overflow-y:auto">
+        <table class="data-table compact" style="width:100%">
+          <thead><tr>
+            <th style="text-align:left">来院日</th>
+            <th style="text-align:left">名前</th>
+            <th>治療</th>
+            <th>医院</th>
+            <th>プロモ</th>
+            <th>状態</th>
+            <th>次回予定</th>
+            <th>成約商材</th>
+            <th style="text-align:right">金額(税抜)</th>
+          </tr></thead>
+          <tbody>
+            ${allRows
+              .slice()
+              .sort((a,b) => {
+                const ad = parseDate(a.bookDate)?.getTime() || 0;
+                const bd = parseDate(b.bookDate)?.getTime() || 0;
+                return bd - ad;
+              })
+              .map(d => {
+                const cat = getTreatmentCategory(d) || '-';
+                const fac = normFac(d.facility) || '-';
+                const promo = d.source || '-';
+                const st = d.status || '未設定';
+                const stColor = st === '成約' ? '#059669' : st === 'キャンセル' ? '#dc2626' : st === '未対応' || st === '未設定' ? '#f97316' : '#475569';
+                const info = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
+                const nextDate = info?.bf_next_date || '';
+                const contractSvc = d.contractService || '';
+                const amt = _amt(d);
+                return `<tr>
+                  <td style="font-size:11px;white-space:nowrap">${escapeHtml(d.bookDate || '-')}</td>
+                  <td style="font-size:11px;font-weight:600">${escapeHtml(d.name || '-')}</td>
+                  <td style="font-size:11px;text-align:center">${escapeHtml(cat)}</td>
+                  <td style="font-size:11px;text-align:center">${escapeHtml(fac)}</td>
+                  <td style="font-size:10px;text-align:center">${escapeHtml(promo)}</td>
+                  <td style="font-size:11px;text-align:center;color:${stColor};font-weight:600">${escapeHtml(st)}</td>
+                  <td style="font-size:10px;text-align:center;color:var(--text-sub)">${escapeHtml(nextDate || '-')}</td>
+                  <td style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
+                  <td style="font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${amt ? '¥' + fmt(amt) : '-'}</td>
+                </tr>`;
+              }).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
+          </tbody>
+        </table>
+      </div>
     </div>`;
 
-  // === 期間/月/基準 ===
-  el.querySelector('#kaiin-all-period')?.addEventListener('change', (e) => {
-    _kaiinAllPeriodState.period = e.target.value;
-    if (e.target.value) _kaiinAllPeriodState.month = '';
-    renderKaiinAll(containerId);
+  // === 期間ボタン (全期間/今月/先月/今期) ===
+  el.querySelectorAll('.kaiin-all-period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _kaiinAllPeriodState.period = btn.dataset.period;
+      _kaiinAllPeriodState.month = '';
+      renderKaiinAll(containerId);
+    });
   });
   el.querySelector('#kaiin-all-month')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.month = e.target.value;
