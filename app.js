@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v326';
+const APP_VERSION = 'v327';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13368,20 +13368,26 @@ function renderMonshinCrossTable(rows) {
 function renderMonshinTreatmentTabs(rows) {
   const counts = {};
   rows.forEach(r => {
-    const t = r.treatment || 'general';
+    let t = r.treatment || 'general';
+    if (t === 'laburie') t = 'bf';  // 旧データ吸収
     counts[t] = (counts[t] || 0) + 1;
   });
   const tabs = document.getElementById('mq-treatment-tabs');
   if (!tabs) return;
-  // 既存の各ボタンに件数を反映
+  // チップ風ボタン (各ボタンに件数を反映)
   tabs.querySelectorAll('button[data-mq-treatment]').forEach(b => {
     const t = b.dataset.mqTreatment;
-    if (t === '__all__') {
-      b.textContent = `全て (${rows.length})`;
-    } else {
-      const label = MONSHIN_TREATMENT_LABELS[t] || t;
-      b.textContent = `${label} (${counts[t] || 0})`;
-    }
+    // ラベル決定
+    let baseLabel;
+    if (t === '__all__') baseLabel = '全て';
+    else if (t === 'kyosei') baseLabel = '矯正';
+    else if (t === 'bf') baseLabel = 'ラミネートベニア';
+    else if (t === 'implant') baseLabel = 'インプラント';
+    else if (t === 'whitening') baseLabel = 'ホワイトニング';
+    else if (t === 'general') baseLabel = '一般';
+    else baseLabel = t;
+    const cnt = (t === '__all__') ? rows.length : (counts[t] || 0);
+    b.textContent = `${baseLabel} (${cnt})`;
     b.classList.toggle('active', t === monshinTreatmentFilter);
   });
 }
@@ -13539,12 +13545,12 @@ function bindMonshinEvents() {
     btn.textContent = isHidden ? '折りたたむ' : '展開する';
   });
 
-  // 治療サブタブクリック (event delegation)
+  // 治療チップクリック (event delegation)
   document.getElementById('mq-treatment-tabs')?.addEventListener('click', e => {
     const btn = e.target.closest('button[data-mq-treatment]');
     if (!btn) return;
     monshinTreatmentFilter = btn.dataset.mqTreatment;
-    document.querySelectorAll('#mq-treatment-tabs .sub-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.mqTreatment === monshinTreatmentFilter));
+    document.querySelectorAll('#mq-treatment-tabs .mq-chip').forEach(b => b.classList.toggle('active', b.dataset.mqTreatment === monshinTreatmentFilter));
     renderMonshinTable();
   });
 
