@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v325';
+const APP_VERSION = 'v326';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13276,28 +13276,34 @@ function renderMonshinStats(rows) {
   document.getElementById('mq-stats').innerHTML = html;
 }
 
-function renderMonshinClinicTabs(rows) {
+function renderMonshinClinicSelect(rows) {
   const counts = {};
   rows.forEach(r => {
     const c = r.clinic_name || '(不明)';
     counts[c] = (counts[c] || 0) + 1;
   });
-  const clinics = Object.keys(counts).sort();
-  const tabs = document.getElementById('mq-clinic-tabs');
-  if (!tabs) return;
-  // 既存の動的タブを削除 (全医院だけ残す)
-  tabs.querySelectorAll('button[data-mq-clinic]:not([data-mq-clinic="__all__"])').forEach(b => b.remove());
-  clinics.forEach(c => {
-    const b = document.createElement('button');
-    b.className = 'sub-nav-btn';
-    b.dataset.mqClinic = c;
-    b.textContent = `${c} (${counts[c]})`;
-    if (c === monshinClinicFilter) b.classList.add('active');
-    tabs.appendChild(b);
-  });
-  // 全医院の件数も
-  const allBtn = tabs.querySelector('button[data-mq-clinic="__all__"]');
-  if (allBtn) allBtn.textContent = `全医院 (${rows.length})`;
+  const clinics = Object.keys(counts).sort((a, b) => counts[b] - counts[a]); // 件数多い順
+  const sel = document.getElementById('mq-filter-clinic');
+  if (!sel) return;
+  const current = sel.value || '__all__';
+  sel.innerHTML = `<option value="__all__">医院: 全医院 (${rows.length})</option>` +
+    clinics.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)} (${counts[c]})</option>`).join('');
+  // 選択状態を維持
+  sel.value = clinics.includes(current) || current === '__all__' ? current : '__all__';
+  monshinClinicFilter = sel.value;
+}
+
+function renderMonshinQuickSummary(rows) {
+  const total = rows.length;
+  const linked = rows.filter(r => r._is_linked).length;
+  const linkRate = total ? Math.round(linked / total * 100) : 0;
+  const now = Date.now();
+  const days7 = rows.filter(r => new Date(r.submitted_at).getTime() > now - 7 * 86400000).length;
+  const el = document.getElementById('mq-quick-summary');
+  if (!el) return;
+  el.textContent = total === 0
+    ? '（記入なし）'
+    : `総件数 ${total} ／ 過去7日 ${days7} ／ 紐付け率 ${linkRate}%`;
 }
 
 function renderMonshinCrossTable(rows) {
@@ -13489,10 +13495,11 @@ async function renderMonshin() {
   const tbody = document.getElementById('mq-tbody');
   if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>';
   monshinData = await loadMonshinData();
+  renderMonshinQuickSummary(monshinData);
   renderMonshinStats(monshinData);
   renderMonshinCrossTable(monshinData);
   renderMonshinTreatmentTabs(monshinData);
-  renderMonshinClinicTabs(monshinData);
+  renderMonshinClinicSelect(monshinData);
   renderMonshinTable();
 }
 
@@ -13505,6 +13512,22 @@ function bindMonshinEvents() {
   document.getElementById('mq-refresh')?.addEventListener('click', renderMonshin);
   document.getElementById('mq-filter-status')?.addEventListener('change', renderMonshinTable);
   document.getElementById('mq-search')?.addEventListener('input', renderMonshinTable);
+
+  // 医院フィルタ (ドロップダウン)
+  document.getElementById('mq-filter-clinic')?.addEventListener('change', e => {
+    monshinClinicFilter = e.target.value;
+    renderMonshinTable();
+  });
+
+  // 詳細・分析エリアの表示トグル
+  document.getElementById('mq-toggle-detail')?.addEventListener('click', () => {
+    const area = document.getElementById('mq-detail-area');
+    const btn = document.getElementById('mq-toggle-detail');
+    if (!area || !btn) return;
+    const isHidden = area.style.display === 'none';
+    area.style.display = isHidden ? '' : 'none';
+    btn.textContent = isHidden ? '📊 詳細・分析を隠す' : '📊 詳細・分析を表示';
+  });
 
   // クロス集計の折りたたみ
   document.getElementById('mq-cross-toggle')?.addEventListener('click', () => {
@@ -13522,15 +13545,6 @@ function bindMonshinEvents() {
     if (!btn) return;
     monshinTreatmentFilter = btn.dataset.mqTreatment;
     document.querySelectorAll('#mq-treatment-tabs .sub-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.mqTreatment === monshinTreatmentFilter));
-    renderMonshinTable();
-  });
-
-  // 医院サブタブクリック (event delegation)
-  document.getElementById('mq-clinic-tabs')?.addEventListener('click', e => {
-    const btn = e.target.closest('button[data-mq-clinic]');
-    if (!btn) return;
-    monshinClinicFilter = btn.dataset.mqClinic;
-    document.querySelectorAll('#mq-clinic-tabs .sub-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.mqClinic === monshinClinicFilter));
     renderMonshinTable();
   });
 

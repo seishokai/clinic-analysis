@@ -262,7 +262,7 @@
   <!-- Login -->
   <div id="login-screen" class="login-screen">
     <!-- v297: バージョン表示 (右下、薄く) -->
-    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v325</div>
+    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v326</div>
     <div class="login-card">
       <div class="login-logo">
         <h1 class="brand-script">Aladdin</h1>
@@ -434,7 +434,7 @@
       <button class="btn-logout" id="logout-btn">ログアウト</button>
     </header>
     <!-- v297: バージョン表示 (右下固定・どのページ・どのロールでも常に表示) -->
-    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン (リロード後も同じなら最新)">v325</div>
+    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン (リロード後も同じなら最新)">v326</div>
 
     <!-- Bottom Nav (mobile) -->
     <nav class="bottom-nav" id="bottom-nav">
@@ -1035,33 +1035,36 @@
     <main id="view-monshin" class="view view-wide" hidden>
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
         <div>
-          <h2 style="margin:0">問診票</h2>
-          <p class="page-desc" style="margin:4px 0 0;font-size:12px;color:var(--text-sub)">事前 Web 問診票の提出状況。予約・来院と name + 予約日 で自動紐付け。</p>
+          <h2 style="margin:0;display:flex;align-items:center;gap:10px">問診票 <span id="mq-quick-summary" style="font-size:12px;font-weight:400;color:var(--text-sub)"></span></h2>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-outline" id="mq-toggle-detail" style="font-size:11px;padding:6px 12px;min-height:30px">📊 詳細・分析を表示</button>
           <button class="btn btn-outline" id="mq-refresh" style="font-size:11px;padding:6px 12px;min-height:30px">🔄 再読込</button>
-          <button class="btn btn-dark" id="mq-copy-url" style="font-size:11px;padding:6px 12px;min-height:30px" title="shareconnect メール用 URL をコピー">📋 メール用URLコピー</button>
+          <button class="btn btn-dark" id="mq-copy-url" style="font-size:11px;padding:6px 12px;min-height:30px" title="shareconnect メール用 URL をコピー">📋 URLコピー</button>
         </div>
       </div>
 
-      <div class="stats-row" id="mq-stats" style="margin-bottom:12px"></div>
+      <!-- 詳細・分析エリア (デフォルト非表示) -->
+      <div id="mq-detail-area" style="display:none">
+        <div class="stats-row" id="mq-stats" style="margin-bottom:12px"></div>
 
-      <!-- 医院 × 治療 クロス集計 -->
-      <div class="card" id="mq-cross-card" style="margin-bottom:12px;padding:12px">
-        <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-          <span>医院 × 治療 クロス集計</span>
-          <button class="btn btn-outline" id="mq-cross-toggle" style="font-size:11px;padding:4px 10px;min-height:24px">折りたたむ</button>
-        </div>
-        <div id="mq-cross-body" class="data-table-wrap" style="margin-top:8px;overflow-x:auto">
-          <table class="data-table compact" id="mq-cross-table">
-            <thead></thead>
-            <tbody></tbody>
-          </table>
+        <!-- 医院 × 治療 クロス集計 -->
+        <div class="card" id="mq-cross-card" style="margin-bottom:12px;padding:12px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>医院 × 治療 クロス集計</span>
+            <button class="btn btn-outline" id="mq-cross-toggle" style="font-size:11px;padding:4px 10px;min-height:24px">折りたたむ</button>
+          </div>
+          <div id="mq-cross-body" class="data-table-wrap" style="margin-top:8px;overflow-x:auto">
+            <table class="data-table compact" id="mq-cross-table">
+              <thead></thead>
+              <tbody></tbody>
+            </table>
+          </div>
         </div>
       </div>
 
       <!-- 治療サブタブ (主検索軸) -->
-      <div class="sub-nav" id="mq-treatment-tabs" style="margin-bottom:8px;flex-wrap:wrap">
+      <div class="sub-nav" id="mq-treatment-tabs" style="margin-bottom:10px;flex-wrap:wrap">
         <button class="sub-nav-btn active" data-mq-treatment="__all__">全て</button>
         <button class="sub-nav-btn" data-mq-treatment="kyosei">矯正</button>
         <button class="sub-nav-btn" data-mq-treatment="bf">ラミネートベニア</button>
@@ -1070,19 +1073,17 @@
         <button class="sub-nav-btn" data-mq-treatment="general">一般・その他</button>
       </div>
 
-      <!-- 医院サブタブ -->
-      <div class="sub-nav" id="mq-clinic-tabs" style="margin-bottom:12px;flex-wrap:wrap">
-        <button class="sub-nav-btn active" data-mq-clinic="__all__">全医院</button>
-        <!-- 動的に追加 -->
-      </div>
-
-      <!-- フィルタ -->
+      <!-- フィルタ (医院セレクト + 紐付け + 検索) -->
       <div class="card" style="padding:10px;margin-bottom:12px">
         <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+          <select class="form-select" id="mq-filter-clinic" style="width:auto;padding:8px 10px;font-size:13px;font-weight:600;min-width:160px">
+            <option value="__all__">医院: 全医院</option>
+            <!-- 動的に追加 -->
+          </select>
           <select class="form-select" id="mq-filter-status" style="width:auto;padding:6px 8px;font-size:12px">
             <option value="">紐付け:全て</option>
-            <option value="linked">予約と紐付け済</option>
-            <option value="unlinked">予約と未紐付け</option>
+            <option value="linked">紐付け済</option>
+            <option value="unlinked">未紐付け</option>
           </select>
           <input type="text" class="form-input" id="mq-search" placeholder="名前・メール検索" style="width:180px;padding:6px 8px;font-size:12px">
           <span style="margin-left:auto;font-size:11px;color:var(--text-sub)" id="mq-result-count">-</span>
