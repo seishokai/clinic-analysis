@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v324';
+const APP_VERSION = 'v325';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13213,21 +13213,32 @@ async function loadMonshinData() {
       console.warn('[monshin] questionnaires load error', e1);
       return [];
     }
+    if (!questionnaires || !questionnaires.length) return [];
 
-    // 紐付け状態を判定するため manual_bookings から名前+日付セットを引く
-    const names = [...new Set((questionnaires || []).map(q => (q.patient_name || '').replace(/\s/g, '')).filter(Boolean))];
-    let bookings = [];
-    if (names.length) {
-      const { data: bk } = await sb
-        .from('manual_bookings')
-        .select('name, book_date, apply_date, facility, service, source, status, email, phone');
-      bookings = bk || [];
+    // 予約データ統合: bookingsData (Sheets + manual_bookings) を使用
+    //   → 「先に問診票 → あとから予約同期」のケースで、予約データが届いたら次の
+    //     読込タイミングで自動的に紐付く
+    if ((!window.bookingsData || !window.bookingsData.length) && typeof loadBookings === 'function') {
+      try { await loadBookings(); } catch(_) {}
     }
+    const allBookings = (window.bookingsData || []).slice();
 
-    return (questionnaires || []).map(q => {
-      const qn = (q.patient_name || '').replace(/\s/g, '');
-      const qd = q.booking_book_date;
-      const matched = bookings.find(b => (b.name || '').replace(/\s/g, '') === qn && b.book_date === qd);
+    return questionnaires.map(q => {
+      const qNameClean = (q.patient_name || '').replace(/\s/g, '');
+      const qDate = monshinNormalizeDate(q.booking_book_date);
+
+      // 名前 + 日付 (双方向 substring 対応) で予約を検索
+      const matched = allBookings.find(b => {
+        const bNameClean = (b.name || '').replace(/\s/g, '');
+        const bDate = monshinNormalizeDate(b.bookDate || b.book_date);
+        if (!bDate || bDate !== qDate) return false;
+        if (!bNameClean) return false;
+        // 完全一致 or どちらかが部分文字列
+        return bNameClean === qNameClean
+            || bNameClean.includes(qNameClean)
+            || qNameClean.includes(bNameClean);
+      });
+
       return {
         ...q,
         _matched_booking: matched || null,
@@ -13238,6 +13249,15 @@ async function loadMonshinData() {
     console.error('[monshin] load exception', e);
     return [];
   }
+}
+
+// 'YYYY/M/D HH:MM' 'YYYY-MM-DD' '2026/5/19' 等を 'YYYY-MM-DD' に正規化
+function monshinNormalizeDate(d) {
+  if (!d) return '';
+  const s = String(d).replace(/\//g, '-').split(' ')[0];
+  const m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+  if (!m) return s;
+  return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
 }
 
 function renderMonshinStats(rows) {
@@ -13278,6 +13298,65 @@ function renderMonshinClinicTabs(rows) {
   // 全医院の件数も
   const allBtn = tabs.querySelector('button[data-mq-clinic="__all__"]');
   if (allBtn) allBtn.textContent = `全医院 (${rows.length})`;
+}
+
+function renderMonshinCrossTable(rows) {
+  const treatments = ['kyosei','bf','implant','whitening','general'];
+  const clinics = [...new Set(rows.map(r => r.clinic_name || '(不明)'))].sort();
+  const counts = {};
+  const colTotals = {};
+  treatments.forEach(t => colTotals[t] = 0);
+  rows.forEach(r => {
+    const c = r.clinic_name || '(不明)';
+    let t = r.treatment || 'general';
+    if (t === 'laburie') t = 'bf';   // 旧ラブリエは bf に集約
+    if (!treatments.includes(t)) t = 'general';
+    if (!counts[c]) counts[c] = {};
+    counts[c][t] = (counts[c][t] || 0) + 1;
+    colTotals[t] = (colTotals[t] || 0) + 1;
+  });
+
+  const thead = document.querySelector('#mq-cross-table thead');
+  const tbody = document.querySelector('#mq-cross-table tbody');
+  if (!thead || !tbody) return;
+
+  thead.innerHTML = `<tr>
+    <th style="text-align:left">医院</th>
+    ${treatments.map(t => `<th>${escapeHtml(MONSHIN_TREATMENT_LABELS[t] || t)}</th>`).join('')}
+    <th>合計</th>
+  </tr>`;
+
+  if (!clinics.length) {
+    tbody.innerHTML = `<tr><td colspan="${treatments.length + 2}" style="text-align:center;padding:18px;color:var(--text-sub)">データがありません</td></tr>`;
+    return;
+  }
+
+  const rowsHTML = clinics.map(c => {
+    const cells = treatments.map(t => {
+      const n = (counts[c] || {})[t] || 0;
+      if (n === 0) return `<td style="text-align:center;color:var(--text-mute)">-</td>`;
+      const color = MONSHIN_TREATMENT_COLORS[t] || '#1f2937';
+      return `<td style="text-align:center;color:${color};font-weight:700">${n}</td>`;
+    }).join('');
+    const rowTotal = treatments.reduce((s, t) => s + ((counts[c] || {})[t] || 0), 0);
+    return `<tr>
+      <td style="text-align:left;font-weight:600">${escapeHtml(c)}</td>
+      ${cells}
+      <td style="text-align:center;font-weight:700">${rowTotal}</td>
+    </tr>`;
+  }).join('');
+
+  const grandTotal = Object.values(colTotals).reduce((s, n) => s + n, 0);
+  const totalRow = `<tr style="background:#f8fafc">
+    <td style="text-align:left;font-weight:700">合計</td>
+    ${treatments.map(t => {
+      const n = colTotals[t] || 0;
+      return `<td style="text-align:center;font-weight:700">${n || '-'}</td>`;
+    }).join('')}
+    <td style="text-align:center;font-weight:700">${grandTotal}</td>
+  </tr>`;
+
+  tbody.innerHTML = rowsHTML + totalRow;
 }
 
 function renderMonshinTreatmentTabs(rows) {
@@ -13411,6 +13490,7 @@ async function renderMonshin() {
   if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>';
   monshinData = await loadMonshinData();
   renderMonshinStats(monshinData);
+  renderMonshinCrossTable(monshinData);
   renderMonshinTreatmentTabs(monshinData);
   renderMonshinClinicTabs(monshinData);
   renderMonshinTable();
@@ -13425,6 +13505,16 @@ function bindMonshinEvents() {
   document.getElementById('mq-refresh')?.addEventListener('click', renderMonshin);
   document.getElementById('mq-filter-status')?.addEventListener('change', renderMonshinTable);
   document.getElementById('mq-search')?.addEventListener('input', renderMonshinTable);
+
+  // クロス集計の折りたたみ
+  document.getElementById('mq-cross-toggle')?.addEventListener('click', () => {
+    const body = document.getElementById('mq-cross-body');
+    const btn = document.getElementById('mq-cross-toggle');
+    if (!body || !btn) return;
+    const isHidden = body.style.display === 'none';
+    body.style.display = isHidden ? '' : 'none';
+    btn.textContent = isHidden ? '折りたたむ' : '展開する';
+  });
 
   // 治療サブタブクリック (event delegation)
   document.getElementById('mq-treatment-tabs')?.addEventListener('click', e => {
