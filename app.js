@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v341';
+const APP_VERSION = 'v342';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8663,12 +8663,16 @@ function getStatusesForTreatment(treatment) {
 // v273: 来院一覧の期間フィルタ状態 (デフォルト今月、来院日基準)
 let _kaiinAllPeriodState = {
   period: 'thisMonth',
+  month: '',
+  basis: 'book',
+  todayOnly: false,
   search: '',
   tool: new Set(),
   facility: new Set(),
   promo: new Set(),
   service: new Set(),
   status: new Set(),
+  contract: new Set(),
 };
 let _kaiinAllDD = null;
 
@@ -8684,27 +8688,47 @@ async function renderKaiinAll(containerId) {
     if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
     return true;
   });
-  // 期間フィルタ
-  const period = _kaiinAllPeriodState.period;
-  if (period) {
-    const ymOf = (d, useApply) => {
-      const src = useApply ? (d.applyDate||'') : (d.bookDate || d.applyDate || '');
-      const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
-      return m ? m[1]+'-'+String(parseInt(m[2])).padStart(2,'0') : '';
-    };
+  // 期間フィルタ (basis: book=来院日 / apply=登録日, month で直接指定可)
+  const state = _kaiinAllPeriodState;
+  const period = state.period;
+  const month = state.month;
+  const basis = state.basis || 'book';
+  const ymOf = (d) => {
+    const src = basis === 'apply' ? (d.applyDate || '') : (d.bookDate || d.applyDate || '');
+    const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
+    return m ? m[1] + '-' + String(parseInt(m[2])).padStart(2, '0') : '';
+  };
+  if (month) {
+    baseRows = baseRows.filter(d => ymOf(d) === month);
+  } else if (period) {
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-    if (period === 'thisMonth') baseRows = baseRows.filter(d => ymOf(d, false) === ym);
-    else if (period === 'thisMonthApply') baseRows = baseRows.filter(d => ymOf(d, true) === ym);
+    if (period === 'thisMonth') baseRows = baseRows.filter(d => ymOf(d) === ym);
     else if (period === 'lastMonth') {
       const last = new Date(now); last.setMonth(last.getMonth()-1);
       const lym = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}`;
-      baseRows = baseRows.filter(d => ymOf(d, false) === lym);
+      baseRows = baseRows.filter(d => ymOf(d) === lym);
+    } else if (period === 'fiscal') {
+      const fy = now.getMonth() < 3 ? now.getFullYear() - 1 : now.getFullYear();
+      baseRows = baseRows.filter(d => {
+        const ymd = ymOf(d);
+        if (!ymd) return false;
+        const [y, m] = ymd.split('-').map(Number);
+        return (y === fy && m >= 4) || (y === fy + 1 && m <= 3);
+      });
     }
   }
   // 一覧フィルタ (予約管理と同じ操作系)
-  const state = _kaiinAllPeriodState;
   let allRows = baseRows;
+  if (state.todayOnly) {
+    const td = new Date();
+    const todayStr = `${td.getFullYear()}-${String(td.getMonth()+1).padStart(2,'0')}-${String(td.getDate()).padStart(2,'0')}`;
+    allRows = allRows.filter(d => {
+      const m = String(d.bookDate || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+      if (!m) return false;
+      return `${m[1]}-${String(parseInt(m[2])).padStart(2,'0')}-${String(parseInt(m[3])).padStart(2,'0')}` === todayStr;
+    });
+  }
   if (state.search) {
     const s = state.search.toLowerCase();
     allRows = allRows.filter(d => d.name && d.name.toLowerCase().includes(s));
@@ -8714,6 +8738,7 @@ async function renderKaiinAll(containerId) {
   if (state.promo.size) allRows = allRows.filter(d => state.promo.has(d.source));
   if (state.service.size) allRows = allRows.filter(d => state.service.has(normSvc(d.service)));
   if (state.status.size) allRows = allRows.filter(d => state.status.has(d.status || '__未設定__'));
+  if (state.contract.size) allRows = allRows.filter(d => state.contract.has(d.contractService));
   // 治療タイプ別カウント
   // 金額は status 不問・bk-extra 優先で合算 (予約管理と同じ集計)
   const _bkExtra = loadData('bk-extra', {});
@@ -8747,43 +8772,99 @@ async function renderKaiinAll(containerId) {
         </div>
       </div>`;
     }).join('');
+  // === 全体統計 (来院は全て過去予約。予約数は表示しない) ===
   const totalCount = allRows.length;
-  const totalContracted = allRows.filter(d => d.status==='成約').length;
+  const visited = allRows.filter(d => isVisitedStatus(d.status || '')).length;
+  const contracted = allRows.filter(d => d.status === '成約').length;
+  const formalCancelled = allRows.filter(d => d.status === 'キャンセル').length;
+  const noShow = allRows.filter(d => {
+    const s = d.status || '';
+    return s !== 'キャンセル' && !isVisitedStatus(s) && s !== '未対応' && s !== '';
+  }).length;
+  const cancelled = formalCancelled + noShow;
+  const overdue = allRows.filter(d => !d.status || d.status === '未対応').length;
   const totalAmt = allRows.reduce((s, d) => s + _amt(d), 0);
-  const totalRate = totalCount ? Math.round(totalContracted / totalCount * 100) : 0;
+  const visitRate = totalCount ? Math.round(visited / totalCount * 100) : 0;
+  const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
 
   // 期間ラベル
-  const periodLabel = {
-    'thisMonth': '今月（来院日基準）',
-    'thisMonthApply': '今月（登録日基準）',
-    'lastMonth': '先月',
-    '': '全期間'
-  }[period] || '全期間';
+  const basisLabel = basis === 'apply' ? '登録日基準' : '来院日基準';
+  const periodLabel = month
+    ? `${month}（${basisLabel}）`
+    : (period === 'thisMonth' ? `今月（${basisLabel}）`
+       : period === 'lastMonth' ? `先月（${basisLabel}）`
+       : period === 'fiscal' ? `今期（${basisLabel}）`
+       : '全期間');
 
   el.innerHTML = `
-    <div style="display:flex;gap:6px;align-items:center;margin-bottom:12px;flex-wrap:wrap;padding:6px 8px;background:var(--card);border:1px solid var(--border);border-radius:6px">
-      <input type="text" id="kaiin-all-search" placeholder="🔍 名前検索" value="${escapeHtml(state.search || '')}" style="width:140px;padding:5px 8px;font-size:12px;border:1px solid var(--border);border-radius:4px">
-      <select id="kaiin-all-period" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:4px;background:#fff;cursor:pointer;font-family:inherit;width:auto">
-        <option value="" ${period===''?'selected':''}>期間: 全期間</option>
-        <option value="thisMonth" ${period==='thisMonth'?'selected':''}>期間: 今月（来院日基準）</option>
-        <option value="thisMonthApply" ${period==='thisMonthApply'?'selected':''}>期間: 今月（登録日基準）</option>
-        <option value="lastMonth" ${period==='lastMonth'?'selected':''}>期間: 先月</option>
-      </select>
-      <span class="kaiin-all-tool-slot"></span>
-      <span class="kaiin-all-facility-slot"></span>
-      <span class="kaiin-all-promo-slot"></span>
-      <span class="kaiin-all-service-slot"></span>
-      <span class="kaiin-all-status-slot"></span>
-      <button id="kaiin-all-reset" class="btn btn-outline" style="font-size:11px;padding:5px 10px;min-height:28px">クリア</button>
-      <span style="font-size:11px;color:var(--text-sub);margin-left:auto">表示中: <strong style="color:var(--text)">${periodLabel}</strong></span>
+    <div id="kaiin-all-period-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:8px 14px;background:linear-gradient(90deg,#eff6ff 0%,#fff 100%);border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:8px">
+      <span style="font-size:11px;color:var(--text-sub)">📅 表示中の期間:</span>
+      <strong style="color:var(--text)">${escapeHtml(periodLabel)}</strong>
+      <span style="margin-left:auto;font-size:11px;color:var(--text-sub)">${totalCount}件 表示</span>
     </div>
-    <div style="margin-bottom:14px;padding:14px;background:linear-gradient(135deg,#f9fafb 0%,#f3f4f6 100%);border-radius:10px;border:1px solid var(--border)">
-      <div style="font-size:12px;color:var(--text-sub);margin-bottom:6px">全治療合計（${escapeHtml(periodLabel)}）</div>
-      <div style="display:flex;gap:24px;align-items:baseline;flex-wrap:wrap">
-        <div><span style="font-size:28px;font-weight:700;color:#111">${totalCount}</span><span style="font-size:12px;color:var(--text-sub);margin-left:3px">件</span></div>
-        <div><span style="font-size:12px;color:var(--text-sub)">成約</span> <span style="font-size:18px;font-weight:700;color:#059669">${totalContracted}</span></div>
-        <div><span style="font-size:12px;color:var(--text-sub)">成約率</span> <span style="font-size:18px;font-weight:700;color:${totalRate>=30?'#059669':'#d97706'}">${totalRate}%</span></div>
-        <div><span style="font-size:12px;color:var(--text-sub)">成約金額</span> <span style="font-size:18px;font-weight:700;color:#111">¥${fmt(totalAmt)}</span></div>
+    <div class="stats-row" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
+      <div class="stat-card" style="border-color:${overdue>0?'#f97316':'var(--border)'};background:${overdue>0?'#fff7ed':'var(--card)'}" title="未対応のまま予約日を過ぎた緊急対応必要件数">
+        <span class="stat-label" style="color:${overdue>0?'#f97316':'var(--text-sub)'};font-weight:700">⚠ 要対応</span>
+        <span class="stat-num" style="color:${overdue>0?'#f97316':'var(--text-main)'}">${overdue}</span>
+        <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">未対応のまま</span>
+      </div>
+      <div class="stat-card" title="キャンセル(取消) + 未来店(連絡途絶)">
+        <span class="stat-label">キャンセル</span>
+        <span class="stat-num" style="color:var(--red)">${cancelled}</span>
+        <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600">取消${formalCancelled}+未来店${noShow}</span>
+      </div>
+      <div class="stat-card" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階">
+        <span class="stat-label">来院済</span>
+        <span class="stat-num">${visited}</span>
+        <span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%</span>
+      </div>
+      <div class="stat-card" title="成約済の予約 (来院後に契約に至った件数)">
+        <span class="stat-label">成約</span>
+        <span class="stat-num" style="color:var(--green)">${contracted}</span>
+        <span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%</span>
+      </div>
+      <div class="stat-card" title="成約金額の合計 (税抜)">
+        <span class="stat-label">成約金額</span>
+        <span class="stat-num">¥${fmt(totalAmt)}</span>
+        <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span>
+      </div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">📅 期間</span>
+        <select id="kaiin-all-period" class="form-select" style="width:auto;padding:6px 8px;font-size:11px" title="表示する期間">
+          <option value="" ${!period?'selected':''}>全期間</option>
+          <option value="thisMonth" ${period==='thisMonth'?'selected':''}>今月</option>
+          <option value="lastMonth" ${period==='lastMonth'?'selected':''}>先月</option>
+          <option value="fiscal" ${period==='fiscal'?'selected':''}>今期</option>
+        </select>
+        <input type="month" id="kaiin-all-month" class="form-input" value="${escapeHtml(month||'')}" style="width:auto;padding:6px 8px;font-size:11px" title="月を直接指定（期間ドロップダウンと排他）">
+        <span style="font-size:9px;color:#999;margin:0 4px">×</span>
+        <span style="font-size:10px;color:#666;font-weight:600">基準:</span>
+        <select id="kaiin-all-basis" class="form-select" style="width:auto;padding:6px 8px;font-size:11px" title="期間/月をどちらの日付で絞るか">
+          <option value="book" ${basis==='book'?'selected':''}>📅 来院日基準</option>
+          <option value="apply" ${basis==='apply'?'selected':''}>📝 登録日基準</option>
+        </select>
+        <span style="font-size:9px;color:#999;margin-left:6px">※期間と月はどちらか片方のみ</span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">⚡ 絞込</span>
+        <button id="kaiin-all-today" class="btn ${state.todayOnly?'btn-dark':'btn-outline'}" style="min-height:30px;padding:5px 10px;font-size:11px;border-radius:14px" title="今日来院のみ表示">📅 今日来院</button>
+        <input type="text" id="kaiin-all-search" class="form-input" placeholder="🔍 名前で検索" value="${escapeHtml(state.search||'')}" style="width:140px;padding:6px 10px;font-size:11px">
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">🎯 詳細</span>
+        <span class="kaiin-all-facility-slot" title="医院で絞り込み"></span>
+        <span class="kaiin-all-status-slot" title="状態で絞り込み"></span>
+        <span class="kaiin-all-promo-slot" title="プロモ(流入元)で絞り込み"></span>
+        <span class="kaiin-all-service-slot" title="相談内容で絞り込み"></span>
+        <span class="kaiin-all-contract-slot" title="成約商材で絞り込み"></span>
+        <span class="kaiin-all-tool-slot" title="登録ツールで絞り込み"></span>
+      </div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">↕️ 操作</span>
+        <span style="flex:1"></span>
+        <button id="kaiin-all-reset" class="btn btn-outline" style="min-height:30px;padding:6px 14px;font-size:11px;border-radius:18px" title="全フィルタをクリアして今月に戻す">🔄 リセット</button>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:20px">
@@ -8793,9 +8874,25 @@ async function renderKaiinAll(containerId) {
       ↑ 治療タイプをクリックで詳細一覧へ
     </div>`;
 
-  // 期間フィルタ変更で再描画
+  // === 期間/月/基準 ===
   el.querySelector('#kaiin-all-period')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.period = e.target.value;
+    if (e.target.value) _kaiinAllPeriodState.month = '';
+    renderKaiinAll(containerId);
+  });
+  el.querySelector('#kaiin-all-month')?.addEventListener('change', (e) => {
+    _kaiinAllPeriodState.month = e.target.value;
+    if (e.target.value) _kaiinAllPeriodState.period = '';
+    renderKaiinAll(containerId);
+  });
+  el.querySelector('#kaiin-all-basis')?.addEventListener('change', (e) => {
+    _kaiinAllPeriodState.basis = e.target.value;
+    renderKaiinAll(containerId);
+  });
+
+  // === 今日来院トグル ===
+  el.querySelector('#kaiin-all-today')?.addEventListener('click', () => {
+    _kaiinAllPeriodState.todayOnly = !_kaiinAllPeriodState.todayOnly;
     renderKaiinAll(containerId);
   });
 
@@ -8807,6 +8904,7 @@ async function renderKaiinAll(containerId) {
   baseRows.forEach(d => { if (d.source && d.source.trim() && d.source.trim() !== '?') promoCounts[d.source] = (promoCounts[d.source]||0) + 1; });
   const promoOpts = Object.keys(promoCounts).sort((a,b) => promoCounts[b]-promoCounts[a]).map(p => ({ value: p, label: `${p} (${promoCounts[p]})` }));
   const serviceOpts = [...new Set(baseRows.map(d => normSvc(d.service)).filter(Boolean))].sort();
+  const contractOpts = [...new Set(baseRows.map(d => d.contractService).filter(Boolean))].sort();
   const statusOpts = [
     '未対応',
     { value: '予約連絡待ち', label: '次回予約連絡待ち' },
@@ -8818,7 +8916,8 @@ async function renderKaiinAll(containerId) {
   const facDD = createMultiSelectDropdown({ label: '医院', options: facilityOpts, selected: state.facility, onChange: triggerRedraw });
   const promoDD = createMultiSelectDropdown({ label: 'プロモ', options: promoOpts, selected: state.promo, onChange: triggerRedraw });
   const svcDD = createMultiSelectDropdown({ label: '相談', options: serviceOpts, selected: state.service, onChange: triggerRedraw });
-  const statusDD = createMultiSelectDropdown({ label: 'ｽﾃｰﾀｽ', options: statusOpts, selected: state.status, onChange: triggerRedraw });
+  const statusDD = createMultiSelectDropdown({ label: '状態', options: statusOpts, selected: state.status, onChange: triggerRedraw });
+  const contractDD = createMultiSelectDropdown({ label: '成約商材', options: contractOpts, selected: state.contract, onChange: triggerRedraw });
 
   const fillSlot = (sel, dd) => { const s = el.querySelector(sel); if (s) s.replaceWith(dd.buttonElement); };
   fillSlot('.kaiin-all-tool-slot', toolDD);
@@ -8826,9 +8925,10 @@ async function renderKaiinAll(containerId) {
   fillSlot('.kaiin-all-promo-slot', promoDD);
   fillSlot('.kaiin-all-service-slot', svcDD);
   fillSlot('.kaiin-all-status-slot', statusDD);
-  _kaiinAllDD = { tool: toolDD, facility: facDD, promo: promoDD, service: svcDD, status: statusDD };
+  fillSlot('.kaiin-all-contract-slot', contractDD);
+  _kaiinAllDD = { tool: toolDD, facility: facDD, promo: promoDD, service: svcDD, status: statusDD, contract: contractDD };
 
-  // 検索ボックス (debounce)
+  // === 検索ボックス (debounce 250ms) ===
   const searchEl = el.querySelector('#kaiin-all-search');
   if (searchEl) {
     let _t;
@@ -8839,22 +8939,26 @@ async function renderKaiinAll(containerId) {
         renderKaiinAll(containerId);
       }, 250);
     });
-    // フォーカスを保持 (再描画後)
     if (state.search) { searchEl.focus(); searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length); }
   }
 
-  // クリアボタン
+  // === リセット ===
   el.querySelector('#kaiin-all-reset')?.addEventListener('click', () => {
+    _kaiinAllPeriodState.period = 'thisMonth';
+    _kaiinAllPeriodState.month = '';
+    _kaiinAllPeriodState.basis = 'book';
+    _kaiinAllPeriodState.todayOnly = false;
     _kaiinAllPeriodState.search = '';
     _kaiinAllPeriodState.tool.clear();
     _kaiinAllPeriodState.facility.clear();
     _kaiinAllPeriodState.promo.clear();
     _kaiinAllPeriodState.service.clear();
     _kaiinAllPeriodState.status.clear();
+    _kaiinAllPeriodState.contract.clear();
     renderKaiinAll(containerId);
   });
 
-  // カードクリック → 該当サブタブへ遷移
+  // === カードクリック → 該当サブタブ ===
   el.querySelectorAll('.kaiin-all-card').forEach(card => {
     card.addEventListener('click', () => {
       const target = card.dataset.target;
