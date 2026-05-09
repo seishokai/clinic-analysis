@@ -379,34 +379,116 @@
   }
   .field-error-msg::before { content: '⚠'; font-size: 14px; }
 
-  /* 完了画面 */
+  /* 完了画面 (上品・余白多め) */
   .thanks {
     text-align: center;
-    padding: 60px 24px;
-    background: linear-gradient(180deg, #ffffff 0%, #ecfdf5 100%);
+    padding: 72px 32px;
+    background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 80%, #ecfdf5 100%);
+    border: 1px solid var(--primary-soft);
+    border-radius: 20px;
+    box-shadow: 0 10px 40px -10px rgba(16, 185, 129, 0.12);
   }
-  .thanks .icon {
-    font-size: 80px;
-    margin-bottom: 20px;
-    display: inline-block;
-    animation: pop 0.5s cubic-bezier(0.16, 1.5, 0.4, 1) both;
+  .thanks-mark {
+    width: 64px;
+    height: 64px;
+    border: 1.5px solid var(--primary);
+    border-radius: 50%;
+    margin: 0 auto 28px;
+    position: relative;
+    animation: thanksMarkAppear 0.7s cubic-bezier(0.16, 1, 0.4, 1) both;
   }
-  @keyframes pop {
-    from { transform: scale(0.5); opacity: 0; }
-    to { transform: scale(1); opacity: 1; }
+  .thanks-mark::after {
+    content: '';
+    position: absolute;
+    width: 22px;
+    height: 11px;
+    border-bottom: 2px solid var(--primary);
+    border-left: 2px solid var(--primary);
+    transform: rotate(-45deg);
+    top: 19px;
+    left: 19px;
+    animation: checkmarkDraw 0.5s ease-out 0.3s both;
+  }
+  @keyframes thanksMarkAppear {
+    from { transform: scale(0.6) rotate(-180deg); opacity: 0; }
+    to   { transform: scale(1) rotate(0deg);     opacity: 1; }
+  }
+  @keyframes checkmarkDraw {
+    from { opacity: 0; transform: rotate(-45deg) scale(0.5); }
+    to   { opacity: 1; transform: rotate(-45deg) scale(1); }
+  }
+  .thanks-eyebrow {
+    font-size: 10px;
+    letter-spacing: 0.4em;
+    color: var(--primary-dark);
+    font-weight: 700;
+    margin-bottom: 14px;
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
   }
   .thanks h2 {
-    font-size: 22px;
-    margin: 0 0 12px;
+    font-size: 24px;
+    margin: 0 0 20px;
     border: none;
     padding: 0;
     font-weight: 700;
+    letter-spacing: 0.08em;
+    line-height: 1.6;
+    color: var(--text);
   }
   .thanks h2::before { display: none; }
-  .thanks p {
+  .thanks-msg {
     color: var(--text-sub);
-    font-size: 15px;
-    line-height: 1.8;
+    font-size: 13.5px;
+    line-height: 2;
+    margin: 0 0 36px;
+    letter-spacing: 0.04em;
+  }
+  .thanks-divider {
+    width: 36px;
+    height: 1px;
+    background: var(--primary);
+    margin: 32px auto;
+    opacity: 0.4;
+  }
+  .thanks-booking {
+    margin: 24px auto 32px;
+    padding: 24px 28px;
+    background: rgba(255, 255, 255, 0.7);
+    backdrop-filter: blur(8px);
+    border-radius: 14px;
+    border: 1px solid var(--primary-soft);
+    max-width: 420px;
+  }
+  .thanks-booking-label {
+    font-size: 10px;
+    color: var(--primary-dark);
+    letter-spacing: 0.3em;
+    margin-bottom: 14px;
+    font-weight: 700;
+    font-family: -apple-system, 'Helvetica Neue', sans-serif;
+  }
+  .thanks-booking-clinic {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 8px;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+  .thanks-booking-datetime {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--primary-dark);
+    letter-spacing: 0.04em;
+    line-height: 1.5;
+  }
+  .thanks-closing {
+    font-size: 13px;
+    color: var(--text);
+    margin-top: 28px;
+    letter-spacing: 0.12em;
+    line-height: 2.2;
+    font-weight: 500;
   }
 
   /* その他自由記入欄 */
@@ -476,10 +558,24 @@
   <div id="screen-form" style="display:none"></div>
 
   <!-- 完了 -->
-  <div id="screen-thanks" class="card thanks" style="display:none">
-    <div class="icon">🎉</div>
+  <div id="screen-thanks" class="thanks" style="display:none">
+    <div class="thanks-mark"></div>
+    <div class="thanks-eyebrow">RECEIVED</div>
     <h2>ご記入ありがとうございました</h2>
-    <p>ご来院お待ちしております。<br>当日のご相談がスムーズになります。</p>
+    <p class="thanks-msg">
+      ご記入いただいた内容は<br>
+      当院のドクター・スタッフのみが事前に拝見いたします。<br>
+      当日、より充実したご相談時間をお過ごしいただけるよう<br>
+      ご準備してお待ちしております。
+    </p>
+    <div class="thanks-divider"></div>
+    <div class="thanks-booking" id="thanks-booking">
+      <!-- 動的挿入 -->
+    </div>
+    <p class="thanks-closing">
+      心よりお会いできる日を<br>
+      楽しみにいたしております
+    </p>
   </div>
 
   <!-- エラー -->
@@ -498,7 +594,7 @@
 <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- 治療別テンプレート -->
-<script src="./templates.js?v=10"></script>
+<script src="./templates.js?v=11"></script>
 
 <script>
 // =====================================================================
@@ -588,6 +684,37 @@ const screens = {
 function showScreen(name) {
   Object.entries(screens).forEach(([k, el]) => { el.style.display = (k === name) ? '' : 'none'; });
   document.getElementById('submitBar').style.display = (name === 'form') ? '' : 'none';
+  // 完了画面: 予約情報を埋め込み
+  if (name === 'thanks') populateThanksBooking();
+}
+
+function populateThanksBooking() {
+  const el = document.getElementById('thanks-booking');
+  if (!el || !currentParams) return;
+  const date = formatJapaneseDate(currentParams.date);
+  const time = currentParams.time || '';
+  const clinic = currentParams.clinic || '';
+  if (!clinic && !date) {
+    el.style.display = 'none';
+    return;
+  }
+  el.innerHTML = `
+    <div class="thanks-booking-label">RESERVATION</div>
+    ${clinic ? `<div class="thanks-booking-clinic">${escapeHtml(clinic)}</div>` : ''}
+    <div class="thanks-booking-datetime">${escapeHtml(date)}${time ? ' &nbsp;' + escapeHtml(time) : ''}</div>
+  `;
+}
+
+function formatJapaneseDate(d) {
+  if (!d) return '';
+  const m = String(d).match(/^(\d{4})[\-\/](\d{1,2})[\-\/](\d{1,2})/);
+  if (!m) return d;
+  const yr = parseInt(m[1]);
+  const mo = parseInt(m[2]);
+  const da = parseInt(m[3]);
+  const dt = new Date(yr, mo - 1, da);
+  const days = ['日', '月', '火', '水', '木', '金', '土'];
+  return `${yr}年${mo}月${da}日 (${days[dt.getDay()]})`;
 }
 
 function escapeHtml(s) {
