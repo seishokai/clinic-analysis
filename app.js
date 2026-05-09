@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v330';
+const APP_VERSION = 'v331';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13249,6 +13249,64 @@ function mqValueLabel(value) {
   }
   return MQ_VALUE_LABELS[value] || String(value);
 }
+
+// 治療タブごとの追加カラム定義
+const MQ_TREATMENT_COLUMNS = {
+  kyosei: [
+    { key: 'kyosei_past_consultation',    label: '過去相談',  width: 70 },
+    { key: 'kyosei_consultation_content', label: '相談内容',  width: 220 },
+    { key: 'kyosei_concerns',             label: '心配な点',  width: 180 },
+    { key: 'kyosei_age',                  label: '年齢',      width: 50 },
+    { key: 'kyosei_referral_source',      label: '認知経路',  width: 160 },
+    { key: 'kyosei_appeal_reason',        label: '選定理由',  width: 200 },
+  ],
+  bf: [
+    { key: 'consultation_content', label: '相談内容', width: 220 },
+    { key: 'concerns',             label: '心配な点', width: 180 },
+    { key: 'age',                  label: '年齢',     width: 50 },
+  ],
+  implant: [
+    { key: 'consultation_content', label: '相談内容', width: 220 },
+    { key: 'concerns',             label: '心配な点', width: 180 },
+    { key: 'age',                  label: '年齢',     width: 50 },
+  ],
+  whitening: [
+    { key: 'consultation_content', label: '相談内容', width: 220 },
+    { key: 'concerns',             label: '心配な点', width: 180 },
+    { key: 'age',                  label: '年齢',     width: 50 },
+  ],
+  general: [
+    { key: 'consultation_content', label: '相談内容', width: 220 },
+    { key: 'concerns',             label: '心配な点', width: 180 },
+    { key: 'age',                  label: '年齢',     width: 50 },
+  ],
+};
+
+// セル内に短く表示するためのフォーマッタ (一覧用)
+function formatAnswerCell(value) {
+  if (value === null || value === undefined || value === '') {
+    return '<span style="color:var(--text-mute)">-</span>';
+  }
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '<span style="color:var(--text-mute)">-</span>';
+    const items = value.slice(0, 2).map(v => {
+      let label;
+      if (typeof v === 'string' && v.startsWith('other:')) {
+        label = 'その他';
+      } else {
+        label = MQ_VALUE_LABELS[v] || v;
+      }
+      return `<span style="display:inline-block;background:#f0fdf4;color:#065f46;padding:1px 6px;border-radius:4px;font-size:10px;margin:1px 2px 1px 0;line-height:1.4;border:1px solid #bbf7d0">${escapeHtml(String(label).slice(0, 12))}</span>`;
+    }).join('');
+    const more = value.length > 2 ? `<span style="font-size:10px;color:var(--text-mute)">+${value.length - 2}</span>` : '';
+    return items + more;
+  }
+  const label = String(MQ_VALUE_LABELS[value] || value);
+  if (label.length > 30) {
+    return `<span title="${escapeHtml(label)}" style="font-size:11px">${escapeHtml(label.slice(0, 30))}…</span>`;
+  }
+  return `<span style="font-size:11px">${escapeHtml(label)}</span>`;
+}
 const MONSHIN_TREATMENT_COLORS = {
   kyosei:    '#06c755',
   bf:        '#1f2937',
@@ -13480,11 +13538,36 @@ function applyMonshinFilters() {
 function renderMonshinTable() {
   const rows = applyMonshinFilters();
   const tbody = document.getElementById('mq-tbody');
+  const thead = document.querySelector('#mq-table thead tr');
   const cnt = document.getElementById('mq-result-count');
   if (cnt) cnt.textContent = rows.length + '件';
-  if (!tbody) return;
+  if (!tbody || !thead) return;
+
+  // 治療フィルタが特定の治療なら、そのカラムを追加
+  const tFilter = monshinTreatmentFilter;
+  const extraCols = (tFilter && tFilter !== '__all__' && MQ_TREATMENT_COLUMNS[tFilter]) || [];
+  const showTreatmentCol = !tFilter || tFilter === '__all__';
+
+  // ヘッダー再構築
+  let headHTML = '';
+  if (showTreatmentCol) {
+    headHTML += '<th style="width:60px;padding:6px 8px;font-size:11px">治療</th>';
+  }
+  headHTML += '<th style="text-align:left;padding:6px 8px;font-size:11px;min-width:150px">名前 / 連絡先</th>';
+  headHTML += '<th style="width:120px;padding:6px 8px;font-size:11px;white-space:nowrap">予約日時</th>';
+  headHTML += '<th style="padding:6px 8px;font-size:11px;min-width:120px">医院</th>';
+  // 治療別カラム
+  extraCols.forEach(c => {
+    headHTML += `<th style="width:${c.width}px;padding:6px 8px;font-size:11px;white-space:nowrap">${escapeHtml(c.label)}</th>`;
+  });
+  headHTML += '<th style="width:70px;padding:6px 8px;font-size:11px">紐付け</th>';
+  headHTML += '<th style="width:70px;padding:6px 8px;font-size:11px">提出</th>';
+  headHTML += '<th style="width:50px;padding:6px 8px"></th>';
+  thead.innerHTML = headHTML;
+
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:60px 30px;color:var(--text-sub)"><div style="font-size:14px;margin-bottom:6px">該当する問診票がありません</div><div style="font-size:11px;color:var(--text-mute)">フィルタを変えるか、患者さんが記入するのを待ちましょう</div></td></tr>';
+    const colspan = (showTreatmentCol ? 1 : 0) + 6 + extraCols.length;
+    tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:60px 30px;color:var(--text-sub)"><div style="font-size:14px;margin-bottom:6px">該当する問診票がありません</div><div style="font-size:11px;color:var(--text-mute)">フィルタを変えるか、患者さんが記入するのを待ちましょう</div></td></tr>`;
     return;
   }
 
@@ -13497,7 +13580,7 @@ function renderMonshinTable() {
     const dt = new Date(yr, mo - 1, da);
     const days = ['日','月','火','水','木','金','土'];
     const dayChar = days[dt.getDay()];
-    return `${mo}/${da} (${dayChar})${t ? ' ' + t : ''}`;
+    return `${mo}/${da}(${dayChar}) ${t || ''}`.trim();
   };
   const fmtSubmitted = (s) => {
     if (!s) return '-';
@@ -13510,24 +13593,32 @@ function renderMonshinTable() {
     const tColor = MONSHIN_TREATMENT_COLORS[r.treatment] || '#6b7280';
     const linked = r._is_linked;
     const linkedBadge = linked
-      ? '<span style="display:inline-block;background:#dcfce7;color:#065f46;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700;line-height:1.3">✓ 紐付済</span>'
-      : '<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700;line-height:1.3">✗ 未紐付</span>';
+      ? '<span style="display:inline-block;background:#dcfce7;color:#065f46;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700;line-height:1.3">✓紐付</span>'
+      : '<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700;line-height:1.3">✗未紐付</span>';
     const contact = [r.patient_email, r.patient_phone].filter(Boolean).join(' / ');
 
-    return `
-      <tr style="cursor:pointer" data-mq-row-id="${r.id}">
-        <td style="text-align:center"><span style="display:inline-block;background:${tColor};color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap;line-height:1.3">${escapeHtml(tLabel)}</span></td>
-        <td style="text-align:left;line-height:1.3">
-          <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHtml(r.patient_name || '(無記名)')}</div>
-          ${contact ? `<div style="font-size:10px;color:var(--text-mute)">${escapeHtml(contact)}</div>` : ''}
-        </td>
-        <td style="font-size:12px;font-weight:600;white-space:nowrap;color:var(--text)">${escapeHtml(fmtBookingDate(r.booking_book_date, r.booking_book_time))}</td>
-        <td style="font-size:11px;color:var(--text-sub);line-height:1.3">${escapeHtml(r.clinic_name || '(不明)')}</td>
-        <td style="text-align:center">${linkedBadge}</td>
-        <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;line-height:1.3">${escapeHtml(fmtSubmitted(r.submitted_at))}</td>
-        <td style="text-align:right"><button class="btn btn-outline mq-detail-btn" data-id="${r.id}" style="font-size:10px;padding:3px 8px;min-height:22px">詳細</button></td>
-      </tr>
-    `;
+    let cells = '';
+    if (showTreatmentCol) {
+      cells += `<td style="text-align:center"><span style="display:inline-block;background:${tColor};color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap;line-height:1.3">${escapeHtml(tLabel)}</span></td>`;
+    }
+    cells += `<td style="text-align:left;line-height:1.3">
+      <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHtml(r.patient_name || '(無記名)')}</div>
+      ${contact ? `<div style="font-size:10px;color:var(--text-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:240px">${escapeHtml(contact)}</div>` : ''}
+    </td>`;
+    cells += `<td style="font-size:12px;font-weight:600;white-space:nowrap;color:var(--text)">${escapeHtml(fmtBookingDate(r.booking_book_date, r.booking_book_time))}</td>`;
+    cells += `<td style="font-size:11px;color:var(--text-sub);line-height:1.3">${escapeHtml(r.clinic_name || '(不明)')}</td>`;
+
+    // 治療別カラム
+    extraCols.forEach(c => {
+      const ans = (r.treatment_answers || {})[c.key];
+      cells += `<td style="line-height:1.4;padding:4px 8px">${formatAnswerCell(ans)}</td>`;
+    });
+
+    cells += `<td style="text-align:center">${linkedBadge}</td>`;
+    cells += `<td style="font-size:10px;color:var(--text-sub);white-space:nowrap;line-height:1.3">${escapeHtml(fmtSubmitted(r.submitted_at))}</td>`;
+    cells += `<td style="text-align:right"><button class="btn btn-outline mq-detail-btn" data-id="${r.id}" style="font-size:10px;padding:3px 8px;min-height:22px">詳細</button></td>`;
+
+    return `<tr style="cursor:pointer" data-mq-row-id="${r.id}">${cells}</tr>`;
   }).join('');
 
   // 行クリックで詳細を開く (ボタン以外をクリックしたとき)

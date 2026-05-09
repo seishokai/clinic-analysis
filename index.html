@@ -262,7 +262,7 @@
   <!-- Login -->
   <div id="login-screen" class="login-screen">
     <!-- v297: バージョン表示 (右下、薄く) -->
-    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v330</div>
+    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v331</div>
     <div class="login-card">
       <div class="login-logo">
         <h1 class="brand-script">Aladdin</h1>
@@ -434,7 +434,7 @@
       <button class="btn-logout" id="logout-btn">ログアウト</button>
     </header>
     <!-- v297: バージョン表示 (右下固定・どのページ・どのロールでも常に表示) -->
-    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン (リロード後も同じなら最新)">v330</div>
+    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン (リロード後も同じなら最新)">v331</div>
 
     <!-- Bottom Nav (mobile) -->
     <nav class="bottom-nav" id="bottom-nav">
@@ -1088,31 +1088,35 @@
         <span style="margin-left:auto;font-size:11px;color:var(--text-sub);font-weight:600" id="mq-result-count">-</span>
       </div>
 
-      <!-- 一覧 (メイン) -->
+      <!-- 一覧 (メイン・横スクロール対応) -->
       <div class="data-table-wrap" style="max-height:calc(100vh - 220px);overflow:auto;border:1px solid var(--border);border-radius:8px;background:#fff">
-        <table class="data-table compact" id="mq-table" style="width:100%;border-collapse:collapse">
+        <table class="data-table compact" id="mq-table" style="width:auto;min-width:100%;border-collapse:collapse">
           <thead style="position:sticky;top:0;background:#f8fafc;z-index:5;box-shadow:0 1px 0 var(--border)">
-            <tr>
-              <th style="width:60px;padding:6px 8px;font-size:11px">治療</th>
-              <th style="text-align:left;padding:6px 8px;font-size:11px">名前 / 連絡先</th>
-              <th style="width:130px;padding:6px 8px;font-size:11px">予約日時</th>
-              <th style="padding:6px 8px;font-size:11px">医院</th>
-              <th style="width:70px;padding:6px 8px;font-size:11px">紐付け</th>
-              <th style="width:70px;padding:6px 8px;font-size:11px">提出</th>
-              <th style="width:50px;padding:6px 8px"></th>
-            </tr>
+            <tr><!-- 動的に再構築 --></tr>
           </thead>
           <tbody id="mq-tbody">
-            <tr><td colspan="7" style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>
+            <tr><td style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>
           </tbody>
         </table>
       </div>
 
       <!-- 一覧テーブル コンパクト化 -->
       <style>
-        #mq-table tbody tr td { padding: 6px 8px !important; vertical-align: middle; }
+        #mq-table tbody tr td { padding: 6px 8px; vertical-align: middle; }
         #mq-table tbody tr { border-bottom: 1px solid #f3f4f6; }
         #mq-table tbody tr:last-child { border-bottom: none; }
+        #mq-table tbody tr:hover { background: #f9fafb; }
+        /* 横スクロール時 名前列を sticky で固定 */
+        #mq-table thead th:first-child,
+        #mq-table tbody td:first-child {
+          position: sticky;
+          left: 0;
+          background: inherit;
+          z-index: 1;
+        }
+        #mq-table thead th:first-child { background: #f8fafc; z-index: 6; }
+        #mq-table tbody tr td:first-child { background: #fff; }
+        #mq-table tbody tr:hover td:first-child { background: #f9fafb; }
       </style>
 
       <!-- 治療チップ用 CSS -->
