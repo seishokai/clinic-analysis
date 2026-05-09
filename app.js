@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v331';
+const APP_VERSION = 'v332';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12543,7 +12543,21 @@ async function renderAuthMigration() {
 
   const tableRows = rows.map(a => {
     const promos = Array.isArray(a.allowed_promos) ? a.allowed_promos : [];
-    const promoStr = promos.length ? promos.map(p => `<code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:10px;margin-right:3px">${escapeHtml(p)}</code>`).join('') : '<span style="color:var(--text-muted);font-size:11px">-</span>';
+    // 担当プロモ: 折りたたみ表示 (件数バッジクリックで展開)
+    let promoStr;
+    if (promos.length === 0) {
+      promoStr = '<span style="color:var(--text-muted);font-size:11px">-</span>';
+    } else if (promos.length === 1 && promos[0] === '%') {
+      promoStr = '<span style="background:#dcfce7;color:#065f46;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700">★ 全許可</span>';
+    } else {
+      const allChipsHtml = promos.map(p => `<code style="background:#f3f4f6;padding:1px 5px;border-radius:3px;font-size:10px;margin:1px 3px 1px 0;display:inline-block">${escapeHtml(p)}</code>`).join('');
+      promoStr = `<details style="display:inline">
+        <summary style="cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px;background:#eff6ff;color:#1e40af;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;border:1px solid #bfdbfe;user-select:none">
+          ${promos.length}件のプロモ <span style="font-size:8px">▾</span>
+        </summary>
+        <div style="margin-top:6px;max-width:600px;line-height:1.6">${allChipsHtml}</div>
+      </details>`;
+    }
     const tabsStr = (a.role === 'admin') ? '<span style="color:#059669;font-size:10px">全表示</span>' : _tabsToBadges(a.visible_tabs);
     const linked = a.supabase_user_id
       ? `<span style="color:#059669;font-size:11px">🔗 ${a.migrated_at ? new Date(a.migrated_at).toLocaleDateString() : '済'}</span>`
@@ -12710,9 +12724,18 @@ async function renderAuthMigration() {
         <button class="btn btn-outline" id="auth-mig-reload" style="padding:4px 10px;font-size:11px">🔄 再読み込み</button>
       </div>
       <div style="overflow-x:auto">
-        <table class="data-table">
+        <table class="data-table compact" style="width:auto;min-width:100%">
           <thead><tr>
-            <th>ID</th><th>名前</th><th>ロール</th><th>代理店</th><th>メール</th><th>担当プロモ</th><th>閲覧タブ</th><th>Auth</th><th style="white-space:nowrap">共有URL</th><th>操作</th>
+            <th style="width:50px">ID</th>
+            <th style="width:120px">名前</th>
+            <th style="width:90px">ロール</th>
+            <th style="width:100px">代理店</th>
+            <th style="min-width:180px">メール</th>
+            <th style="min-width:120px">担当プロモ</th>
+            <th style="width:140px">閲覧タブ</th>
+            <th style="width:90px">Auth</th>
+            <th style="width:100px;white-space:nowrap">共有URL</th>
+            <th style="width:200px;white-space:nowrap">操作</th>
           </tr></thead>
           <tbody>${tableRows}</tbody>
         </table>
