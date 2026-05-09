@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v323';
+const APP_VERSION = 'v324';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13183,19 +13183,19 @@ function printTable(beforeFn, afterFn) {
 // =============================================================
 const MONSHIN_TREATMENT_LABELS = {
   kyosei:    '矯正',
-  bf:        'BF/ラミネート',
+  bf:        'ラミネートベニア',
   implant:   'インプラント',
   whitening: 'ホワイトニング',
-  laburie:   'ラブリエ',
   general:   '一般',
+  laburie:   'ラミネートベニア',  // 旧データ互換: ラブリエ → bf 表示扱い
 };
 const MONSHIN_TREATMENT_COLORS = {
   kyosei:    '#06c755',
   bf:        '#1f2937',
   implant:   '#2563eb',
   whitening: '#f59e0b',
-  laburie:   '#ec4899',
   general:   '#6b7280',
+  laburie:   '#1f2937',  // bf と同色
 };
 
 let monshinData = [];           // medical_questionnaires + v_booking_with_questionnaire 結合済み

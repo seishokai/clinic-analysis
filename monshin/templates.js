@@ -96,7 +96,7 @@ const COMMON_MEDICAL_FIELDS = [
 // =====================================================================
 const KYOSEI_TEMPLATE = {
   treatment: 'kyosei',
-  title: '矯正相談 事前問診票',
+  title: '無料矯正相談 事前問診票',
   description:
     'ご来院前に、いくつかご質問にお答えください。スタッフ・ドクターが事前に内容を把握し、当日のご相談がスムーズになります。',
   includeCommonMedical: false,
@@ -227,10 +227,9 @@ const STUB_FIELDS = [
   },
 ];
 
-const BF_TEMPLATE        = { treatment: 'bf',        title: 'ブラックフィルム相談 事前問診票',     includeCommonMedical: false, sections: STUB_FIELDS };
+const BF_TEMPLATE        = { treatment: 'bf',        title: '削らないラミネートベニア 事前問診票', includeCommonMedical: false, sections: STUB_FIELDS };
 const IMPLANT_TEMPLATE   = { treatment: 'implant',   title: 'インプラント相談 事前問診票',         includeCommonMedical: false, sections: STUB_FIELDS };
 const WHITENING_TEMPLATE = { treatment: 'whitening', title: 'ホワイトニング相談 事前問診票',       includeCommonMedical: false, sections: STUB_FIELDS };
-const LABURIE_TEMPLATE   = { treatment: 'laburie',   title: 'ラブリエ相談 事前問診票',             includeCommonMedical: false, sections: STUB_FIELDS };
 const GENERAL_TEMPLATE   = { treatment: 'general',   title: '事前問診票',                           includeCommonMedical: false, sections: STUB_FIELDS };
 
 const TEMPLATES = {
@@ -238,8 +237,9 @@ const TEMPLATES = {
   bf:        BF_TEMPLATE,
   implant:   IMPLANT_TEMPLATE,
   whitening: WHITENING_TEMPLATE,
-  laburie:   LABURIE_TEMPLATE,
   general:   GENERAL_TEMPLATE,
+  // 旧: ラブリエ → bf に統合 (URL からの後方互換)
+  laburie:   BF_TEMPLATE,
 };
 
 // =====================================================================
@@ -252,12 +252,12 @@ const TEMPLATES = {
 function detectTreatment(input) {
   if (!input) return null;
   const s = String(input).toLowerCase().normalize('NFKC');
-  if (/bf|black\s*film|ブラック|ﾌﾞﾗｯｸ|ラミネート|laminate/i.test(s))                return 'bf';
-  if (/矯正|kyosei|kyousei|invisalign|インビザ|ワイヤー|マウスピース|aligner/i.test(s)) return 'kyosei';
-  if (/インプラント|implant/i.test(s))                                                  return 'implant';
-  if (/ホワイトニング|whitening|ホワイト|wt/i.test(s))                                  return 'whitening';
-  if (/ラブリエ|laburie|labu/i.test(s))                                                 return 'laburie';
-  if (/general|一般|その他/i.test(s))                                                   return 'general';
+  // BF / ラミネート / ラブリエ は全て「削らないラミネートベニア」に統合
+  if (/bf|black\s*film|ブラック|ﾌﾞﾗｯｸ|ラミネート|laminate|ベニア|ラブリエ|laburie|labu|削らない/i.test(s)) return 'bf';
+  if (/矯正|kyosei|kyousei|invisalign|インビザ|ワイヤー|マウスピース|aligner/i.test(s))    return 'kyosei';
+  if (/インプラント|implant/i.test(s))                                                       return 'implant';
+  if (/ホワイトニング|whitening|ホワイト|wt/i.test(s))                                       return 'whitening';
+  if (/general|一般|その他/i.test(s))                                                        return 'general';
   return null;
 }
 
