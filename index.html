@@ -1054,9 +1054,7 @@
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
           <button class="btn btn-outline" id="mq-csv-export" style="font-size:11px;padding:6px 12px;min-height:30px" title="現在の絞り込み結果を CSV 出力">📥 CSV</button>
-          <button class="btn btn-outline" id="mq-toggle-detail" style="font-size:11px;padding:6px 12px;min-height:30px">📊 詳細・分析</button>
-          <button class="btn btn-outline" id="mq-refresh" style="font-size:11px;padding:6px 12px;min-height:30px">🔄 再読込</button>
-          <button class="btn btn-dark" id="mq-copy-url" style="font-size:11px;padding:6px 12px;min-height:30px" title="shareconnect メール用 URL をコピー">📋 URLコピー</button>
+          <a class="btn btn-outline" href="https://docs.google.com/spreadsheets/d/1fHzd7xnfxxAVQOhrsMCYjZlvzYdtZ7dl7g1GXp3HBqo/edit" target="_blank" rel="noopener" style="font-size:11px;padding:6px 12px;min-height:30px;display:inline-flex;align-items:center;text-decoration:none" title="Google スプレッドシートで全件ログを確認">📊 スプレッドシート</a>
         </div>
       </div>
 
@@ -1079,11 +1077,6 @@
           <div id="mq-treatment-cards" class="mq-card-grid"></div>
         </div>
 
-        <!-- 外部ログ (subtle footer) -->
-        <div style="margin-top:14px;padding:10px 14px;text-align:right;font-size:11px;color:var(--text-mute);display:flex;gap:14px;justify-content:flex-end;flex-wrap:wrap">
-          <a href="https://docs.google.com/spreadsheets/d/1fHzd7xnfxxAVQOhrsMCYjZlvzYdtZ7dl7g1GXp3HBqo/edit" target="_blank" rel="noopener" style="color:var(--text-sub);text-decoration:none">📊 スプレッドシートログ</a>
-          <a href="#" id="mq-csv-export-footer" style="color:var(--text-sub);text-decoration:none">📥 CSV出力</a>
-        </div>
       </div>
 
       <!-- ============================================== -->
@@ -1093,25 +1086,6 @@
         <!-- ダッシュボードに戻るボタン -->
         <div style="margin-bottom:10px">
           <button class="btn btn-outline" id="mq-back-to-dashboard" style="font-size:11px;padding:6px 12px;min-height:30px">← ダッシュボードに戻る</button>
-        </div>
-
-        <!-- 詳細・分析エリア (デフォルト非表示) -->
-        <div id="mq-detail-area" style="display:none">
-          <div class="stats-row" id="mq-stats" style="margin-bottom:12px"></div>
-
-          <!-- 医院 × 治療 クロス集計 -->
-          <div class="card" id="mq-cross-card" style="margin-bottom:12px;padding:12px">
-            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-              <span>医院 × 治療 クロス集計</span>
-              <button class="btn btn-outline" id="mq-cross-toggle" style="font-size:11px;padding:4px 10px;min-height:24px">折りたたむ</button>
-            </div>
-            <div id="mq-cross-body" class="data-table-wrap" style="margin-top:8px;overflow-x:auto">
-              <table class="data-table compact" id="mq-cross-table">
-                <thead></thead>
-                <tbody></tbody>
-              </table>
-            </div>
-          </div>
         </div>
 
         <!-- フィルタ (医院セレクト + 紐付け + 検索) -->
@@ -1470,7 +1444,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=338"></script>
+  <script src="app.js?v=339"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

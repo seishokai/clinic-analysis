@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v338';
+const APP_VERSION = 'v339';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -14233,8 +14233,6 @@ async function renderMonshin() {
   if (tbody) tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>';
   monshinData = await loadMonshinData();
   renderMonshinQuickSummary(monshinData);
-  renderMonshinStats(monshinData);
-  renderMonshinCrossTable(monshinData);
   renderMonshinTreatmentTabs(monshinData);
   renderMonshinClinicSelect(monshinData);
   renderMonshinDashboard(monshinData);
@@ -14249,7 +14247,6 @@ function bindMonshinEvents() {
   if (monshinBound) return;
   monshinBound = true;
 
-  document.getElementById('mq-refresh')?.addEventListener('click', renderMonshin);
   document.getElementById('mq-filter-status')?.addEventListener('change', renderMonshinTable);
   document.getElementById('mq-search')?.addEventListener('input', renderMonshinTable);
 
@@ -14257,26 +14254,6 @@ function bindMonshinEvents() {
   document.getElementById('mq-filter-clinic')?.addEventListener('change', e => {
     monshinClinicFilter = e.target.value;
     renderMonshinTable();
-  });
-
-  // 詳細・分析エリアの表示トグル
-  document.getElementById('mq-toggle-detail')?.addEventListener('click', () => {
-    const area = document.getElementById('mq-detail-area');
-    const btn = document.getElementById('mq-toggle-detail');
-    if (!area || !btn) return;
-    const isHidden = area.style.display === 'none';
-    area.style.display = isHidden ? '' : 'none';
-    btn.textContent = isHidden ? '📊 詳細・分析を隠す' : '📊 詳細・分析を表示';
-  });
-
-  // クロス集計の折りたたみ
-  document.getElementById('mq-cross-toggle')?.addEventListener('click', () => {
-    const body = document.getElementById('mq-cross-body');
-    const btn = document.getElementById('mq-cross-toggle');
-    if (!body || !btn) return;
-    const isHidden = body.style.display === 'none';
-    body.style.display = isHidden ? '' : 'none';
-    btn.textContent = isHidden ? '折りたたむ' : '展開する';
   });
 
   // 治療チップクリック (event delegation)
@@ -14325,12 +14302,8 @@ function bindMonshinEvents() {
     setMonshinViewMode('list');
   });
 
-  // CSV エクスポート (ヘッダーボタン + ダッシュボードフッターリンク)
+  // CSV エクスポート (ヘッダーボタン)
   document.getElementById('mq-csv-export')?.addEventListener('click', exportMonshinCSV);
-  document.getElementById('mq-csv-export-footer')?.addEventListener('click', e => {
-    e.preventDefault();
-    exportMonshinCSV();
-  });
 
   // 一括削除ボタン
   document.getElementById('mq-bulk-delete')?.addEventListener('click', bulkDeleteMonshin);
@@ -14342,17 +14315,6 @@ function bindMonshinEvents() {
   });
   document.getElementById('mq-detail-modal')?.addEventListener('click', e => {
     if (e.target.id === 'mq-detail-modal') e.target.style.display = 'none';
-  });
-
-  // メール用URLコピー
-  document.getElementById('mq-copy-url')?.addEventListener('click', () => {
-    const baseUrl = location.origin + location.pathname.replace(/\/index\.html.*$|\/$/, '') + '/monshin/';
-    const template = `${baseUrl}?name={name}&clinic={clinicName}&date={date}&time={time}&email={email}&phone={phone}`;
-    navigator.clipboard.writeText(template).then(() => {
-      alert('shareconnect メール用 URL をコピーしました\n\n' + template + '\n\n※ メール本文の好きな位置に貼り付けてください');
-    }).catch(() => {
-      prompt('以下をコピーしてください', template);
-    });
   });
 }
 
