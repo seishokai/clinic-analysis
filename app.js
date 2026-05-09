@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v328';
+const APP_VERSION = 'v329';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13484,37 +13484,69 @@ function renderMonshinTable() {
   if (cnt) cnt.textContent = rows.length + '件';
   if (!tbody) return;
   if (!rows.length) {
-    tbody.innerHTML = '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-sub)">該当する問診票がありません</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;padding:60px 30px;color:var(--text-sub)"><div style="font-size:14px;margin-bottom:6px">該当する問診票がありません</div><div style="font-size:11px;color:var(--text-mute)">フィルタを変えるか、患者さんが記入するのを待ちましょう</div></td></tr>';
     return;
   }
+
+  // 日本語の曜日付き予約日フォーマット
+  const fmtBookingDate = (d, t) => {
+    if (!d) return '-';
+    const m = String(d).match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (!m) return d + (t ? ' ' + t : '');
+    const yr = parseInt(m[1]), mo = parseInt(m[2]), da = parseInt(m[3]);
+    const dt = new Date(yr, mo - 1, da);
+    const days = ['日','月','火','水','木','金','土'];
+    const dayChar = days[dt.getDay()];
+    return `${mo}/${da} (${dayChar})${t ? ' ' + t : ''}`;
+  };
+  const fmtSubmitted = (s) => {
+    if (!s) return '-';
+    const d = new Date(s);
+    return `${d.getMonth()+1}/${d.getDate()} ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+  };
+
   tbody.innerHTML = rows.map(r => {
-    const submitted = r.submitted_at ? new Date(r.submitted_at).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-';
     const tLabel = MONSHIN_TREATMENT_LABELS[r.treatment] || r.treatment || '-';
     const tColor = MONSHIN_TREATMENT_COLORS[r.treatment] || '#6b7280';
-    const linkedBadge = r._is_linked
-      ? '<span style="color:#059669;font-weight:600;font-size:11px">✓ 紐付済</span>'
-      : '<span style="color:#dc2626;font-weight:600;font-size:11px">✗ 未紐付</span>';
-    const via = r.resolved_via || '-';
-    const viaShort = via.includes('smart_router') ? '🤖 自動' : via.includes('url_param') ? '🔗 URL' : via.includes('manual_select') ? '👆 選択' : via.includes('fallback') ? '📋 選択' : via;
+    const linked = r._is_linked;
+    const linkedBadge = linked
+      ? '<span style="display:inline-block;background:#dcfce7;color:#065f46;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:700">✓ 紐付済</span>'
+      : '<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:700">✗ 未紐付</span>';
     const contact = [r.patient_email, r.patient_phone].filter(Boolean).join(' / ');
+
     return `
-      <tr>
-        <td style="font-size:11px;white-space:nowrap">${escapeHtml(submitted)}</td>
-        <td><span style="background:${tColor};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">${escapeHtml(tLabel)}</span></td>
-        <td style="text-align:left;font-weight:600">${escapeHtml(r.patient_name || '-')}</td>
-        <td style="font-size:11px">${escapeHtml(r.clinic_name || '(不明)')}</td>
-        <td style="font-size:11px;white-space:nowrap">${escapeHtml(r.booking_book_date || '-')} ${escapeHtml(r.booking_book_time || '')}</td>
+      <tr style="cursor:pointer" data-mq-row-id="${r.id}">
+        <td style="text-align:center"><span style="display:inline-block;background:${tColor};color:#fff;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap">${escapeHtml(tLabel)}</span></td>
+        <td style="text-align:left;line-height:1.5">
+          <div style="font-weight:700;font-size:14px;color:var(--text)">${escapeHtml(r.patient_name || '(無記名)')}</div>
+          ${contact ? `<div style="font-size:11px;color:var(--text-sub);margin-top:2px">${escapeHtml(contact)}</div>` : ''}
+        </td>
+        <td style="font-size:13px;font-weight:600;white-space:nowrap;color:var(--text)">${escapeHtml(fmtBookingDate(r.booking_book_date, r.booking_book_time))}</td>
+        <td style="font-size:12px;color:var(--text-sub)">${escapeHtml(r.clinic_name || '(不明)')}</td>
         <td style="text-align:center">${linkedBadge}</td>
-        <td style="font-size:10px;color:var(--text-sub)">${escapeHtml(contact || '-')}</td>
-        <td style="font-size:10px;color:var(--text-sub)">${escapeHtml(viaShort)}</td>
-        <td><button class="btn btn-outline mq-detail-btn" data-id="${r.id}" style="font-size:10px;padding:3px 8px;min-height:24px">詳細</button></td>
+        <td style="font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fmtSubmitted(r.submitted_at))}</td>
+        <td style="text-align:right"><button class="btn btn-outline mq-detail-btn" data-id="${r.id}" style="font-size:11px;padding:5px 12px;min-height:26px">詳細</button></td>
       </tr>
     `;
   }).join('');
 
+  // 行クリックで詳細を開く (ボタン以外をクリックしたとき)
+  tbody.querySelectorAll('tr[data-mq-row-id]').forEach(tr => {
+    tr.addEventListener('click', e => {
+      // ボタンクリックは別ハンドラで処理
+      if (e.target.closest('button')) return;
+      const id = Number(tr.dataset.mqRowId);
+      const row = monshinData.find(r => r.id === id);
+      if (row) showMonshinDetail(row);
+    });
+    tr.addEventListener('mouseover', () => { tr.style.background = '#f9fafb'; });
+    tr.addEventListener('mouseout',  () => { tr.style.background = ''; });
+  });
+
   // 詳細ボタンのリスナー
   tbody.querySelectorAll('.mq-detail-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
       const id = Number(btn.dataset.id);
       const row = monshinData.find(r => r.id === id);
       if (row) showMonshinDetail(row);
