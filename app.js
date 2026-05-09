@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v344';
+const APP_VERSION = 'v345';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2638,21 +2638,22 @@ function renderHomeDashboard() {
   const name = (window.currentUserName || sessionStorage.getItem('customName') || (typeof currentRole !== 'undefined' ? currentRole : '') || '').toString();
 
   el.innerHTML = `
-    <div style="margin-bottom:14px">
-      <div style="font-size:13px;color:var(--text-sub);margin-bottom:4px">${greeting}${name ? '、' + escapeHtml(name) + ' さん' : ''}</div>
-      <div style="font-size:18px;font-weight:700;color:#1a1a1a">今日は ${now.getMonth()+1}月${now.getDate()}日 (${'日月火水木金土'[now.getDay()]})</div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+      <div style="flex:0 0 auto">
+        <div style="font-size:12px;color:var(--text-sub);margin-bottom:2px">${greeting}${name ? '、' + escapeHtml(name) + ' さん' : ''}</div>
+        <div style="font-size:18px;font-weight:700;color:#1a1a1a;white-space:nowrap">今日は ${now.getMonth()+1}月${now.getDate()}日 (${'日月火水木金土'[now.getDay()]})</div>
+      </div>
+      ${todayPending > 0 ? `
+        <div class="home-alert" data-action="today-pending" style="flex:1 1 280px;padding:10px 14px;background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border:2px solid #dc2626;border-radius:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px">
+          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
+            <span style="font-size:12px;color:#991b1b;font-weight:700;letter-spacing:0.5px">⚠️ 今日の未対応予約</span>
+            <span style="font-size:22px;color:#991b1b;font-weight:900;line-height:1">${todayPending}<span style="font-size:12px;font-weight:600">件</span></span>
+          </div>
+          <span style="font-size:11px;color:#991b1b;font-weight:600;white-space:nowrap">タップ →</span>
+        </div>
+      ` : ''}
     </div>
 
-    <!-- 大きなアラート (要対応が多い) -->
-    ${todayPending > 0 ? `
-      <div class="home-alert" data-action="today-pending" style="margin-bottom:14px;padding:14px 16px;background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border:2px solid #dc2626;border-radius:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center">
-        <div>
-          <div style="font-size:12px;color:#991b1b;font-weight:700;letter-spacing:0.5px;margin-bottom:2px">⚠️ 今日の未対応予約</div>
-          <div style="font-size:24px;color:#991b1b;font-weight:900">${todayPending} <span style="font-size:13px;font-weight:600">件</span></div>
-        </div>
-        <div style="font-size:11px;color:#991b1b;font-weight:600">タップで確認 →</div>
-      </div>
-    ` : ''}
 
     <!-- メインメトリクス -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
