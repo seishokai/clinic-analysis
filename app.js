@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v339';
+const APP_VERSION = 'v340';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -5475,21 +5475,28 @@ async function migrateToSupabase() {
       }
     }
     // Booking extra (status, contract info)
+    // ★ 重要バグ修正 (2026-05-09): 以前のコードは contract_amount: Number(val.contractAmount) || 0
+    //   と書いていたため、val.contractAmount が undefined のとき 0 で DB 上書きし、
+    //   既存の金額データを破壊していた (5/8 15:45 の事故)。
+    //   → 値が存在するフィールドだけを payload に入れるよう修正。
     const bkExtra = JSON.parse(localStorage.getItem('bk-extra') || '{}');
     for (const [key, val] of Object.entries(bkExtra)) {
       const [name, apply] = key.split('|');
-      if (name && apply) {
-        try {
-          await sb.from('booking_status').upsert({
-            name, apply_date: apply,
-            status: val.status || '',
-            contract_service: val.contractService || '',
-            contract_amount: Number(val.contractAmount) || 0,
-            payment_month: val.paymentMonth || '',
-            incentive_month: val.incentiveMonth || ''
-          }, { onConflict: 'name,apply_date' });
-        } catch(_){}
+      if (!name || !apply) continue;
+      const payload = { name, apply_date: apply };
+      if (val.status !== undefined && val.status !== '')                    payload.status = val.status;
+      if (val.contractService !== undefined && val.contractService !== '')  payload.contract_service = val.contractService;
+      if (val.contractAmount !== undefined && val.contractAmount !== '' && val.contractAmount !== null) {
+        const amt = Number(val.contractAmount);
+        if (Number.isFinite(amt) && amt > 0) payload.contract_amount = amt;
       }
+      if (val.paymentMonth !== undefined && val.paymentMonth !== '')        payload.payment_month = val.paymentMonth;
+      if (val.incentiveMonth !== undefined && val.incentiveMonth !== '')    payload.incentive_month = val.incentiveMonth;
+      // payload が name+apply_date しかない場合は upsert しない (DB上書きするだけで意味なし)
+      if (Object.keys(payload).length <= 2) continue;
+      try {
+        await sb.from('booking_status').upsert(payload, { onConflict: 'name,apply_date' });
+      } catch(_){}
     }
     // Reviews
     const reviews = JSON.parse(localStorage.getItem('reviews-data') || '[]');
