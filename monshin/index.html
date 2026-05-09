@@ -496,7 +496,7 @@
 <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- 治療別テンプレート -->
-<script src="./templates.js?v=8"></script>
+<script src="./templates.js?v=9"></script>
 
 <script>
 // =====================================================================
@@ -780,8 +780,12 @@ function evaluateShowWhen() {
 async function submitForm() {
   if (!currentTemplate) return;
   const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn.disabled) return;  // 二重クリック防止
   submitBtn.disabled = true;
   submitBtn.textContent = '送信中...';
+
+  // 送信成功時のみ false にする (= ボタンをリセットしないでOKな状態)
+  let needsButtonReset = true;
 
   try {
     const sections = [...(currentTemplate.sections || [])];
@@ -801,7 +805,6 @@ async function submitForm() {
         let val;
         if (f.type === 'checkbox') {
           val = Array.from(screens.form.querySelectorAll(`input[name="${f.name}"]:checked`)).map(i => i.value);
-          // その他自由記入を結合
           const otherInput = screens.form.querySelector(`input[name="${f.name}__other"]`);
           if (otherInput && val.includes('__other__')) {
             val = val.filter(v => v !== '__other__');
@@ -822,7 +825,7 @@ async function submitForm() {
       }
     }
 
-    // エラーハイライト
+    // エラーハイライト (毎回クリアして再評価)
     screens.form.querySelectorAll('.field').forEach(d => d.classList.remove('error'));
     screens.form.querySelectorAll('.field-error-msg').forEach(d => d.remove());
     if (errors.length) {
@@ -835,10 +838,9 @@ async function submitForm() {
         m.textContent = msg;
         div.appendChild(m);
       });
-      // 最初のエラーへスクロール
       const firstErr = screens.form.querySelector('.field.error');
       if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      return;
+      return;  // finally でボタン復帰
     }
 
     // INSERT
@@ -863,18 +865,21 @@ async function submitForm() {
     if (error) {
       console.error(error);
       alert('送信に失敗しました: ' + (error.message || JSON.stringify(error)));
-      submitBtn.disabled = false;
-      submitBtn.textContent = '送信する';
-      return;
+      return;  // finally でボタン復帰
     }
 
+    // 送信成功
+    needsButtonReset = false;
     showScreen('thanks');
     window.scrollTo({ top: 0, behavior: 'smooth' });
   } catch (e) {
     console.error(e);
-    alert('エラー: ' + e.message);
-    submitBtn.disabled = false;
-    submitBtn.textContent = '送信する';
+    alert('エラー: ' + (e && e.message ? e.message : e));
+  } finally {
+    if (needsButtonReset) {
+      submitBtn.disabled = false;
+      submitBtn.textContent = '送信する';
+    }
   }
 }
 
