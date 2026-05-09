@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v335';
+const APP_VERSION = 'v336';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -14123,8 +14123,12 @@ function bindMonshinEvents() {
     setMonshinViewMode('list');
   });
 
-  // CSV エクスポート
+  // CSV エクスポート (ヘッダーボタン + ダッシュボードフッターリンク)
   document.getElementById('mq-csv-export')?.addEventListener('click', exportMonshinCSV);
+  document.getElementById('mq-csv-export-footer')?.addEventListener('click', e => {
+    e.preventDefault();
+    exportMonshinCSV();
+  });
 
   // 詳細モーダル閉じる
   document.getElementById('mq-detail-close')?.addEventListener('click', () => {
