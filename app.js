@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v336';
+const APP_VERSION = 'v337';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13427,6 +13427,7 @@ let monshinData = [];           // medical_questionnaires + v_booking_with_quest
 let monshinClinicFilter = '__all__';
 let monshinTreatmentFilter = '__all__';
 let monshinViewMode = 'dashboard';  // 'dashboard' | 'list'
+const monshinSelectedIds = new Set();  // 一括削除用
 
 async function loadMonshinData() {
   try {
@@ -13830,6 +13831,9 @@ function renderMonshinTable() {
 
   // ヘッダー再構築
   let headHTML = '';
+  // 全選択チェックボックス (1番左)
+  const allSelected = rows.length > 0 && rows.every(r => monshinSelectedIds.has(r.id));
+  headHTML += `<th style="width:30px;padding:6px 4px;text-align:center"><input type="checkbox" id="mq-select-all" ${allSelected ? 'checked' : ''} style="cursor:pointer"></th>`;
   if (showTreatmentCol) {
     headHTML += '<th style="width:60px;padding:6px 8px;font-size:11px">治療</th>';
   }
@@ -13846,8 +13850,9 @@ function renderMonshinTable() {
   thead.innerHTML = headHTML;
 
   if (!rows.length) {
-    const colspan = (showTreatmentCol ? 1 : 0) + 6 + extraCols.length;
+    const colspan = 1 + (showTreatmentCol ? 1 : 0) + 6 + extraCols.length;
     tbody.innerHTML = `<tr><td colspan="${colspan}" style="text-align:center;padding:60px 30px;color:var(--text-sub)"><div style="font-size:14px;margin-bottom:6px">該当する問診票がありません</div><div style="font-size:11px;color:var(--text-mute)">フィルタを変えるか、患者さんが記入するのを待ちましょう</div></td></tr>`;
+    updateMonshinBulkDeleteButton();
     return;
   }
 
@@ -13878,6 +13883,9 @@ function renderMonshinTable() {
     const contact = [r.patient_email, r.patient_phone].filter(Boolean).join(' / ');
 
     let cells = '';
+    // 行選択チェックボックス
+    const isChecked = monshinSelectedIds.has(r.id);
+    cells += `<td style="text-align:center;padding:4px"><input type="checkbox" class="mq-row-checkbox" data-id="${r.id}" ${isChecked ? 'checked' : ''} style="cursor:pointer"></td>`;
     if (showTreatmentCol) {
       cells += `<td style="text-align:center"><span style="display:inline-block;background:${tColor};color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap;line-height:1.3">${escapeHtml(tLabel)}</span></td>`;
     }
@@ -13901,11 +13909,12 @@ function renderMonshinTable() {
     return `<tr style="cursor:pointer" data-mq-row-id="${r.id}">${cells}</tr>`;
   }).join('');
 
-  // 行クリックで詳細を開く (ボタン以外をクリックしたとき)
+  // 行クリックで詳細を開く (ボタン・チェックボックス以外をクリックしたとき)
   tbody.querySelectorAll('tr[data-mq-row-id]').forEach(tr => {
     tr.addEventListener('click', e => {
-      // ボタンクリックは別ハンドラで処理
+      // ボタン・チェックボックスクリックは別ハンドラ
       if (e.target.closest('button')) return;
+      if (e.target.closest('input[type="checkbox"]')) return;
       const id = Number(tr.dataset.mqRowId);
       const row = monshinData.find(r => r.id === id);
       if (row) showMonshinDetail(row);
@@ -13923,6 +13932,66 @@ function renderMonshinTable() {
       if (row) showMonshinDetail(row);
     });
   });
+
+  // 行チェックボックスのリスナー
+  tbody.querySelectorAll('.mq-row-checkbox').forEach(cb => {
+    cb.addEventListener('click', e => e.stopPropagation());
+    cb.addEventListener('change', e => {
+      const id = Number(e.target.dataset.id);
+      if (e.target.checked) monshinSelectedIds.add(id);
+      else                  monshinSelectedIds.delete(id);
+      updateMonshinBulkDeleteButton();
+      // 全選択チェックボックスの状態も更新
+      const allCb = document.getElementById('mq-select-all');
+      if (allCb) {
+        const allOn = rows.every(r => monshinSelectedIds.has(r.id));
+        allCb.checked = allOn;
+      }
+    });
+  });
+
+  // 全選択チェックボックス
+  document.getElementById('mq-select-all')?.addEventListener('change', e => {
+    if (e.target.checked) {
+      rows.forEach(r => monshinSelectedIds.add(r.id));
+    } else {
+      rows.forEach(r => monshinSelectedIds.delete(r.id));
+    }
+    renderMonshinTable();  // 全行のチェック状態を反映
+  });
+
+  updateMonshinBulkDeleteButton();
+}
+
+// =====================================================================
+// 一括削除ボタンの表示更新
+// =====================================================================
+function updateMonshinBulkDeleteButton() {
+  const btn = document.getElementById('mq-bulk-delete');
+  if (!btn) return;
+  const cnt = monshinSelectedIds.size;
+  if (cnt > 0) {
+    btn.hidden = false;
+    btn.textContent = `🗑 削除 (${cnt})`;
+  } else {
+    btn.hidden = true;
+  }
+}
+
+// =====================================================================
+// 選択された問診票を一括削除
+// =====================================================================
+async function bulkDeleteMonshin() {
+  const ids = Array.from(monshinSelectedIds);
+  if (!ids.length) return;
+  if (!confirm(`${ids.length}件の問診票を削除します。よろしいですか？`)) return;
+  const { error } = await sb.from('medical_questionnaires').delete().in('id', ids);
+  if (error) {
+    alert('削除に失敗しました: ' + (error.message || JSON.stringify(error)));
+    return;
+  }
+  monshinSelectedIds.clear();
+  await renderMonshin();  // データ再読込 + 全描画
 }
 
 function showMonshinDetail(row) {
@@ -14129,6 +14198,9 @@ function bindMonshinEvents() {
     e.preventDefault();
     exportMonshinCSV();
   });
+
+  // 一括削除ボタン
+  document.getElementById('mq-bulk-delete')?.addEventListener('click', bulkDeleteMonshin);
 
   // 詳細モーダル閉じる
   document.getElementById('mq-detail-close')?.addEventListener('click', () => {

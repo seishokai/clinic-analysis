@@ -1126,7 +1126,8 @@
             <option value="unlinked">未紐付け</option>
           </select>
           <input type="text" class="form-input" id="mq-search" placeholder="名前・メール検索" style="width:180px;padding:6px 8px;font-size:12px">
-          <span style="margin-left:auto;font-size:11px;color:var(--text-sub);font-weight:600" id="mq-result-count">-</span>
+          <button class="btn" id="mq-bulk-delete" hidden style="margin-left:auto;font-size:11px;padding:4px 10px;min-height:28px;background:#fee2e2;color:#991b1b;border:1px solid #fecaca">🗑 削除</button>
+          <span style="font-size:11px;color:var(--text-sub);font-weight:600" id="mq-result-count">-</span>
         </div>
 
         <!-- 一覧 (メイン・横スクロール対応) -->
@@ -1469,7 +1470,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=336"></script>
+  <script src="app.js?v=337"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
