@@ -111,6 +111,8 @@
     margin-bottom: 10px;
     color: var(--text);
     line-height: 1.5;
+    word-break: break-word;
+    overflow-wrap: anywhere;
   }
   .field .req {
     color: #b45309;
@@ -496,7 +498,7 @@
 <!-- Supabase JS -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <!-- 治療別テンプレート -->
-<script src="./templates.js?v=9"></script>
+<script src="./templates.js?v=10"></script>
 
 <script>
 // =====================================================================
@@ -551,16 +553,21 @@ async function smartRouteTreatment(params) {
     return { resolvedTreatment: null, via: 'no_params', booking: null };
   }
 
-  // 2. Supabase RPC で照会
+  // 2. Supabase RPC で照会 (5秒タイムアウト付き)
   try {
-    const { data, error } = await sb.rpc('lookup_questionnaire_treatment', {
+    const rpcPromise = sb.rpc('lookup_questionnaire_treatment', {
       p_name: params.name,
       p_book_date: normalizeDate(params.date),
       p_clinic: params.clinic,
     });
+    const timeoutPromise = new Promise(resolve => setTimeout(() => resolve({ data: null, error: { message: 'rpc_timeout' } }), 5000));
+    const { data, error } = await Promise.race([rpcPromise, timeoutPromise]);
     if (!error && data && data.found) {
       const t = detectTreatment(data.service) || detectTreatment(data.source);
       if (t) return { resolvedTreatment: t, via: 'smart_router_supabase', booking: data };
+    }
+    if (error && error.message === 'rpc_timeout') {
+      console.warn('[supabase rpc timeout] フォールバック');
     }
   } catch(e) { console.warn('[supabase rpc exception]', e); }
 
@@ -670,9 +677,10 @@ function renderField(f, params) {
       inner = `<input type="date" name="${f.name}" ${f.required ? 'required' : ''} />`;
       break;
     case 'radio':
-      inner = `<div class="options">${(f.options || []).map((o, i) => `
+      // ラジオは required を全選択肢に付与 (HTML5 バリデーションも効くように)
+      inner = `<div class="options">${(f.options || []).map(o => `
         <label class="opt-item">
-          <input type="radio" name="${f.name}" value="${escapeHtml(o.value)}" ${f.required && i === -1 ? 'required' : ''} />
+          <input type="radio" name="${f.name}" value="${escapeHtml(o.value)}" ${f.required ? 'required' : ''} />
           <span class="opt-text">${escapeHtml(o.label)}</span>
         </label>`).join('')}
       </div>`;
@@ -711,7 +719,7 @@ function renderField(f, params) {
 }
 
 function attachFieldListeners() {
-  // チェック / ラジオ の選択状態をカード型に反映
+  // ラジオ・チェック の選択状態
   screens.form.querySelectorAll('input[type=radio], input[type=checkbox]').forEach(input => {
     input.addEventListener('change', () => {
       // ラジオは name 単位で全部更新
@@ -722,7 +730,7 @@ function attachFieldListeners() {
       } else {
         input.closest('label.opt-item').classList.toggle('checked', input.checked);
       }
-      // showWhen 評価
+      clearFieldError(input.closest('.field'));
       evaluateShowWhen();
       // その他トグル
       const otherKey = input.dataset.otherToggle;
@@ -730,13 +738,28 @@ function attachFieldListeners() {
         const other = screens.form.querySelector(`input[name="${otherKey}__other"]`);
         if (other) other.style.display = input.checked ? '' : 'none';
       }
-      // ラジオ選択時のみ次のフィールドへ自動スクロール (Typeform 風)
+      // ラジオ選択時のみ次のフィールドへ自動スクロール
       if (input.type === 'radio' && input.checked) {
         scrollToNextField(input.closest('.field'));
       }
     });
   });
+
+  // テキスト系: 入力したらエラー表示を消す
+  screens.form.querySelectorAll('input[type=text], input[type=number], input[type=tel], input[type=email], input[type=date], textarea, select').forEach(el => {
+    el.addEventListener('input', () => clearFieldError(el.closest('.field')));
+    el.addEventListener('change', () => clearFieldError(el.closest('.field')));
+  });
+
   evaluateShowWhen();
+}
+
+// フィールドのエラー表示を消す (入力修正後のクリア)
+function clearFieldError(fieldDiv) {
+  if (!fieldDiv || !fieldDiv.classList.contains('error')) return;
+  fieldDiv.classList.remove('error');
+  const msg = fieldDiv.querySelector('.field-error-msg');
+  if (msg) msg.remove();
 }
 
 // 次に表示されてるフィールドにスムーズスクロール
@@ -806,9 +829,16 @@ async function submitForm() {
         if (f.type === 'checkbox') {
           val = Array.from(screens.form.querySelectorAll(`input[name="${f.name}"]:checked`)).map(i => i.value);
           const otherInput = screens.form.querySelector(`input[name="${f.name}__other"]`);
-          if (otherInput && val.includes('__other__')) {
+          const hasOther = val.includes('__other__');
+          if (otherInput && hasOther) {
             val = val.filter(v => v !== '__other__');
-            if (otherInput.value.trim()) val.push('other:' + otherInput.value.trim());
+            const otherText = otherInput.value.trim();
+            if (otherText) {
+              val.push('other:' + otherText);
+            } else {
+              // 「その他」チェック中だけど自由記入欄が空 → エラー
+              errors.push({ field: f.name, msg: '「その他」の内容をご記入ください' });
+            }
           }
           if (f.required && val.length === 0) errors.push({ field: f.name, msg: '選択してください' });
         } else if (f.type === 'radio') {
