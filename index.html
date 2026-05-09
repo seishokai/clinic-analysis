@@ -1037,6 +1037,11 @@
       <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:10px">
         <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
           <h2 style="margin:0;display:flex;align-items:center;gap:8px;white-space:nowrap">問診票 <span id="mq-quick-summary" style="font-size:12px;font-weight:400;color:var(--text-sub)"></span></h2>
+          <!-- 表示モード切替 (Dashboard / List) -->
+          <div id="mq-view-mode-toggle" style="display:flex;gap:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;background:#fff">
+            <button class="mq-mode-btn active" data-view-mode="dashboard" style="border:0;background:transparent;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text-sub);font-family:inherit">📊 ダッシュボード</button>
+            <button class="mq-mode-btn" data-view-mode="list" style="border:0;background:transparent;padding:6px 12px;font-size:11px;font-weight:600;cursor:pointer;color:var(--text-sub);font-family:inherit;border-left:1px solid var(--border)">📋 一覧</button>
+          </div>
           <!-- 治療フィルタ (チップ) -->
           <div id="mq-treatment-tabs" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
             <button class="mq-chip active" data-mq-treatment="__all__">全て</button>
@@ -1048,56 +1053,87 @@
           </div>
         </div>
         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          <button class="btn btn-outline" id="mq-csv-export" style="font-size:11px;padding:6px 12px;min-height:30px" title="現在の絞り込み結果を CSV 出力">📥 CSV</button>
           <button class="btn btn-outline" id="mq-toggle-detail" style="font-size:11px;padding:6px 12px;min-height:30px">📊 詳細・分析</button>
           <button class="btn btn-outline" id="mq-refresh" style="font-size:11px;padding:6px 12px;min-height:30px">🔄 再読込</button>
           <button class="btn btn-dark" id="mq-copy-url" style="font-size:11px;padding:6px 12px;min-height:30px" title="shareconnect メール用 URL をコピー">📋 URLコピー</button>
         </div>
       </div>
 
-      <!-- 詳細・分析エリア (デフォルト非表示) -->
-      <div id="mq-detail-area" style="display:none">
-        <div class="stats-row" id="mq-stats" style="margin-bottom:12px"></div>
+      <!-- ============================================== -->
+      <!-- ダッシュボードビュー (デフォルト表示)        -->
+      <!-- ============================================== -->
+      <div id="mq-dashboard-view">
+        <!-- KPI -->
+        <div class="stats-row" id="mq-dashboard-stats" style="margin-bottom:14px"></div>
 
-        <!-- 医院 × 治療 クロス集計 -->
-        <div class="card" id="mq-cross-card" style="margin-bottom:12px;padding:12px">
-          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
-            <span>医院 × 治療 クロス集計</span>
-            <button class="btn btn-outline" id="mq-cross-toggle" style="font-size:11px;padding:4px 10px;min-height:24px">折りたたむ</button>
-          </div>
-          <div id="mq-cross-body" class="data-table-wrap" style="margin-top:8px;overflow-x:auto">
-            <table class="data-table compact" id="mq-cross-table">
-              <thead></thead>
-              <tbody></tbody>
-            </table>
-          </div>
+        <!-- 医院別カード -->
+        <div class="card" style="padding:14px;margin-bottom:14px">
+          <div class="card-header" style="margin-bottom:10px">医院別</div>
+          <div id="mq-clinic-cards" class="mq-card-grid"></div>
+        </div>
+
+        <!-- 治療別カード -->
+        <div class="card" style="padding:14px">
+          <div class="card-header" style="margin-bottom:10px">治療別</div>
+          <div id="mq-treatment-cards" class="mq-card-grid"></div>
         </div>
       </div>
 
-      <!-- フィルタ (医院セレクト + 紐付け + 検索) -->
-      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;padding:6px 8px;background:#fff;border:1px solid var(--border);border-radius:8px">
-        <select class="form-select" id="mq-filter-clinic" style="width:auto;padding:6px 10px;font-size:13px;font-weight:600;min-width:160px">
-          <option value="__all__">医院: 全医院</option>
-          <!-- 動的に追加 -->
-        </select>
-        <select class="form-select" id="mq-filter-status" style="width:auto;padding:6px 8px;font-size:12px">
-          <option value="">紐付け:全て</option>
-          <option value="linked">紐付け済</option>
-          <option value="unlinked">未紐付け</option>
-        </select>
-        <input type="text" class="form-input" id="mq-search" placeholder="名前・メール検索" style="width:180px;padding:6px 8px;font-size:12px">
-        <span style="margin-left:auto;font-size:11px;color:var(--text-sub);font-weight:600" id="mq-result-count">-</span>
-      </div>
+      <!-- ============================================== -->
+      <!-- 一覧ビュー (ダッシュボードからのドリルダウン) -->
+      <!-- ============================================== -->
+      <div id="mq-list-view" style="display:none">
+        <!-- ダッシュボードに戻るボタン -->
+        <div style="margin-bottom:10px">
+          <button class="btn btn-outline" id="mq-back-to-dashboard" style="font-size:11px;padding:6px 12px;min-height:30px">← ダッシュボードに戻る</button>
+        </div>
 
-      <!-- 一覧 (メイン・横スクロール対応) -->
-      <div class="data-table-wrap" style="max-height:calc(100vh - 220px);overflow:auto;border:1px solid var(--border);border-radius:8px;background:#fff">
-        <table class="data-table compact" id="mq-table" style="width:auto;min-width:100%;border-collapse:collapse">
-          <thead style="position:sticky;top:0;background:#f8fafc;z-index:5;box-shadow:0 1px 0 var(--border)">
-            <tr><!-- 動的に再構築 --></tr>
-          </thead>
-          <tbody id="mq-tbody">
-            <tr><td style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>
-          </tbody>
-        </table>
+        <!-- 詳細・分析エリア (デフォルト非表示) -->
+        <div id="mq-detail-area" style="display:none">
+          <div class="stats-row" id="mq-stats" style="margin-bottom:12px"></div>
+
+          <!-- 医院 × 治療 クロス集計 -->
+          <div class="card" id="mq-cross-card" style="margin-bottom:12px;padding:12px">
+            <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+              <span>医院 × 治療 クロス集計</span>
+              <button class="btn btn-outline" id="mq-cross-toggle" style="font-size:11px;padding:4px 10px;min-height:24px">折りたたむ</button>
+            </div>
+            <div id="mq-cross-body" class="data-table-wrap" style="margin-top:8px;overflow-x:auto">
+              <table class="data-table compact" id="mq-cross-table">
+                <thead></thead>
+                <tbody></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- フィルタ (医院セレクト + 紐付け + 検索) -->
+        <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px;padding:6px 8px;background:#fff;border:1px solid var(--border);border-radius:8px">
+          <select class="form-select" id="mq-filter-clinic" style="width:auto;padding:6px 10px;font-size:13px;font-weight:600;min-width:160px">
+            <option value="__all__">医院: 全医院</option>
+            <!-- 動的に追加 -->
+          </select>
+          <select class="form-select" id="mq-filter-status" style="width:auto;padding:6px 8px;font-size:12px">
+            <option value="">紐付け:全て</option>
+            <option value="linked">紐付け済</option>
+            <option value="unlinked">未紐付け</option>
+          </select>
+          <input type="text" class="form-input" id="mq-search" placeholder="名前・メール検索" style="width:180px;padding:6px 8px;font-size:12px">
+          <span style="margin-left:auto;font-size:11px;color:var(--text-sub);font-weight:600" id="mq-result-count">-</span>
+        </div>
+
+        <!-- 一覧 (メイン・横スクロール対応) -->
+        <div class="data-table-wrap" style="max-height:calc(100vh - 220px);overflow:auto;border:1px solid var(--border);border-radius:8px;background:#fff">
+          <table class="data-table compact" id="mq-table" style="width:auto;min-width:100%;border-collapse:collapse">
+            <thead style="position:sticky;top:0;background:#f8fafc;z-index:5;box-shadow:0 1px 0 var(--border)">
+              <tr><!-- 動的に再構築 --></tr>
+            </thead>
+            <tbody id="mq-tbody">
+              <tr><td style="text-align:center;padding:30px;color:var(--text-sub)">読み込み中...</td></tr>
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <!-- 一覧テーブル コンパクト化 -->
@@ -1143,6 +1179,77 @@
           background: var(--text);
           color: #fff;
           border-color: var(--text);
+        }
+        /* 表示モード切替ボタン */
+        .mq-mode-btn:hover { color: var(--text); background: #f9fafb; }
+        .mq-mode-btn.active { background: var(--text); color: #fff; }
+        /* ダッシュボード: 医院/治療カードグリッド */
+        .mq-card-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+          gap: 10px;
+        }
+        .mq-card-item {
+          background: #fff;
+          border: 1px solid var(--border);
+          border-radius: 10px;
+          padding: 12px 14px;
+          cursor: pointer;
+          transition: all 0.15s ease;
+          display: flex;
+          flex-direction: column;
+          gap: 6px;
+        }
+        .mq-card-item:hover {
+          border-color: var(--text);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+          transform: translateY(-1px);
+        }
+        .mq-card-item.empty {
+          opacity: 0.5;
+          cursor: default;
+        }
+        .mq-card-item.empty:hover {
+          border-color: var(--border);
+          box-shadow: none;
+          transform: none;
+        }
+        .mq-card-title {
+          display: flex;
+          justify-content: space-between;
+          align-items: baseline;
+          gap: 8px;
+          font-size: 13px;
+          font-weight: 700;
+          color: var(--text);
+        }
+        .mq-card-count {
+          font-size: 18px;
+          font-weight: 800;
+          color: var(--text);
+          white-space: nowrap;
+        }
+        .mq-card-count.zero {
+          color: var(--text-mute);
+          font-weight: 600;
+        }
+        .mq-card-breakdown {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 4px;
+          font-size: 10px;
+          color: var(--text-sub);
+        }
+        .mq-card-breakdown-item {
+          background: #f3f4f6;
+          border-radius: 999px;
+          padding: 2px 8px;
+          font-weight: 600;
+          white-space: nowrap;
+        }
+        .mq-card-arrow {
+          font-size: 10px;
+          color: var(--text-mute);
         }
       </style>
 
@@ -1356,7 +1463,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=334"></script>
+  <script src="app.js?v=335"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

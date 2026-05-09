@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v334';
+const APP_VERSION = 'v335';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13426,6 +13426,7 @@ const MONSHIN_TREATMENT_COLORS = {
 let monshinData = [];           // medical_questionnaires + v_booking_with_questionnaire 結合済み
 let monshinClinicFilter = '__all__';
 let monshinTreatmentFilter = '__all__';
+let monshinViewMode = 'dashboard';  // 'dashboard' | 'list'
 
 async function loadMonshinData() {
   try {
@@ -13530,6 +13531,172 @@ function renderMonshinQuickSummary(rows) {
   el.textContent = total === 0
     ? '（記入なし）'
     : `総件数 ${total} ／ 過去7日 ${days7} ／ 紐付け率 ${linkRate}%`;
+}
+
+// =====================================================================
+// ダッシュボード描画 (医院別カード + 治療別カード + KPI)
+// =====================================================================
+function renderMonshinDashboard(rows) {
+  const treatments = ['kyosei','bf','implant','whitening','general'];
+
+  // KPI 計算
+  const total = rows.length;
+  const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const recent = rows.filter(r => {
+    const d = new Date(r.submitted_at || r.created_at).getTime();
+    return Number.isFinite(d) && d >= sevenDaysAgo;
+  }).length;
+  const linked = rows.filter(r => r._is_linked).length;
+  const linkRate = total ? Math.round((linked / total) * 100) : 0;
+  const unlinked = total - linked;
+
+  const statsEl = document.getElementById('mq-dashboard-stats');
+  if (statsEl) {
+    statsEl.innerHTML = `
+      <div class="stat-card"><span class="stat-num">${total}</span><span class="stat-label">総件数</span></div>
+      <div class="stat-card"><span class="stat-num">${recent}</span><span class="stat-label">過去7日</span></div>
+      <div class="stat-card"><span class="stat-num">${linkRate}%</span><span class="stat-label">紐付け率</span></div>
+      <div class="stat-card"><span class="stat-num" style="color:${unlinked ? '#ef4444' : 'inherit'}">${unlinked}</span><span class="stat-label">未紐付け</span></div>
+    `;
+  }
+
+  // 医院別集計
+  const clinicCounts = {};
+  rows.forEach(r => {
+    const c = r.clinic_name || '(不明)';
+    if (!clinicCounts[c]) clinicCounts[c] = { total: 0, byT: {} };
+    clinicCounts[c].total += 1;
+    let t = r.treatment || 'general';
+    if (t === 'laburie') t = 'bf';
+    if (!treatments.includes(t)) t = 'general';
+    clinicCounts[c].byT[t] = (clinicCounts[c].byT[t] || 0) + 1;
+  });
+  const clinicEntries = Object.entries(clinicCounts).sort((a, b) => b[1].total - a[1].total);
+
+  const clinicEl = document.getElementById('mq-clinic-cards');
+  if (clinicEl) {
+    if (!clinicEntries.length) {
+      clinicEl.innerHTML = '<div style="color:var(--text-mute);font-size:13px;padding:8px">問診票データがまだありません</div>';
+    } else {
+      clinicEl.innerHTML = clinicEntries.map(([clinic, info]) => {
+        const breakdown = treatments
+          .filter(t => info.byT[t])
+          .map(t => {
+            const color = MONSHIN_TREATMENT_COLORS[t] || '#6b7280';
+            const label = MONSHIN_TREATMENT_LABELS[t] || t;
+            return `<span class="mq-card-breakdown-item" style="color:${color}">${escapeHtml(label)} ${info.byT[t]}</span>`;
+          })
+          .join('');
+        return `<div class="mq-card-item" data-mq-drill-clinic="${escapeHtml(clinic)}">
+          <div class="mq-card-title">
+            <span>${escapeHtml(clinic)}</span>
+            <span class="mq-card-count">${info.total}件 <span class="mq-card-arrow">▶</span></span>
+          </div>
+          ${breakdown ? `<div class="mq-card-breakdown">${breakdown}</div>` : ''}
+        </div>`;
+      }).join('');
+    }
+  }
+
+  // 治療別集計
+  const treatmentCounts = {};
+  treatments.forEach(t => treatmentCounts[t] = { total: 0, byClinic: {} });
+  rows.forEach(r => {
+    let t = r.treatment || 'general';
+    if (t === 'laburie') t = 'bf';
+    if (!treatments.includes(t)) t = 'general';
+    const c = r.clinic_name || '(不明)';
+    treatmentCounts[t].total += 1;
+    treatmentCounts[t].byClinic[c] = (treatmentCounts[t].byClinic[c] || 0) + 1;
+  });
+  const treatmentEntries = treatments
+    .map(t => [t, treatmentCounts[t]])
+    .sort((a, b) => b[1].total - a[1].total);
+
+  const treatmentEl = document.getElementById('mq-treatment-cards');
+  if (treatmentEl) {
+    treatmentEl.innerHTML = treatmentEntries.map(([t, info]) => {
+      const isEmpty = info.total === 0;
+      const color = MONSHIN_TREATMENT_COLORS[t] || '#6b7280';
+      const label = MONSHIN_TREATMENT_LABELS[t] || t;
+      const breakdown = Object.entries(info.byClinic)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([c, n]) => `<span class="mq-card-breakdown-item">${escapeHtml(c)} ${n}</span>`)
+        .join('');
+      return `<div class="mq-card-item${isEmpty ? ' empty' : ''}" ${isEmpty ? '' : `data-mq-drill-treatment="${t}"`}>
+        <div class="mq-card-title">
+          <span style="color:${color}">${escapeHtml(label)}</span>
+          <span class="mq-card-count${isEmpty ? ' zero' : ''}">${info.total}件${isEmpty ? '' : ' <span class="mq-card-arrow">▶</span>'}</span>
+        </div>
+        ${breakdown ? `<div class="mq-card-breakdown">${breakdown}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+}
+
+// =====================================================================
+// 表示モード切替 (dashboard / list)
+// =====================================================================
+function setMonshinViewMode(mode) {
+  monshinViewMode = mode;
+  const dash = document.getElementById('mq-dashboard-view');
+  const list = document.getElementById('mq-list-view');
+  if (dash) dash.style.display = (mode === 'dashboard') ? '' : 'none';
+  if (list) list.style.display = (mode === 'list')      ? '' : 'none';
+  document.querySelectorAll('#mq-view-mode-toggle .mq-mode-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.viewMode === mode);
+  });
+  // 一覧に切り替えた瞬間にテーブルを再描画 (フィルタ反映)
+  if (mode === 'list') renderMonshinTable();
+}
+
+// =====================================================================
+// CSV エクスポート (現在の絞り込み結果)
+// =====================================================================
+function exportMonshinCSV() {
+  const rows = applyMonshinFilters();
+  if (!rows.length) {
+    alert('出力対象がありません');
+    return;
+  }
+  const cols = [
+    { key: 'submitted_at',   label: '提出日時' },
+    { key: 'treatment',      label: '治療' },
+    { key: 'patient_name',   label: '名前' },
+    { key: 'patient_email',  label: 'メール' },
+    { key: 'patient_phone',  label: '電話' },
+    { key: 'clinic_name',    label: '医院' },
+    { key: 'booking_book_date', label: '予約日' },
+    { key: 'booking_book_time', label: '予約時間' },
+    { key: '_is_linked',     label: '紐付け', tx: v => v ? '紐付' : '未紐付' },
+    { key: 'common_answers', label: '共通回答', tx: v => JSON.stringify(v || {}) },
+    { key: 'treatment_answers', label: '治療回答', tx: v => JSON.stringify(v || {}) },
+  ];
+  const esc = v => {
+    if (v === null || v === undefined) return '';
+    const s = String(v);
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+  const header = cols.map(c => esc(c.label)).join(',');
+  const lines = rows.map(r => cols.map(c => {
+    const raw = r[c.key];
+    const val = c.tx ? c.tx(raw) : (c.key === 'treatment' ? (MONSHIN_TREATMENT_LABELS[raw] || raw) : raw);
+    return esc(val);
+  }).join(','));
+  // BOM 付き UTF-8 (Excelで文字化けしない)
+  const csv = '﻿' + [header, ...lines].join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const today = new Date().toISOString().slice(0, 10);
+  a.href = url;
+  a.download = `monshin_${today}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 function renderMonshinCrossTable(rows) {
@@ -13868,7 +14035,10 @@ async function renderMonshin() {
   renderMonshinCrossTable(monshinData);
   renderMonshinTreatmentTabs(monshinData);
   renderMonshinClinicSelect(monshinData);
+  renderMonshinDashboard(monshinData);
   renderMonshinTable();
+  // 初期表示モード反映
+  setMonshinViewMode(monshinViewMode);
 }
 
 // イベントバインド (1回だけ)
@@ -13915,6 +14085,46 @@ function bindMonshinEvents() {
     document.querySelectorAll('#mq-treatment-tabs .mq-chip').forEach(b => b.classList.toggle('active', b.dataset.mqTreatment === monshinTreatmentFilter));
     renderMonshinTable();
   });
+
+  // 表示モード切替トグル (Dashboard / List)
+  document.getElementById('mq-view-mode-toggle')?.addEventListener('click', e => {
+    const btn = e.target.closest('button[data-view-mode]');
+    if (!btn) return;
+    setMonshinViewMode(btn.dataset.viewMode);
+  });
+
+  // 一覧 → ダッシュボードへ戻る
+  document.getElementById('mq-back-to-dashboard')?.addEventListener('click', () => {
+    setMonshinViewMode('dashboard');
+  });
+
+  // 医院別カードクリック → 一覧画面で絞り込み
+  document.getElementById('mq-clinic-cards')?.addEventListener('click', e => {
+    const card = e.target.closest('[data-mq-drill-clinic]');
+    if (!card) return;
+    monshinClinicFilter = card.dataset.mqDrillClinic;
+    monshinTreatmentFilter = '__all__';
+    // 一覧側のフィルタ UI も同期
+    const sel = document.getElementById('mq-filter-clinic');
+    if (sel) sel.value = monshinClinicFilter;
+    document.querySelectorAll('#mq-treatment-tabs .mq-chip').forEach(b => b.classList.toggle('active', b.dataset.mqTreatment === '__all__'));
+    setMonshinViewMode('list');
+  });
+
+  // 治療別カードクリック → 一覧画面で絞り込み
+  document.getElementById('mq-treatment-cards')?.addEventListener('click', e => {
+    const card = e.target.closest('[data-mq-drill-treatment]');
+    if (!card) return;
+    monshinTreatmentFilter = card.dataset.mqDrillTreatment;
+    monshinClinicFilter = '__all__';
+    const sel = document.getElementById('mq-filter-clinic');
+    if (sel) sel.value = '__all__';
+    document.querySelectorAll('#mq-treatment-tabs .mq-chip').forEach(b => b.classList.toggle('active', b.dataset.mqTreatment === monshinTreatmentFilter));
+    setMonshinViewMode('list');
+  });
+
+  // CSV エクスポート
+  document.getElementById('mq-csv-export')?.addEventListener('click', exportMonshinCSV);
 
   // 詳細モーダル閉じる
   document.getElementById('mq-detail-close')?.addEventListener('click', () => {
