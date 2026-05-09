@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v332';
+const APP_VERSION = 'v333';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12359,17 +12359,19 @@ function _showCredModal(info) {
 
 // Phase 8: タブ定義
 const AUTH_TAB_DEFS = [
-  { key: 'bookings', label: '予約' },
-  { key: 'kaiin',    label: '来院' },
-  { key: 'tc',       label: 'TC' },
-  { key: 'sales',    label: '売上' },
-  { key: 'adbudget', label: '広告' },
-  { key: 'admin',    label: '管理' },
+  { key: 'bookings',  label: '予約' },
+  { key: 'kaiin',     label: '来院' },
+  { key: 'monshin',   label: '問診票' },
+  { key: 'analytics', label: '分析' },
+  { key: 'tc',        label: 'TC' },
+  { key: 'sales',     label: '売上' },
+  { key: 'adbudget',  label: '広告' },
+  { key: 'admin',     label: '管理' },
 ];
 function _defaultTabsForRole(role) {
-  if (role === 'admin')       return { bookings:true, kaiin:true,  tc:true,  sales:true,  adbudget:true,  admin:true  };
-  if (role === 'staff_promo') return { bookings:true, kaiin:true,  tc:false, sales:false, adbudget:false, admin:false };
-  return                             { bookings:true, kaiin:false, tc:false, sales:false, adbudget:false, admin:false };
+  if (role === 'admin')       return { bookings:true, kaiin:true,  monshin:true,  analytics:true,  tc:true,  sales:true,  adbudget:true,  admin:true  };
+  if (role === 'staff_promo') return { bookings:true, kaiin:true,  monshin:true,  analytics:false, tc:false, sales:false, adbudget:false, admin:false };
+  return                             { bookings:true, kaiin:false, monshin:false, analytics:false, tc:false, sales:false, adbudget:false, admin:false };
 }
 function _tabsToBadges(vt) {
   if (!vt || typeof vt !== 'object') return '<span style="color:var(--text-muted);font-size:11px">-</span>';
@@ -12630,7 +12632,7 @@ async function renderAuthMigration() {
           <label class="form-label" style="font-size:11px">担当プロモ
             <button type="button" id="new-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px;margin-left:8px">全選択</button>
             <button type="button" id="new-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
-            <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
+            <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">★ 新規プロモも自動許可</button>
             <span style="color:var(--text-muted);font-size:10px;margin-left:6px">※「全許可(%)」は現在・今後の全プロモを含む</span>
           </label>
           ${groupBarHtml}
@@ -12692,7 +12694,7 @@ async function renderAuthMigration() {
           <label class="form-label" style="font-size:11px">担当プロモ
             <button type="button" id="new-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px;margin-left:8px">全選択</button>
             <button type="button" id="new-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
-            <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
+            <button type="button" id="new-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">★ 新規プロモも自動許可</button>
           </label>
           ${groupBarHtml}
           <div id="new-acct-promos-list" style="max-height:200px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px">
@@ -13069,17 +13071,22 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
         </div>
       </div>
       <div style="margin-bottom:14px">
-        <label class="form-label" style="font-size:11px">担当プロモ
-          <button type="button" id="edit-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px;margin-left:8px">全選択</button>
+        <label class="form-label" style="font-size:11px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+          <span>担当プロモ</span>
+          <button type="button" id="edit-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全選択</button>
           <button type="button" id="edit-acct-promos-none" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全解除</button>
-          <button type="button" id="edit-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px">全許可(%)</button>
+          <button type="button" id="edit-acct-promos-wildcard" class="btn btn-outline" style="font-size:10px;padding:1px 6px;${wildcard ? 'background:#059669;color:#fff;border-color:#059669' : ''}">★ 新規プロモも自動許可</button>
         </label>
+        <div style="font-size:10px;color:var(--text-sub);margin:4px 0 8px">
+          <strong style="color:#059669">★ 新規プロモも自動許可</strong>: 今後追加される新しいプロモコードも自動で許可されます (例: 丸田さん用)<br>
+          <strong>全選択</strong>: 今ある全プロモのみ許可 (新規は手動で追加が必要)
+        </div>
         ${editGroupBarHtml}
-        <div id="edit-acct-promos-list" data-wildcard="${wildcard ? '1' : '0'}" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;${wildcard ? 'outline:2px solid #059669' : ''}">
+        <div id="edit-acct-promos-list" data-wildcard="${wildcard ? '1' : '0'}" style="max-height:220px;overflow-y:auto;border:1px solid var(--border);border-radius:4px;padding:8px;background:#fff;display:flex;flex-wrap:wrap;gap:6px;${wildcard ? 'outline:2px solid #059669;background:#f0fdf4' : ''}">
           ${promoChks || '<span style="color:var(--text-muted);font-size:11px">プロモ候補なし</span>'}
           ${extraChks}
         </div>
-        ${wildcard ? '<div id="edit-acct-promos-wild-note" style="margin-top:4px;font-size:11px;color:#059669;font-weight:600">★ 全プロモ許可 (%) を送信します。個別チェックは無視されます。</div>' : ''}
+        ${wildcard ? '<div id="edit-acct-promos-wild-note" style="margin-top:4px;font-size:11px;color:#059669;font-weight:700;padding:6px 10px;background:#dcfce7;border-radius:4px">★ このユーザーは新規プロモも自動で許可されます (個別チェック設定は保存時に無視されます)</div>' : ''}
       </div>
       <div style="margin-bottom:14px">
         <label class="form-label" style="font-size:11px">閲覧可能タブ <span style="color:var(--text-muted);font-size:10px">※ admin は全タブ強制表示 (この設定は無視)</span></label>
@@ -13120,17 +13127,22 @@ function _openEditAccountModal({ id, name, curRole, curAgency, curPromos, curTab
   wrap.querySelector('#edit-acct-promos-none').addEventListener('click', () => {
     listEl.querySelectorAll('.edit-acct-promo-chk').forEach(c => { c.checked = false; });
   });
-  wrap.querySelector('#edit-acct-promos-wildcard').addEventListener('click', () => {
+  wrap.querySelector('#edit-acct-promos-wildcard').addEventListener('click', (e) => {
+    const btn = e.currentTarget;
     const on = listEl.dataset.wildcard !== '1';
     listEl.dataset.wildcard = on ? '1' : '0';
     listEl.style.outline = on ? '2px solid #059669' : '';
+    listEl.style.background = on ? '#f0fdf4' : '#fff';
+    btn.style.background = on ? '#059669' : '';
+    btn.style.color = on ? '#fff' : '';
+    btn.style.borderColor = on ? '#059669' : '';
     const existing = wrap.querySelector('#edit-acct-promos-wild-note');
     if (existing) existing.remove();
     if (on) {
       const n = document.createElement('div');
       n.id = 'edit-acct-promos-wild-note';
-      n.style.cssText = 'margin-top:4px;font-size:11px;color:#059669;font-weight:600';
-      n.textContent = '★ 全プロモ許可 (%) を送信します。個別チェックは無視されます。';
+      n.style.cssText = 'margin-top:4px;font-size:11px;color:#059669;font-weight:700;padding:6px 10px;background:#dcfce7;border-radius:4px';
+      n.textContent = '★ このユーザーは新規プロモも自動で許可されます (個別チェック設定は保存時に無視されます)';
       listEl.after(n);
     }
   });
