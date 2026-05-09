@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v345';
+const APP_VERSION = 'v346';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2638,40 +2638,33 @@ function renderHomeDashboard() {
   const name = (window.currentUserName || sessionStorage.getItem('customName') || (typeof currentRole !== 'undefined' ? currentRole : '') || '').toString();
 
   el.innerHTML = `
-    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:12px">
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">
       <div style="flex:0 0 auto">
-        <div style="font-size:12px;color:var(--text-sub);margin-bottom:2px">${greeting}${name ? '、' + escapeHtml(name) + ' さん' : ''}</div>
-        <div style="font-size:18px;font-weight:700;color:#1a1a1a;white-space:nowrap">今日は ${now.getMonth()+1}月${now.getDate()}日 (${'日月火水木金土'[now.getDay()]})</div>
+        <div style="font-size:11px;color:var(--text-sub);line-height:1.2">${greeting}${name ? '、' + escapeHtml(name) + ' さん' : ''}</div>
+        <div style="font-size:16px;font-weight:700;color:#1a1a1a;white-space:nowrap">今日は ${now.getMonth()+1}月${now.getDate()}日 (${'日月火水木金土'[now.getDay()]})</div>
       </div>
       ${todayPending > 0 ? `
-        <div class="home-alert" data-action="today-pending" style="flex:1 1 280px;padding:10px 14px;background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border:2px solid #dc2626;border-radius:12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;gap:10px">
-          <div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap">
-            <span style="font-size:12px;color:#991b1b;font-weight:700;letter-spacing:0.5px">⚠️ 今日の未対応予約</span>
-            <span style="font-size:22px;color:#991b1b;font-weight:900;line-height:1">${todayPending}<span style="font-size:12px;font-weight:600">件</span></span>
-          </div>
-          <span style="font-size:11px;color:#991b1b;font-weight:600;white-space:nowrap">タップ →</span>
+        <div class="home-alert" data-action="today-pending" style="flex:0 1 auto;padding:6px 12px;background:linear-gradient(135deg,#fee2e2 0%,#fecaca 100%);border:2px solid #dc2626;border-radius:10px;cursor:pointer;display:flex;align-items:center;gap:8px">
+          <span style="font-size:11px;color:#991b1b;font-weight:700">⚠️ 未対応</span>
+          <span style="font-size:20px;color:#991b1b;font-weight:900;line-height:1">${todayPending}<span style="font-size:11px;font-weight:600">件</span></span>
+          <span style="font-size:10px;color:#991b1b;font-weight:600">→</span>
         </div>
       ` : ''}
-    </div>
-
-
-    <!-- メインメトリクス -->
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px">
-      <div class="home-card" data-action="today" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s">
-        <div style="font-size:10px;color:var(--text-sub);font-weight:600;letter-spacing:0.5px">📅 今日</div>
-        <div style="font-size:22px;font-weight:800;color:#1d4ed8;margin-top:4px">${today.length}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      <div class="home-card" data-action="today" style="flex:0 0 auto;background:#fff;border:1px solid var(--border);border-radius:10px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:var(--text-sub);font-weight:600">📅 今日</span>
+        <span style="font-size:18px;font-weight:800;color:#1d4ed8;line-height:1">${today.length}<span style="font-size:10px;color:var(--text-sub);margin-left:1px">件</span></span>
       </div>
-      <div class="home-card" data-action="tomorrow" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s">
-        <div style="font-size:10px;color:var(--text-sub);font-weight:600;letter-spacing:0.5px">🗓 明日</div>
-        <div style="font-size:22px;font-weight:800;color:#7c3aed;margin-top:4px">${tomorrow.length}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      <div class="home-card" data-action="tomorrow" style="flex:0 0 auto;background:#fff;border:1px solid var(--border);border-radius:10px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:var(--text-sub);font-weight:600">🗓 明日</span>
+        <span style="font-size:18px;font-weight:800;color:#7c3aed;line-height:1">${tomorrow.length}<span style="font-size:10px;color:var(--text-sub);margin-left:1px">件</span></span>
       </div>
-      <div class="home-card" data-action="week" style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s">
-        <div style="font-size:10px;color:var(--text-sub);font-weight:600;letter-spacing:0.5px">📆 今週</div>
-        <div style="font-size:22px;font-weight:800;color:#059669;margin-top:4px">${thisWeek.length}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      <div class="home-card" data-action="week" style="flex:0 0 auto;background:#fff;border:1px solid var(--border);border-radius:10px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:var(--text-sub);font-weight:600">📆 今週</span>
+        <span style="font-size:18px;font-weight:800;color:#059669;line-height:1">${thisWeek.length}<span style="font-size:10px;color:var(--text-sub);margin-left:1px">件</span></span>
       </div>
-      <div class="home-card" data-action="pending" style="background:#fff;border:1px solid #f59e0b;border-radius:12px;padding:12px 10px;cursor:pointer;transition:all 0.15s;background:#fffbeb">
-        <div style="font-size:10px;color:#92400e;font-weight:600;letter-spacing:0.5px">⏳ 要対応</div>
-        <div style="font-size:22px;font-weight:800;color:#b45309;margin-top:4px">${pending}<span style="font-size:11px;color:var(--text-sub);margin-left:2px">件</span></div>
+      <div class="home-card" data-action="pending" style="flex:0 0 auto;background:#fffbeb;border:1px solid #f59e0b;border-radius:10px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px">
+        <span style="font-size:10px;color:#92400e;font-weight:600">⏳ 要対応</span>
+        <span style="font-size:18px;font-weight:800;color:#b45309;line-height:1">${pending}<span style="font-size:10px;color:var(--text-sub);margin-left:1px">件</span></span>
       </div>
     </div>
 
@@ -8830,7 +8823,7 @@ async function renderKaiinAll(containerId) {
         <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span>
       </div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:8px;margin-bottom:12px;padding:10px 12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
+    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">📅 期間</span>
         ${(() => {
@@ -8848,23 +8841,17 @@ async function renderKaiinAll(containerId) {
         </select>
       </div>
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">⚡ 絞込</span>
-        <button id="kaiin-all-today" class="btn ${state.todayOnly?'btn-dark':'btn-outline'}" style="min-height:30px;padding:5px 10px;font-size:11px;border-radius:14px" title="今日来院のみ表示">📅 今日来院</button>
-        <input type="text" id="kaiin-all-search" class="form-input" placeholder="🔍 名前で検索" value="${escapeHtml(state.search||'')}" style="width:140px;padding:6px 10px;font-size:11px">
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">🎯 詳細</span>
-        <span class="kaiin-all-facility-slot" title="医院で絞り込み"></span>
-        <span class="kaiin-all-status-slot" title="状態で絞り込み"></span>
-        <span class="kaiin-all-promo-slot" title="プロモ(流入元)で絞り込み"></span>
-        <span class="kaiin-all-service-slot" title="相談内容で絞り込み"></span>
-        <span class="kaiin-all-contract-slot" title="成約商材で絞り込み"></span>
-        <span class="kaiin-all-tool-slot" title="登録ツールで絞り込み"></span>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">↕️ 操作</span>
+        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">🎯 絞込</span>
+        <input type="text" id="kaiin-all-search" class="form-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:120px;padding:5px 8px;font-size:11px">
+        <button id="kaiin-all-today" class="btn ${state.todayOnly?'btn-dark':'btn-outline'}" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:14px" title="今日来院のみ">📅 今日</button>
+        <span class="kaiin-all-facility-slot" title="医院"></span>
+        <span class="kaiin-all-status-slot" title="状態"></span>
+        <span class="kaiin-all-promo-slot" title="プロモ"></span>
+        <span class="kaiin-all-service-slot" title="相談"></span>
+        <span class="kaiin-all-contract-slot" title="成約商材"></span>
+        <span class="kaiin-all-tool-slot" title="ツール"></span>
         <span style="flex:1"></span>
-        <button id="kaiin-all-reset" class="btn btn-outline" style="min-height:30px;padding:6px 14px;font-size:11px;border-radius:18px" title="全フィルタをクリアして今月に戻す">🔄 リセット</button>
+        <button id="kaiin-all-reset" class="btn btn-outline" style="min-height:28px;padding:4px 12px;font-size:11px;border-radius:14px" title="全フィルタをクリア">🔄 リセット</button>
       </div>
     </div>
     <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px">
