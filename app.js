@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v327';
+const APP_VERSION = 'v328';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13189,6 +13189,66 @@ const MONSHIN_TREATMENT_LABELS = {
   general:   '一般',
   laburie:   'ラミネートベニア',  // 旧データ互換: ラブリエ → bf 表示扱い
 };
+
+// 問診票 詳細表示用 ラベルマップ
+const MQ_FIELD_LABELS = {
+  // 矯正
+  kyosei_past_consultation:    '今までに矯正治療相談をされたことはありますか？',
+  kyosei_consultation_content: '相談したい内容',
+  kyosei_concerns:             '矯正治療を受けることに関して、心配な点',
+  kyosei_other_questions:      'その他気になること',
+  kyosei_age:                  '年齢',
+  kyosei_referral_source:      '当院をどこで知りましたか？',
+  kyosei_appeal_reason:        '当院が気になった理由',
+  // BF/共通スタブ
+  consultation_content: 'ご相談したい内容',
+  concerns:             '心配な点',
+  age:                  '年齢',
+  // 共通医療
+  has_underlying_disease:    '現在治療中・通院中のご病気',
+  underlying_disease_detail: 'ご病気の内容',
+  taking_medication:         '現在服用中のお薬',
+  medication_detail:         'お薬の名前',
+  has_allergy:               'アレルギー',
+  allergy_detail:            'アレルギーの内容',
+  is_pregnant:               '妊娠/授乳',
+  free_remarks:              'その他連絡事項',
+};
+
+const MQ_VALUE_LABELS = {
+  yes: 'はい', no: 'いいえ',
+  pregnant: '妊娠中', nursing: '授乳中', possibly: '可能性あり', na: '該当なし (男性等)',
+  // 流入経路
+  instagram_ad:     'インスタ広告',
+  facebook_ad:      'Facebook広告',
+  google_search_ad: 'ネット (グーグル検索) 広告',
+  referral:         '知人の紹介',
+  // 選定理由
+  monthly_3000:     '月額3,000円〜',
+  short_term:       '期間が3ヶ月からと短期間',
+  near_station:     '駅から近い',
+  invisible:        '透明で気づかれにくい',
+  multiple_options: '多数の選択肢から治療を選べる',
+  qualified_doctor: 'ちゃんとした歯科医師に診てもらえる',
+};
+
+function mqFieldLabel(key) {
+  return MQ_FIELD_LABELS[key] || key;
+}
+
+function mqValueLabel(value) {
+  if (value === null || value === undefined || value === '') return '(未回答)';
+  if (Array.isArray(value)) {
+    if (value.length === 0) return '(未選択)';
+    return value.map(v => {
+      if (typeof v === 'string' && v.startsWith('other:')) {
+        return 'その他: ' + v.substring(6);
+      }
+      return MQ_VALUE_LABELS[v] || v;
+    });
+  }
+  return MQ_VALUE_LABELS[value] || String(value);
+}
 const MONSHIN_TREATMENT_COLORS = {
   kyosei:    '#06c755',
   bf:        '#1f2937',
@@ -13469,29 +13529,95 @@ function showMonshinDetail(row) {
   if (!modal || !body) return;
 
   const tLabel = MONSHIN_TREATMENT_LABELS[row.treatment] || row.treatment;
-  if (title) title.textContent = `${tLabel} 問診票 - ${row.patient_name || ''}`;
+  if (title) title.textContent = `${tLabel} 問診票`;
 
-  const fmtJSON = (obj) => {
-    if (!obj || typeof obj !== 'object' || Object.keys(obj).length === 0) return '<div style="color:var(--text-sub);font-style:italic">回答なし</div>';
+  // Google Forms 風 Q&A レンダラ
+  const renderAnswers = (obj) => {
+    if (!obj || typeof obj !== 'object' || Object.keys(obj).length === 0) {
+      return '<div style="text-align:center;padding:24px 0;color:var(--text-mute);font-style:italic;font-size:13px">この治療では追加の質問はありません</div>';
+    }
     return Object.entries(obj).map(([k, v]) => {
-      const valStr = Array.isArray(v) ? v.join(', ') : (v ?? '');
-      return `<div style="display:flex;gap:8px;padding:6px 0;border-bottom:1px dashed #eee"><div style="font-size:12px;color:var(--text-sub);flex:0 0 180px">${escapeHtml(k)}</div><div style="font-size:13px;flex:1;word-break:break-word">${escapeHtml(String(valStr) || '-')}</div></div>`;
+      const label = mqFieldLabel(k);
+      const value = mqValueLabel(v);
+      let valueHtml;
+      if (Array.isArray(value)) {
+        // 複数選択: タグ風に並べる
+        if (value.length === 0) {
+          valueHtml = '<span style="color:var(--text-mute);font-style:italic">(未選択)</span>';
+        } else {
+          valueHtml = `<div style="display:flex;flex-wrap:wrap;gap:6px">${value.map(item => `
+            <span style="display:inline-flex;align-items:center;background:#f0fdf4;border:1px solid #bbf7d0;color:#065f46;padding:6px 12px;border-radius:6px;font-size:13px;font-weight:500">${escapeHtml(item)}</span>
+          `).join('')}</div>`;
+        }
+      } else {
+        // 単一回答
+        const valStr = String(value);
+        const isUnanswered = valStr === '(未回答)' || valStr === '(未選択)';
+        valueHtml = `<div style="font-size:14px;line-height:1.7;color:${isUnanswered ? 'var(--text-mute)' : 'var(--text)'};font-weight:${isUnanswered ? 400 : 500};white-space:pre-wrap;word-break:break-word">${escapeHtml(valStr)}</div>`;
+      }
+      return `
+        <div style="margin-bottom:18px;padding:16px 18px;background:#fafafa;border-radius:10px;border:1px solid #f0f0f0">
+          <div style="font-size:13px;font-weight:700;color:#1f2937;margin-bottom:10px;line-height:1.5">${escapeHtml(label)}</div>
+          ${valueHtml}
+        </div>
+      `;
     }).join('');
   };
 
+  // 紐付け状態バッジ
+  const linkBadge = row._is_linked
+    ? '<span style="background:#dcfce7;color:#065f46;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">✓ 予約と紐付け済</span>'
+    : '<span style="background:#fee2e2;color:#991b1b;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700">✗ 予約と未紐付け</span>';
+
+  // 判定経路を読みやすく
+  const viaShort = String(row.resolved_via || '').includes('url_param') ? 'URL自動判定'
+    : String(row.resolved_via || '').includes('smart_router_supabase') ? 'Supabase 自動判定'
+    : String(row.resolved_via || '').includes('manual_select') ? '患者が選択'
+    : (row.resolved_via || '不明');
+
+  const submittedStr = row.submitted_at
+    ? new Date(row.submitted_at).toLocaleString('ja-JP', { year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' })
+    : '-';
+
   body.innerHTML = `
-    <div style="margin-bottom:16px;font-size:12px;color:var(--text-sub)">
-      提出日時: ${row.submitted_at ? new Date(row.submitted_at).toLocaleString('ja-JP') : '-'}<br>
-      医院: ${escapeHtml(row.clinic_name || '-')} / 予約日: ${escapeHtml(row.booking_book_date || '-')} ${escapeHtml(row.booking_book_time || '')}<br>
-      連絡先: ${escapeHtml(row.patient_email || '-')} / ${escapeHtml(row.patient_phone || '-')}<br>
-      判定経路: ${escapeHtml(row.resolved_via || '-')}<br>
-      ${row._is_linked ? '<span style="color:#059669">✓ 予約と紐付け済み</span>' : '<span style="color:#dc2626">✗ 予約と未紐付け (名前 or 予約日が一致せず)</span>'}
+    <!-- ヘッダー: 患者基本情報 -->
+    <div style="background:linear-gradient(135deg,#f0fdf4 0%,#ecfdf5 100%);border:1px solid #bbf7d0;border-radius:12px;padding:18px 20px;margin-bottom:22px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;margin-bottom:14px">
+        <div>
+          <div style="font-size:11px;letter-spacing:0.15em;color:#065f46;font-weight:700;margin-bottom:6px">PATIENT</div>
+          <div style="font-size:20px;font-weight:700;color:#1f2937">${escapeHtml(row.patient_name || '(無記名)')}</div>
+        </div>
+        ${linkBadge}
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px 18px;font-size:12px">
+        <div><span style="color:#065f46;font-weight:600">医院</span> ${escapeHtml(row.clinic_name || '-')}</div>
+        <div><span style="color:#065f46;font-weight:600">予約日時</span> ${escapeHtml(row.booking_book_date || '-')} ${escapeHtml(row.booking_book_time || '')}</div>
+        <div><span style="color:#065f46;font-weight:600">連絡先</span> ${escapeHtml(row.patient_email || '-')}</div>
+        <div><span style="color:#065f46;font-weight:600">電話</span> ${escapeHtml(row.patient_phone || '-')}</div>
+        <div><span style="color:#065f46;font-weight:600">提出</span> ${escapeHtml(submittedStr)}</div>
+        <div><span style="color:#065f46;font-weight:600">判定</span> ${escapeHtml(viaShort)}</div>
+      </div>
     </div>
-    <h4 style="margin:16px 0 8px;font-size:14px;border-left:3px solid #06c755;padding-left:8px">治療別の回答</h4>
-    ${fmtJSON(row.treatment_answers)}
-    <h4 style="margin:20px 0 8px;font-size:14px;border-left:3px solid #f59e0b;padding-left:8px">医療情報</h4>
-    ${fmtJSON(row.common_answers)}
-    ${row.upload_files && row.upload_files.length ? `<h4 style="margin:20px 0 8px;font-size:14px">添付ファイル</h4><div>${row.upload_files.map(f => `<div>${escapeHtml(JSON.stringify(f))}</div>`).join('')}</div>` : ''}
+
+    <!-- 治療別の回答 -->
+    <div style="margin-bottom:24px">
+      <h4 style="margin:0 0 14px;font-size:13px;color:#065f46;letter-spacing:0.1em;font-weight:700;display:flex;align-items:center;gap:8px">
+        <span style="width:3px;height:14px;background:#10b981;border-radius:2px"></span>
+        ${escapeHtml(tLabel)} のご相談内容
+      </h4>
+      ${renderAnswers(row.treatment_answers)}
+    </div>
+
+    <!-- 共通医療情報 -->
+    ${row.common_answers && Object.keys(row.common_answers).length ? `
+      <div style="margin-bottom:24px">
+        <h4 style="margin:0 0 14px;font-size:13px;color:#92400e;letter-spacing:0.1em;font-weight:700;display:flex;align-items:center;gap:8px">
+          <span style="width:3px;height:14px;background:#f59e0b;border-radius:2px"></span>
+          医療情報
+        </h4>
+        ${renderAnswers(row.common_answers)}
+      </div>
+    ` : ''}
   `;
   modal.style.display = 'flex';
 }
