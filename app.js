@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v337';
+const APP_VERSION = 'v338';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13323,20 +13323,133 @@ const MQ_FIELD_LABELS = {
 };
 
 const MQ_VALUE_LABELS = {
+  // 共通
   yes: 'はい', no: 'いいえ',
   pregnant: '妊娠中', nursing: '授乳中', possibly: '可能性あり', na: '該当なし (男性等)',
-  // 流入経路
-  instagram_ad:     'インスタ広告',
-  facebook_ad:      'Facebook広告',
-  google_search_ad: 'ネット (グーグル検索) 広告',
-  referral:         '知人の紹介',
-  // 選定理由
+  // どこで知ったか (全治療共通)
+  instagram_ad:      'インスタ広告',
+  facebook_ad:       'Facebook広告',
+  tiktok_ad:         'TikTok広告',
+  google_search_ad:  'ネット (グーグル検索) 広告',
+  instagram_account: 'インスタアカウント',
+  tiktok_account:    'ティックトックアカウント',
+  referral:          '知人の紹介',
+  // 矯正 - 気になっている部位・症状
+  crowded_teeth:         '歯並びがガタガタ',
+  maxillary_protrusion:  '出っ歯',
+  fang_teeth:            '八重歯',
+  gap_teeth:             'すきっ歯',
+  mandibular_protrusion: '受け口',
+  mouth_protrusion:      '口元のもっこり感',
+  biting_concern:        '噛み合わせ',
+  // 共通の心配な点
+  pain:            '痛み',
+  cost:            '費用',
+  duration:        '治療期間',
+  appearance:      '装置の見た目',
+  eating:          '食事制限',
+  visit_frequency: '通院頻度',
+  no_concern:      '特に心配なし',
+  // 矯正 - 選定理由
   monthly_3000:     '月額3,000円〜',
   short_term:       '期間が3ヶ月からと短期間',
-  near_station:     '駅から近い',
   invisible:        '透明で気づかれにくい',
-  multiple_options: '多数の選択肢から治療を選べる',
-  qualified_doctor: 'ちゃんとした歯科医師に診てもらえる',
+  partial_kyosei:   '部分矯正',
+  campaign:         '学割・キャンペーン',
+  near_station:     '駅から近い',
+  qualified_doctor: 'ちゃんとした歯科医師',
+  multiple_options: '多数の選択肢から選べる',
+  // BF - 気になっている点
+  tooth_color:    '歯の色',
+  tooth_shape:    '歯の形',
+  minor_crowding: '歯並びの軽い乱れ',
+  chipped_tooth:  '欠けた歯の修復',
+  silver_crown:   '銀歯を白くしたい',
+  overall_look:   '全体的な見た目',
+  // BF - 心配な点
+  durability:   'もちのよさ',
+  natural_look: '自然な見た目',
+  visit_count:  '通院回数',
+  // BF - 選定理由
+  no_drilling:      '歯を削らない',
+  no_pain:          '痛くない・麻酔不要',
+  natural_finish:   '自然な仕上がり',
+  special_occasion: '結婚式・特別な日',
+  reversible:       'もとに戻せる',
+  // インプラント - 失った歯の本数
+  '1': '1本', '2to3': '2〜3本', '4plus': '4本以上', unknown: 'わからない',
+  // インプラント - 期間
+  within_1m: '1ヶ月以内',
+  within_6m: '半年以内',
+  within_1y: '1年以内',
+  years:     '数年経過',
+  // インプラント - 現在の対処
+  denture:   '入れ歯',
+  bridge:    'ブリッジ',
+  temporary: '仮歯',
+  untreated: '放置',
+  // インプラント - 心配な点
+  surgery:    '手術が怖い',
+  anesthesia: '麻酔',
+  underlying: '持病',
+  // インプラント - 選定理由
+  experienced:     '経験豊富',
+  equipment:       '設備充実',
+  painless:        '痛み配慮',
+  warranty:        '長期保証',
+  same_day:        '即日対応',
+  cost_acceptable: '費用感',
+  // ホワイトニング - 経験
+  first_time: '初めて',
+  clinic:     'クリニックで経験あり',
+  home_kit:   '自宅キットで経験あり',
+  both:       '両方経験あり',
+  // ホワイトニング - 部位
+  all_teeth:          '歯全体',
+  front_teeth:        '前歯',
+  specific_teeth:     '1〜2本だけ変色',
+  visible_when_smile: '笑った時に見える歯',
+  dead_tooth:         '失活歯',
+  around_filling:     '詰め物の周辺',
+  // ホワイトニング - 仕上がり
+  natural:     '自然な白さ',
+  clear_white: 'はっきり白く',
+  celebrity:   '芸能人並みに白く',
+  wedding:     '結婚式・特別な日',
+  job_hunting: '就活・面接',
+  undecided:   '未決定',
+  // ホワイトニング - 心配な点
+  sensitivity:   'しみる',
+  rebound:       '後戻り',
+  effectiveness: '効果',
+  // ホワイトニング - 選定理由
+  professional: '歯科医院でしっかり',
+  home:         '自宅で続けられる',
+  long_lasting: '持続期間が長い',
+  // 一般診療 - 相談内容
+  cavity:       '虫歯',
+  gum_disease:  '歯ぐきの腫れ・出血',
+  checkup:      '定期検診・クリーニング',
+  crown_repair: '詰め物・かぶせ物の修理',
+  wisdom_tooth: '親知らず',
+  // 一般診療 - 痛みの程度
+  discomfort:       '違和感程度',
+  biting_pain:      '噛むと痛い',
+  cold_sensitive:   '冷たいものでしみる',
+  spontaneous_pain: '何もしなくても痛い',
+  throbbing:        'ズキズキする',
+  // 一般診療 - 最後の歯科受診
+  '1to2y': '1〜2年前',
+  '3to5y': '3〜5年前',
+  over_5y: '5年以上前',
+  // 一般診療 - 心配な点
+  unknown_proc: '何をされるか不安',
+  // 一般診療 - 選定理由
+  clear_explain:    '説明がわかりやすい',
+  emergency:        '急患対応',
+  insurance:        '保険診療',
+  modern_equipment: '設備が新しい',
+  good_atmosphere:  '院内雰囲気',
 };
 
 function mqFieldLabel(key) {
@@ -13360,32 +13473,52 @@ function mqValueLabel(value) {
 // 治療タブごとの追加カラム定義
 const MQ_TREATMENT_COLUMNS = {
   kyosei: [
-    { key: 'kyosei_past_consultation',    label: '過去相談',  width: 70 },
-    { key: 'kyosei_consultation_content', label: '相談内容',  width: 220 },
-    { key: 'kyosei_concerns',             label: '心配な点',  width: 180 },
-    { key: 'kyosei_age',                  label: '年齢',      width: 50 },
-    { key: 'kyosei_referral_source',      label: '認知経路',  width: 160 },
-    { key: 'kyosei_appeal_reason',        label: '選定理由',  width: 200 },
+    { key: 'kyosei_past_consultation', label: '過去相談',  width: 70  },
+    { key: 'kyosei_concern_areas',     label: '気になる部位', width: 180 },
+    { key: 'kyosei_concerns',          label: '心配な点',  width: 160 },
+    { key: 'kyosei_age',               label: '年齢',      width: 50  },
+    { key: 'kyosei_referral_source',   label: '認知経路',  width: 160 },
+    { key: 'kyosei_appeal_reason',     label: '選定理由',  width: 180 },
+    { key: 'kyosei_other_questions',   label: 'ご質問',    width: 200 },
   ],
   bf: [
-    { key: 'consultation_content', label: '相談内容', width: 220 },
-    { key: 'concerns',             label: '心配な点', width: 180 },
-    { key: 'age',                  label: '年齢',     width: 50 },
+    { key: 'bf_past_treatment',  label: '過去の治療歴',  width: 90  },
+    { key: 'bf_concern_areas',   label: '気になる点',    width: 180 },
+    { key: 'bf_concerns',        label: '心配な点',      width: 160 },
+    { key: 'bf_age',             label: '年齢',          width: 50  },
+    { key: 'bf_referral_source', label: '認知経路',      width: 160 },
+    { key: 'bf_appeal_reason',   label: '選定理由',      width: 180 },
+    { key: 'bf_other_questions', label: 'ご質問',        width: 200 },
   ],
   implant: [
-    { key: 'consultation_content', label: '相談内容', width: 220 },
-    { key: 'concerns',             label: '心配な点', width: 180 },
-    { key: 'age',                  label: '年齢',     width: 50 },
+    { key: 'implant_lost_count',         label: '失った本数', width: 70  },
+    { key: 'implant_lost_period',        label: '経過期間',   width: 80  },
+    { key: 'implant_current_treatment',  label: '現在の対処', width: 140 },
+    { key: 'implant_concerns',           label: '心配な点',   width: 160 },
+    { key: 'implant_age',                label: '年齢',       width: 50  },
+    { key: 'implant_referral_source',    label: '認知経路',   width: 160 },
+    { key: 'implant_appeal_reason',      label: '選定理由',   width: 180 },
+    { key: 'implant_other_questions',    label: 'ご質問',     width: 200 },
   ],
   whitening: [
-    { key: 'consultation_content', label: '相談内容', width: 220 },
-    { key: 'concerns',             label: '心配な点', width: 180 },
-    { key: 'age',                  label: '年齢',     width: 50 },
+    { key: 'whitening_experience',       label: '経験',       width: 90  },
+    { key: 'whitening_concern_areas',    label: '気になる部位', width: 160 },
+    { key: 'whitening_goal',             label: '希望仕上がり', width: 130 },
+    { key: 'whitening_concerns',         label: '心配な点',   width: 140 },
+    { key: 'whitening_age',              label: '年齢',       width: 50  },
+    { key: 'whitening_referral_source',  label: '認知経路',   width: 160 },
+    { key: 'whitening_appeal_reason',    label: '選定理由',   width: 180 },
+    { key: 'whitening_other_questions',  label: 'ご質問',     width: 200 },
   ],
   general: [
-    { key: 'consultation_content', label: '相談内容', width: 220 },
-    { key: 'concerns',             label: '心配な点', width: 180 },
-    { key: 'age',                  label: '年齢',     width: 50 },
+    { key: 'general_concern_topics',  label: '相談内容',     width: 180 },
+    { key: 'general_pain_level',      label: '痛みの程度',   width: 130 },
+    { key: 'general_last_visit',      label: '最後の受診',   width: 100 },
+    { key: 'general_concerns',        label: '心配な点',     width: 140 },
+    { key: 'general_age',             label: '年齢',         width: 50  },
+    { key: 'general_referral_source', label: '認知経路',     width: 160 },
+    { key: 'general_appeal_reason',   label: '選定理由',     width: 180 },
+    { key: 'general_other_questions', label: 'ご質問',       width: 200 },
   ],
 };
 
