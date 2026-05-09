@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v333';
+const APP_VERSION = 'v334';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -264,7 +264,8 @@ function setupRealtime() {
   realtimeChannels.forEach(ch => { try { sb.removeChannel(ch); } catch(_){} });
   realtimeChannels = [];
 
-  const tables = ['booking_status','manual_bookings','self_recordings','bf_history','accounts','promo_rates','para_records'];
+  // BUG#5 修正: medical_questionnaires も Realtime 購読対象に追加
+  const tables = ['booking_status','manual_bookings','self_recordings','bf_history','accounts','promo_rates','para_records','medical_questionnaires'];
   tables.forEach(tbl => {
     const ch = sb.channel('rt-' + tbl)
       .on('postgres_changes', { event: '*', schema: 'public', table: tbl }, (payload) => {
@@ -346,6 +347,11 @@ function handleRealtimeChange(table, payload) {
     debouncedRefresh('promo', () => { if (typeof renderPromoRates === 'function') renderPromoRates(); });
   } else if (table === 'para_records') {
     debouncedRefresh('para', () => { if (typeof renderPara === 'function') renderPara(); });
+  } else if (table === 'medical_questionnaires') {
+    // BUG#5 修正: 問診票が新規/更新されたら問診票タブを再描画
+    debouncedRefresh('monshin', () => {
+      if (currentView === 'monshin' && typeof renderMonshin === 'function') renderMonshin();
+    });
   }
 
   // 他ユーザー編集通知（控えめに）
@@ -617,8 +623,11 @@ function fmtBookDate(d) {
 }
 
 // === Unified Date Parser ===
+// BUG#15 修正: dateStr が string 以外 (Date / number / object 等) で .match クラッシュしないよう String() 化
 function parseDate(dateStr) {
-  if (!dateStr) return null;
+  if (dateStr == null || dateStr === '') return null;
+  if (dateStr instanceof Date) return isNaN(dateStr.getTime()) ? null : dateStr;
+  dateStr = String(dateStr);
   const m = dateStr.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
   if (!m) return null;
   return new Date(parseInt(m[1]), parseInt(m[2])-1, parseInt(m[3]));
@@ -952,6 +961,17 @@ function maskName(name) {
   const rest = Math.max(1, s.length - 2);
   return keep + '※'.repeat(rest);
 }
+// BUG#13 修正用ヘルパー: 国際表記の電話 (+81...) や既に0始まりの電話を安全に表示形式に揃える
+//   旧式: '0' で始まらないなら '0' を頭に付ける → '+81 90...' が '0+81 90...' になっていた
+function _normalizePhoneForDisplay(phone) {
+  if (!phone) return '';
+  const s = String(phone).trim();
+  if (s.startsWith('0')) return s;       // 既に国内表記
+  if (s.startsWith('+')) return s;       // 国際表記はそのまま
+  if (/^\d/.test(s)) return '0' + s;     // 数字始まりだけ '0' を補完 (国番号無し国内番号想定)
+  return s;
+}
+
 function maskPhone(phone) {
   if (!phone) return phone;
   if (!_isPII_MaskNeeded()) return phone;
@@ -1302,7 +1322,8 @@ function setupEventListeners() {
         } else {
           const map = {'kaiin-bf':'BF','kaiin-kyosei':'矯正','kaiin-implant':'インプラント','kaiin-labrie':'ラブリエ','kaiin-hotetsu':'自費補綴','kaiin-konchi':'自費根治','kaiin-whitening':'ホワイトニング','kaiin-lipart':'リップアート','kaiin-jewelry':'ティースジュエリー','kaiin-other':'その他'};
           const t = map[sub];
-          if (t) renderKaiinTab(t, sub.replace('kaiin-','kaiin-') + '-content');
+          // BUG#12 修正: sub.replace('kaiin-','kaiin-') は no-op。シンプルに sub をそのまま使う
+          if (t) renderKaiinTab(t, sub + '-content');
         }
       }
     });
@@ -2298,10 +2319,26 @@ function restoreLastView() {
 // === Navigation ===
 // === v261 ホームダッシュボード ===
 // v273: ホームダッシュボードの分析期間 (デフォルト = 今月) — sessionStorage で永続化
+// BUG#10 修正: 月をまたいで起動した場合、保存値が古いYM(先月)を指すと「今月」ラベルなのに先月が表示されるため、
+//             label='今月'/'先月' のプリセット時は現在日時で再計算する。
 let _homeAnalysisRange = (() => {
   try {
     const saved = sessionStorage.getItem('home-analysis-range');
-    return saved ? JSON.parse(saved) : null;
+    if (!saved) return null;
+    const parsed = JSON.parse(saved);
+    if (parsed && typeof parsed === 'object' && parsed.label) {
+      const now = new Date();
+      const ym = (d) => `${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}`;
+      if (parsed.label === '今月') {
+        parsed.fromYM = ym(now);
+        parsed.toYM = ym(now);
+      } else if (parsed.label === '先月') {
+        const lm = new Date(now.getFullYear(), now.getMonth()-1, 1);
+        parsed.fromYM = ym(lm);
+        parsed.toYM = ym(lm);
+      }
+    }
+    return parsed;
   } catch(_) { return null; }
 })();
 function _saveHomeRange() {
@@ -3889,7 +3926,7 @@ function renderCallMode() {
   };
   const stClr = stColors[st] || { bg:'#f3f4f6', fg:'#6b7280' };
   const name = _callModeCanViewPII ? d.name : maskName(d.name);
-  const phone = _callModeCanViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
+  const phone = _callModeCanViewPII ? (d.phone ? _normalizePhoneForDisplay(d.phone) : '') : maskPhone(d.phone);
   const fac = normFac(d.facility);
   const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
 
@@ -4014,7 +4051,7 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
   };
   const stClr = stColors[st] || { bg:'#f3f4f6', fg:'#6b7280' };
   const name = canViewPII ? d.name : maskName(d.name);
-  const phone = canViewPII ? (d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '') : maskPhone(d.phone);
+  const phone = canViewPII ? (d.phone ? _normalizePhoneForDisplay(d.phone) : '') : maskPhone(d.phone);
   const fac = normFac(d.facility);
   const phoneDigits = phone ? phone.replace(/[^0-9]/g,'') : '';
   // メモセル (来院タブと同じスタイル: クリックで編集モーダル、黄色ハイライト)
@@ -4418,14 +4455,15 @@ function setupKeyboardShortcuts() {
           ${row('検索ボックスにフォーカス', 'Ctrl+K')}
           ${row('予約タブ', 'Alt+1')}
           ${row('来院タブ', 'Alt+2')}
-          ${row('TCタブ', 'Alt+3')}
-          ${row('売上タブ', 'Alt+4')}
-          ${row('広告タブ', 'Alt+5')}
-          ${row('管理タブ', 'Alt+6')}
+          ${row('問診票タブ', 'Alt+3')}
+          ${row('分析タブ', 'Alt+4')}
+          ${row('TCタブ', 'Alt+5')}
+          ${row('売上タブ', 'Alt+6')}
+          ${row('広告タブ', 'Alt+7')}
           ${row('モーダルを閉じる', 'Esc')}
           ${row('このヘルプ', '?')}
         </table>
-        <div style="margin-top:10px;font-size:11px;color:#999;line-height:1.5">※ Mac は Ctrl の代わりに Cmd キー<br>※ Ctrl+1〜6 はブラウザのタブ切替と競合するため Alt 推奨</div>
+        <div style="margin-top:10px;font-size:11px;color:#999;line-height:1.5">※ Mac は Ctrl の代わりに Cmd キー<br>※ Ctrl+1〜7 はブラウザのタブ切替と競合するため Alt 推奨</div>
         <button id="kbd-help-close" style="width:100%;margin-top:14px;padding:10px;background:#111;color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-family:inherit">閉じる</button>
       </div>`;
     m.addEventListener('click', (ev) => { if (ev.target === m) m.remove(); });
@@ -4452,8 +4490,9 @@ function setupKeyboardShortcuts() {
       return;
     }
 
-    // Alt+1〜6 / Ctrl+1〜6: タブ切替（テキスト入力中は除く）
-    if ((e.altKey || isMod) && /^[1-6]$/.test(e.key) && !inEditable) {
+    // Alt+1〜7 / Ctrl+1〜7: タブ切替（テキスト入力中は除く）
+    // BUG#3 修正: monshin (問診票) 追加で 7タブになったので [1-7] に拡張
+    if ((e.altKey || isMod) && /^[1-7]$/.test(e.key) && !inEditable) {
       e.preventDefault();
       const v = VIEWS[parseInt(e.key, 10) - 1];
       if (v) {
@@ -6142,7 +6181,8 @@ function ensureBkMultiSelects() {
 function renderBookings() {
   // #13 loadData を一度だけ読み出して共有 (連打解消)
   const _bkExtra = loadData('bk-extra', {});
-  const searchVal = (document.getElementById('bk-search').value || '').trim().toLowerCase();
+  // BUG#8 修正: 要素が存在しないケース (Realtime更新時など) で null クラッシュしないように ?. を使う
+  const searchVal = (document.getElementById('bk-search')?.value || '').trim().toLowerCase();
   const dd = window._bkDD || {};
   const toolSet = dd.tool?.selected || new Set();
   const facSet = dd.facility?.selected || new Set();
@@ -6150,7 +6190,7 @@ function renderBookings() {
   const svcSet = dd.service?.selected || new Set();
   const statusSet = dd.status?.selected || new Set();
   const contractSet = dd.contract?.selected || new Set();
-  const monthFilter = document.getElementById('bk-month').value;
+  const monthFilter = document.getElementById('bk-month')?.value || '';
 
   // v275: 表示と統計を一致させる effective status (BF予約は bf_status 優先)
   const _effSt = (d) => {
@@ -7146,6 +7186,13 @@ function saveRowEdit() {
   showToast(d.name + ' を更新しました');
   closeRowEditModal();
   renderBookings();
+  // BUG#6 修正: 医院タブが開いていれば再描画 (旧式の重複ハンドラ削除分の代替)
+  try {
+    const facView = document.getElementById('fac-tbody');
+    if (facView && typeof renderFacTab === 'function' && typeof currentFacTab !== 'undefined' && currentFacTab) {
+      renderFacTab(currentFacTab);
+    }
+  } catch(_){}
 }
 
 // === Memo Modal ===
@@ -7287,7 +7334,7 @@ function exportCSV() {
     const extra = bkExtra[key] || {};
     // 非adminは個人情報マスク
     const name = _isPII_MaskNeeded() ? maskName(d.name) : d.name;
-    const phoneRaw = d.phone ? (String(d.phone).startsWith('0') ? d.phone : '0'+d.phone) : '';
+    const phoneRaw = d.phone ? _normalizePhoneForDisplay(d.phone) : '';
     const phone = _isPII_MaskNeeded() ? (phoneRaw ? maskPhone(phoneRaw) : '') : phoneRaw;
     const email = _isPII_MaskNeeded() ? (d.email ? maskEmail(d.email) : '') : (d.email || '');
     return [
@@ -7388,14 +7435,12 @@ function renderFacTab(facility) {
   }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
 
   // 名前クリックで行編集
+  // BUG#6 修正: 旧実装は re-save に once:true ハンドラを毎回追加してたが、
+  //   既存の永続バインド (line 1353) が残ってるため saveRowEdit() が2回走っていた。
+  //   今回は単純に編集モーダルを開くだけ。再描画は saveRowEdit 末尾で window-level イベントを発火し受信する形にする。
   document.querySelectorAll('#fac-tbody .fac-row-edit').forEach(td => {
     td.addEventListener('click', () => {
       openRowEditModal(td.dataset.name, td.dataset.apply);
-      // 保存後にこの医院タブを再描画
-      const origSave = document.getElementById('re-save').onclick;
-      document.getElementById('re-save').onclick = null;
-      const handler = () => { saveRowEdit(); renderFacTab(currentFacTab); document.getElementById('re-save').removeEventListener('click', handler); };
-      document.getElementById('re-save').addEventListener('click', handler, { once: true });
     });
   });
 
@@ -9301,8 +9346,16 @@ function drawKaiinRows(treatment, rows, container) {
   });
 
   // CS医院 (複数選択モーダル再利用)
+  // BUG#11 修正: rows をクロージャで束縛すると、タブ切替後も古い rows が使われてしまう。
+  //             代わりにモーダル開時に最新 bookingsData から該当患者を抽出して渡す。
   container.querySelectorAll('.kaiin-csfac-btn').forEach(btn => {
-    btn.addEventListener('click', () => openBFCsFacModal(btn.dataset.name, btn.dataset.apply, rows));
+    btn.addEventListener('click', () => {
+      const n = btn.dataset.name;
+      const a = btn.dataset.apply;
+      // 最新のグローバル bookingsData から該当患者のセット (BFキーが一致するもの) を作成
+      const freshRows = (typeof getBFRows === 'function') ? getBFRows() : (bookingsData || []);
+      openBFCsFacModal(n, a, freshRows);
+    });
   });
 
   // セット医院の保存
@@ -9562,13 +9615,24 @@ function drawBFLifecycleTable(bfRows) {
     td.addEventListener('click', () => openBFMemoModal(td.dataset.name, td.dataset.apply, bfRows));
   });
   // 名前クリックで編集 (予約一覧と同期)
+  // BUG#7 修正: 編集後 td.dataset.name を更新しないと、再描画前に再クリックすると古い名前で誤動作する
   tbody.querySelectorAll('.bf-lc-name-cell').forEach(td => {
     td.addEventListener('click', () => {
+      if (td.dataset.editing === '1') return;  // 二重クリック防止
       const oldName = td.dataset.name;
       const apply = td.dataset.apply;
       const newName = prompt('患者名を編集:', oldName);
-      if (!newName || newName === oldName) return;
-      editPatientName(oldName, apply, newName.trim(), bfRows);
+      if (!newName || newName.trim() === oldName) return;
+      td.dataset.editing = '1';
+      const trimmed = newName.trim();
+      try {
+        editPatientName(oldName, apply, trimmed, bfRows);
+        // 再描画前のフォールバック: dataset.name を即更新して、次のクリックで oldName が残らないようにする
+        td.dataset.name = trimmed;
+      } finally {
+        // 安全策: 短時間で別ハンドラ起動禁止
+        setTimeout(() => { td.dataset.editing = ''; }, 800);
+      }
     });
   });
   // CS医院複数選択
@@ -9961,10 +10025,16 @@ function renderApplyAnalysis(period) {
   const total = data.length;
   const byTool = {}; data.forEach(d => { byTool[d.tool||'不明'] = (byTool[d.tool||'不明']||0)+1; });
 
+  // BUG#9 修正: 手動登録ツールも表示 (合計と内訳の食い違いをなくす)
+  const toolKeysOrder = ['DXHUB', 'セレクト', '手動'];
+  const knownSum = toolKeysOrder.reduce((s, k) => s + (byTool[k] || 0), 0);
+  const otherSum = total - knownSum;
   document.getElementById('apply-stats').innerHTML = `
     <div class="stat-card"><span class="stat-label">申込数</span><span class="stat-num">${total}</span></div>
     <div class="stat-card"><span class="stat-label">DXHUB</span><span class="stat-num">${byTool['DXHUB']||0}</span></div>
     <div class="stat-card"><span class="stat-label">セレクト</span><span class="stat-num">${byTool['セレクト']||0}</span></div>
+    <div class="stat-card"><span class="stat-label">手動</span><span class="stat-num">${byTool['手動']||0}</span></div>
+    ${otherSum > 0 ? `<div class="stat-card"><span class="stat-label">その他</span><span class="stat-num">${otherSum}</span></div>` : ''}
   `;
 
   // 日別チャート
@@ -10048,7 +10118,9 @@ function renderAnalysis() {
   const contracted = data.filter(d => d.status==='成約').length;
   const bkExtra = loadData('bk-extra',{});
   let amt = 0; data.forEach(d => { const k=d.name+'|'+d.applyDate; if (bkExtra[k]&&bkExtra[k].contractAmount) amt+=Number(bkExtra[k].contractAmount); });
-  const vr = total>0?Math.round((total-cancelled)/total*100):0;
+  // BUG#2 修正: 旧式は (total-cancelled)/total = 「未キャンセル率」になっていた
+  // 来院率は実際に来院済 / 予約総数 が正しい
+  const vr = total>0?Math.round(visited/total*100):0;
   const cr = visited>0?pct(contracted,visited):0;
   const unit = contracted>0?Math.round(amt/contracted):0;
 
@@ -13371,10 +13443,11 @@ async function loadMonshinData() {
     // 予約データ統合: bookingsData (Sheets + manual_bookings) を使用
     //   → 「先に問診票 → あとから予約同期」のケースで、予約データが届いたら次の
     //     読込タイミングで自動的に紐付く
-    if ((!window.bookingsData || !window.bookingsData.length) && typeof loadBookings === 'function') {
+    // BUG#1 修正: bookingsData は let 宣言なので window.bookingsData ではアクセス不可
+    if ((!bookingsData || !bookingsData.length) && typeof loadBookings === 'function') {
       try { await loadBookings(); } catch(_) {}
     }
-    const allBookings = (window.bookingsData || []).slice();
+    const allBookings = (bookingsData || []).slice();
 
     return questionnaires.map(q => {
       const qNameClean = (q.patient_name || '').replace(/\s/g, '');
@@ -13553,7 +13626,12 @@ function applyMonshinFilters() {
 
   let rows = monshinData.slice();
   if (treatment && treatment !== '__all__') {
-    rows = rows.filter(r => (r.treatment || 'general') === treatment);
+    // BUG#4 修正: laburie 旧データは bf タブで表示されるよう正規化
+    rows = rows.filter(r => {
+      let t = r.treatment || 'general';
+      if (t === 'laburie') t = 'bf';
+      return t === treatment;
+    });
   }
   if (clinic && clinic !== '__all__') {
     rows = rows.filter(r => (r.clinic_name || '(不明)') === clinic);
