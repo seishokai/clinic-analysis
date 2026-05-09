@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v329';
+const APP_VERSION = 'v330';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13510,22 +13510,22 @@ function renderMonshinTable() {
     const tColor = MONSHIN_TREATMENT_COLORS[r.treatment] || '#6b7280';
     const linked = r._is_linked;
     const linkedBadge = linked
-      ? '<span style="display:inline-block;background:#dcfce7;color:#065f46;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:700">✓ 紐付済</span>'
-      : '<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:3px 8px;border-radius:99px;font-size:11px;font-weight:700">✗ 未紐付</span>';
+      ? '<span style="display:inline-block;background:#dcfce7;color:#065f46;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700;line-height:1.3">✓ 紐付済</span>'
+      : '<span style="display:inline-block;background:#fee2e2;color:#991b1b;padding:2px 6px;border-radius:99px;font-size:10px;font-weight:700;line-height:1.3">✗ 未紐付</span>';
     const contact = [r.patient_email, r.patient_phone].filter(Boolean).join(' / ');
 
     return `
       <tr style="cursor:pointer" data-mq-row-id="${r.id}">
-        <td style="text-align:center"><span style="display:inline-block;background:${tColor};color:#fff;padding:3px 10px;border-radius:99px;font-size:11px;font-weight:700;white-space:nowrap">${escapeHtml(tLabel)}</span></td>
-        <td style="text-align:left;line-height:1.5">
-          <div style="font-weight:700;font-size:14px;color:var(--text)">${escapeHtml(r.patient_name || '(無記名)')}</div>
-          ${contact ? `<div style="font-size:11px;color:var(--text-sub);margin-top:2px">${escapeHtml(contact)}</div>` : ''}
+        <td style="text-align:center"><span style="display:inline-block;background:${tColor};color:#fff;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:700;white-space:nowrap;line-height:1.3">${escapeHtml(tLabel)}</span></td>
+        <td style="text-align:left;line-height:1.3">
+          <div style="font-weight:700;font-size:13px;color:var(--text)">${escapeHtml(r.patient_name || '(無記名)')}</div>
+          ${contact ? `<div style="font-size:10px;color:var(--text-mute)">${escapeHtml(contact)}</div>` : ''}
         </td>
-        <td style="font-size:13px;font-weight:600;white-space:nowrap;color:var(--text)">${escapeHtml(fmtBookingDate(r.booking_book_date, r.booking_book_time))}</td>
-        <td style="font-size:12px;color:var(--text-sub)">${escapeHtml(r.clinic_name || '(不明)')}</td>
+        <td style="font-size:12px;font-weight:600;white-space:nowrap;color:var(--text)">${escapeHtml(fmtBookingDate(r.booking_book_date, r.booking_book_time))}</td>
+        <td style="font-size:11px;color:var(--text-sub);line-height:1.3">${escapeHtml(r.clinic_name || '(不明)')}</td>
         <td style="text-align:center">${linkedBadge}</td>
-        <td style="font-size:11px;color:var(--text-sub);white-space:nowrap">${escapeHtml(fmtSubmitted(r.submitted_at))}</td>
-        <td style="text-align:right"><button class="btn btn-outline mq-detail-btn" data-id="${r.id}" style="font-size:11px;padding:5px 12px;min-height:26px">詳細</button></td>
+        <td style="font-size:10px;color:var(--text-sub);white-space:nowrap;line-height:1.3">${escapeHtml(fmtSubmitted(r.submitted_at))}</td>
+        <td style="text-align:right"><button class="btn btn-outline mq-detail-btn" data-id="${r.id}" style="font-size:10px;padding:3px 8px;min-height:22px">詳細</button></td>
       </tr>
     `;
   }).join('');

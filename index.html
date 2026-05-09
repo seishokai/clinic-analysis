@@ -262,7 +262,7 @@
   <!-- Login -->
   <div id="login-screen" class="login-screen">
     <!-- v297: バージョン表示 (右下、薄く) -->
-    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v329</div>
+    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン">v330</div>
     <div class="login-card">
       <div class="login-logo">
         <h1 class="brand-script">Aladdin</h1>
@@ -434,7 +434,7 @@
       <button class="btn-logout" id="logout-btn">ログアウト</button>
     </header>
     <!-- v297: バージョン表示 (右下固定・どのページ・どのロールでも常に表示) -->
-    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン (リロード後も同じなら最新)">v329</div>
+    <div class="app-version-tag" style="position:fixed;bottom:6px;right:10px;font-size:10px;color:#9ca3af;font-family:monospace;letter-spacing:1px;user-select:none;pointer-events:none;z-index:9999;background:rgba(255,255,255,.85);padding:2px 6px;border-radius:6px;border:1px solid #e5e7eb" title="アプリバージョン (リロード後も同じなら最新)">v330</div>
 
     <!-- Bottom Nav (mobile) -->
     <nav class="bottom-nav" id="bottom-nav">
@@ -1090,16 +1090,16 @@
 
       <!-- 一覧 (メイン) -->
       <div class="data-table-wrap" style="max-height:calc(100vh - 220px);overflow:auto;border:1px solid var(--border);border-radius:8px;background:#fff">
-        <table class="data-table compact" id="mq-table" style="width:100%">
+        <table class="data-table compact" id="mq-table" style="width:100%;border-collapse:collapse">
           <thead style="position:sticky;top:0;background:#f8fafc;z-index:5;box-shadow:0 1px 0 var(--border)">
             <tr>
-              <th style="width:60px">治療</th>
-              <th style="text-align:left">名前 / 連絡先</th>
-              <th style="width:140px">予約日時</th>
-              <th>医院</th>
-              <th style="width:80px">紐付け</th>
-              <th style="width:80px">提出</th>
-              <th style="width:60px"></th>
+              <th style="width:60px;padding:6px 8px;font-size:11px">治療</th>
+              <th style="text-align:left;padding:6px 8px;font-size:11px">名前 / 連絡先</th>
+              <th style="width:130px;padding:6px 8px;font-size:11px">予約日時</th>
+              <th style="padding:6px 8px;font-size:11px">医院</th>
+              <th style="width:70px;padding:6px 8px;font-size:11px">紐付け</th>
+              <th style="width:70px;padding:6px 8px;font-size:11px">提出</th>
+              <th style="width:50px;padding:6px 8px"></th>
             </tr>
           </thead>
           <tbody id="mq-tbody">
@@ -1107,6 +1107,13 @@
           </tbody>
         </table>
       </div>
+
+      <!-- 一覧テーブル コンパクト化 -->
+      <style>
+        #mq-table tbody tr td { padding: 6px 8px !important; vertical-align: middle; }
+        #mq-table tbody tr { border-bottom: 1px solid #f3f4f6; }
+        #mq-table tbody tr:last-child { border-bottom: none; }
+      </style>
 
       <!-- 治療チップ用 CSS -->
       <style>
