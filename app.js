@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v360';
+const APP_VERSION = 'v361';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6597,28 +6597,34 @@ function renderBookings() {
         saveData('bk-extra', bkEx);
         // DB保存
         const upsertData = { name, apply_date: applyDate, status: newStatus };
-        // === 連動: status 変更を bf_status にも同期 (タブ間整合性のため) ===
-        // v360 以前は「進行中 bf_status の保護」ロジックで一部ケースのみ同期していたが、
-        // 結果としてタブ間でステータスが食い違う原因になっていた。
-        // v360: 常に bf_status も同じ値にする。BF lifecycle 詳細(CT/診断 等)は BF タブで再設定可。
+        // === 連動: status 変更を bf_status にも同期 (BFスタッフの意図を保護) ===
+        // v361: 「BFスタッフが既に bf_status を意図的に設定済みなら触らない」ポリシー
+        //   - bf_status 空 / 離脱 / キャンセル → 同期OK (resettable)
+        //   - newStatus が 成約 / キャンセル / 除外 → 確定遷移なので強制同期 (BFタブの編集も終端化)
+        //   - 上記以外 (例: bf_status='検討中' or 'CT/診断' で newStatus='来院済') → bf_status は触らない
         if (newStatus) {
           const targetBF = STATUS_TO_BF[newStatus] !== undefined ? STATUS_TO_BF[newStatus] : newStatus;
           if (targetBF !== null) {
             const curBF = bfLifecycleCache[key]?.bf_status;
-            upsertData.bf_status = targetBF;
-            if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
-            bfLifecycleCache[key].bf_status = targetBF;
-            // BF行のみ履歴記録
-            if (match && isBFBooking(match) && curBF !== targetBF) {
-              (async () => {
-                try {
-                  await sb.from('bf_history').insert({
-                    booking_name: name, booking_apply_date: applyDate,
-                    from_status: curBF || null, to_status: targetBF,
-                    changed_by: getLoggedUserName() + '(自動連動:状態→BF)'
-                  });
-                } catch(e) { console.warn('bf_history insert failed:', e); }
-              })();
+            const isResettable = !curBF || curBF === '離脱' || curBF === 'キャンセル';
+            const isTerminal = (newStatus === '成約' || newStatus === 'キャンセル' || newStatus === '除外');
+            const shouldUpdate = isResettable || isTerminal;
+            if (shouldUpdate) {
+              upsertData.bf_status = targetBF;
+              if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
+              bfLifecycleCache[key].bf_status = targetBF;
+              // BF行のみ履歴記録
+              if (match && isBFBooking(match) && curBF !== targetBF) {
+                (async () => {
+                  try {
+                    await sb.from('bf_history').insert({
+                      booking_name: name, booking_apply_date: applyDate,
+                      from_status: curBF || null, to_status: targetBF,
+                      changed_by: getLoggedUserName() + '(自動連動:状態→BF)'
+                    });
+                  } catch(e) { console.warn('bf_history insert failed:', e); }
+                })();
+              }
             }
           }
         }
@@ -8953,8 +8959,8 @@ async function renderKaiinAll(containerId) {
     });
   });
 
-  // === 編集: 状態 (DB upsert + bookingsData同期 + bf_status 同期) ===
-  // v360: 来院一覧で status を変更したら bf_status も同じ値にする (タブ間整合性)
+  // === 編集: 状態 (DB upsert + bookingsData同期 + bf_status 同期 BF意図保護) ===
+  // v361: BFスタッフが既に意図的に設定済み bf_status は予約系編集からは保護する
   el.querySelectorAll('.kaiin-all-status-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
       const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || null;
@@ -8963,11 +8969,17 @@ async function renderKaiinAll(containerId) {
         if (val && typeof STATUS_TO_BF !== 'undefined') {
           const targetBF = STATUS_TO_BF[val] !== undefined ? STATUS_TO_BF[val] : val;
           if (targetBF !== null) {
-            payload.bf_status = targetBF;
             const key = name + '|' + apply;
-            if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
-              if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
-              bfLifecycleCache[key].bf_status = targetBF;
+            const curBF = (typeof bfLifecycleCache === 'object' && bfLifecycleCache && bfLifecycleCache[key]) ? bfLifecycleCache[key].bf_status : null;
+            const isResettable = !curBF || curBF === '離脱' || curBF === 'キャンセル';
+            const isTerminal = (val === '成約' || val === 'キャンセル' || val === '除外');
+            const shouldUpdate = isResettable || isTerminal;
+            if (shouldUpdate) {
+              payload.bf_status = targetBF;
+              if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
+                if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
+                bfLifecycleCache[key].bf_status = targetBF;
+              }
             }
           }
         }
