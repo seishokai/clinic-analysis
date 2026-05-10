@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v366';
+const APP_VERSION = 'v367';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8784,7 +8784,7 @@ async function renderKaiinAll(containerId) {
     </div>
     <div class="card" style="padding:10px">
       <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">来院一覧 <span style="font-weight:400;color:var(--text-muted)">${totalCount}件</span></div>
-      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - 360px);overflow-y:auto">
+      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${state.dashboardOpen ? 360 : 220}px);overflow-y:auto">
         <table class="data-table compact kaiin-all-list-table" style="width:100%">
           <thead><tr>
             <th style="text-align:left">来院日</th>
