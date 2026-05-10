@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v377';
+const APP_VERSION = 'v378';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1338,8 +1338,11 @@ function setupEventListeners() {
   // Sub nav
   document.querySelectorAll('.sub-nav-btn:not(.bf-sub-btn)').forEach(b => {
     b.addEventListener('click', () => {
+      // v378: data-sub のないトグルボタン (治療/医院) は別ハンドラで処理するためスキップ
+      if (!b.dataset.sub) return;
       const parent = b.closest('.sub-nav');
-      parent.querySelectorAll('.sub-nav-btn').forEach(s => s.classList.remove('active'));
+      // v378: 治療/医院 トグルボタンの active 状態は除去しない (それぞれ独立したトグルなので)
+      parent.querySelectorAll('.sub-nav-btn[data-sub]').forEach(s => s.classList.remove('active'));
       b.classList.add('active');
       const sub = b.dataset.sub;
       const view = b.closest('.view') || b.closest('main');
@@ -1416,6 +1419,9 @@ function setupEventListeners() {
 
   // === v369: グローバルヘッダー圧縮トグル (Aladdin ロゴクリック) ===
   setupHeaderLogoToggle();
+
+  // === v378: 来院サブタブの「治療」「医院」トグル + 動的医院ボタン生成 ===
+  setupKaiinSubnavToggles();
 
   // === v264 スワイプアクション (モバイル) ===
   // 左→確認済 / 右→メモ
@@ -4361,6 +4367,81 @@ function setupHeaderLogoToggle() {
       apply(false);
     });
   }
+}
+
+// === v378: 来院サブタブ「治療」「医院」トグル ===
+// 「治療」押下 → 治療オプション(BF/矯正/...)を inline 表示、医院は閉じる
+// 「医院」押下 → bookingsData から医院を集計して動的ボタン生成、治療は閉じる
+// 医院ボタン押下 → kaiin-all 表示 + facilityフィルタを適用
+function setupKaiinSubnavToggles() {
+  const treatmentToggle = document.getElementById('kaiin-treatment-toggle');
+  const facilityToggle = document.getElementById('kaiin-facility-toggle');
+  const facilityOptsSlot = document.getElementById('kaiin-facility-opts-slot');
+  if (!treatmentToggle || !facilityToggle || !facilityOptsSlot) return;
+
+  const showTreatment = (show) => {
+    document.querySelectorAll('.kaiin-treatment-opt').forEach(b => { b.hidden = !show; });
+    treatmentToggle.classList.toggle('active', show);
+    if (show) {
+      facilityOptsSlot.hidden = true;
+      facilityToggle.classList.remove('active');
+    }
+    try { sessionStorage.setItem('kaiin-subnav-mode', show ? 'treatment' : ''); } catch(_){}
+  };
+  const showFacility = (show) => {
+    if (show) {
+      // bookingsData から医院ユニーク値を抽出
+      const facs = [...new Set((bookingsData || []).map(d => normFac(d.facility)).filter(Boolean))].sort();
+      facilityOptsSlot.innerHTML = facs.map(f => `<button class="sub-nav-btn kaiin-facility-opt" data-fac="${escapeHtml(f)}">${escapeHtml(f)}</button>`).join('');
+      facilityOptsSlot.hidden = false;
+      facilityToggle.classList.add('active');
+      // 治療オプションは閉じる
+      document.querySelectorAll('.kaiin-treatment-opt').forEach(b => { b.hidden = true; });
+      treatmentToggle.classList.remove('active');
+      // 医院ボタンクリックで kaiin-all + facility フィルタ
+      facilityOptsSlot.querySelectorAll('.kaiin-facility-opt').forEach(btn => {
+        btn.addEventListener('click', () => {
+          // アクティブ表示
+          facilityOptsSlot.querySelectorAll('.kaiin-facility-opt').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          // kaiin-all を表示 (medication tabs hidden)
+          document.querySelectorAll('#view-kaiin > [id^="sub-"]').forEach(s => s.hidden = s.id !== 'sub-kaiin-all');
+          document.querySelectorAll('#kaiin-sub-nav .sub-nav-btn').forEach(b => b.classList.remove('active'));
+          const allBtn = document.querySelector('#kaiin-sub-nav .sub-nav-btn[data-sub="kaiin-all"]');
+          if (allBtn) allBtn.classList.add('active');
+          facilityToggle.classList.add('active');
+          btn.classList.add('active');
+          // 医院フィルタを適用
+          if (typeof _kaiinAllPeriodState === 'object') {
+            _kaiinAllPeriodState.facility.clear();
+            _kaiinAllPeriodState.facility.add(btn.dataset.fac);
+            if (typeof renderKaiinAll === 'function') renderKaiinAll('kaiin-all-content');
+          }
+        });
+      });
+    } else {
+      facilityOptsSlot.hidden = true;
+      facilityOptsSlot.innerHTML = '';
+      facilityToggle.classList.remove('active');
+    }
+    try { sessionStorage.setItem('kaiin-subnav-mode', show ? 'facility' : ''); } catch(_){}
+  };
+
+  treatmentToggle.addEventListener('click', () => {
+    const open = !document.querySelector('.kaiin-treatment-opt:not([hidden])');
+    showTreatment(open);
+  });
+  facilityToggle.addEventListener('click', () => {
+    const open = facilityOptsSlot.hidden;
+    showFacility(open);
+  });
+
+  // 初期状態 (sessionStorage)
+  try {
+    const mode = sessionStorage.getItem('kaiin-subnav-mode') || '';
+    if (mode === 'treatment') showTreatment(true);
+    else if (mode === 'facility') showFacility(true);
+  } catch(_){}
 }
 
 // === v264 キーボードショートカット ===
@@ -8825,13 +8906,6 @@ async function renderKaiinAll(containerId) {
         <button id="kaiin-all-dashboard-toggle" class="filter-btn ${state.dashboardOpen?'is-active':''}" title="サマリー(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ サマリー':'▼ サマリー'}</button>
       </span>
     </div>
-    <!-- v377: 2行目 = 治療別/医院別 トグル + 押したらカードが横に並ぶ -->
-    <div id="kaiin-all-breakdown" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0;min-height:32px">
-      <button class="kaiin-all-view-btn filter-btn ${state.viewMode==='treatment'?'is-active':''}" data-view="treatment" title="治療別の件数・成約率を横並びで表示">🩺 治療別</button>
-      <button class="kaiin-all-view-btn filter-btn ${state.viewMode==='facility'?'is-active':''}" data-view="facility" title="医院別の件数・成約率を横並びで表示">🏢 医院別</button>
-      ${state.viewMode==='treatment' || state.viewMode==='facility' ? `<button class="kaiin-all-view-btn filter-btn" data-view="all" title="閉じる" style="font-size:10px;padding:2px 6px">✕</button>` : ''}
-      ${cardsToShow ? `<div style="display:flex;gap:6px;flex:1;overflow-x:auto;padding-bottom:2px">${cardsToShow}</div>` : '<span style="font-size:10px;color:var(--text-muted)">↑ ボタンを押すと内訳カードが並びます</span>'}
-    </div>
     ${state.dashboardOpen ? `
     <div class="stats-row" style="gap:6px;margin-bottom:8px">
       <div class="stat-card" title="予約数 = 来院済 + キャンセル + 未来予約 + 進行中 (要対応はキャンセル内)"><span class="stat-label">予約数</span><span class="stat-num">${totalCount}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
@@ -8866,7 +8940,7 @@ async function renderKaiinAll(containerId) {
     </div>
     ` : ''}
     <div class="card" style="padding:6px">
-      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${(state.dashboardOpen?160:0) + (state.filterOpen?80:0) + 130}px);overflow-y:auto">
+      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${(state.dashboardOpen?160:0) + (state.filterOpen?80:0) + 90}px);overflow-y:auto">
         <table class="data-table compact kaiin-all-list-table" style="width:100%">
           <thead><tr>
             <th style="width:55px">来院</th>

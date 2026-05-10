@@ -905,16 +905,21 @@
     <main id="view-kaiin" class="view view-wide" hidden>
       <div class="sub-nav" id="kaiin-sub-nav">
         <button class="sub-nav-btn active" data-sub="kaiin-all">一覧</button>
-        <button class="sub-nav-btn" data-sub="kaiin-bf">BF</button>
-        <button class="sub-nav-btn" data-sub="kaiin-kyosei">矯正</button>
-        <button class="sub-nav-btn" data-sub="kaiin-implant">インプラント</button>
-        <button class="sub-nav-btn" data-sub="kaiin-labrie">ラブリエ</button>
-        <button class="sub-nav-btn" data-sub="kaiin-hotetsu">自費補綴</button>
-        <button class="sub-nav-btn" data-sub="kaiin-konchi">自費根治</button>
-        <button class="sub-nav-btn" data-sub="kaiin-whitening">ホワイトニング</button>
-        <button class="sub-nav-btn" data-sub="kaiin-lipart">リップアート</button>
-        <button class="sub-nav-btn" data-sub="kaiin-jewelry">ティースジュエリー</button>
-        <button class="sub-nav-btn" data-sub="kaiin-other">その他</button>
+        <button class="sub-nav-btn" id="kaiin-treatment-toggle" title="治療別タブを表示/非表示">治療</button>
+        <button class="sub-nav-btn" id="kaiin-facility-toggle" title="医院別タブを表示/非表示">医院</button>
+        <!-- v378: 治療別オプション (デフォルト非表示) -->
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-bf" hidden>BF</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-kyosei" hidden>矯正</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-implant" hidden>インプラント</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-labrie" hidden>ラブリエ</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-hotetsu" hidden>自費補綴</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-konchi" hidden>自費根治</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-whitening" hidden>ホワイトニング</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-lipart" hidden>リップアート</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-jewelry" hidden>ティースジュエリー</button>
+        <button class="sub-nav-btn kaiin-treatment-opt" data-sub="kaiin-other" hidden>その他</button>
+        <!-- 医院別オプション (デフォルト非表示・JSで動的生成) -->
+        <span id="kaiin-facility-opts-slot" hidden></span>
       </div>
       <div id="sub-kaiin-all"><div id="kaiin-all-content"></div></div>
       <div id="sub-kaiin-bf" hidden><div class="page-header"><h2>BF 来院管理</h2></div><div id="kaiin-bf-content"></div></div>
@@ -1438,7 +1443,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=377"></script>
+  <script src="app.js?v=378"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
