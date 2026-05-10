@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v363';
+const APP_VERSION = 'v364';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4259,6 +4259,23 @@ function switchView(view) {
       const t = map[activeSub];
       if (t) setTimeout(() => renderKaiinTab(t, activeSub + '-content'), 50);
     }
+  }
+  // v363: 予約タブ切替時にもアクティブなサブを自動再描画 (旧: bk-home が auto-render を担っていたが廃止したため)
+  if (view === 'bookings') {
+    const activeSub = document.querySelector('#bk-sub-nav .sub-nav-btn.active')?.dataset.sub || 'bk-phone';
+    setTimeout(() => {
+      if (activeSub === 'bk-phone') {
+        if (typeof renderPhoneCheck === 'function') renderPhoneCheck();
+      } else if (activeSub === 'bk-list') {
+        if (typeof renderBookings === 'function') renderBookings();
+      } else if (activeSub === 'bk-analysis' && bookingsData.length > 0) {
+        if (typeof renderAnalysis === 'function') renderAnalysis();
+      } else if (activeSub === 'bk-apply' && bookingsData.length > 0) {
+        if (typeof renderApplyAnalysis === 'function') renderApplyAnalysis('today');
+      } else if (activeSub === 'bk-availability') {
+        if (typeof renderAvailability === 'function') renderAvailability();
+      }
+    }, 50);
   }
 }
 
