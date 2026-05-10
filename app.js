@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v361';
+const APP_VERSION = 'v362';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9098,6 +9098,29 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     if (st && byStatus[st] !== undefined) byStatus[st]++;
     else noSt++;
   });
+  // v362: 来院一覧と同じ5カードまとめ集計
+  const _bkExtraSL = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
+  const _amtSL = (d) => {
+    const ex = _bkExtraSL[d.name + '|' + d.applyDate] || {};
+    return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+  };
+  const _summaryFor = (rs) => {
+    const total = rs.length;
+    const visited = rs.filter(d => isVisitedStatus(d.status || '')).length;
+    const contracted = rs.filter(d => d.status === '成約').length;
+    const formalCancelled = rs.filter(d => d.status === 'キャンセル').length;
+    const noShow = rs.filter(d => {
+      const s = d.status || '';
+      return s !== 'キャンセル' && !isVisitedStatus(s) && s !== '未対応' && s !== '';
+    }).length;
+    const cancelled = formalCancelled + noShow;
+    const overdue = rs.filter(d => !d.status || d.status === '未対応').length;
+    const totalAmt = rs.reduce((s, d) => s + _amtSL(d), 0);
+    const visitRate = total ? Math.round(visited / total * 100) : 0;
+    const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
+    return { overdue, cancelled, formalCancelled, noShow, visited, contracted, totalAmt, visitRate, contractRate };
+  };
+  const sum = _summaryFor(rows);
 
   const facs = ['全て','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
   const FACS_OPTS = ['','BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都'];
@@ -9138,6 +9161,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         </select>
         <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF出力</button>
       </div>
+    </div>
+    <!-- v362: 来院一覧と同じスタイルの5カードまとめ -->
+    <div class="stats-row stats-row-compact kaiin-summary-row">
+      <div class="stat-card ${sum.overdue>0?'is-warning':''}" title="未対応のまま"><span class="stat-label">⚠ 要対応</span><span class="stat-num kaiin-sum-overdue">${sum.overdue}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">未対応</span></div>
+      <div class="stat-card ${sum.cancelled>0?'is-danger':''}" title="キャンセル(取消) + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num kaiin-sum-cancelled">${sum.cancelled}</span><span class="stat-yoy kaiin-sum-cancelled-detail" style="color:var(--text-sub);font-size:10px;font-weight:600">取消${sum.formalCancelled}+未来店${sum.noShow}</span></div>
+      <div class="stat-card ${sum.visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 治療段階"><span class="stat-label">来院済</span><span class="stat-num kaiin-sum-visited">${sum.visited}</span><span class="stat-yoy kaiin-sum-visited-rate" style="color:var(--text-sub);font-size:11px">来院率 ${sum.visitRate}%</span></div>
+      <div class="stat-card ${sum.contracted>0?'is-success':''}" title="成約済"><span class="stat-label">成約</span><span class="stat-num kaiin-sum-contracted">${sum.contracted}</span><span class="stat-yoy kaiin-sum-contracted-rate" style="color:var(--text-sub);font-size:11px">成約率 ${sum.contractRate}%</span></div>
+      <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num kaiin-sum-amt">¥${fmt(sum.totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
     </div>
     <div class="kaiin-header-wrap" style="display:none">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto;align-items:center">
@@ -9393,6 +9424,45 @@ function drawKaiinRows(treatment, rows, container) {
       const v = el.dataset.st;
       el.textContent = byStatusF[v] || 0;
     });
+    // v362: 5カードまとめサマリーもフィルター結果で更新
+    try {
+      const _bkExtraDR = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
+      const _amtDR = (d) => {
+        const ex = _bkExtraDR[d.name + '|' + d.applyDate] || {};
+        return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+      };
+      const total = filtered.length;
+      const visited = filtered.filter(d => isVisitedStatus(d.status || '')).length;
+      const contracted = filtered.filter(d => d.status === '成約').length;
+      const formalCancelled = filtered.filter(d => d.status === 'キャンセル').length;
+      const noShow = filtered.filter(d => {
+        const s = d.status || '';
+        return s !== 'キャンセル' && !isVisitedStatus(s) && s !== '未対応' && s !== '';
+      }).length;
+      const cancelled = formalCancelled + noShow;
+      const overdue = filtered.filter(d => !d.status || d.status === '未対応').length;
+      const totalAmt = filtered.reduce((s, d) => s + _amtDR(d), 0);
+      const visitRate = total ? Math.round(visited / total * 100) : 0;
+      const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
+      const setN = (sel, n) => { const e = container.querySelector(sel); if (e) e.textContent = n; };
+      setN('.kaiin-sum-overdue', overdue);
+      setN('.kaiin-sum-cancelled', cancelled);
+      setN('.kaiin-sum-cancelled-detail', `取消${formalCancelled}+未来店${noShow}`);
+      setN('.kaiin-sum-visited', visited);
+      setN('.kaiin-sum-visited-rate', `来院率 ${visitRate}%`);
+      setN('.kaiin-sum-contracted', contracted);
+      setN('.kaiin-sum-contracted-rate', `成約率 ${contractRate}%`);
+      setN('.kaiin-sum-amt', '¥' + fmt(totalAmt));
+      // モディファイア (is-warning/danger/success/info) もフィルタ結果で再評価
+      const summaryRow = container.querySelector('.kaiin-summary-row');
+      if (summaryRow) {
+        const cards = summaryRow.querySelectorAll('.stat-card');
+        if (cards[0]) cards[0].classList.toggle('is-warning', overdue > 0);
+        if (cards[1]) cards[1].classList.toggle('is-danger', cancelled > 0);
+        if (cards[2]) cards[2].classList.toggle('is-info', visited > 0);
+        if (cards[3]) cards[3].classList.toggle('is-success', contracted > 0);
+      }
+    } catch(e) { console.warn('summary update failed', e); }
   })();
   container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
     const info = getBFInfo(d.name, d.applyDate) || {};
