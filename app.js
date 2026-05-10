@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v380';
+const APP_VERSION = 'v381';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11342,6 +11342,7 @@ let _promoTabState = {
   showPaidOnly: false,            // 支給済みのみ
   showUnpaidOnly: false,          // 未支給のみ
   selected: new Set(),            // v380: 通知書作成用に選択中の {name|applyDate}
+  mode: 'all',                    // v381: 'all' = プロモ管理 / 'incentive' = インセンティブ管理 (rate>0のみ)
 };
 
 function renderPromo() {
@@ -11413,10 +11414,18 @@ function renderPromo() {
       p.cancelled++;
     }
   });
-  const sortedPromos = Object.values(byPromo).sort((a, b) => b.total - a.total);
+  let sortedPromos = Object.values(byPromo).sort((a, b) => b.total - a.total);
+
+  // v381: インセンティブ管理モード = promo_rates にレート設定済みのプロモのみ
+  if (_promoTabState.mode === 'incentive') {
+    sortedPromos = sortedPromos.filter(p => {
+      const rate = (typeof promoRatesCache === 'object' && promoRatesCache) ? Number(promoRatesCache[p.source] || 0) : 0;
+      return rate > 0;
+    });
+  }
 
   // 全体集計
-  const allTotal = rows.length;
+  const allTotal = sortedPromos.reduce((s, p) => s + p.total, 0);
   const allContracted = sortedPromos.reduce((s, p) => s + p.contracted, 0);
   const allContractAmt = sortedPromos.reduce((s, p) => s + p.contractAmount, 0);
   const allIncTotal = sortedPromos.reduce((s, p) => s + p.incentiveTotal, 0);
@@ -11430,7 +11439,9 @@ function renderPromo() {
 
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;padding:2px 0">
-      <strong style="font-size:14px;font-weight:700">📣 プロモ管理</strong>
+      <!-- v381: プロモ管理 / インセンティブ管理 トグル -->
+      <button class="promo-mode-btn filter-btn ${_promoTabState.mode==='all'?'is-active':''}" data-mode="all" style="font-weight:700;font-size:13px;padding:4px 10px">📣 プロモ管理</button>
+      <button class="promo-mode-btn filter-btn ${_promoTabState.mode==='incentive'?'is-active':''}" data-mode="incentive" style="font-weight:700;font-size:13px;padding:4px 10px;${_promoTabState.mode==='incentive'?'background:#7c3aed;color:#fff':''}" title="インセ率設定済みのプロモのみ表示">💰 インセンティブ管理</button>
       <span style="font-size:11px;color:var(--text-sub)">${escapeHtml(periodLabel)} ・ ${sortedPromos.length}コード ・ ${allTotal}件</span>
       <span style="margin-left:auto;display:flex;gap:4px">
         ${['', 'thisMonth', 'lastMonth', 'thisYear'].map(p => {
@@ -11491,6 +11502,14 @@ function renderPromo() {
   `;
 
   // === イベント結合 ===
+  // v381: モード切替 (プロモ管理 / インセンティブ管理)
+  el.querySelectorAll('.promo-mode-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _promoTabState.mode = btn.dataset.mode;
+      _promoTabState.expandedSource = null; // モード切替時は展開を閉じる
+      renderPromo();
+    });
+  });
   el.querySelectorAll('.promo-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       _promoTabState.filterPeriod = btn.dataset.period;
