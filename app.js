@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v398';
+const APP_VERSION = 'v399';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12174,15 +12174,30 @@ function renderFollowup() {
     const status = d.status || '';
     const bd = (typeof parseDate === 'function') ? parseDate(d.bookDate) : null;
     const isPastBd = bd && bd.getTime() < todayMs;
+    // v399: メモの有無を先に判定 (状態の取りこぼし検出に使う)
+    const memoCheck = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+    const hasMemo = !!memoCheck;
     let category = null;
     let reason = '';
     if (status === 'キャンセル') {
-      category = 'cancelled';
-      reason = '正式キャンセル';
+      // v399: キャンセルでもメモがあれば「状態確認必要」(本当は来院した可能性)
+      if (hasMemo && isPastBd) {
+        category = 'review';
+        reason = 'キャンセル(メモあり)';
+      } else {
+        category = 'cancelled';
+        reason = '正式キャンセル';
+      }
     } else if (status !== 'キャンセル' && (typeof isVisitedStatus === 'function' ? !isVisitedStatus(status) : !['来院済','成約','検討中'].includes(status)) && status !== '除外' && isPastBd) {
-      // 過去予約で来院もキャンセルもしてない = 無断キャンセル
-      category = 'noshow';
-      reason = '無断キャンセル';
+      // 過去予約で来院もキャンセルもしてない
+      // v399: メモがあれば「状態確認必要」、なければ純粋な無断キャンセル
+      if (hasMemo) {
+        category = 'review';
+        reason = `${status||'未対応'}(メモあり)`;
+      } else {
+        category = 'noshow';
+        reason = '無断キャンセル';
+      }
     } else if (status === '検討中') {
       // 検討中で 2週間以上動きなし
       const lastEdit = bd ? bd.getTime() : 0;
@@ -12240,7 +12255,8 @@ function renderFollowup() {
   });
 
   // 集計
-  const byCat = { cancelled: 0, noshow: 0, considering: 0 };
+  // v399: review カテゴリ追加 (メモあり 過去予約 + 未対応/キャンセル → 状態確認必要)
+  const byCat = { cancelled: 0, noshow: 0, considering: 0, review: 0 };
   candidates.forEach(c => byCat[c.category]++);
   const totalSent = candidates.filter(c => c.lastSms).length;
   const totalRebooked = candidates.filter(c => c.rebooking).length;
@@ -12269,11 +12285,13 @@ function renderFollowup() {
       <span style="font-size:11px;color:var(--text-sub)">対象:</span>
       ${[
         { key: 'all', label: '全て', count: candidates.length, color: '#6b7280' },
+        { key: 'review', label: '🤝 状態確認必要', count: byCat.review, color: '#0284c7' },
         { key: 'cancelled', label: '💔 キャンセル', count: byCat.cancelled, color: '#dc2626' },
         { key: 'noshow', label: '⚠️ 無断キャンセル', count: byCat.noshow, color: '#b45309' },
         { key: 'considering', label: '🤔 検討中(2週間+)', count: byCat.considering, color: '#7c3aed' },
       ].map(b => `<button class="followup-cat-btn filter-btn ${cat===b.key?'is-active':''}" data-cat="${b.key}" style="${cat===b.key?`background:${b.color};color:#fff;font-weight:700`:''}">${b.label} <span style="font-size:10px;opacity:.8">${b.count}</span></button>`).join('')}
     </div>
+    ${cat==='review' ? '<div style="font-size:11px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:6px 10px;margin-bottom:6px">💡 過去の予約日 + メモあり + 未対応/キャンセル の方達。実際は来院済の可能性が高いので「✅ 来院済にする」で1タップ修正できます。</div>' : ''}
     <div class="card" style="padding:6px">
       <div class="data-table-wrap" style="max-height:calc(100vh - 200px);overflow-y:auto">
         <table class="data-table compact" style="width:100%;font-size:12px">
@@ -12286,6 +12304,7 @@ function renderFollowup() {
             <th style="width:100px">SMS履歴</th>
             <th style="width:120px">再予約</th>
             <th style="text-align:left">メモ</th>
+            <th style="width:130px;text-align:center">クイック修正</th>
           </tr></thead>
           <tbody>
             ${filtered.map(c => {
@@ -12300,6 +12319,7 @@ function renderFollowup() {
               // 状況バッジ
               const catColor = c.category === 'cancelled' ? { bg: '#fee2e2', fg: '#b91c1c' }
                             : c.category === 'noshow' ? { bg: '#fed7aa', fg: '#9a3412' }
+                            : c.category === 'review' ? { bg: '#dbeafe', fg: '#0369a1' }
                             : { bg: '#ede9fe', fg: '#7c3aed' };
               // SMS 履歴サマリー
               const smsCell = c.lastSms
@@ -12309,7 +12329,12 @@ function renderFollowup() {
               const rebookCell = c.rebooking
                 ? `<span style="display:inline-block;padding:2px 7px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:700;border:1px solid #86efac" title="再予約日: ${escapeHtml(c.rebooking.applyDate||'')} / ステータス: ${escapeHtml(c.rebooking.status||'')}">✅ 再予約 ${escapeHtml(fmtMD(c.rebooking.applyDate))}</span>`
                 : '<span style="color:var(--text-muted);font-size:10px">なし</span>';
-              return `<tr style="background:${c.rebooking?'#f0fdf4':''}">
+              // v399: クイック修正ボタン (来院済 / キャンセル)
+              const quickFix = `
+                <button class="followup-quick-visited filter-btn" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="状態を「来院済」に変更" style="font-size:10px;padding:3px 6px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;margin-right:2px">✅来院</button>
+                <button class="followup-quick-cancel filter-btn" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="状態を「キャンセル」に変更" style="font-size:10px;padding:3px 6px;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;font-weight:700">❌取消</button>
+              `;
+              return `<tr style="background:${c.rebooking?'#f0fdf4':c.category==='review'?'#f0f9ff':''}">
                 <td style="font-weight:600">${escapeHtml(d.name||'')}</td>
                 <td><span style="display:inline-block;padding:2px 6px;background:${catColor.bg};color:${catColor.fg};border-radius:8px;font-size:10px;font-weight:600">${escapeHtml(c.reason)}</span></td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fmtMD(d.bookDate))}</td>
@@ -12318,8 +12343,9 @@ function renderFollowup() {
                 <td style="text-align:center">${smsCell}</td>
                 <td style="text-align:center">${rebookCell}</td>
                 <td style="font-size:10px;color:var(--text-sub);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(memo||'')}">${escapeHtml((typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo.slice(0, 60)) || '-')}</td>
+                <td style="text-align:center;white-space:nowrap">${quickFix}</td>
               </tr>`;
-            }).join('') || '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
+            }).join('') || '<tr><td colspan="9" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -12356,6 +12382,41 @@ function renderFollowup() {
       if (typeof openSmsModal === 'function') {
         openSmsModal(btn.dataset.name, btn.dataset.phone, btn.dataset.bookdate, btn.dataset.facility);
       }
+    });
+  });
+
+  // v399: クイック修正 (来院済 / キャンセル に1タップで変更)
+  const _quickStatusFix = async (name, apply, newStatus) => {
+    try {
+      const payload = { name, apply_date: apply, status: newStatus };
+      // BFステータスも同期 (STATUS_TO_BFマップ経由)
+      if (typeof STATUS_TO_BF !== 'undefined') {
+        const targetBF = STATUS_TO_BF[newStatus] !== undefined ? STATUS_TO_BF[newStatus] : newStatus;
+        payload.bf_status = targetBF;
+        if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
+          const key = name + '|' + apply;
+          if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
+          bfLifecycleCache[key].bf_status = targetBF;
+        }
+      }
+      await safeSave({ type:'upsert', table:'booking_status', payload, options:{ onConflict:'name,apply_date' } });
+      const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+      if (target) target.status = newStatus;
+      showToast(`✓ ${name} を「${newStatus}」に変更しました`);
+      renderFollowup();
+      if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+    } catch(e) {
+      console.warn('quick fix failed', e);
+      showToast('状態変更に失敗', true);
+    }
+  };
+  el.querySelectorAll('.followup-quick-visited').forEach(btn => {
+    btn.addEventListener('click', () => _quickStatusFix(btn.dataset.name, btn.dataset.apply, '来院済'));
+  });
+  el.querySelectorAll('.followup-quick-cancel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm(`${btn.dataset.name} さんを「キャンセル」状態にしますか?`)) return;
+      _quickStatusFix(btn.dataset.name, btn.dataset.apply, 'キャンセル');
     });
   });
 }
