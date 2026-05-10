@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v364';
+const APP_VERSION = 'v365';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9121,27 +9121,41 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     if (st && byStatus[st] !== undefined) byStatus[st]++;
     else noSt++;
   });
-  // v362: 来院一覧と同じ5カードまとめ集計
+  // v365: 予約管理と同じ8カードまとめ集計 (予約数/要対応/未来予約/進行中/キャンセル/来院済/成約/成約金額)
   const _bkExtraSL = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
   const _amtSL = (d) => {
     const ex = _bkExtraSL[d.name + '|' + d.applyDate] || {};
     return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
   };
   const _summaryFor = (rs) => {
+    const today = new Date(); today.setHours(0,0,0,0);
     const total = rs.length;
     const visited = rs.filter(d => isVisitedStatus(d.status || '')).length;
     const contracted = rs.filter(d => d.status === '成約').length;
     const formalCancelled = rs.filter(d => d.status === 'キャンセル').length;
+    const isUnhandled = (d) => !d.status || d.status === '未対応';
+    const isPast = (d) => { const bd = parseDate(d.bookDate); return bd && bd < today; };
+    const isFuture = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= today; };
     const noShow = rs.filter(d => {
       const s = d.status || '';
-      return s !== 'キャンセル' && !isVisitedStatus(s) && s !== '未対応' && s !== '';
+      return s !== 'キャンセル' && !isVisitedStatus(s) && isPast(d);
     }).length;
     const cancelled = formalCancelled + noShow;
-    const overdue = rs.filter(d => !d.status || d.status === '未対応').length;
+    const overdue = rs.filter(d => isUnhandled(d) && isPast(d)).length;
+    const pending = rs.filter(d => isUnhandled(d) && isFuture(d)).length;
+    const inProgress = rs.filter(d => {
+      const s = d.status || '';
+      if (isUnhandled(d)) return false;
+      if (s === 'キャンセル') return false;
+      if (isVisitedStatus(s)) return false;
+      return isFuture(d);
+    }).length;
     const totalAmt = rs.reduce((s, d) => s + _amtSL(d), 0);
-    const visitRate = total ? Math.round(visited / total * 100) : 0;
+    const pastBookings = rs.filter(d => isPast(d));
+    const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status || '')).length;
+    const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
     const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
-    return { overdue, cancelled, formalCancelled, noShow, visited, contracted, totalAmt, visitRate, contractRate };
+    return { total, overdue, pending, inProgress, cancelled, formalCancelled, noShow, visited, pastVisited, pastBookings, contracted, totalAmt, visitRate, contractRate };
   };
   const sum = _summaryFor(rows);
 
@@ -9185,12 +9199,15 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF出力</button>
       </div>
     </div>
-    <!-- v362: 来院一覧と同じスタイルの5カードまとめ -->
-    <div class="stats-row stats-row-compact kaiin-summary-row">
-      <div class="stat-card ${sum.overdue>0?'is-warning':''}" title="未対応のまま"><span class="stat-label">⚠ 要対応</span><span class="stat-num kaiin-sum-overdue">${sum.overdue}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">未対応</span></div>
-      <div class="stat-card ${sum.cancelled>0?'is-danger':''}" title="キャンセル(取消) + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num kaiin-sum-cancelled">${sum.cancelled}</span><span class="stat-yoy kaiin-sum-cancelled-detail" style="color:var(--text-sub);font-size:10px;font-weight:600">取消${sum.formalCancelled}+未来店${sum.noShow}</span></div>
-      <div class="stat-card ${sum.visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 治療段階"><span class="stat-label">来院済</span><span class="stat-num kaiin-sum-visited">${sum.visited}</span><span class="stat-yoy kaiin-sum-visited-rate" style="color:var(--text-sub);font-size:11px">来院率 ${sum.visitRate}%</span></div>
-      <div class="stat-card ${sum.contracted>0?'is-success':''}" title="成約済"><span class="stat-label">成約</span><span class="stat-num kaiin-sum-contracted">${sum.contracted}</span><span class="stat-yoy kaiin-sum-contracted-rate" style="color:var(--text-sub);font-size:11px">成約率 ${sum.contractRate}%</span></div>
+    <!-- v365: 予約管理と同じ8カードまとめ (予約数/要対応/未来予約/進行中/キャンセル/来院済/成約/成約金額) -->
+    <div class="stats-row kaiin-summary-row" style="gap:6px;margin-bottom:8px">
+      <div class="stat-card" title="予約数 = 来院済 + キャンセル + 未来予約 + 進行中 (要対応はキャンセル内)"><span class="stat-label">予約数</span><span class="stat-num kaiin-sum-total">${sum.total}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
+      <div class="stat-card ${sum.overdue>0?'is-warning':''}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数"><span class="stat-label">⚠ 要対応</span><span class="stat-num kaiin-sum-overdue">${sum.overdue}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
+      <div class="stat-card" title="未来予約 = 未対応のまま予約日がまだ未来"><span class="stat-label">未来予約</span><span class="stat-num kaiin-sum-pending">${sum.pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">未対応で予約日<br>がまだ未来</span></div>
+      <div class="stat-card" title="進行中 = 未来予約で 確認済/連絡待ち/予約変更等"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num kaiin-sum-progress" style="color:#7c3aed">${sum.inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
+      <div class="stat-card ${sum.cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num kaiin-sum-cancelled">${sum.cancelled}</span><span class="stat-yoy kaiin-sum-cancelled-detail" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${sum.formalCancelled}+未来店${sum.noShow}</span></div>
+      <div class="stat-card ${sum.visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 治療段階"><span class="stat-label">来院済</span><span class="stat-num kaiin-sum-visited">${sum.visited}</span><span class="stat-yoy kaiin-sum-visited-rate" style="color:var(--text-sub);font-size:11px">来院率 ${sum.visitRate}%（${sum.pastVisited}/${sum.pastBookings.length}）</span></div>
+      <div class="stat-card ${sum.contracted>0?'is-success':''}" title="成約済"><span class="stat-label">成約</span><span class="stat-num kaiin-sum-contracted">${sum.contracted}</span><span class="stat-yoy kaiin-sum-contracted-rate" style="color:var(--text-sub);font-size:11px">成約率 ${sum.contractRate}%（${sum.contracted}/${sum.visited}）</span></div>
       <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num kaiin-sum-amt">¥${fmt(sum.totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
     </div>
     <div class="kaiin-header-wrap" style="display:none">
@@ -9447,43 +9464,57 @@ function drawKaiinRows(treatment, rows, container) {
       const v = el.dataset.st;
       el.textContent = byStatusF[v] || 0;
     });
-    // v362: 5カードまとめサマリーもフィルター結果で更新
+    // v365: 8カードまとめサマリーをフィルタ結果で更新 (予約管理と同等)
     try {
       const _bkExtraDR = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
       const _amtDR = (d) => {
         const ex = _bkExtraDR[d.name + '|' + d.applyDate] || {};
         return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
       };
+      const today = new Date(); today.setHours(0,0,0,0);
+      const isUnhandled = (d) => !d.status || d.status === '未対応';
+      const isPast = (d) => { const bd = parseDate(d.bookDate); return bd && bd < today; };
+      const isFuture = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= today; };
       const total = filtered.length;
       const visited = filtered.filter(d => isVisitedStatus(d.status || '')).length;
       const contracted = filtered.filter(d => d.status === '成約').length;
       const formalCancelled = filtered.filter(d => d.status === 'キャンセル').length;
-      const noShow = filtered.filter(d => {
-        const s = d.status || '';
-        return s !== 'キャンセル' && !isVisitedStatus(s) && s !== '未対応' && s !== '';
-      }).length;
+      const noShow = filtered.filter(d => d.status !== 'キャンセル' && !isVisitedStatus(d.status || '') && isPast(d)).length;
       const cancelled = formalCancelled + noShow;
-      const overdue = filtered.filter(d => !d.status || d.status === '未対応').length;
+      const overdue = filtered.filter(d => isUnhandled(d) && isPast(d)).length;
+      const pending = filtered.filter(d => isUnhandled(d) && isFuture(d)).length;
+      const inProgress = filtered.filter(d => {
+        const s = d.status || '';
+        if (isUnhandled(d)) return false;
+        if (s === 'キャンセル') return false;
+        if (isVisitedStatus(s)) return false;
+        return isFuture(d);
+      }).length;
       const totalAmt = filtered.reduce((s, d) => s + _amtDR(d), 0);
-      const visitRate = total ? Math.round(visited / total * 100) : 0;
+      const pastBookings = filtered.filter(isPast);
+      const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status || '')).length;
+      const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
       const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
       const setN = (sel, n) => { const e = container.querySelector(sel); if (e) e.textContent = n; };
+      setN('.kaiin-sum-total', total);
       setN('.kaiin-sum-overdue', overdue);
+      setN('.kaiin-sum-pending', pending);
+      setN('.kaiin-sum-progress', inProgress);
       setN('.kaiin-sum-cancelled', cancelled);
       setN('.kaiin-sum-cancelled-detail', `取消${formalCancelled}+未来店${noShow}`);
       setN('.kaiin-sum-visited', visited);
-      setN('.kaiin-sum-visited-rate', `来院率 ${visitRate}%`);
+      setN('.kaiin-sum-visited-rate', `来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）`);
       setN('.kaiin-sum-contracted', contracted);
-      setN('.kaiin-sum-contracted-rate', `成約率 ${contractRate}%`);
+      setN('.kaiin-sum-contracted-rate', `成約率 ${contractRate}%（${contracted}/${visited}）`);
       setN('.kaiin-sum-amt', '¥' + fmt(totalAmt));
-      // モディファイア (is-warning/danger/success/info) もフィルタ結果で再評価
+      // モディファイア再評価 (8枚順: 予約数/要対応/未来/進行/キャンセル/来院済/成約/金額)
       const summaryRow = container.querySelector('.kaiin-summary-row');
       if (summaryRow) {
         const cards = summaryRow.querySelectorAll('.stat-card');
-        if (cards[0]) cards[0].classList.toggle('is-warning', overdue > 0);
-        if (cards[1]) cards[1].classList.toggle('is-danger', cancelled > 0);
-        if (cards[2]) cards[2].classList.toggle('is-info', visited > 0);
-        if (cards[3]) cards[3].classList.toggle('is-success', contracted > 0);
+        if (cards[1]) cards[1].classList.toggle('is-warning', overdue > 0);
+        if (cards[4]) cards[4].classList.toggle('is-danger', cancelled > 0);
+        if (cards[5]) cards[5].classList.toggle('is-info', visited > 0);
+        if (cards[6]) cards[6].classList.toggle('is-success', contracted > 0);
       }
     } catch(e) { console.warn('summary update failed', e); }
   })();
