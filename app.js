@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v350';
+const APP_VERSION = 'v351';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8895,26 +8895,29 @@ async function renderKaiinAll(containerId) {
                   const lbl = d.source.length > 14 ? d.source.slice(0,14) + '…' : d.source;
                   promoChip = `<span style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
                 }
-                // 状態バッジ (BFスタイル: 丸形・色付き)
+                // 状態 (編集可能なセレクト, BFスタイル: 丸形・色付き)
                 const st = d.status || '';
                 const stMap = {
                   '成約': '#059669', 'キャンセル': '#dc2626', '未対応': '#f97316',
                   '来院済': '#1d4ed8', '検討中': '#7c3aed', '予約変更': '#0891b2',
                   '確認済': '#0369a1', '後追いLINE済み': '#0e7490', '予約連絡待ち': '#a855f7'
                 };
-                const stColor = stMap[st] || '#475569';
-                const stLabel = st === '予約連絡待ち' ? '次回予約連絡待ち' : (st || '未設定');
-                const stBadge = st
-                  ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:${stColor}22;color:${stColor};border:1.5px solid ${stColor};font-weight:700;font-size:10px;white-space:nowrap">${escapeHtml(stLabel)}</span>`
-                  : '<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#f3f4f6;color:#9ca3af;border:1.5px solid #d4d4d8;font-weight:600;font-size:10px">未設定</span>';
+                const stColor = stMap[st] || '#9ca3af';
+                const stOptions = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル'];
+                const stRound = `padding:4px 10px;border-radius:20px;background:${stColor}22;color:${stColor};border:1.5px solid ${stColor};font-weight:700`;
+                const stBadge = `<select class="kaiin-all-status-sel" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:10px;width:100%;${stRound};appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px;padding-right:24px;cursor:pointer">
+                  <option value="">未設定</option>
+                  ${stOptions.map(s => { const lbl = s === '予約連絡待ち' ? '次回予約連絡待ち' : s; return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
+                </select>`;
                 // 来院日チップ
                 const bookChip = bookMMDD !== '-'
                   ? `<span style="display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600;border-radius:4px;font-size:11px">${bookMMDD}</span>`
                   : '<span style="color:var(--text-muted);font-size:10px">-</span>';
-                // 次回予定チップ
-                const nextChip = nextMMDD
-                  ? `<span style="display:inline-block;padding:3px 8px;background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600;border-radius:4px;font-size:10px">${nextMMDD}</span>`
-                  : '<span style="display:inline-block;padding:3px 8px;background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e;border-radius:4px;font-size:10px">年/月/日</span>';
+                // 次回予定 (編集可能ボタン + 隠し date input)
+                const nextDateStyle = nextMMDD
+                  ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
+                  : 'background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e';
+                const nextChip = `<button type="button" class="kaiin-all-next-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${escapeHtml(nextDate)}" style="font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;${nextDateStyle}">${nextMMDD || '年/月/日'}</button><input type="date" class="kaiin-all-next-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(nextDate)}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">`;
                 const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
                 const memoCell = memo
                   ? `<span style="display:inline-block;padding:3px 8px;background:#fff8e1;border:1px dashed #f9a825;border-radius:4px;font-size:11px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="${escapeHtml(memo)}">${escapeHtml(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 40) : memo.slice(0,40))}</span>`
@@ -8926,10 +8929,10 @@ async function renderKaiinAll(containerId) {
                   <td data-label="医院" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(fac)}</td>
                   <td data-label="プロモ" style="text-align:center">${promoChip}</td>
                   <td data-label="状態" style="text-align:center">${stBadge}</td>
-                  <td data-label="次回予定" style="text-align:center">${nextChip}</td>
+                  <td data-label="次回予定" style="text-align:center;position:relative">${nextChip}</td>
                   <td data-label="成約商材" style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
-                  <td data-label="金額" style="font-size:11px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${amt ? '¥' + fmt(amt) : '<span style="color:var(--text-muted);font-weight:400">-</span>'}</td>
-                  <td data-label="メモ" style="text-align:left">${memoCell}</td>
+                  <td data-label="金額" style="text-align:right"><input type="text" inputmode="numeric" class="kaiin-all-money" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${amt ? Number(amt).toLocaleString() : ''}" placeholder="0" style="font-size:11px;padding:3px 8px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;font-weight:600;box-sizing:border-box"></td>
+                  <td class="kaiin-all-memo-cell" data-label="メモ" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;text-align:left">${memoCell}</td>
                 </tr>`;
               }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
           </tbody>
@@ -9043,6 +9046,61 @@ async function renderKaiinAll(containerId) {
       const target = card.dataset.target;
       if (target) {
         document.querySelector(`#kaiin-sub-nav .sub-nav-btn[data-sub="${target}"]`)?.click();
+      }
+    });
+  });
+
+  // === 編集: 状態 (DB upsert + bookingsData同期) ===
+  el.querySelectorAll('.kaiin-all-status-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || null;
+      try {
+        await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: val }, options: { onConflict:'name,apply_date' } });
+        const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+        if (target) target.status = val || '';
+        sel.style.outline = '2px solid #16a34a';
+        setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
+      } catch (e) { console.warn('status save failed', e); showToast('状態の保存に失敗', true); }
+    });
+  });
+
+  // === 編集: 金額 (contract_amount) ===
+  el.querySelectorAll('.kaiin-all-money').forEach(inp => {
+    inp.addEventListener('focus', () => { inp.value = inp.value.replace(/,/g,''); });
+    inp.addEventListener('blur', () => { const n = Number(inp.value.replace(/,/g,'')); inp.value = n ? n.toLocaleString() : ''; });
+    inp.addEventListener('change', async () => {
+      const n = Number(inp.value.replace(/,/g,'')) || 0;
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'contract_amount', n);
+      if (ok) { inp.style.borderColor = '#16a34a'; setTimeout(() => { inp.style.borderColor = ''; }, 1000); }
+    });
+  });
+
+  // === 編集: 次回予定 (button + hidden date input) ===
+  el.querySelectorAll('.kaiin-all-next-mmdd').forEach(btn => {
+    const hidden = btn.parentElement?.querySelector('.kaiin-all-next-hidden');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!hidden) return;
+      if (typeof hidden.showPicker === 'function') { try { hidden.showPicker(); return; } catch(_){} }
+      hidden.focus(); hidden.click();
+    });
+    if (hidden) {
+      hidden.addEventListener('change', async () => {
+        const iso = hidden.value || null;
+        const ok = await saveBFLifecycleField(btn.dataset.name, btn.dataset.apply, 'bf_next_date', iso);
+        if (ok) {
+          btn.style.outline = '2px solid #16a34a';
+          setTimeout(() => { btn.style.outline = ''; renderKaiinAll(containerId); }, 400);
+        }
+      });
+    }
+  });
+
+  // === 編集: メモ (クリックで modal) ===
+  el.querySelectorAll('.kaiin-all-memo-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      if (typeof openMemoModal === 'function') {
+        openMemoModal(cell.dataset.name, cell.dataset.apply, () => renderKaiinAll(containerId));
       }
     });
   });
