@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v391';
+const APP_VERSION = 'v392';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1075,7 +1075,8 @@ function maskPhone(phone) {
 
 // === v391: SMS送信機能 (sms: URL スキーム経由でデフォルトメッセージアプリ起動) ===
 // テンプレート定義 (placeholder: {name}/{date}/{clinic}/{time})
-const SMS_TEMPLATES = [
+// v392: 管理タブから編集可能。デフォルトとカスタム(localStorage 'sms-templates-custom')をマージ
+const SMS_TEMPLATES_DEFAULT = [
   {
     id: 'pre-confirm',
     icon: '📞',
@@ -1112,6 +1113,46 @@ const SMS_TEMPLATES = [
     body: ''
   },
 ];
+
+// v392: 実際使うテンプレート (デフォルト + カスタム override + カスタム追加分)
+// 構造: localStorage 'sms-templates-custom' に { id, icon, label, desc, body, deleted } を保存
+//   - 同じ id があればデフォルトを上書き、deleted:true なら非表示
+//   - id がデフォルトに無いものは新規追加
+function loadSmsTemplates() {
+  let custom = [];
+  try { custom = (typeof loadData === 'function') ? loadData('sms-templates-custom', []) : []; } catch(_){}
+  if (!Array.isArray(custom)) custom = [];
+  const customById = new Map();
+  custom.forEach(c => { if (c && c.id) customById.set(c.id, c); });
+  // デフォルトを マージ + 削除フラグ除外
+  const merged = SMS_TEMPLATES_DEFAULT
+    .map(d => {
+      const c = customById.get(d.id);
+      if (!c) return d;
+      if (c.deleted) return null;
+      return { ...d, ...c };
+    })
+    .filter(Boolean);
+  // カスタム独自 (id がデフォルトに存在しないもの)
+  const defaultIds = new Set(SMS_TEMPLATES_DEFAULT.map(d => d.id));
+  custom.forEach(c => {
+    if (c && c.id && !defaultIds.has(c.id) && !c.deleted) {
+      merged.push({ icon: '📨', label: 'カスタム', desc: '', body: '', ...c });
+    }
+  });
+  // 自由入力は最後に固定
+  const customIdx = merged.findIndex(t => t.id === 'custom');
+  if (customIdx > -1 && customIdx !== merged.length - 1) {
+    const [c] = merged.splice(customIdx, 1);
+    merged.push(c);
+  }
+  return merged;
+}
+
+// 旧名 SMS_TEMPLATES を維持するための getter
+Object.defineProperty(globalThis, 'SMS_TEMPLATES', {
+  get() { return loadSmsTemplates(); }
+});
 
 // {placeholder} 置換
 function _smsRenderTemplate(template, ctx) {
@@ -1240,6 +1281,152 @@ function openSmsModal(name, phone, bookDate, facility) {
     const url = `sms:${phoneNorm}?body=${encodeURIComponent(body)}`;
     window.location.href = url;
     closeAndLog('custom', body);
+  });
+}
+
+// === v392: SMS定型文の管理画面 (管理タブ → SMS定型文 サブタブ) ===
+function renderSmsTemplatesAdmin() {
+  const el = document.getElementById('adm-sms-content');
+  if (!el) return;
+  const templates = loadSmsTemplates();
+  const customRaw = (typeof loadData === 'function') ? loadData('sms-templates-custom', []) : [];
+  const isOverridden = (id) => customRaw.some(c => c.id === id && !c.deleted);
+  const isDefault = (id) => SMS_TEMPLATES_DEFAULT.some(d => d.id === id);
+
+  el.innerHTML = `
+    <div class="page-header"><h2>📱 SMS定型文</h2><p class="page-desc">電話前確認・キャンセル後追い等で使うSMSテンプレートを編集できます。プレースホルダー: <code>{name}</code> {date} {time} {clinic}</p></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
+      <button id="sms-tpl-add" class="filter-btn" style="background:#7c3aed;color:#fff;font-weight:700;padding:6px 14px">＋ 新規追加</button>
+      <span style="font-size:11px;color:var(--text-sub)">${templates.length}件のテンプレート</span>
+      <span style="margin-left:auto;font-size:10px;color:var(--text-muted)">プレースホルダー使用例: <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{name}様</code> → 「山田太郎様」</span>
+    </div>
+    <div class="card" style="padding:0;overflow:hidden">
+      <table class="data-table" style="margin:0;font-size:12px">
+        <thead><tr>
+          <th style="width:40px">アイコン</th>
+          <th style="text-align:left;width:180px">ラベル</th>
+          <th style="text-align:left;width:200px">説明</th>
+          <th style="text-align:left">本文 (プレビュー)</th>
+          <th style="width:60px">種別</th>
+          <th style="width:140px;text-align:center">操作</th>
+        </tr></thead>
+        <tbody>
+          ${templates.map(t => {
+            const overridden = isOverridden(t.id);
+            const isCustomOnly = !isDefault(t.id);
+            const badge = isCustomOnly
+              ? '<span style="display:inline-block;padding:2px 6px;background:#ede9fe;color:#7c3aed;border-radius:8px;font-size:9px;font-weight:600">カスタム</span>'
+              : overridden
+                ? '<span style="display:inline-block;padding:2px 6px;background:#fef3c7;color:#b45309;border-radius:8px;font-size:9px;font-weight:600">編集済</span>'
+                : '<span style="display:inline-block;padding:2px 6px;background:#f3f4f6;color:#6b7280;border-radius:8px;font-size:9px;font-weight:600">標準</span>';
+            const preview = (t.body || '').slice(0, 80) + ((t.body || '').length > 80 ? '…' : '');
+            return `<tr>
+              <td style="text-align:center;font-size:18px">${t.icon || '📨'}</td>
+              <td style="font-weight:600">${escapeHtml(t.label || '')}</td>
+              <td style="color:var(--text-sub);font-size:11px">${escapeHtml(t.desc || '')}</td>
+              <td style="font-size:10px;color:var(--text-sub);white-space:pre-wrap;max-width:400px;line-height:1.5">${escapeHtml(preview)}</td>
+              <td style="text-align:center">${badge}</td>
+              <td style="text-align:center">
+                <button class="sms-tpl-edit filter-btn" data-id="${escapeHtml(t.id)}" style="font-size:10px;padding:3px 8px">編集</button>
+                ${isCustomOnly
+                  ? `<button class="sms-tpl-del filter-btn" data-id="${escapeHtml(t.id)}" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#b91c1c;border-color:#fecaca">削除</button>`
+                  : (overridden ? `<button class="sms-tpl-reset filter-btn" data-id="${escapeHtml(t.id)}" style="font-size:10px;padding:3px 8px;background:#fef3c7;color:#92400e" title="標準内容に戻す">リセット</button>` : '')}
+              </td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // === ハンドラー ===
+  el.querySelector('#sms-tpl-add').addEventListener('click', () => _openSmsTemplateEditor(null));
+  el.querySelectorAll('.sms-tpl-edit').forEach(btn => {
+    btn.addEventListener('click', () => _openSmsTemplateEditor(btn.dataset.id));
+  });
+  el.querySelectorAll('.sms-tpl-del').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm(`このテンプレートを削除しますか?`)) return;
+      const cur = (typeof loadData === 'function') ? loadData('sms-templates-custom', []) : [];
+      const next = cur.filter(c => c.id !== btn.dataset.id);
+      saveData('sms-templates-custom', next);
+      renderSmsTemplatesAdmin();
+    });
+  });
+  el.querySelectorAll('.sms-tpl-reset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (!confirm(`このテンプレートを標準内容にリセットしますか?`)) return;
+      const cur = (typeof loadData === 'function') ? loadData('sms-templates-custom', []) : [];
+      const next = cur.filter(c => c.id !== btn.dataset.id);
+      saveData('sms-templates-custom', next);
+      renderSmsTemplatesAdmin();
+    });
+  });
+}
+
+// SMS定型文編集モーダル
+function _openSmsTemplateEditor(id) {
+  document.getElementById('sms-tpl-editor')?.remove();
+  const isNew = !id;
+  const templates = loadSmsTemplates();
+  const existing = id ? templates.find(t => t.id === id) : null;
+  const isDefaultId = id && SMS_TEMPLATES_DEFAULT.some(d => d.id === id);
+
+  const modal = document.createElement('div');
+  modal.id = 'sms-tpl-editor';
+  modal.className = 'modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99998;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:600px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35)">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);background:#f9fafb;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:8px">
+        <strong style="font-size:14px">${isNew ? '＋ 新規テンプレート' : '✏️ テンプレート編集'}</strong>
+        <button class="sms-tpl-close" style="margin-left:auto;background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--text-sub);padding:0 4px">✕</button>
+      </div>
+      <div style="padding:16px 18px">
+        <div style="display:grid;grid-template-columns:80px 1fr;gap:10px 12px;align-items:center;margin-bottom:14px">
+          <label style="font-size:11px;color:var(--text-sub)">アイコン</label>
+          <input id="tpl-icon" type="text" value="${escapeHtml(existing?.icon || '📨')}" style="font-size:18px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;width:60px" maxlength="2">
+          <label style="font-size:11px;color:var(--text-sub)">ID</label>
+          <input id="tpl-id" type="text" value="${escapeHtml(existing?.id || '')}" placeholder="custom-${Date.now()}" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px" ${isDefaultId ? 'readonly title="標準テンプレートのIDは変更できません"' : ''}>
+          <label style="font-size:11px;color:var(--text-sub)">ラベル</label>
+          <input id="tpl-label" type="text" value="${escapeHtml(existing?.label || '')}" placeholder="例: 来院前確認" style="font-size:13px;padding:6px 10px;border:1px solid var(--border);border-radius:6px;font-weight:600">
+          <label style="font-size:11px;color:var(--text-sub)">説明</label>
+          <input id="tpl-desc" type="text" value="${escapeHtml(existing?.desc || '')}" placeholder="例: 前日リマインド" style="font-size:12px;padding:6px 10px;border:1px solid var(--border);border-radius:6px">
+        </div>
+        <div style="margin-bottom:8px">
+          <label style="font-size:11px;color:var(--text-sub)">本文</label>
+          <div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">使えるプレースホルダー: <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{name}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{date}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{time}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{clinic}</code></div>
+          <textarea id="tpl-body" style="width:100%;height:160px;padding:10px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;box-sizing:border-box;resize:vertical" placeholder="{name}様&#10;&#10;清翔会です。&#10;{date} {time} のご予約のご確認です。...">${escapeHtml(existing?.body || '')}</textarea>
+        </div>
+        <div style="display:flex;gap:8px;justify-content:flex-end">
+          <button class="sms-tpl-close filter-btn" style="padding:8px 14px">キャンセル</button>
+          <button id="tpl-save" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:700;padding:8px 18px">💾 保存</button>
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  modal.querySelectorAll('.sms-tpl-close').forEach(b => b.addEventListener('click', () => modal.remove()));
+  modal.querySelector('#tpl-save').addEventListener('click', () => {
+    const newT = {
+      id: (modal.querySelector('#tpl-id').value || '').trim() || 'custom-' + Date.now(),
+      icon: (modal.querySelector('#tpl-icon').value || '📨').trim().slice(0, 2) || '📨',
+      label: (modal.querySelector('#tpl-label').value || '').trim(),
+      desc: (modal.querySelector('#tpl-desc').value || '').trim(),
+      body: modal.querySelector('#tpl-body').value || ''
+    };
+    if (!newT.label) {
+      showToast('ラベルを入力してください', true);
+      return;
+    }
+    const cur = (typeof loadData === 'function') ? loadData('sms-templates-custom', []) : [];
+    const idx = cur.findIndex(c => c.id === newT.id);
+    if (idx >= 0) cur[idx] = newT; else cur.push(newT);
+    saveData('sms-templates-custom', cur);
+    modal.remove();
+    showToast('テンプレートを保存しました');
+    renderSmsTemplatesAdmin();
   });
 }
 function maskEmail(email) {
@@ -1578,6 +1765,7 @@ function setupEventListeners() {
       if (sub === 'bk-fac') { const facBtn = document.querySelector('.bk-fac-tab.active'); if (facBtn) renderFacTab(facBtn.dataset.fac); }
       if (sub === 'recordings') renderRecordings();
       if (sub === 'adm-history') { renderChangeLog(); renderBackupsList(); }
+      if (sub === 'adm-sms') { if (typeof renderSmsTemplatesAdmin === 'function') renderSmsTemplatesAdmin(); }
       if (sub === 'para-manage') { if (typeof renderPara === 'function') renderPara(); }
       if (sub === 'adm-auth-migration') { if (typeof renderAuthMigration === 'function') renderAuthMigration(); }
       // 来院タブのサブ
@@ -4182,7 +4370,7 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     <td data-label="名前" style="padding:5px 8px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(name || '')}">${escapeHtml(name || '')}</td>
     <td data-label="施術" style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(normSvc(d.service) || '-')}</td>
     <td data-label="医院" style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(fac)}</td>
-    <td data-label="連絡先" style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<span style="display:inline-flex;align-items:center;gap:3px"><a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:2px;padding:3px 6px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a><button type="button" class="phone-sms-btn" data-name="${escapeHtml(d.name)}" data-phone="${escapeHtml(d.phone||'')}" data-bookdate="${escapeHtml(d.bookDate||'')}" data-facility="${escapeHtml(d.facility||'')}" title="SMSを送る (テンプレート選択)" style="padding:3px 7px;background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd;border-radius:5px;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit">📱</button></span>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td data-label="連絡先" style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<span style="display:inline-flex;align-items:stretch;gap:0;border-radius:6px;overflow:hidden;border:1px solid #86efac;line-height:1"><a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#dcfce7;color:#15803d;font-weight:700;text-decoration:none;font-size:11px;line-height:1">📞<span style="font-size:11px;letter-spacing:0">${escapeHtml(phone)}</span></a><button type="button" class="phone-sms-btn" data-name="${escapeHtml(d.name)}" data-phone="${escapeHtml(d.phone||'')}" data-bookdate="${escapeHtml(d.bookDate||'')}" data-facility="${escapeHtml(d.facility||'')}" title="SMSを送る (テンプレート選択)" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;background:#ede9fe;color:#7c3aed;border:none;border-left:1px solid #c4b5fd;font-weight:700;font-size:13px;cursor:pointer;font-family:inherit;line-height:1">📱</button></span>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td data-label="プロモ" style="padding:5px 8px;font-size:10px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td data-label="状況" style="padding:5px 8px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap" title="${escapeHtml(st)}">${escapeHtml(_phoneStatusLabel(st))}</span></td>
     ${memoCellHtml.replace(/<td /, '<td data-label="メモ" ')}
