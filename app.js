@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v399';
+const APP_VERSION = 'v400';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12335,7 +12335,7 @@ function renderFollowup() {
                 <button class="followup-quick-cancel filter-btn" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="状態を「キャンセル」に変更" style="font-size:10px;padding:3px 6px;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;font-weight:700">❌取消</button>
               `;
               return `<tr style="background:${c.rebooking?'#f0fdf4':c.category==='review'?'#f0f9ff':''}">
-                <td style="font-weight:600">${escapeHtml(d.name||'')}</td>
+                <td style="font-weight:600"><a href="#" class="followup-name-link" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="color:#1d4ed8;text-decoration:none;display:inline-flex;align-items:center;gap:2px" title="予約一覧で詳細を見る">${escapeHtml(d.name||'')} <span style="font-size:9px;opacity:.6">↗</span></a></td>
                 <td><span style="display:inline-block;padding:2px 6px;background:${catColor.bg};color:${catColor.fg};border-radius:8px;font-size:10px;font-weight:600">${escapeHtml(c.reason)}</span></td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fmtMD(d.bookDate))}</td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fac)}</td>
@@ -12417,6 +12417,51 @@ function renderFollowup() {
     btn.addEventListener('click', () => {
       if (!confirm(`${btn.dataset.name} さんを「キャンセル」状態にしますか?`)) return;
       _quickStatusFix(btn.dataset.name, btn.dataset.apply, 'キャンセル');
+    });
+  });
+
+  // v400: 名前クリック → 予約一覧 + その人で検索フィルタ
+  el.querySelectorAll('.followup-name-link').forEach(link => {
+    link.addEventListener('click', (ev) => {
+      ev.preventDefault();
+      const name = link.dataset.name;
+      const apply = link.dataset.apply;
+      if (!name) return;
+      // 予約タブへ → 予約一覧サブタブ → 名前検索ボックスに入れる → render
+      try {
+        switchView('bookings');
+        setTimeout(() => {
+          switchBookingSub('bk-list');
+          setTimeout(() => {
+            const searchInput = document.getElementById('bk-search');
+            if (searchInput) {
+              searchInput.value = name;
+              searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+              // フォーカス + スクロール
+              searchInput.focus();
+              searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            // 対象行をハイライト + スクロール (該当行が見えるように)
+            setTimeout(() => {
+              const tbody = document.getElementById('bk-tbody');
+              if (!tbody) return;
+              const rows = tbody.querySelectorAll('tr');
+              for (const row of rows) {
+                const nameCell = row.querySelector('td[data-name]') || row;
+                const nm = nameCell.dataset?.name;
+                const ap = nameCell.dataset?.apply;
+                if (nm === name && ap === apply) {
+                  row.style.background = '#fef3c7';
+                  row.style.transition = 'background .8s';
+                  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  setTimeout(() => { row.style.background = ''; }, 3000);
+                  break;
+                }
+              }
+            }, 600);
+          }, 150);
+        }, 100);
+      } catch(e) { console.warn('navigate to booking failed', e); }
     });
   });
 }
