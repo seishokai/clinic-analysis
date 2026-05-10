@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v393';
+const APP_VERSION = 'v394';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1154,6 +1154,45 @@ Object.defineProperty(globalThis, 'SMS_TEMPLATES', {
   get() { return loadSmsTemplates(); }
 });
 
+// === v394: 医院正式名称マッピング ===
+// SMSテンプレ内の {clinic} は短縮名 (BF銀座/アール等) ではなく正式名称で送りたい。
+// localStorage 'facility-formal-names' = { 'BF銀座': '医療法人清翔会 BF銀座歯科', ... }
+const FACILITY_FORMAL_DEFAULTS = {
+  'BF銀座': '清翔会 BF銀座歯科',
+  'アール': '清翔会 アール歯科',
+  'ウィズ': '清翔会 ウィズ歯科',
+  'エスカ': '清翔会 エスカ歯科',
+  'ルミナス': '清翔会 ルミナス歯科',
+  '茶屋': '清翔会 茶屋ヶ坂歯科',
+  '知立': '清翔会 知立歯科',
+  '小牧': '清翔会 小牧歯科',
+  '八事': '清翔会 八事歯科',
+  '大森': '清翔会 大森歯科',
+  '京都': '清翔会 京都歯科',
+  'アサノ': '清翔会 アサノ歯科',
+  '岩田': '清翔会 岩田歯科',
+  '訪問': '清翔会 訪問歯科',
+};
+function loadFacilityFormalNames() {
+  let custom = {};
+  try { custom = (typeof loadData === 'function') ? loadData('facility-formal-names', {}) : {}; } catch(_){}
+  if (typeof custom !== 'object' || !custom) custom = {};
+  return { ...FACILITY_FORMAL_DEFAULTS, ...custom };
+}
+function getFacilityFormalName(shortName) {
+  if (!shortName) return '';
+  const map = loadFacilityFormalNames();
+  return map[shortName] || shortName;
+}
+
+// === v394: SMS文字カウンタ ===
+// 日本語SMS は通常 70文字/通 (UCS-2)、iMessage は実質無制限だが目安として 70刻みで分割数を表示
+function smsCountChars(body) {
+  const len = [...String(body || '')].length;  // 絵文字を1文字としてカウント
+  const segments = len === 0 ? 0 : Math.ceil(len / 70);
+  return { len, segments };
+}
+
 // {placeholder} 置換
 function _smsRenderTemplate(template, ctx) {
   return String(template || '').replace(/\{(\w+)\}/g, (m, key) => ctx[key] || '');
@@ -1194,7 +1233,8 @@ function openSmsModal(name, phone, bookDate, facility) {
     name: name || 'お客',
     date: date || '近日中',
     time: time || '',
-    clinic: facility || '清翔会'
+    // v394: {clinic} は正式名称で出す (短縮名 BF銀座 → 「清翔会 BF銀座歯科」)
+    clinic: (typeof getFacilityFormalName === 'function' && facility) ? getFacilityFormalName(facility) : (facility || '清翔会')
   };
 
   const modal = document.createElement('div');
@@ -1213,10 +1253,14 @@ function openSmsModal(name, phone, bookDate, facility) {
         <div id="sms-template-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
           ${SMS_TEMPLATES.map(t => {
             const filled = _smsRenderTemplate(t.body, ctx);
+            const cc = smsCountChars(filled);
+            const segBadge = cc.segments > 1
+              ? `<span style="display:inline-block;margin-left:6px;padding:1px 5px;background:#fef3c7;color:#b45309;border-radius:8px;font-size:9px;font-weight:600">${cc.segments}通分</span>`
+              : '';
             return `<button class="sms-tpl-btn" data-id="${t.id}" data-body="${escapeHtml(filled)}" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;text-align:left;font-family:inherit;transition:all .15s" onmouseover="this.style.background='#f3f4f6';this.style.borderColor='#7c3aed'" onmouseout="this.style.background='#fff';this.style.borderColor='var(--border)'">
               <span style="font-size:18px">${t.icon}</span>
               <span style="flex:1">
-                <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">${escapeHtml(t.label)} <span style="font-size:10px;font-weight:400;color:var(--text-sub)">— ${escapeHtml(t.desc)}</span></div>
+                <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">${escapeHtml(t.label)} <span style="font-size:10px;font-weight:400;color:var(--text-sub)">— ${escapeHtml(t.desc)}</span> ${filled ? `<span style="font-size:9px;color:${cc.len>140?'#b45309':'var(--text-muted)'};margin-left:4px">${cc.len}字</span>${segBadge}` : ''}</div>
                 <div style="font-size:10px;color:var(--text-sub);white-space:pre-wrap;line-height:1.4">${filled ? escapeHtml(filled.length > 80 ? filled.slice(0, 80) + '…' : filled) : '(本文を入力してください)'}</div>
               </span>
             </button>`;
@@ -1293,8 +1337,34 @@ function renderSmsTemplatesAdmin() {
   const isOverridden = (id) => customRaw.some(c => c.id === id && !c.deleted);
   const isDefault = (id) => SMS_TEMPLATES_DEFAULT.some(d => d.id === id);
 
+  // v394: 医院正式名称の現在マッピング
+  const facMap = loadFacilityFormalNames();
+  const facKeys = Object.keys(facMap).sort();
+
   el.innerHTML = `
     <div class="page-header"><h2>📱 SMS定型文</h2><p class="page-desc">電話前確認・キャンセル後追い等で使うSMSテンプレートを編集できます。プレースホルダー: <code>{name}</code> {date} {time} {clinic}</p></div>
+
+    <!-- v394: 医院正式名称マッピング -->
+    <details style="margin-bottom:16px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#92400e">🏥 医院正式名称マッピング (SMS本文の {clinic} で使用)</summary>
+      <div style="font-size:11px;color:var(--text-sub);margin:8px 0">
+        SMS送信時、テンプレ内の <code>{clinic}</code> はここで設定した正式名称に置換されます。<br>
+        例: 「BF銀座」(短縮名) → 「清翔会 BF銀座歯科」(正式名称・SMS用)
+      </div>
+      <div id="facility-formal-list" style="display:grid;grid-template-columns:140px 1fr;gap:6px 12px;align-items:center;margin-top:10px">
+        ${facKeys.map(k => `
+          <label style="font-size:12px;font-weight:600">${escapeHtml(k)}</label>
+          <input type="text" class="facility-formal-input" data-key="${escapeHtml(k)}" value="${escapeHtml(facMap[k]||'')}" placeholder="${escapeHtml(FACILITY_FORMAL_DEFAULTS[k]||k)}" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:5px">
+        `).join('')}
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
+        <button id="facility-formal-save" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:700;padding:6px 14px">💾 正式名称を保存</button>
+        <button id="facility-formal-reset" class="filter-btn" style="padding:6px 14px" title="デフォルトに戻す">🔄 デフォルトに戻す</button>
+        <span id="facility-formal-msg" style="font-size:11px;color:var(--text-sub)"></span>
+      </div>
+    </details>
+
+    <h3 style="font-size:14px;font-weight:700;margin-bottom:8px">📝 テンプレート一覧</h3>
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:10px">
       <button id="sms-tpl-add" class="filter-btn" style="background:#7c3aed;color:#fff;font-weight:700;padding:6px 14px">＋ 新規追加</button>
       <span style="font-size:11px;color:var(--text-sub)">${templates.length}件のテンプレート</span>
@@ -1338,6 +1408,29 @@ function renderSmsTemplatesAdmin() {
       </table>
     </div>
   `;
+
+  // === v394: 医院正式名称 save/reset ===
+  el.querySelector('#facility-formal-save')?.addEventListener('click', () => {
+    const next = {};
+    el.querySelectorAll('.facility-formal-input').forEach(inp => {
+      const k = inp.dataset.key;
+      const v = (inp.value || '').trim();
+      // デフォルトと違うものだけ保存
+      if (v && v !== FACILITY_FORMAL_DEFAULTS[k]) next[k] = v;
+    });
+    saveData('facility-formal-names', next);
+    const msg = el.querySelector('#facility-formal-msg');
+    if (msg) {
+      msg.textContent = '✓ 保存しました';
+      msg.style.color = '#16a34a';
+      setTimeout(() => { msg.textContent = ''; }, 2000);
+    }
+  });
+  el.querySelector('#facility-formal-reset')?.addEventListener('click', () => {
+    if (!confirm('医院正式名称をデフォルトに戻しますか?')) return;
+    saveData('facility-formal-names', {});
+    renderSmsTemplatesAdmin();
+  });
 
   // === ハンドラー ===
   el.querySelector('#sms-tpl-add').addEventListener('click', () => _openSmsTemplateEditor(null));
@@ -1395,8 +1488,12 @@ function _openSmsTemplateEditor(id) {
         </div>
         <div style="margin-bottom:8px">
           <label style="font-size:11px;color:var(--text-sub)">本文</label>
-          <div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">使えるプレースホルダー: <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{name}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{date}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{time}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{clinic}</code></div>
+          <div style="font-size:10px;color:var(--text-muted);margin:2px 0 4px">使えるプレースホルダー: <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{name}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{date}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{time}</code> <code style="background:#f3f4f6;padding:1px 4px;border-radius:3px">{clinic}</code> ※{clinic}は医院正式名称に置換</div>
           <textarea id="tpl-body" style="width:100%;height:160px;padding:10px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;box-sizing:border-box;resize:vertical" placeholder="{name}様&#10;&#10;清翔会です。&#10;{date} {time} のご予約のご確認です。...">${escapeHtml(existing?.body || '')}</textarea>
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;font-size:10px">
+            <span id="tpl-body-count" style="color:var(--text-sub)">0字 / 70字以内推奨</span>
+            <span style="color:var(--text-muted)">SMS 1通 = 70字 / 超過は分割送信</span>
+          </div>
         </div>
         <div style="display:flex;gap:8px;justify-content:flex-end">
           <button class="sms-tpl-close filter-btn" style="padding:8px 14px">キャンセル</button>
@@ -1408,6 +1505,17 @@ function _openSmsTemplateEditor(id) {
   document.body.appendChild(modal);
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   modal.querySelectorAll('.sms-tpl-close').forEach(b => b.addEventListener('click', () => modal.remove()));
+  // v394: リアルタイム文字数カウント
+  const updateCount = () => {
+    const body = modal.querySelector('#tpl-body').value || '';
+    const cc = smsCountChars(body);
+    const countEl = modal.querySelector('#tpl-body-count');
+    const segLabel = cc.segments <= 1 ? '1通以内' : `${cc.segments}通に分割`;
+    const color = cc.len === 0 ? 'var(--text-sub)' : cc.len <= 70 ? '#16a34a' : cc.len <= 140 ? '#d97706' : '#dc2626';
+    countEl.innerHTML = `<strong style="color:${color}">${cc.len}字</strong> / 70字以内推奨 (${segLabel})`;
+  };
+  modal.querySelector('#tpl-body').addEventListener('input', updateCount);
+  updateCount();
   modal.querySelector('#tpl-save').addEventListener('click', () => {
     const newT = {
       id: (modal.querySelector('#tpl-id').value || '').trim() || 'custom-' + Date.now(),
