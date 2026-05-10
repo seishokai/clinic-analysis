@@ -290,6 +290,39 @@ body {
 .stat-yoy { font-size: 11px; font-weight: 600; margin-top: 1px; display: block; }
 .stat-label { font-size: 10px; color: var(--text-sub); margin-top: 2px; display: block; text-transform: uppercase; letter-spacing: 0.3px; }
 
+/* === Stats Row 統一 (来院/予約等の compact 行) === */
+.stats-row-compact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+/* warning/danger/success モディファイア: 全タブ共通の 要対応・キャンセル・成約 表現 */
+.stat-card.is-warning {
+  border-color: #f97316;
+  background: #fff7ed;
+}
+.stat-card.is-warning .stat-label { color: #c2410c; font-weight: 700; }
+.stat-card.is-warning .stat-num   { color: #c2410c; }
+.stat-card.is-danger {
+  border-color: #ef4444;
+  background: #fef2f2;
+}
+.stat-card.is-danger .stat-label { color: #b91c1c; font-weight: 700; }
+.stat-card.is-danger .stat-num   { color: #b91c1c; }
+.stat-card.is-success {
+  border-color: #22c55e;
+  background: #f0fdf4;
+}
+.stat-card.is-success .stat-label { color: #15803d; font-weight: 700; }
+.stat-card.is-success .stat-num   { color: #059669; }
+.stat-card.is-info {
+  border-color: #3b82f6;
+  background: #eff6ff;
+}
+.stat-card.is-info .stat-label { color: #1d4ed8; font-weight: 700; }
+.stat-card.is-info .stat-num   { color: #1d4ed8; }
+
 /* === Clinic Grid === */
 .clinic-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
 .clinic-card {

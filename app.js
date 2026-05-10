@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v353';
+const APP_VERSION = 'v354';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6399,12 +6399,12 @@ function renderBookings() {
   // 未対応 → 「未来予約」にリネーム (来院前で予約日が未来)
   document.getElementById('bk-stats').innerHTML = `
     <div class="stat-card" title="予約数 = 来院済 + キャンセル + 未来予約 + 進行中 (要対応はキャンセル内)"><span class="stat-label">予約数</span><span class="stat-num">${total}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
-    <div class="stat-card" style="border-color:${overdueCount>0?'var(--red)':'var(--border)'};background:${overdueCount>0?'#fff5f5':'var(--card)'}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数 (キャンセル内の未来店に含まれます)"><span class="stat-label" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'};font-weight:700">⚠ 要対応</span><span class="stat-num" style="color:${overdueCount>0?'var(--red)':'var(--text-main)'}">${overdueCount}</span><span class="stat-yoy" style="color:${overdueCount>0?'var(--red)':'var(--text-sub)'};font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
+    <div class="stat-card ${overdueCount>0?'is-warning':''}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数 (キャンセル内の未来店に含まれます)"><span class="stat-label">⚠ 要対応</span><span class="stat-num">${overdueCount}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
     <div class="stat-card" title="未来予約 = 未対応のまま予約日がまだ未来。新規予約で未連絡な状態"><span class="stat-label">未来予約</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">未対応で予約日<br>がまだ未来</span></div>
     <div class="stat-card" title="進行中 = 未来予約で 確認済/後追いLINE済み/予約変更等 (連絡済で来院待ち)"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
-    <div class="stat-card" title="キャンセル合計 = 正式キャンセル + 未来店(来院せず・連絡途絶・予約日経過)"><span class="stat-label">キャンセル</span><span class="stat-num" style="color:var(--red)">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
-    <div class="stat-card" title="来院済 = 来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
-    <div class="stat-card" title="成約済の予約 (来院後に契約に至った件数。来院済の内数)"><span class="stat-label">成約</span><span class="stat-num" style="color:var(--green)">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
+    <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店(来院せず・連絡途絶・予約日経過)"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
+    <div class="stat-card ${visited>0?'is-info':''}" title="来院済 = 来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
+    <div class="stat-card ${contracted>0?'is-success':''}" title="成約済の予約 (来院後に契約に至った件数。来院済の内数)"><span class="stat-label">成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
     <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
   `;
   // インセ金額は別途集計不要（各行で入力）
@@ -8824,25 +8824,25 @@ async function renderKaiinAll(containerId) {
       </span>
     </div>
     ${state.dashboardOpen ? `
-    <div class="stats-row" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
-      <div class="stat-card" style="border-color:${overdue>0?'#f97316':'var(--border)'};background:${overdue>0?'#fff7ed':'var(--card)'}" title="未対応のまま予約日を過ぎた緊急対応必要件数">
-        <span class="stat-label" style="color:${overdue>0?'#f97316':'var(--text-sub)'};font-weight:700">⚠ 要対応</span>
-        <span class="stat-num" style="color:${overdue>0?'#f97316':'var(--text-main)'}">${overdue}</span>
+    <div class="stats-row stats-row-compact">
+      <div class="stat-card ${overdue>0?'is-warning':''}" title="未対応のまま予約日を過ぎた緊急対応必要件数">
+        <span class="stat-label">⚠ 要対応</span>
+        <span class="stat-num">${overdue}</span>
         <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">未対応のまま</span>
       </div>
-      <div class="stat-card" title="キャンセル(取消) + 未来店(連絡途絶)">
+      <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル(取消) + 未来店(連絡途絶)">
         <span class="stat-label">キャンセル</span>
-        <span class="stat-num" style="color:var(--red)">${cancelled}</span>
+        <span class="stat-num">${cancelled}</span>
         <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600">取消${formalCancelled}+未来店${noShow}</span>
       </div>
-      <div class="stat-card" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階">
+      <div class="stat-card ${visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階">
         <span class="stat-label">来院済</span>
         <span class="stat-num">${visited}</span>
         <span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%</span>
       </div>
-      <div class="stat-card" title="成約済の予約 (来院後に契約に至った件数)">
+      <div class="stat-card ${contracted>0?'is-success':''}" title="成約済の予約 (来院後に契約に至った件数)">
         <span class="stat-label">成約</span>
-        <span class="stat-num" style="color:var(--green)">${contracted}</span>
+        <span class="stat-num">${contracted}</span>
         <span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%</span>
       </div>
       <div class="stat-card" title="成約金額の合計 (税抜)">
