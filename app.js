@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v383';
+const APP_VERSION = 'v384';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11453,13 +11453,17 @@ function renderPromo() {
         }).join('')}
       </span>
     </div>
-    <!-- v379: 集計サマリー -->
-    <div class="stats-row" style="gap:6px;margin-bottom:8px">
-      <div class="stat-card"><span class="stat-label">予約合計</span><span class="stat-num">${allTotal}</span></div>
-      <div class="stat-card is-success"><span class="stat-label">成約</span><span class="stat-num">${allContracted}</span><span class="stat-yoy" style="font-size:10px;color:var(--text-sub)">¥${fmt(allContractAmt)}</span></div>
-      <div class="stat-card"><span class="stat-label">インセ計</span><span class="stat-num" style="color:#7c3aed">¥${fmt(allIncTotal)}</span></div>
-      <div class="stat-card is-info"><span class="stat-label">支給済</span><span class="stat-num" style="color:#059669">¥${fmt(allIncPaid)}</span></div>
-      <div class="stat-card ${allIncUnpaid>0?'is-warning':''}"><span class="stat-label">未支給</span><span class="stat-num" style="color:${allIncUnpaid>0?'#b45309':'inherit'}">¥${fmt(allIncUnpaid)}</span></div>
+    <!-- v384: 集計サマリーをコンパクトに 1行で -->
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:6px;padding:6px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;font-size:11px">
+      <span><span style="color:var(--text-sub)">予約</span> <strong style="font-size:13px">${allTotal}</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">成約</span> <strong style="color:#059669;font-size:13px">${allContracted}</strong> <span style="color:var(--text-sub)">¥${fmt(allContractAmt)}</span></span>
+      <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">インセ計</span> <strong style="color:#7c3aed;font-size:13px">¥${fmt(allIncTotal)}</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">支給済</span> <strong style="color:#059669;font-size:13px">¥${fmt(allIncPaid)}</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">未支給</span> <strong style="color:${allIncUnpaid>0?'#b45309':'var(--text)'};font-size:13px">¥${fmt(allIncUnpaid)}</strong></span>
     </div>
     <div class="card" style="padding:6px">
       <div class="data-table-wrap" style="max-height:calc(100vh - 200px);overflow-y:auto">
