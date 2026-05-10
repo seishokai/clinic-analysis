@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v387';
+const APP_VERSION = 'v388';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9608,25 +9608,27 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   let _initFilterOpen = false;
   try { _initFilterOpen = sessionStorage.getItem(FILTER_KEY_TR) === '1'; } catch(_){}
   el.innerHTML = `
-    <div class="kaiin-tr-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0">
+    <div class="kaiin-tr-banner" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0">
       <strong style="color:#1a1a1a;font-size:14px;font-weight:700">${treatment} 来院管理</strong>
       <span style="font-size:11px;color:var(--text-sub)">${rows.length}件</span>
-      <input type="text" class="kaiin-filter-search filter-input" data-treatment="${treatment}" placeholder="🔍 名前" style="width:140px;font-size:11px;padding:3px 8px">
+      <input type="text" class="kaiin-filter-search filter-input" data-treatment="${treatment}" placeholder="🔍 名前" style="width:120px;font-size:11px;padding:3px 8px">
+      <!-- v388: 期間プルダウンを常時表示 (一覧タブと統一) -->
+      <select class="kaiin-filter-period filter-select" data-treatment="${treatment}" title="期間" style="font-size:11px;padding:3px 6px;width:auto">
+        <option value="">期間:全て</option>
+        <option value="thisMonth" selected>今月（来院日）</option>
+        <option value="thisMonthApply">今月（登録日）</option>
+        <option value="lastMonth">先月</option>
+      </select>
+      <!-- v388: プロモスロットも常時表示 -->
+      <span class="kaiin-filter-promo-slot" title="プロモ"></span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
-        <button class="kaiin-tr-filter-toggle filter-btn ${_initFilterOpen?'is-active':''}" title="絞込フィルタを表示/非表示">${_initFilterOpen?'▲ 絞込':'▼ 絞込'}</button>
+        <button class="kaiin-tr-filter-toggle filter-btn ${_initFilterOpen?'is-active':''}" title="他の絞込フィルタを表示/非表示">${_initFilterOpen?'▲ 絞込':'▼ 絞込'}</button>
         <button class="kaiin-header-toggle filter-btn" title="サマリー(統計+カード)を表示/非表示">▼ サマリーを表示</button>
       </span>
     </div>
     <div class="kaiin-topbar filter-bar" style="margin-bottom:4px;display:${_initFilterOpen?'block':'none'}">
       <div class="filter-row">
-        <select class="kaiin-filter-period filter-select" data-treatment="${treatment}" style="font-size:11px;padding:3px 6px">
-          <option value="">期間:全て</option>
-          <option value="thisMonth" selected>今月（来院日基準）</option>
-          <option value="thisMonthApply">今月（登録日基準）</option>
-          <option value="lastMonth">先月</option>
-        </select>
         <span class="kaiin-filter-tool-slot"></span>
-        <span class="kaiin-filter-promo-slot"></span>
         <span class="kaiin-filter-csfac-slot"></span>
         <span class="kaiin-filter-setfac-slot"></span>
         <span class="kaiin-filter-consult-slot"></span>
