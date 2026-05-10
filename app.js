@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v373';
+const APP_VERSION = 'v374';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -91,6 +91,48 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => setTimeout(syncSharedQuickChips, 800));
 } else {
   setTimeout(syncSharedQuickChips, 800);
+}
+
+// === v374: クロスタブ再描画ヘルパー (一覧タブ等で編集した値を予約/電話前確認/BF/治療別タブに即反映) ===
+// 1つのフィールドを編集したとき、他のタブが既に開いていれば即時に再描画。
+// 重複呼び出しを避けるため debounce 処理。
+let _syncCrossTabTimer = null;
+function syncCrossTabRender() {
+  if (_syncCrossTabTimer) clearTimeout(_syncCrossTabTimer);
+  _syncCrossTabTimer = setTimeout(() => {
+    _syncCrossTabTimer = null;
+    try {
+      // 予約タブ - bk-table が DOM にあれば再描画
+      if (typeof renderBookings === 'function' && document.getElementById('bk-tbody')) {
+        renderBookings();
+      }
+      // 電話前確認 - phone-check-content が DOM にあれば再描画
+      if (typeof renderPhoneCheck === 'function' && document.getElementById('phone-check-content')) {
+        renderPhoneCheck();
+      }
+      // BF進捗 (lifecycle) が表示中なら再描画
+      const lc = document.getElementById('bf-lifecycle');
+      if (lc && !lc.hidden && typeof updateBFFunnelAndTable === 'function' && typeof getBFRows === 'function') {
+        updateBFFunnelAndTable(getBFRows());
+      }
+      // 来院タブの各治療サブタブ - 表示中の sub-kaiin-* があれば renderKaiinTab 再実行
+      const treatmentMap = { 'sub-kaiin-bf':'BF', 'sub-kaiin-kyosei':'矯正', 'sub-kaiin-implant':'インプラント', 'sub-kaiin-labrie':'ラブリエ', 'sub-kaiin-hotetsu':'自費補綴', 'sub-kaiin-konchi':'自費根治', 'sub-kaiin-whitening':'ホワイトニング', 'sub-kaiin-lipart':'リップアート', 'sub-kaiin-jewelry':'ティースジュエリー', 'sub-kaiin-other':'その他' };
+      Object.keys(treatmentMap).forEach(subId => {
+        const sub = document.getElementById(subId);
+        if (!sub || sub.hidden) return;
+        const innerId = subId + '-content';
+        if (!document.getElementById(innerId)) return;
+        if (typeof renderKaiinTab === 'function') {
+          try { renderKaiinTab(treatmentMap[subId], innerId); } catch(_){}
+        }
+      });
+      // 一覧タブ - sub-kaiin-list が表示中なら renderKaiinAll 再実行
+      const listSub = document.getElementById('sub-kaiin-list');
+      if (listSub && !listSub.hidden && document.getElementById('kaiin-all-content') && typeof renderKaiinAll === 'function') {
+        try { renderKaiinAll('kaiin-all-content'); } catch(_){}
+      }
+    } catch (e) { console.warn('syncCrossTabRender failed', e); }
+  }, 80);
 }
 
 // === Supabase ===
@@ -4065,6 +4107,7 @@ function _bindPhoneCheckRowEvents(el) {
             // v297: 該当行だけ更新 (全テーブル再描画を回避)
             _updatePhoneRowInPlace(row, dRow);
             updateHeaderBadge();
+            if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
           } catch(e) { _showBigToast('保存エラー: ' + e.message, '#dc2626'); }
           return;
         }
@@ -4092,6 +4135,7 @@ function _bindPhoneCheckRowEvents(el) {
           // v297: 該当行だけ更新 (全テーブル再描画を回避してスクロール位置維持)
           if (match) _updatePhoneRowInPlace(row, match);
           updateHeaderBadge();
+          if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
         } catch(e) {
           _showBigToast('保存エラー: ' + e.message, '#dc2626');
           btn.disabled = false;
@@ -6819,6 +6863,8 @@ function renderBookings() {
         } else {
           await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
         }
+        // v374: 一覧/電話前確認/BF タブも同期再描画
+        if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
       })();
     };
     // セレクト
@@ -8126,6 +8172,8 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
     bfHistoryCache[key].unshift({ ...hist, created_at: new Date().toISOString() });
   }
+  // v374: 一覧/予約/電話前確認 タブも同期再描画
+  if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
   return true;
 }
 
@@ -9086,6 +9134,7 @@ async function renderKaiinAll(containerId) {
         if (target) target.status = val || '';
         sel.style.outline = '2px solid #16a34a';
         setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
+        syncCrossTabRender();
       } catch (e) { console.warn('status save failed', e); showToast('状態の保存に失敗', true); }
     });
   });
@@ -9097,7 +9146,11 @@ async function renderKaiinAll(containerId) {
     inp.addEventListener('change', async () => {
       const n = Number(inp.value.replace(/,/g,'')) || 0;
       const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'contract_amount', n);
-      if (ok) { inp.style.borderColor = '#16a34a'; setTimeout(() => { inp.style.borderColor = ''; }, 1000); }
+      if (ok) {
+        inp.style.borderColor = '#16a34a';
+        setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+        syncCrossTabRender();
+      }
     });
   });
 
@@ -9117,6 +9170,7 @@ async function renderKaiinAll(containerId) {
         if (ok) {
           btn.style.outline = '2px solid #16a34a';
           setTimeout(() => { btn.style.outline = ''; renderKaiinAll(containerId); }, 400);
+          syncCrossTabRender();
         }
       });
     }
@@ -9126,7 +9180,7 @@ async function renderKaiinAll(containerId) {
   el.querySelectorAll('.kaiin-all-memo-cell').forEach(cell => {
     cell.addEventListener('click', () => {
       if (typeof openMemoModal === 'function') {
-        openMemoModal(cell.dataset.name, cell.dataset.apply, () => renderKaiinAll(containerId));
+        openMemoModal(cell.dataset.name, cell.dataset.apply, () => { renderKaiinAll(containerId); syncCrossTabRender(); });
       }
     });
   });
@@ -9155,6 +9209,7 @@ async function renderKaiinAll(containerId) {
         });
         sel.style.outline = '2px solid #16a34a';
         setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
+        syncCrossTabRender();
       } catch (e) {
         console.warn('contract_service save failed', e);
         showToast('成約商材の保存に失敗', true);
@@ -9194,6 +9249,7 @@ async function renderKaiinAll(containerId) {
           });
           btn.style.outline = '2px solid #16a34a';
           setTimeout(() => { btn.style.outline = ''; renderKaiinAll(containerId); }, 400);
+          syncCrossTabRender();
         } catch (e) {
           console.warn('book date save failed', e);
           showToast('来院日の保存に失敗', true);
@@ -9222,6 +9278,7 @@ async function renderKaiinAll(containerId) {
         });
         sel.style.outline = '2px solid #16a34a';
         setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
+        syncCrossTabRender();
       } catch (e) {
         console.warn('facility save failed', e);
         showToast('医院の保存に失敗', true);
@@ -9249,6 +9306,7 @@ async function renderKaiinAll(containerId) {
         });
         inp.style.borderColor = '#16a34a';
         setTimeout(() => { inp.style.borderColor = ''; renderKaiinAll(containerId); }, 600);
+        syncCrossTabRender();
       } catch (e) {
         console.warn('promo save failed', e);
         showToast('プロモの保存に失敗', true);
@@ -9281,6 +9339,7 @@ async function renderKaiinAll(containerId) {
         });
         inp.style.borderColor = '#16a34a';
         setTimeout(() => { inp.style.borderColor = ''; renderKaiinAll(containerId); }, 600);
+        syncCrossTabRender();
       } catch (e) {
         console.warn('name save failed', e);
         inp.value = _orig;
@@ -9909,6 +9968,8 @@ function drawKaiinRows(treatment, rows, container) {
           } catch(e) { console.warn('bk-extra supabase sync exception', e); }
         })();
       }
+      // v374: 一覧/電話前確認/予約 タブも同期再描画
+      if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
       return true;
     } catch(e) { console.warn('bk-extra save error', e); return false; }
   };
