@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v346';
+const APP_VERSION = 'v347';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2612,6 +2612,7 @@ function renderHomeDashboard() {
   const rangeLabel = range.label || (range.fromYM === range.toYM ? ymToLabel(range.fromYM) : `${ymToLabel(range.fromYM)}〜${ymToLabel(range.toYM)}`);
   // 期間プリセットの判定
   const presetMatch = (preset) => {
+    if (preset === 'all' && range.fromYM === '2000/01' && range.toYM === '2099/12') return true;
     if (preset === 'last' && range.fromYM === ymOffset(-1) && range.toYM === ymOffset(-1)) return true;
     if (preset === 'this' && range.fromYM === ymOffset(0) && range.toYM === ymOffset(0)) return true;
     if (preset === 'next' && range.fromYM === ymOffset(1) && range.toYM === ymOffset(1)) return true;
@@ -2669,10 +2670,16 @@ function renderHomeDashboard() {
     </div>
 
     <!-- v273 期間分析: クイック選択 + カスタム範囲 + KPI -->
-    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;gap:8px;flex-wrap:wrap">
-        <div style="font-size:13px;font-weight:700;color:#1a1a1a">📊 期間分析: <span style="color:#1d4ed8">${escapeHtml(rangeLabel)}</span> <span style="font-size:11px;color:#7c3aed;font-weight:600">${_homeAnalysisBasis==='apply'?'(登録日基準)':'(予約日基準)'}</span></div>
-        <div style="font-size:10px;color:var(--text-sub)">来院率=来院÷予約 / 決定率=成約÷来院</div>
+    <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:10px 12px;margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:6px 14px;margin-bottom:8px;flex-wrap:wrap" title="来院率=来院÷予約 / 決定率=成約÷来院">
+        <div style="font-size:13px;font-weight:700;color:#1a1a1a;flex:0 0 auto">📊 期間分析: <span style="color:#1d4ed8">${escapeHtml(rangeLabel)}</span> <span style="font-size:11px;color:#7c3aed;font-weight:600">${_homeAnalysisBasis==='apply'?'(登録日基準)':'(予約日基準)'}</span></div>
+        <span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:baseline;gap:3px"><b style="color:#1a1a1a">予約</b> <span style="font-size:14px;font-weight:800;color:#1a1a1a">${kpiRange.booking}</span>${fmtDelta(kpiRange.booking, kpiPrev.booking)}</span>
+        <span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:baseline;gap:3px"><b style="color:#1d4ed8">来院</b> <span style="font-size:14px;font-weight:800;color:#1d4ed8">${kpiRange.visited}</span>${fmtDelta(kpiRange.visited, kpiPrev.visited)}</span>
+        <span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:baseline;gap:3px"><b style="color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'}">来院率</b> <span style="font-size:14px;font-weight:800;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'}">${kpiRange.booking?kpiRange.visitRate+'%':'-'}</span>${fmtDelta(kpiRange.visitRate, kpiPrev.visitRate)}</span>
+        <span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:baseline;gap:3px"><b style="color:#059669">成約</b> <span style="font-size:14px;font-weight:800;color:#059669">${kpiRange.contracted}</span>${fmtDelta(kpiRange.contracted, kpiPrev.contracted)}</span>
+        <span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:baseline;gap:3px"><b style="color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'}">決定率</b> <span style="font-size:14px;font-weight:800;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'}">${kpiRange.visited?kpiRange.decideRate+'%':'-'}</span>${fmtDelta(kpiRange.decideRate, kpiPrev.decideRate)}</span>
+        <span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:baseline;gap:3px"><b style="color:#0e7490">単価</b> <span style="font-size:13px;font-weight:800;color:#0e7490">${kpiRange.unitPrice?fmtYen(kpiRange.unitPrice):'-'}</span>${fmtDelta(kpiRange.unitPrice, kpiPrev.unitPrice)}</span>
+        <span style="font-size:11px;color:var(--text-sub);display:inline-flex;align-items:baseline;gap:3px"><b style="color:#0e7490">合計</b> <span style="font-size:13px;font-weight:800;color:#0e7490">${fmtYen(kpiRange.amount)}</span>${fmtDelta(kpiRange.amount, kpiPrev.amount)}</span>
       </div>
       <!-- v316: 基準切替トグル + 期間セレクター -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:8px;padding:8px;background:#fef9c3;border-radius:8px;border:1px solid #fde68a">
@@ -2684,6 +2691,7 @@ function renderHomeDashboard() {
       <!-- 期間セレクター -->
       <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;padding:8px;background:#f9fafb;border-radius:8px">
         <span style="font-size:11px;color:var(--text-sub);font-weight:600;letter-spacing:1px;margin-right:4px">期間</span>
+        <button class="home-period-btn" data-preset="all" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('all')?'#1a1a1a':'var(--border)'};background:${presetMatch('all')?'#1a1a1a':'#fff'};color:${presetMatch('all')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">全期間</button>
         <button class="home-period-btn" data-preset="last" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('last')?'#1a1a1a':'var(--border)'};background:${presetMatch('last')?'#1a1a1a':'#fff'};color:${presetMatch('last')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">前月</button>
         <button class="home-period-btn" data-preset="this" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('this')?'#1a1a1a':'var(--border)'};background:${presetMatch('this')?'#1a1a1a':'#fff'};color:${presetMatch('this')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">今月</button>
         <button class="home-period-btn" data-preset="next" style="padding:5px 12px;font-size:11px;border:1px solid ${presetMatch('next')?'#1a1a1a':'var(--border)'};background:${presetMatch('next')?'#1a1a1a':'#fff'};color:${presetMatch('next')?'#fff':'#555'};border-radius:14px;cursor:pointer;font-weight:600;font-family:inherit">来月</button>
@@ -2694,38 +2702,7 @@ function renderHomeDashboard() {
         <span style="font-size:11px;color:var(--text-sub)">〜</span>
         <input type="month" id="home-to-month" value="${escapeHtml(monthInputValue(range.toYM))}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit">
       </div>
-      <!-- KPI 表示 (前期間比較付き) -->
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px">
-        <div style="text-align:center;padding:10px;background:#f9fafb;border-radius:8px">
-          <div style="font-size:10px;color:var(--text-sub);font-weight:600">予約</div>
-          <div style="font-size:22px;font-weight:800;color:#1a1a1a">${kpiRange.booking}${fmtDelta(kpiRange.booking, kpiPrev.booking)}</div>
-        </div>
-        <div style="text-align:center;padding:10px;background:#eff6ff;border-radius:8px">
-          <div style="font-size:10px;color:#1d4ed8;font-weight:600">来院</div>
-          <div style="font-size:22px;font-weight:800;color:#1d4ed8">${kpiRange.visited}${fmtDelta(kpiRange.visited, kpiPrev.visited)}</div>
-        </div>
-        <div style="text-align:center;padding:10px;background:${kpiRange.visitRate>=70?'#dcfce7':kpiRange.visitRate>=50?'#fef3c7':'#fee2e2'};border-radius:8px">
-          <div style="font-size:10px;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'};font-weight:600">来院率</div>
-          <div style="font-size:22px;font-weight:800;color:${kpiRange.visitRate>=70?'#059669':kpiRange.visitRate>=50?'#d97706':'#dc2626'}">${kpiRange.booking?kpiRange.visitRate+'%':'-'}${fmtDelta(kpiRange.visitRate, kpiPrev.visitRate)}</div>
-        </div>
-        <div style="text-align:center;padding:10px;background:#dcfce7;border-radius:8px">
-          <div style="font-size:10px;color:#059669;font-weight:600">成約</div>
-          <div style="font-size:22px;font-weight:800;color:#059669">${kpiRange.contracted}${fmtDelta(kpiRange.contracted, kpiPrev.contracted)}</div>
-        </div>
-        <div style="text-align:center;padding:10px;background:${kpiRange.decideRate>=40?'#dcfce7':kpiRange.decideRate>=20?'#fef3c7':'#fee2e2'};border-radius:8px">
-          <div style="font-size:10px;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'};font-weight:600">決定率</div>
-          <div style="font-size:22px;font-weight:800;color:${kpiRange.decideRate>=40?'#059669':kpiRange.decideRate>=20?'#d97706':'#dc2626'}">${kpiRange.visited?kpiRange.decideRate+'%':'-'}${fmtDelta(kpiRange.decideRate, kpiPrev.decideRate)}</div>
-        </div>
-        <div style="text-align:center;padding:10px;background:#ecfeff;border-radius:8px">
-          <div style="font-size:10px;color:#0891b2;font-weight:600">成約単価</div>
-          <div style="font-size:18px;font-weight:800;color:#0e7490">${kpiRange.unitPrice?fmtYen(kpiRange.unitPrice):'-'}${fmtDelta(kpiRange.unitPrice, kpiPrev.unitPrice)}</div>
-        </div>
-        <div style="text-align:center;padding:10px;background:#ecfeff;border-radius:8px">
-          <div style="font-size:10px;color:#0891b2;font-weight:600">合計金額</div>
-          <div style="font-size:18px;font-weight:800;color:#0e7490">${fmtYen(kpiRange.amount)}${fmtDelta(kpiRange.amount, kpiPrev.amount)}</div>
-        </div>
-      </div>
-      <div style="margin-top:6px;font-size:10px;color:var(--text-sub)">前期間比較: ${escapeHtml(prevFromYM === prevToYM ? ymToLabel(prevFromYM) : ymToLabel(prevFromYM)+'〜'+ymToLabel(prevToYM))}</div>
+      <div style="margin-top:4px;font-size:10px;color:var(--text-sub)">前期間比較: ${escapeHtml(prevFromYM === prevToYM ? ymToLabel(prevFromYM) : ymToLabel(prevFromYM)+'〜'+ymToLabel(prevToYM))}</div>
       ${weekCancel > 0 ? `<div style="margin-top:8px;font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</div>` : ''}
     </div>
 
@@ -3054,7 +3031,8 @@ function renderHomeDashboard() {
   el.querySelectorAll('.home-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const preset = btn.dataset.preset;
-      if (preset === 'last') _homeAnalysisRange = { fromYM: ymOffset(-1), toYM: ymOffset(-1), label: '前月' };
+      if (preset === 'all') _homeAnalysisRange = { fromYM: '2000/01', toYM: '2099/12', label: '全期間' };
+      else if (preset === 'last') _homeAnalysisRange = { fromYM: ymOffset(-1), toYM: ymOffset(-1), label: '前月' };
       else if (preset === 'this') _homeAnalysisRange = { fromYM: ymOffset(0), toYM: ymOffset(0), label: '今月' };
       else if (preset === 'next') _homeAnalysisRange = { fromYM: ymOffset(1), toYM: ymOffset(1), label: '来月' };
       else if (preset === '3m') _homeAnalysisRange = { fromYM: ymOffset(-1), toYM: ymOffset(1), label: '前月〜来月' };
