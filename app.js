@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v374';
+const APP_VERSION = 'v375';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8810,12 +8810,19 @@ async function renderKaiinAll(containerId) {
        : '全期間');
 
   el.innerHTML = `
-    <div id="kaiin-all-period-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0">
+    <div id="kaiin-all-period-banner" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0">
       <strong style="color:#1a1a1a;font-size:14px;font-weight:700">🏥 来院管理</strong>
-      <span style="font-size:11px;color:var(--text-sub)">${escapeHtml(periodLabel)} ・ ${totalCount}件</span>
-      <input type="text" id="kaiin-all-search" class="filter-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:140px;font-size:11px;padding:3px 8px">
+      <span style="font-size:11px;color:var(--text-sub)">${totalCount}件</span>
+      <input type="text" id="kaiin-all-search" class="filter-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:120px;font-size:11px;padding:3px 8px">
+      <select id="kaiin-all-period-quick" class="filter-select" title="期間" style="font-size:11px;padding:3px 6px;width:auto">
+        <option value="" ${(!period&&!month)?'selected':''}>期間:全期間</option>
+        <option value="thisMonth" ${period==='thisMonth'?'selected':''}>今月</option>
+        <option value="lastMonth" ${period==='lastMonth'?'selected':''}>先月</option>
+        <option value="fiscal" ${period==='fiscal'?'selected':''}>今期</option>
+      </select>
+      <span class="kaiin-all-promo-slot" title="プロモ"></span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
-        <button id="kaiin-all-filter-toggle" class="filter-btn ${state.filterOpen?'is-active':''}" title="絞込フィルタを表示/非表示">${state.filterOpen?'▲ 絞込':'▼ 絞込'}</button>
+        <button id="kaiin-all-filter-toggle" class="filter-btn ${state.filterOpen?'is-active':''}" title="他の絞込フィルタを表示/非表示">${state.filterOpen?'▲ 絞込':'▼ 絞込'}</button>
         <button id="kaiin-all-dashboard-toggle" class="filter-btn ${state.dashboardOpen?'is-active':''}" title="サマリー(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ サマリー':'▼ サマリー'}</button>
       </span>
     </div>
@@ -8836,12 +8843,6 @@ async function renderKaiinAll(containerId) {
     ${state.filterOpen ? `
     <div class="filter-bar" style="margin-bottom:4px">
       <div class="filter-row">
-        <span class="filter-label">期間</span>
-        ${(() => {
-          const isPb = (v) => !month && period === v;
-          const btn = (v, l) => `<button class="kaiin-all-period-btn filter-btn ${isPb(v)?'is-active':''}" data-period="${v}">${l}</button>`;
-          return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
-        })()}
         <button id="kaiin-all-today" class="filter-btn filter-btn-dark ${state.todayOnly?'is-active':''}" title="今日来院のみ">📅 今日</button>
         <input type="month" id="kaiin-all-month" class="filter-input" value="${escapeHtml(month||'')}" title="月直接指定" placeholder="月指定" style="font-size:11px;padding:3px 6px">
         <select id="kaiin-all-basis" class="filter-select" title="日付基準" style="font-size:11px;padding:3px 6px">
@@ -8855,16 +8856,15 @@ async function renderKaiinAll(containerId) {
           const btn = (v, l) => `<button class="kaiin-all-view-btn filter-btn filter-btn-dark ${isVb(v)?'is-active':''}" data-view="${v}">${l}</button>`;
           return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
         })()}
+        <span style="flex:1"></span>
+        <button id="kaiin-all-reset" class="filter-btn" title="全フィルタをクリア">🔄 リセット</button>
       </div>
       <div class="filter-row" style="margin-top:4px">
         <span class="kaiin-all-facility-slot" title="医院"></span>
         <span class="kaiin-all-status-slot" title="ステータス"></span>
-        <span class="kaiin-all-promo-slot" title="プロモ"></span>
         <span class="kaiin-all-service-slot" title="相談"></span>
         <span class="kaiin-all-contract-slot" title="成約商材"></span>
         <span class="kaiin-all-tool-slot" title="ツール"></span>
-        <span style="flex:1"></span>
-        <button id="kaiin-all-reset" class="filter-btn" title="全フィルタをクリア">🔄 リセット</button>
       </div>
     </div>
     ` : ''}
@@ -8988,13 +8988,19 @@ async function renderKaiinAll(containerId) {
       </div>
     </div>`;
 
-  // === 期間ボタン (全期間/今月/先月/今期) ===
+  // === 期間ボタン (全期間/今月/先月/今期) — 絞込内 ===
   el.querySelectorAll('.kaiin-all-period-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       _kaiinAllPeriodState.period = btn.dataset.period;
       _kaiinAllPeriodState.month = '';
       renderKaiinAll(containerId);
     });
+  });
+  // v375: 期間プルダウン (バナー上のコンパクト版)
+  el.querySelector('#kaiin-all-period-quick')?.addEventListener('change', (e) => {
+    _kaiinAllPeriodState.period = e.target.value;
+    _kaiinAllPeriodState.month = '';
+    renderKaiinAll(containerId);
   });
   el.querySelector('#kaiin-all-month')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.month = e.target.value;
