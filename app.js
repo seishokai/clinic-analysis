@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v381';
+const APP_VERSION = 'v382';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11343,6 +11343,8 @@ let _promoTabState = {
   showUnpaidOnly: false,          // 未支給のみ
   selected: new Set(),            // v380: 通知書作成用に選択中の {name|applyDate}
   mode: 'all',                    // v381: 'all' = プロモ管理 / 'incentive' = インセンティブ管理 (rate>0のみ)
+  hideZeroIncentive: true,        // v382: インセ¥0は非表示 (デフォルトON)
+  hidePaid: true,                 // v382: 支給済は非表示 (デフォルトON)
 };
 
 function renderPromo() {
@@ -11599,6 +11601,19 @@ function renderPromo() {
       renderPromo();
     });
   });
+  // v382: フィルタトグル (インセ¥0非表示 / 支給済非表示)
+  el.querySelectorAll('.promo-hide-zero').forEach(cb => {
+    cb.addEventListener('change', () => {
+      _promoTabState.hideZeroIncentive = cb.checked;
+      renderPromo();
+    });
+  });
+  el.querySelectorAll('.promo-hide-paid').forEach(cb => {
+    cb.addEventListener('change', () => {
+      _promoTabState.hidePaid = cb.checked;
+      renderPromo();
+    });
+  });
   // 支払い通知書作成
   el.querySelectorAll('.promo-create-notice').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -11773,7 +11788,24 @@ function _renderPromoDetail(p, _bkEx) {
   };
   const _isSelected = (d) => _promoTabState.selected.has(d.name + '|' + d.applyDate);
   // 成約のみ表示 (インセ管理対象)
-  const contracted = p.bookings.filter(b => b.status === '成約').sort((a, b) => {
+  // v382: hideZeroIncentive / hidePaid でフィルタ
+  let contracted = p.bookings.filter(b => b.status === '成約');
+  const totalContracted = contracted.length;
+  let hiddenZero = 0, hiddenPaid = 0;
+  if (_promoTabState.hideZeroIncentive) {
+    contracted = contracted.filter(b => {
+      const inc = _inc(b);
+      if (inc <= 0) { hiddenZero++; return false; }
+      return true;
+    });
+  }
+  if (_promoTabState.hidePaid) {
+    contracted = contracted.filter(b => {
+      if (_isPaid(b)) { hiddenPaid++; return false; }
+      return true;
+    });
+  }
+  contracted.sort((a, b) => {
     const ad = parseDate(a.applyDate)?.getTime() || 0;
     const bd = parseDate(b.applyDate)?.getTime() || 0;
     return bd - ad;
@@ -11789,8 +11821,18 @@ function _renderPromoDetail(p, _bkEx) {
   contracted.forEach(d => { if (_isSelected(d)) { selectedCount++; selectedInc += _inc(d); } });
   return `<div style="padding:8px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-      <span style="font-size:11px;font-weight:600;color:var(--text-sub)">📋 ${escapeHtml(p.source)} の成約案件 (${contracted.length}件) - インセ支給管理</span>
+      <span style="font-size:11px;font-weight:600;color:var(--text-sub)">📋 ${escapeHtml(p.source)} の成約案件 (${contracted.length}/${totalContracted}件)${hiddenZero?` <span style="color:var(--text-muted);font-weight:400">・インセ¥0=${hiddenZero}件 非表示</span>`:''}${hiddenPaid?` <span style="color:var(--text-muted);font-weight:400">・支給済=${hiddenPaid}件 非表示</span>`:''}</span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <!-- v382: 表示フィルタ -->
+        <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;user-select:none" title="インセ金額が¥0の案件を非表示にする">
+          <input type="checkbox" class="promo-hide-zero" ${_promoTabState.hideZeroIncentive?'checked':''} style="cursor:pointer">
+          <span>インセ¥0非表示</span>
+        </label>
+        <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;user-select:none" title="支給済の案件を非表示にする">
+          <input type="checkbox" class="promo-hide-paid" ${_promoTabState.hidePaid?'checked':''} style="cursor:pointer">
+          <span>支給済非表示</span>
+        </label>
+        <span style="width:1px;height:18px;background:var(--border)"></span>
         <span style="font-size:11px;color:${selectedCount>0?'#7c3aed':'var(--text-muted)'};font-weight:${selectedCount>0?'600':'400'}">選択 ${selectedCount}件 ${selectedCount>0?`/ ¥${fmt(selectedInc)}`:''}</span>
         <button class="promo-select-unpaid filter-btn" data-source="${escapeHtml(p.source)}" title="未通知の成約を全選択">未通知を全選択</button>
         <button class="promo-clear-select filter-btn" data-source="${escapeHtml(p.source)}" title="選択クリア" ${selectedCount===0?'disabled':''}>選択解除</button>
