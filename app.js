@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v390';
+const APP_VERSION = 'v391';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1071,6 +1071,176 @@ function maskPhone(phone) {
   if (!phone) return phone;
   if (!_isPII_MaskNeeded()) return phone;
   return '※※※※※※※※';
+}
+
+// === v391: SMS送信機能 (sms: URL スキーム経由でデフォルトメッセージアプリ起動) ===
+// テンプレート定義 (placeholder: {name}/{date}/{clinic}/{time})
+const SMS_TEMPLATES = [
+  {
+    id: 'pre-confirm',
+    icon: '📞',
+    label: '来院前確認',
+    desc: '前日リマインド',
+    body: '{name}様\n\n清翔会です。\n{date} {time} のご予約のご確認です。\n医院: {clinic}\nお気をつけてご来院お待ちしております。\n\n※ご予定の変更等ございましたらこのままご返信ください。'
+  },
+  {
+    id: 'cancel-followup',
+    icon: '💔',
+    label: 'キャンセル後追い',
+    desc: '再予約のご案内',
+    body: '{name}様\n\n清翔会です。\n先日はご予約をいただきありがとうございました。\nまたのご予約お待ちしております。\n\nご都合のよい日時がございましたらお気軽にご返信ください。'
+  },
+  {
+    id: 'visit-thanks',
+    icon: '🙏',
+    label: '来院後フォロー',
+    desc: '来院お礼',
+    body: '{name}様\n\n本日はご来院いただきありがとうございました。清翔会です。\n\n治療後何かご不明点・違和感ございましたらお気軽にご連絡ください。'
+  },
+  {
+    id: 'no-show',
+    icon: '⚠️',
+    label: '無断キャンセル',
+    desc: '来院確認連絡',
+    body: '{name}様\n\n清翔会です。\n本日 {time} のご予約でしたが、まだご来院がないようでしたので確認のご連絡です。\n\nご都合がつかれましたらこのままご返信ください。'
+  },
+  {
+    id: 'custom',
+    icon: '✍️',
+    label: '自由入力',
+    desc: '空のメッセージから作成',
+    body: ''
+  },
+];
+
+// {placeholder} 置換
+function _smsRenderTemplate(template, ctx) {
+  return String(template || '').replace(/\{(\w+)\}/g, (m, key) => ctx[key] || '');
+}
+
+// 電話番号を sms: URL 用に正規化 (国内: 0始まり / +81始まり も可)
+function _smsNormalizePhone(raw) {
+  if (!raw) return '';
+  let s = String(raw).replace(/[\s\-()]/g, '');
+  if (s.startsWith('+')) return s;
+  if (s.startsWith('0')) return s;
+  if (/^\d/.test(s)) return '0' + s;
+  return s;
+}
+
+// bookDate / applyDate を「M/D」形式と「H:MM」形式に分解
+function _smsParseDate(raw) {
+  const s = String(raw || '');
+  const md = s.match(/(\d{4})?[\/\-]?(\d{1,2})[\/\-](\d{1,2})/);
+  const hm = s.match(/(\d{1,2}):(\d{2})/);
+  return {
+    date: md ? `${parseInt(md[2])}月${parseInt(md[3])}日` : '',
+    time: hm ? `${hm[1]}:${hm[2]}` : '',
+  };
+}
+
+// SMS送信モーダル: name/phone/bookDate/facility を受けてテンプレ選択 → sms:URL 起動
+function openSmsModal(name, phone, bookDate, facility) {
+  // 既存モーダルがあれば削除
+  document.getElementById('sms-modal')?.remove();
+  const phoneNorm = _smsNormalizePhone(phone);
+  if (!phoneNorm) {
+    showToast('電話番号がありません', true);
+    return;
+  }
+  const { date, time } = _smsParseDate(bookDate);
+  const ctx = {
+    name: name || 'お客',
+    date: date || '近日中',
+    time: time || '',
+    clinic: facility || '清翔会'
+  };
+
+  const modal = document.createElement('div');
+  modal.id = 'sms-modal';
+  modal.className = 'modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99998;display:flex;align-items:flex-start;justify-content:center;padding:16px;overflow-y:auto';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:520px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:inherit">
+      <div style="padding:14px 18px;border-bottom:1px solid var(--border);background:#f9fafb;border-radius:12px 12px 0 0;display:flex;align-items:center;gap:8px">
+        <strong style="font-size:14px">📱 SMS送信</strong>
+        <span style="font-size:11px;color:var(--text-sub)">→ ${escapeHtml(name || '')} (${escapeHtml(phoneNorm)})</span>
+        <button id="sms-close-btn" style="margin-left:auto;background:transparent;border:none;font-size:18px;cursor:pointer;color:var(--text-sub);padding:0 4px">✕</button>
+      </div>
+      <div style="padding:14px 16px">
+        <div style="font-size:11px;color:var(--text-sub);margin-bottom:8px">テンプレートを選んでください (タップでメッセージアプリが開きます)</div>
+        <div id="sms-template-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px">
+          ${SMS_TEMPLATES.map(t => {
+            const filled = _smsRenderTemplate(t.body, ctx);
+            return `<button class="sms-tpl-btn" data-id="${t.id}" data-body="${escapeHtml(filled)}" style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;background:#fff;border:1px solid var(--border);border-radius:8px;cursor:pointer;text-align:left;font-family:inherit;transition:all .15s" onmouseover="this.style.background='#f3f4f6';this.style.borderColor='#7c3aed'" onmouseout="this.style.background='#fff';this.style.borderColor='var(--border)'">
+              <span style="font-size:18px">${t.icon}</span>
+              <span style="flex:1">
+                <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:2px">${escapeHtml(t.label)} <span style="font-size:10px;font-weight:400;color:var(--text-sub)">— ${escapeHtml(t.desc)}</span></div>
+                <div style="font-size:10px;color:var(--text-sub);white-space:pre-wrap;line-height:1.4">${filled ? escapeHtml(filled.length > 80 ? filled.slice(0, 80) + '…' : filled) : '(本文を入力してください)'}</div>
+              </span>
+            </button>`;
+          }).join('')}
+        </div>
+        <div style="border-top:1px dashed var(--border);padding-top:10px">
+          <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">📝 本文を編集して送る (任意)</div>
+          <textarea id="sms-custom-body" style="width:100%;height:90px;padding:8px;font-size:12px;border:1px solid var(--border);border-radius:6px;font-family:inherit;box-sizing:border-box;resize:vertical" placeholder="ここに直接入力もできます"></textarea>
+          <button id="sms-custom-send" class="filter-btn" style="margin-top:6px;width:100%;padding:8px;background:#7c3aed;color:#fff;font-weight:700">📤 入力した内容で送信</button>
+        </div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:10px;line-height:1.5">
+          💡 ボタンを押すと iPhone/Android のメッセージアプリが起動し、宛先と本文が入力された状態になります。<br>
+          相手が iPhone (iMessage) の場合は無料、それ以外は SMS (1通約3〜30円・キャリア課金) で送信されます。
+        </div>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+
+  const closeAndLog = (templateId, finalBody) => {
+    // 送信ログ保存 (localStorage 'sms-history')
+    try {
+      const hist = (typeof loadData === 'function') ? loadData('sms-history', []) : [];
+      hist.push({
+        name, phone: phoneNorm, templateId,
+        body: (finalBody || '').slice(0, 500),
+        sentAt: new Date().toISOString()
+      });
+      // 最大500件まで保持
+      if (hist.length > 500) hist.splice(0, hist.length - 500);
+      saveData('sms-history', hist);
+    } catch(_){}
+    modal.remove();
+  };
+
+  modal.querySelector('#sms-close-btn').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+
+  // テンプレートボタン
+  modal.querySelectorAll('.sms-tpl-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const body = btn.dataset.body;
+      const id = btn.dataset.id;
+      if (id === 'custom') {
+        // 自由入力モードはテンプレに本文をセットしてもらう
+        modal.querySelector('#sms-custom-body').focus();
+        return;
+      }
+      const url = `sms:${phoneNorm}?body=${encodeURIComponent(body)}`;
+      window.location.href = url;
+      closeAndLog(id, body);
+    });
+  });
+
+  // 自由入力 → 送信
+  modal.querySelector('#sms-custom-send').addEventListener('click', () => {
+    const body = modal.querySelector('#sms-custom-body').value || '';
+    if (!body.trim()) {
+      showToast('本文を入力してください', true);
+      return;
+    }
+    const url = `sms:${phoneNorm}?body=${encodeURIComponent(body)}`;
+    window.location.href = url;
+    closeAndLog('custom', body);
+  });
 }
 function maskEmail(email) {
   if (!email) return email;
@@ -4012,7 +4182,7 @@ function _renderPhoneCheckRow(d, canViewPII, memos) {
     <td data-label="名前" style="padding:5px 8px;font-size:13px;font-weight:700;color:#1a1a1a;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(name || '')}">${escapeHtml(name || '')}</td>
     <td data-label="施術" style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(normSvc(d.service) || '-')}</td>
     <td data-label="医院" style="padding:5px 8px;font-size:11px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escapeHtml(fac)}</td>
-    <td data-label="連絡先" style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:3px;padding:3px 7px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a>` : '<span style="color:#9ca3af">-</span>'}</td>
+    <td data-label="連絡先" style="padding:5px 8px;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${canViewPII && phone ? `<span style="display:inline-flex;align-items:center;gap:3px"><a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:2px;padding:3px 6px;background:#dcfce7;color:#15803d;border-radius:5px;font-weight:700;text-decoration:none">📞 ${escapeHtml(phone)}</a><button type="button" class="phone-sms-btn" data-name="${escapeHtml(d.name)}" data-phone="${escapeHtml(d.phone||'')}" data-bookdate="${escapeHtml(d.bookDate||'')}" data-facility="${escapeHtml(d.facility||'')}" title="SMSを送る (テンプレート選択)" style="padding:3px 7px;background:#ede9fe;color:#7c3aed;border:1px solid #c4b5fd;border-radius:5px;font-weight:700;font-size:11px;cursor:pointer;font-family:inherit">📱</button></span>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td data-label="プロモ" style="padding:5px 8px;font-size:10px;color:var(--text-sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(d.source || '')}">${d.source ? `<span style="display:inline-block;padding:2px 7px;background:#e0f2fe;color:#0369a1;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #bae6fd">${escapeHtml(d.source.length>14 ? d.source.slice(0,14)+'…' : d.source)}</span>` : '<span style="color:#9ca3af">-</span>'}</td>
     <td data-label="状況" style="padding:5px 8px;text-align:left"><span style="padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;background:${stClr.bg};color:${stClr.fg};white-space:nowrap" title="${escapeHtml(st)}">${escapeHtml(_phoneStatusLabel(st))}</span></td>
     ${memoCellHtml.replace(/<td /, '<td data-label="メモ" ')}
@@ -4109,6 +4279,20 @@ function _phoneStatusBtn(targetSt, icon, title, bg, fg, border, currentSt) {
 }
 
 function _bindPhoneCheckRowEvents(el) {
+  // v391: SMS送信ボタン (.phone-sms-btn)
+  el.querySelectorAll('.phone-sms-btn').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      const name = btn.dataset.name;
+      const phone = btn.dataset.phone;
+      const bookDate = btn.dataset.bookdate;
+      const facility = btn.dataset.facility;
+      if (typeof openSmsModal === 'function') {
+        openSmsModal(name, phone, bookDate, facility);
+      }
+    });
+  });
   el.querySelectorAll('tr.phone-row, .phone-row').forEach(row => {
     const name = row.dataset.name;
     const apply = row.dataset.apply;
