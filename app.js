@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v385';
+const APP_VERSION = 'v386';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -96,18 +96,23 @@ if (document.readyState === 'loading') {
 // === v374: クロスタブ再描画ヘルパー (一覧タブ等で編集した値を予約/電話前確認/BF/治療別タブに即反映) ===
 // 1つのフィールドを編集したとき、他のタブが既に開いていれば即時に再描画。
 // 重複呼び出しを避けるため debounce 処理。
+// v386: skipSelf 引数で「自分のタブは既に再描画したのでスキップ」を可能に (#1 二重render防止)
 let _syncCrossTabTimer = null;
-function syncCrossTabRender() {
+let _syncCrossTabSkip = null;  // 'kaiin-all' | 'bookings' | 'phone' | 'kaiin-tab' | null
+function syncCrossTabRender(skipSelf) {
+  if (skipSelf) _syncCrossTabSkip = skipSelf;
   if (_syncCrossTabTimer) clearTimeout(_syncCrossTabTimer);
   _syncCrossTabTimer = setTimeout(() => {
     _syncCrossTabTimer = null;
+    const skip = _syncCrossTabSkip;
+    _syncCrossTabSkip = null;
     try {
       // 予約タブ - bk-table が DOM にあれば再描画
-      if (typeof renderBookings === 'function' && document.getElementById('bk-tbody')) {
+      if (skip !== 'bookings' && typeof renderBookings === 'function' && document.getElementById('bk-tbody')) {
         renderBookings();
       }
       // 電話前確認 - phone-check-content が DOM にあれば再描画
-      if (typeof renderPhoneCheck === 'function' && document.getElementById('phone-check-content')) {
+      if (skip !== 'phone' && typeof renderPhoneCheck === 'function' && document.getElementById('phone-check-content')) {
         renderPhoneCheck();
       }
       // BF進捗 (lifecycle) が表示中なら再描画
@@ -116,20 +121,24 @@ function syncCrossTabRender() {
         updateBFFunnelAndTable(getBFRows());
       }
       // 来院タブの各治療サブタブ - 表示中の sub-kaiin-* があれば renderKaiinTab 再実行
-      const treatmentMap = { 'sub-kaiin-bf':'BF', 'sub-kaiin-kyosei':'矯正', 'sub-kaiin-implant':'インプラント', 'sub-kaiin-labrie':'ラブリエ', 'sub-kaiin-hotetsu':'自費補綴', 'sub-kaiin-konchi':'自費根治', 'sub-kaiin-whitening':'ホワイトニング', 'sub-kaiin-lipart':'リップアート', 'sub-kaiin-jewelry':'ティースジュエリー', 'sub-kaiin-other':'その他' };
-      Object.keys(treatmentMap).forEach(subId => {
-        const sub = document.getElementById(subId);
-        if (!sub || sub.hidden) return;
-        const innerId = subId + '-content';
-        if (!document.getElementById(innerId)) return;
-        if (typeof renderKaiinTab === 'function') {
-          try { renderKaiinTab(treatmentMap[subId], innerId); } catch(_){}
-        }
-      });
+      if (skip !== 'kaiin-tab') {
+        const treatmentMap = { 'sub-kaiin-bf':'BF', 'sub-kaiin-kyosei':'矯正', 'sub-kaiin-implant':'インプラント', 'sub-kaiin-labrie':'ラブリエ', 'sub-kaiin-hotetsu':'自費補綴', 'sub-kaiin-konchi':'自費根治', 'sub-kaiin-whitening':'ホワイトニング', 'sub-kaiin-lipart':'リップアート', 'sub-kaiin-jewelry':'ティースジュエリー', 'sub-kaiin-other':'その他' };
+        Object.keys(treatmentMap).forEach(subId => {
+          const sub = document.getElementById(subId);
+          if (!sub || sub.hidden) return;
+          const innerId = subId + '-content';
+          if (!document.getElementById(innerId)) return;
+          if (typeof renderKaiinTab === 'function') {
+            try { renderKaiinTab(treatmentMap[subId], innerId); } catch(_){}
+          }
+        });
+      }
       // 一覧タブ - sub-kaiin-list が表示中なら renderKaiinAll 再実行
-      const listSub = document.getElementById('sub-kaiin-list');
-      if (listSub && !listSub.hidden && document.getElementById('kaiin-all-content') && typeof renderKaiinAll === 'function') {
-        try { renderKaiinAll('kaiin-all-content'); } catch(_){}
+      if (skip !== 'kaiin-all') {
+        const listSub = document.getElementById('sub-kaiin-list');
+        if (listSub && !listSub.hidden && document.getElementById('kaiin-all-content') && typeof renderKaiinAll === 'function') {
+          try { renderKaiinAll('kaiin-all-content'); } catch(_){}
+        }
       }
     } catch (e) { console.warn('syncCrossTabRender failed', e); }
   }, 80);
@@ -6932,7 +6941,12 @@ function renderBookings() {
       // DBにも保存
       const dbField = field === 'contractService' ? 'contract_service' : field === 'contractAmount' ? 'contract_amount' : field === 'paymentMonth' ? 'payment_month' : field === 'incentiveAmount' ? 'incentive_amount' : 'incentive_month';
       const update = { name, apply_date: apply };
-      update[dbField] = (field === 'contractAmount' || field === 'incentiveAmount') ? Number(String(value).replace(/,/g,'')) || 0 : value;
+      // v386: 月フィールドの空文字は null に変換 (空文字保存だと「未設定」と「明示クリア」が区別できない #7)
+      const isMonth = (field === 'paymentMonth' || field === 'incentiveMonth');
+      const isAmount = (field === 'contractAmount' || field === 'incentiveAmount');
+      update[dbField] = isAmount
+        ? (Number(String(value).replace(/,/g,'')) || 0)
+        : (isMonth && (value === '' || value == null) ? null : value);
       // A2+A3
       const bkKey = name + '|' + apply;
       const seen = getVersion('booking_status', bkKey);
@@ -8165,29 +8179,29 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     const mapped = BF_TO_STATUS[value];
     if (mapped) {
       // マッピング有: DBとメモリの両方に正規化された status を設定
+      // v386: name+applyDate の完全一致のみ (#4 同名別人バグ修正)
       update.status = mapped;
-      const nnTarget = normName(name);
-      const dateKey = normDateKey(applyDate);
       (bookingsData || []).forEach(b => {
-        if (normName(b.name) === nnTarget && normDateKey(b.bookDate || b.applyDate) === dateKey) {
+        if (b.name === name && b.applyDate === applyDate) {
           b.status = mapped;
         }
       });
     }
-    // マッピング有無に関わらず、bk-extra.editedStatus は常に value で上書き (クリア含む)
+    // v386: editedStatus を editedBFStatus に分離 (#6 通常編集とBF同期の競合解消)
     try {
       const bkEx = loadData('bk-extra', {});
       if (!bkEx[key]) bkEx[key] = {};
+      bkEx[key].editedBFStatus = mapped || value;
+      // 互換のため editedStatus も書き続ける (旧コードが参照する可能性)
       bkEx[key].editedStatus = mapped || value;
       saveData('bk-extra', bkEx);
     } catch(_){}
   }
   // === 金額連動: contract_amount は bookingsData.contractAmount と同期 ===
+  // v386: name+applyDate の完全一致のみ (#4)
   if (field === 'contract_amount') {
-    const nnTarget = normName(name);
-    const dateKey = normDateKey(applyDate);
     (bookingsData || []).forEach(b => {
-      if (normName(b.name) === nnTarget && normDateKey(b.bookDate || b.applyDate) === dateKey) {
+      if (b.name === name && b.applyDate === applyDate) {
         b.contractAmount = Number(value) || 0;
       }
     });
@@ -8221,16 +8235,14 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   // キャッシュ更新
   if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
   bfLifecycleCache[key][field] = value;
-  // メモ連動: 予約一覧の d._memo も更新 (スペース差含めた同名患者も対応)
+  // メモ連動: 予約一覧の d._memo も更新
+  // v386: name+applyDate の完全一致のみ (旧: normName で fuzzy match → 同名別人を上書きするバグ #4/#12)
   if (field === 'bf_memo' || field === 'memo') {
-    const nnTarget = normName(name);
-    const dateKey = (applyDate || '').substring(0,10);
     (bookingsData || []).forEach(b => {
-      if (normName(b.name) === nnTarget && (b.applyDate||'').substring(0,10) === dateKey) {
+      if (b.name === name && b.applyDate === applyDate) {
         b._memo = value;
       }
     });
-    const bk = (bookingsData || []).find(b => b.name === name && b.applyDate === applyDate);
     try {
       const memos = loadData('bk-memos', {});
       memos[key] = value;
@@ -8538,6 +8550,8 @@ const STATUS_TO_BF = {
   '除外': null
 };
 // BFステータス → 予約一覧の状態 (上書き)
+// v386: BF治療途中の細かい段階 (CT/診断, P処置等) も全て '成約' にマッピング
+// (それ以前は未対応で、bf_status だけ更新されて status が古いまま残るバグがあった #5)
 const BF_TO_STATUS = {
   '離脱': '来院済',
   '検討中': '来院済',
@@ -8545,12 +8559,24 @@ const BF_TO_STATUS = {
   'ローン審査中': '成約',
   'ローン審査落': '成約',
   '矯正決定(BF保留)': '成約',
+  'ラブリエ決定(BF保留)': '成約',
+  'インプラント決定(BF保留)': '成約',
   '印象待ち(治療無)': '成約',
   '印象待ち(治療有)': '成約',
   '治療中': '成約',
   'セット日確定待ち': '成約',
   'セット待ち': '成約',
   'セット完了': '成約',
+  // v386: 治療各段階を追加 (BF意図保護で表示はそれぞれの段階だが、status は成約として扱う)
+  'CT/診断': '成約',
+  'P処置': '成約',
+  'C処置': '成約',
+  'ガイド印象': '成約',
+  '手術予定': '成約',
+  '治癒期間': '成約',
+  '印象': '成約',
+  'セット': '成約',
+  '完了': '成約',
   'キャンセル': 'キャンセル'
 };
 
@@ -11378,7 +11404,7 @@ function renderPromo() {
   };
   const _isPaid = (d) => {
     const ex = _bkEx[d.name + '|' + d.applyDate] || {};
-    return ex.incentivePaid === true || ex.incentivePaid === 'true' || d.incentivePaid === true;
+    return ex.incentivePaid === true || d.incentivePaid === true;
   };
 
   // === プロモコード別に集計 ===
@@ -11532,17 +11558,19 @@ function renderPromo() {
     cb.addEventListener('change', async () => {
       const name = cb.dataset.name, apply = cb.dataset.apply, paid = cb.checked;
       try {
+        // v386: paid を Boolean で統一して保存 (#8)
+        const paidBool = Boolean(paid);
         const bkEx = loadData('bk-extra', {});
         const key = name + '|' + apply;
         if (!bkEx[key]) bkEx[key] = {};
-        bkEx[key].incentivePaid = paid;
+        bkEx[key].incentivePaid = paidBool;
         saveData('bk-extra', bkEx);
         const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-        if (target) target.incentivePaid = paid;
+        if (target) target.incentivePaid = paidBool;
         await safeSave({
           type: 'upsert',
           table: 'booking_status',
-          payload: { name, apply_date: apply, incentive_paid: paid },
+          payload: { name, apply_date: apply, incentive_paid: paidBool },
           options: { onConflict: 'name,apply_date' }
         });
         renderPromo();
@@ -11796,7 +11824,7 @@ function _renderPromoDetail(p, _bkEx) {
   };
   const _isPaid = (d) => {
     const ex = _bkEx[d.name + '|' + d.applyDate] || {};
-    return ex.incentivePaid === true || ex.incentivePaid === 'true' || d.incentivePaid === true;
+    return ex.incentivePaid === true || d.incentivePaid === true;
   };
   const _imLbl = (d) => {
     const ex = _bkEx[d.name + '|' + d.applyDate] || {};
