@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v365';
+const APP_VERSION = 'v366';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8710,6 +8710,8 @@ async function renderKaiinAll(containerId) {
 
   el.innerHTML = `
     <div id="kaiin-all-period-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 12px;background:linear-gradient(90deg,#eff6ff 0%,#fff 100%);border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:8px">
+      <strong style="color:#1a1a1a;font-size:16px;font-weight:700;letter-spacing:0.5px">🏥 来院管理</strong>
+      <span style="font-size:10px;color:#999">|</span>
       <span style="font-size:11px;color:var(--text-sub)">📅</span>
       <strong style="color:var(--text);font-size:13px">${escapeHtml(periodLabel)}</strong>
       ${(() => {
