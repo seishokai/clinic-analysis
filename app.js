@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v396';
+const APP_VERSION = 'v397';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -42,6 +42,62 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', injectAppVersion);
 } else {
   injectAppVersion();
+}
+
+// === v397: バージョン自動チェック (キャッシュ更新誘導バナー) ===
+// GitHub Pages にデプロイされた version.txt を no-cache で取得し、
+// APP_VERSION と一致しなければ「新バージョンあります」バナーを表示。
+// スマホブラウザで古いHTMLがキャッシュされていてもアプリ起動時にチェック走る。
+let _updateBannerShown = false;
+async function checkLatestVersion() {
+  try {
+    const res = await fetch('version.txt?_=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const remote = (await res.text()).trim();
+    if (!remote || remote === APP_VERSION) return;
+    if (_updateBannerShown) return;
+    _updateBannerShown = true;
+    showUpdateBanner(remote);
+  } catch (_) { /* ネットワーク失敗時は無視 */ }
+}
+function showUpdateBanner(newVer) {
+  // 既存バナーは削除
+  document.getElementById('update-banner')?.remove();
+  const banner = document.createElement('div');
+  banner.id = 'update-banner';
+  banner.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:linear-gradient(135deg,#fbbf24 0%,#f59e0b 100%);color:#78350f;padding:10px 14px;display:flex;align-items:center;gap:10px;font-size:13px;font-weight:600;box-shadow:0 4px 12px rgba(0,0,0,.2);font-family:inherit';
+  banner.innerHTML = `
+    <span style="font-size:18px">🆕</span>
+    <span style="flex:1;line-height:1.3">新しいバージョン <strong>${newVer}</strong> があります<br><span style="font-size:11px;font-weight:400;opacity:.85">現在: ${APP_VERSION} ・ 更新して最新機能を使う</span></span>
+    <button id="update-reload-btn" style="padding:8px 16px;background:#fff;color:#92400e;border:1px solid #fbbf24;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;font-size:13px;white-space:nowrap">🔄 更新</button>
+    <button id="update-dismiss-btn" style="padding:4px 8px;background:transparent;border:none;color:#78350f;cursor:pointer;font-size:20px;line-height:1;font-family:inherit">✕</button>
+  `;
+  document.body.prepend(banner);
+  document.getElementById('update-reload-btn').addEventListener('click', () => {
+    // Service Worker キャッシュ無しなのでハードリロード相当
+    // URL に ?_v= を付けて強制的に新規取得 + reload
+    const url = window.location.href.split('#')[0].split('?')[0] + '?_v=' + Date.now();
+    window.location.replace(url);
+  });
+  document.getElementById('update-dismiss-btn').addEventListener('click', () => {
+    banner.remove();
+    // 5分後に再表示
+    setTimeout(() => { _updateBannerShown = false; checkLatestVersion(); }, 5 * 60 * 1000);
+  });
+}
+// 起動時に1回 + 5分ごとに自動チェック
+function _startVersionCheck() {
+  checkLatestVersion();
+  setInterval(checkLatestVersion, 5 * 60 * 1000);  // 5分間隔
+  // タブが復帰したときも再チェック (スリープ復帰対応)
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) checkLatestVersion();
+  });
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(_startVersionCheck, 1000));
+} else {
+  setTimeout(_startVersionCheck, 1000);
 }
 
 // === v293: app_settings テーブル経由で全ユーザー共有設定 ===
