@@ -380,6 +380,37 @@ body {
 .badge-warning { background: #fffbeb; color: #b45309; border: 1px solid #fde68a; }
 .badge-danger { background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; }
 
+/* === 状態バッジ統一クラス (全タブで同じ見た目) === */
+.status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  line-height: 1.4;
+  border: 1.5px solid;
+  cursor: default;
+}
+.status-pill-mut    { color: #6b7280; background: #f3f4f6; border-color: #d1d5db; }
+.status-pill-orange { color: #c2410c; background: #fff7ed; border-color: #fdba74; }
+.status-pill-purple { color: #9333ea; background: #faf5ff; border-color: #d8b4fe; }
+.status-pill-cyan   { color: #0e7490; background: #ecfeff; border-color: #67e8f9; }
+.status-pill-blued  { color: #0369a1; background: #f0f9ff; border-color: #7dd3fc; }
+.status-pill-blue   { color: #1d4ed8; background: #eff6ff; border-color: #93c5fd; }
+.status-pill-violet { color: #7c3aed; background: #f5f3ff; border-color: #c4b5fd; }
+.status-pill-teal   { color: #0891b2; background: #ecfeff; border-color: #67e8f9; }
+.status-pill-green  { color: #059669; background: #ecfdf5; border-color: #86efac; }
+.status-pill-red    { color: #dc2626; background: #fef2f2; border-color: #fca5a5; }
+/* select として使う場合のリセット (背景画像の矢印は個別 inline style に任せる) */
+select.status-pill {
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  font-family: inherit;
+  padding-right: 24px;
+}
+
 /* === Facility Tabs === */
 .facility-tabs {
   display: flex; gap: 0; overflow-x: auto;

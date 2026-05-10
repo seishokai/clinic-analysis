@@ -1,11 +1,36 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v351';
+const APP_VERSION = 'v352';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
   return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 const esc = escapeHtml; // 短縮エイリアス (innerHTML展開・属性値両対応)
+
+// === 状態バッジ統一クラス (styles.css の .status-pill-* と対応) ===
+const STATUS_PILL_CLASS = {
+  '': 'status-pill-mut',
+  '未対応': 'status-pill-orange',
+  '予約連絡待ち': 'status-pill-purple',
+  '後追いLINE済み': 'status-pill-cyan',
+  '確認済': 'status-pill-blued',
+  '予約変更': 'status-pill-teal',
+  '検討中': 'status-pill-violet',
+  '来院済': 'status-pill-blue',
+  '成約': 'status-pill-green',
+  'キャンセル': 'status-pill-red',
+};
+const statusPillClass = (s) => STATUS_PILL_CLASS[s || ''] || 'status-pill-mut';
+const statusPillLabel = (s) => s === '予約連絡待ち' ? '次回予約連絡待ち' : (s || '未設定');
+const statusPillHtml = (s) => `<span class="status-pill ${statusPillClass(s)}">${escapeHtml(statusPillLabel(s))}</span>`;
+// 治療別ステータス (BF/矯正/インプラント等の lifecycle 含む) では status が標準9種に
+// 該当しないことがある。その場合は構造クラス .status-pill だけ付与し、色は inline 指定。
+const statusPillCss = (s, fallbackColor) => {
+  const std = STATUS_PILL_CLASS[s || ''];
+  if (std) return { c: `status-pill ${std}`, s: '' };
+  if (fallbackColor) return { c: 'status-pill', s: `background-color:${fallbackColor}22;color:${fallbackColor};border-color:${fallbackColor}` };
+  return { c: 'status-pill status-pill-mut', s: '' };
+};
 
 // === DOM準備後にバージョンを画面の各所に注入 ===
 function injectAppVersion() {
@@ -8895,19 +8920,12 @@ async function renderKaiinAll(containerId) {
                   const lbl = d.source.length > 14 ? d.source.slice(0,14) + '…' : d.source;
                   promoChip = `<span style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
                 }
-                // 状態 (編集可能なセレクト, BFスタイル: 丸形・色付き)
+                // 状態 (編集可能なセレクト, 統一クラス .status-pill 使用)
                 const st = d.status || '';
-                const stMap = {
-                  '成約': '#059669', 'キャンセル': '#dc2626', '未対応': '#f97316',
-                  '来院済': '#1d4ed8', '検討中': '#7c3aed', '予約変更': '#0891b2',
-                  '確認済': '#0369a1', '後追いLINE済み': '#0e7490', '予約連絡待ち': '#a855f7'
-                };
-                const stColor = stMap[st] || '#9ca3af';
                 const stOptions = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル'];
-                const stRound = `padding:4px 10px;border-radius:20px;background:${stColor}22;color:${stColor};border:1.5px solid ${stColor};font-weight:700`;
-                const stBadge = `<select class="kaiin-all-status-sel" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:10px;width:100%;${stRound};appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px;padding-right:24px;cursor:pointer">
+                const stBadge = `<select class="kaiin-all-status-sel status-pill ${statusPillClass(st)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:10px;width:100%;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
                   <option value="">未設定</option>
-                  ${stOptions.map(s => { const lbl = s === '予約連絡待ち' ? '次回予約連絡待ち' : s; return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
+                  ${stOptions.map(s => { const lbl = statusPillLabel(s); return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
                 </select>`;
                 // 来院日チップ
                 const bookChip = bookMMDD !== '-'
@@ -9469,7 +9487,6 @@ function drawKaiinRows(treatment, rows, container) {
     // インプラントは予約タブと完全統合: d.status を使用 (既存ステータスを維持)
     const st = (treatment === 'インプラント') ? (d.status || '') : (info.bf_status || '');
     const stColor = statuses.find(s => s.value === st)?.color || '';
-    const stStyle = st ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700` : '';
     const memo = d._memo || findAnyMemo(d.name);
     // プロモ表示: 統一スタイル (バッジ風) + 手動はクリックで編集
     let promoBadge = '';
@@ -9487,8 +9504,8 @@ function drawKaiinRows(treatment, rows, container) {
     // 次回予定日の色分け (BFと同じ)
     const nextDate = info.bf_next_date || '';
     const nextDateStyle = nextDate ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600' : 'background:#fef3c7;border:1.5px solid #f59e0b;color:#92400e';
-    // 丸いステータスバッジ
-    const stRound = st ? `border-radius:20px;background:${stColor}22;color:${stColor};border:1.5px solid ${stColor};font-weight:700;padding:4px 10px` : 'border-radius:20px;padding:4px 10px';
+    // 丸いステータスバッジ (統一 .status-pill クラス + 治療別色は inline fallback)
+    const stPill = statusPillCss(st, stColor);
     // CS医院 (複数選択可)
     const csFac = info.bf_cs_facility || normFac(d.facility) || '';
     const csFacList = parseCsFac(csFac);
@@ -9535,7 +9552,7 @@ function drawKaiinRows(treatment, rows, container) {
       <td><select class="kaiin-consult-sel kaiin-plain-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:none;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center">
         ${CONSULT_TYPES.map(t => `<option ${curConsult===t?'selected':''}>${t}</option>`).join('')}
       </select></td>
-      <td><select class="kaiin-status-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;width:100%;${stRound};appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M6 9l6 6 6-6&quot;/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px;padding-right:24px">
+      <td><select class="kaiin-status-sel ${stPill.c}" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;width:100%;${stPill.s ? stPill.s + ';' : ''}background-image:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M6 9l6 6 6-6&quot;/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
         <option value="">未設定</option>
         ${statuses.map(s => { const lbl = s.value === '予約連絡待ち' ? '次回予約連絡待ち' : s.value; return `<option value="${esc(s.value)}" ${st===s.value?'selected':''}>${esc(lbl)}</option>`; }).join('')}
       </select></td>
