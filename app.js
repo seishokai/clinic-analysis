@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v375';
+const APP_VERSION = 'v376';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8898,9 +8898,16 @@ async function renderKaiinAll(containerId) {
                 const nextDate = info?.bf_next_date || '';
                 const contractSvc = d.contractService || '';
                 const amt = _amt(d);
-                // 来院日 MM/DD
-                const bdMatch = String(d.bookDate || '').match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-                const bookMMDD = bdMatch ? `${parseInt(bdMatch[2])}/${parseInt(bdMatch[3])}` : '-';
+                // 来院日 MM/DD (v376: BFタブと同じく YYYY/MM/DD と短縮形式 "M/D" の両方に対応 — セレクトタイプ等は短縮形式)
+                const _b = String(d.bookDate || '');
+                let bdMatch = _b.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                let bdYear = '', bdMonth = '', bdDay = '';
+                if (bdMatch) { bdYear = bdMatch[1]; bdMonth = bdMatch[2]; bdDay = bdMatch[3]; }
+                else {
+                  const m2 = _b.match(/^(\d{1,2})\/(\d{1,2})/);
+                  if (m2) { bdYear = String(new Date().getFullYear()); bdMonth = m2[1]; bdDay = m2[2]; }
+                }
+                const bookMMDD = (bdMonth && bdDay) ? `${parseInt(bdMonth)}/${parseInt(bdDay)}` : '-';
                 // 次回予定 MM/DD
                 const ndMatch = String(nextDate).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
                 const nextMMDD = ndMatch ? `${parseInt(ndMatch[2])}/${parseInt(ndMatch[3])}` : '';
@@ -8931,9 +8938,9 @@ async function renderKaiinAll(containerId) {
                   <option value="">未設定</option>
                   ${stOptions.map(s => { const lbl = statusPillLabel(s); return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
                 </select>`;
-                // 来院日 (v373: button + 隠しdate input で編集可、BFタブと同じパターン)
-                const bookDateISO = bdMatch
-                  ? `${bdMatch[1]}-${String(bdMatch[2]).padStart(2,'0')}-${String(bdMatch[3]).padStart(2,'0')}`
+                // 来院日 (v376: 短縮形式 "M/D" は今年として扱う)
+                const bookDateISO = (bdYear && bdMonth && bdDay)
+                  ? `${bdYear}-${String(bdMonth).padStart(2,'0')}-${String(bdDay).padStart(2,'0')}`
                   : '';
                 const bookBtnStyle = bookDateISO
                   ? 'background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600'
