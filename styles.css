@@ -411,6 +411,81 @@ select.status-pill {
   padding-right: 24px;
 }
 
+/* === フィルタバー統一クラス (予約一覧をベースに全タブで共通化) === */
+.filter-bar {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+.filter-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.filter-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #666;
+  letter-spacing: 1px;
+  width: 50px;
+  flex: 0 0 auto;
+}
+.filter-input {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  outline: none;
+  min-height: 28px;
+  box-sizing: border-box;
+}
+.filter-input:focus { border-color: var(--accent); }
+.filter-select {
+  padding: 6px 8px;
+  font-size: 11px;
+  font-family: inherit;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  outline: none;
+  width: auto;
+  min-height: 28px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
+.filter-btn {
+  padding: 5px 12px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: inherit;
+  border: 1px solid #d4d4d8;
+  border-radius: 14px;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  min-height: 28px;
+  white-space: nowrap;
+}
+.filter-btn:hover { border-color: #1d4ed8; color: #1d4ed8; }
+.filter-btn.is-active {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  color: #fff;
+  font-weight: 700;
+}
+.filter-btn-dark.is-active {
+  background: #1a1a1a;
+  border-color: #1a1a1a;
+}
+
 /* === Facility Tabs === */
 .facility-tabs {
   display: flex; gap: 0; overflow-x: auto;

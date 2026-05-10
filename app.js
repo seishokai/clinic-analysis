@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v352';
+const APP_VERSION = 'v353';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8808,19 +8808,19 @@ async function renderKaiinAll(containerId) {
       <strong style="color:var(--text);font-size:13px">${escapeHtml(periodLabel)}</strong>
       ${(() => {
         const isPb = (v) => !month && period === v;
-        const btn = (v, l) => `<button class="kaiin-all-period-btn" data-period="${v}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid ${isPb(v)?'#1d4ed8':'#cbd5e1'};background:${isPb(v)?'#1d4ed8':'#fff'};color:${isPb(v)?'#fff':'#475569'};font-weight:${isPb(v)?'700':'500'};cursor:pointer;min-height:24px">${l}</button>`;
+        const btn = (v, l) => `<button class="kaiin-all-period-btn filter-btn ${isPb(v)?'is-active':''}" data-period="${v}">${l}</button>`;
         return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
       })()}
       <span style="margin:0 4px;font-size:10px;color:#999">|</span>
       <span style="font-size:10px;color:#666;font-weight:600">表示:</span>
       ${(() => {
         const isVb = (v) => state.viewMode === v;
-        const btn = (v, l) => `<button class="kaiin-all-view-btn" data-view="${v}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid ${isVb(v)?'#1a1a1a':'#cbd5e1'};background:${isVb(v)?'#1a1a1a':'#fff'};color:${isVb(v)?'#fff':'#475569'};font-weight:${isVb(v)?'700':'500'};cursor:pointer;min-height:24px">${l}</button>`;
+        const btn = (v, l) => `<button class="kaiin-all-view-btn filter-btn filter-btn-dark ${isVb(v)?'is-active':''}" data-view="${v}">${l}</button>`;
         return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
       })()}
       <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
         <span style="font-size:11px;color:var(--text-sub)">${totalCount}件</span>
-        <button id="kaiin-all-dashboard-toggle" class="btn btn-outline" style="font-size:10px;padding:3px 10px;min-height:24px;border-radius:12px" title="ダッシュボード(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ ダッシュボード隠す':'▼ ダッシュボード表示'}</button>
+        <button id="kaiin-all-dashboard-toggle" class="filter-btn" title="ダッシュボード(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ ダッシュボード隠す':'▼ ダッシュボード表示'}</button>
       </span>
     </div>
     ${state.dashboardOpen ? `
@@ -8854,23 +8854,25 @@ async function renderKaiinAll(containerId) {
     ${cardsToShow ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:8px">${cardsToShow}</div>` : ''}
     ${state.viewMode === 'treatment' ? `<div style="font-size:10px;color:var(--text-sub);text-align:center;padding:4px;margin-bottom:8px">↑ 治療タイプをクリックで詳細一覧へ</div>` : ''}
     ` : ''}
-    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
-      <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px">🎯 絞込</span>
-      <input type="text" id="kaiin-all-search" class="form-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:120px;padding:5px 8px;font-size:11px">
-      <button id="kaiin-all-today" class="btn ${state.todayOnly?'btn-dark':'btn-outline'}" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:14px" title="今日来院のみ">📅 今日</button>
-      <input type="month" id="kaiin-all-month" class="form-input" value="${escapeHtml(month||'')}" style="width:auto;padding:5px 8px;font-size:11px" title="月直接指定" placeholder="月指定">
-      <select id="kaiin-all-basis" class="form-select" style="width:auto;padding:5px 8px;font-size:11px" title="日付基準">
-        <option value="book" ${basis==='book'?'selected':''}>来院日基準</option>
-        <option value="apply" ${basis==='apply'?'selected':''}>登録日基準</option>
-      </select>
-      <span class="kaiin-all-facility-slot" title="医院"></span>
-      <span class="kaiin-all-status-slot" title="状態"></span>
-      <span class="kaiin-all-promo-slot" title="プロモ"></span>
-      <span class="kaiin-all-service-slot" title="相談"></span>
-      <span class="kaiin-all-contract-slot" title="成約商材"></span>
-      <span class="kaiin-all-tool-slot" title="ツール"></span>
-      <span style="flex:1"></span>
-      <button id="kaiin-all-reset" class="btn btn-outline" style="min-height:28px;padding:4px 12px;font-size:11px;border-radius:14px" title="全フィルタをクリア">🔄 リセット</button>
+    <div class="filter-bar">
+      <div class="filter-row">
+        <span class="filter-label">🎯 絞込</span>
+        <input type="text" id="kaiin-all-search" class="filter-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:140px">
+        <button id="kaiin-all-today" class="filter-btn filter-btn-dark ${state.todayOnly?'is-active':''}" title="今日来院のみ">📅 今日</button>
+        <input type="month" id="kaiin-all-month" class="filter-input" value="${escapeHtml(month||'')}" title="月直接指定" placeholder="月指定">
+        <select id="kaiin-all-basis" class="filter-select" title="日付基準">
+          <option value="book" ${basis==='book'?'selected':''}>来院日基準</option>
+          <option value="apply" ${basis==='apply'?'selected':''}>登録日基準</option>
+        </select>
+        <span class="kaiin-all-facility-slot" title="医院"></span>
+        <span class="kaiin-all-status-slot" title="状態"></span>
+        <span class="kaiin-all-promo-slot" title="プロモ"></span>
+        <span class="kaiin-all-service-slot" title="相談"></span>
+        <span class="kaiin-all-contract-slot" title="成約商材"></span>
+        <span class="kaiin-all-tool-slot" title="ツール"></span>
+        <span style="flex:1"></span>
+        <button id="kaiin-all-reset" class="filter-btn" title="全フィルタをクリア">🔄 リセット</button>
+      </div>
     </div>
     <div class="card" style="padding:10px">
       <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">来院一覧 <span style="font-weight:400;color:var(--text-muted)">${totalCount}件</span></div>
@@ -9204,28 +9206,30 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const CONSULT_TYPES = ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー','その他'];
 
   el.innerHTML = `
-    <button class="kaiin-header-toggle" style="padding:4px 10px;font-size:11px;background:var(--bg);border:1px solid var(--border);border-radius:4px;cursor:pointer;white-space:nowrap">▼ ヘッダーを表示</button>
-    <div class="kaiin-topbar" style="display:flex;gap:4px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:4px 6px;background:var(--card);border:1px solid var(--border);border-radius:6px">
-      <input type="text" class="form-input kaiin-filter-search" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px;padding:5px 8px;font-size:12px">
-      <select class="form-select kaiin-filter-period" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto">
-        <option value="">期間:全て</option>
-        <option value="thisMonth" selected>今月（来院日基準）</option>
-        <option value="thisMonthApply">今月（登録日基準）</option>
-        <option value="lastMonth">先月</option>
-      </select>
-      <span class="kaiin-filter-tool-slot"></span>
-      <span class="kaiin-filter-promo-slot"></span>
-      <span class="kaiin-filter-csfac-slot"></span>
-      <span class="kaiin-filter-setfac-slot"></span>
-      <span class="kaiin-filter-consult-slot"></span>
-      <span class="kaiin-filter-status-slot"></span>
-      <select class="form-select kaiin-sort" data-treatment="${treatment}" style="font-size:12px;padding:5px 8px;width:auto">
-        <option value="date-desc" selected>ソート:来院日(新→古)</option>
-        <option value="date-asc">来院日(古→新)</option>
-        <option value="status">ステータス順</option>
-        <option value="name">名前順</option>
-      </select>
-      <button class="btn btn-outline kaiin-pdf-btn" data-treatment="${treatment}" style="font-size:11px;padding:5px 8px;min-height:28px;white-space:nowrap">📄 PDF出力</button>
+    <button class="kaiin-header-toggle filter-btn">▼ ヘッダーを表示</button>
+    <div class="kaiin-topbar filter-bar" style="margin-bottom:10px">
+      <div class="filter-row">
+        <input type="text" class="kaiin-filter-search filter-input" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px">
+        <select class="kaiin-filter-period filter-select" data-treatment="${treatment}">
+          <option value="">期間:全て</option>
+          <option value="thisMonth" selected>今月（来院日基準）</option>
+          <option value="thisMonthApply">今月（登録日基準）</option>
+          <option value="lastMonth">先月</option>
+        </select>
+        <span class="kaiin-filter-tool-slot"></span>
+        <span class="kaiin-filter-promo-slot"></span>
+        <span class="kaiin-filter-csfac-slot"></span>
+        <span class="kaiin-filter-setfac-slot"></span>
+        <span class="kaiin-filter-consult-slot"></span>
+        <span class="kaiin-filter-status-slot"></span>
+        <select class="kaiin-sort filter-select" data-treatment="${treatment}">
+          <option value="date-desc" selected>ソート:来院日(新→古)</option>
+          <option value="date-asc">来院日(古→新)</option>
+          <option value="status">ステータス順</option>
+          <option value="name">名前順</option>
+        </select>
+        <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF出力</button>
+      </div>
     </div>
     <div class="kaiin-header-wrap" style="display:none">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto;align-items:center">
