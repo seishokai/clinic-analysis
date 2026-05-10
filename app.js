@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v347';
+const APP_VERSION = 'v348';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8645,6 +8645,8 @@ let _kaiinAllPeriodState = {
   service: new Set(),
   status: new Set(),
   contract: new Set(),
+  viewMode: 'all', // 'all' | 'treatment' | 'facility'
+  dashboardOpen: true,
 };
 let _kaiinAllDD = null;
 
@@ -8719,31 +8721,38 @@ async function renderKaiinAll(containerId) {
     return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
   };
   const byCat = {};
+  const byFac = {};
   allRows.forEach(d => {
     const cat = getTreatmentCategory(d) || 'その他';
+    const fac = normFac(d.facility) || '未設定';
     if (!byCat[cat]) byCat[cat] = { count: 0, contracted: 0, contractAmt: 0 };
     byCat[cat].count++;
     if (d.status === '成約') byCat[cat].contracted++;
     byCat[cat].contractAmt += _amt(d);
+    if (!byFac[fac]) byFac[fac] = { count: 0, contracted: 0, contractAmt: 0 };
+    byFac[fac].count++;
+    if (d.status === '成約') byFac[fac].contracted++;
+    byFac[fac].contractAmt += _amt(d);
   });
   const catOrder = ['BF','矯正','インプラント','ラブリエ','自費補綴','自費根治','ホワイトニング','リップアート','ティースジュエリー','その他'];
   const subNavMap = {'BF':'kaiin-bf','矯正':'kaiin-kyosei','インプラント':'kaiin-implant','ラブリエ':'kaiin-labrie','自費補綴':'kaiin-hotetsu','自費根治':'kaiin-konchi','ホワイトニング':'kaiin-whitening','リップアート':'kaiin-lipart','ティースジュエリー':'kaiin-jewelry','その他':'kaiin-other'};
-  const catCards = catOrder
-    .filter(c => byCat[c])
-    .map(c => {
-      const info = byCat[c];
-      const rate = info.count ? Math.round(info.contracted / info.count * 100) : 0;
-      const targetSub = subNavMap[c];
-      return `<div class="kaiin-all-card" data-target="${targetSub}" style="border:1px solid var(--border);border-radius:10px;padding:14px;cursor:pointer;background:#fff;transition:all .15s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#6366f1'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'">
-        <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">${c}</div>
-        <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
-          <div><span style="font-size:22px;font-weight:700;color:#111">${info.count}</span><span style="font-size:11px;color:var(--text-sub);margin-left:3px">件</span></div>
-          <div style="font-size:11px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:600">${info.contracted}</span></div>
-          <div style="font-size:11px;color:var(--text-sub)">率 <span style="color:${rate>=30?'#059669':'#d97706'};font-weight:600">${rate}%</span></div>
-          <div style="font-size:11px;color:var(--text-sub)">¥${fmt(info.contractAmt)}</div>
-        </div>
-      </div>`;
-    }).join('');
+  const renderCard = (label, info, target) => {
+    const rate = info.count ? Math.round(info.contracted / info.count * 100) : 0;
+    return `<div class="kaiin-all-card" ${target?`data-target="${target}"`:''} style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:${target?'pointer':'default'};background:#fff;transition:all .15s" ${target?`onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#6366f1'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'"`:''}>
+      <div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text)">${escapeHtml(label)}</div>
+      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
+        <div><span style="font-size:18px;font-weight:700;color:#111">${info.count}</span><span style="font-size:10px;color:var(--text-sub);margin-left:2px">件</span></div>
+        <div style="font-size:10px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:600">${info.contracted}</span></div>
+        <div style="font-size:10px;color:var(--text-sub)">率 <span style="color:${rate>=30?'#059669':'#d97706'};font-weight:600">${rate}%</span></div>
+        <div style="font-size:10px;color:var(--text-sub)">¥${fmt(info.contractAmt)}</div>
+      </div>
+    </div>`;
+  };
+  const catCards = catOrder.filter(c => byCat[c]).map(c => renderCard(c, byCat[c], subNavMap[c])).join('');
+  const facCards = Object.keys(byFac).sort((a,b) => byFac[b].count - byFac[a].count).map(f => renderCard(f, byFac[f], null)).join('');
+  const cardsToShow = state.viewMode === 'facility' ? facCards
+                    : state.viewMode === 'treatment' ? catCards
+                    : '';
   // === 全体統計 (来院は全て過去予約。予約数は表示しない) ===
   const totalCount = allRows.length;
   const visited = allRows.filter(d => isVisitedStatus(d.status || '')).length;
@@ -8769,11 +8778,27 @@ async function renderKaiinAll(containerId) {
        : '全期間');
 
   el.innerHTML = `
-    <div id="kaiin-all-period-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:8px 14px;background:linear-gradient(90deg,#eff6ff 0%,#fff 100%);border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:8px">
-      <span style="font-size:11px;color:var(--text-sub)">📅 表示中の期間:</span>
-      <strong style="color:var(--text)">${escapeHtml(periodLabel)}</strong>
-      <span style="margin-left:auto;font-size:11px;color:var(--text-sub)">${totalCount}件 表示</span>
+    <div id="kaiin-all-period-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 12px;background:linear-gradient(90deg,#eff6ff 0%,#fff 100%);border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:8px">
+      <span style="font-size:11px;color:var(--text-sub)">📅</span>
+      <strong style="color:var(--text);font-size:13px">${escapeHtml(periodLabel)}</strong>
+      ${(() => {
+        const isPb = (v) => !month && period === v;
+        const btn = (v, l) => `<button class="kaiin-all-period-btn" data-period="${v}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid ${isPb(v)?'#1d4ed8':'#cbd5e1'};background:${isPb(v)?'#1d4ed8':'#fff'};color:${isPb(v)?'#fff':'#475569'};font-weight:${isPb(v)?'700':'500'};cursor:pointer;min-height:24px">${l}</button>`;
+        return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
+      })()}
+      <span style="margin:0 4px;font-size:10px;color:#999">|</span>
+      <span style="font-size:10px;color:#666;font-weight:600">表示:</span>
+      ${(() => {
+        const isVb = (v) => state.viewMode === v;
+        const btn = (v, l) => `<button class="kaiin-all-view-btn" data-view="${v}" style="padding:3px 10px;font-size:11px;border-radius:12px;border:1px solid ${isVb(v)?'#1a1a1a':'#cbd5e1'};background:${isVb(v)?'#1a1a1a':'#fff'};color:${isVb(v)?'#fff':'#475569'};font-weight:${isVb(v)?'700':'500'};cursor:pointer;min-height:24px">${l}</button>`;
+        return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
+      })()}
+      <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+        <span style="font-size:11px;color:var(--text-sub)">${totalCount}件</span>
+        <button id="kaiin-all-dashboard-toggle" class="btn btn-outline" style="font-size:10px;padding:3px 10px;min-height:24px;border-radius:12px" title="ダッシュボード(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ ダッシュボード隠す':'▼ ダッシュボード表示'}</button>
+      </span>
     </div>
+    ${state.dashboardOpen ? `
     <div class="stats-row" style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
       <div class="stat-card" style="border-color:${overdue>0?'#f97316':'var(--border)'};background:${overdue>0?'#fff7ed':'var(--card)'}" title="未対応のまま予約日を過ぎた緊急対応必要件数">
         <span class="stat-label" style="color:${overdue>0?'#f97316':'var(--text-sub)'};font-weight:700">⚠ 要対応</span>
@@ -8801,42 +8826,26 @@ async function renderKaiinAll(containerId) {
         <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span>
       </div>
     </div>
-    <div style="display:flex;flex-direction:column;gap:6px;margin-bottom:10px;padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">📅 期間</span>
-        ${(() => {
-          const isPb = (v) => !month && period === v;
-          const btn = (v, l) => `<button class="kaiin-all-period-btn" data-period="${v}" style="padding:5px 12px;font-size:11px;border-radius:14px;border:1px solid ${isPb(v)?'#1d4ed8':'#d4d4d8'};background:${isPb(v)?'#1d4ed8':'#fff'};color:${isPb(v)?'#fff':'#475569'};font-weight:${isPb(v)?'700':'500'};cursor:pointer;min-height:28px">${l}</button>`;
-          return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
-        })()}
-        <span style="font-size:10px;color:#999;margin:0 4px">|</span>
-        <input type="month" id="kaiin-all-month" class="form-input" value="${escapeHtml(month||'')}" style="width:auto;padding:6px 8px;font-size:11px" title="月を直接指定（ボタンと排他）" placeholder="月指定">
-        <span style="font-size:9px;color:#999;margin:0 4px">×</span>
-        <span style="font-size:10px;color:#666;font-weight:600">基準:</span>
-        <select id="kaiin-all-basis" class="form-select" style="width:auto;padding:6px 8px;font-size:11px" title="期間/月をどちらの日付で絞るか">
-          <option value="book" ${basis==='book'?'selected':''}>📅 来院日基準</option>
-          <option value="apply" ${basis==='apply'?'selected':''}>📝 登録日基準</option>
-        </select>
-      </div>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px;width:50px">🎯 絞込</span>
-        <input type="text" id="kaiin-all-search" class="form-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:120px;padding:5px 8px;font-size:11px">
-        <button id="kaiin-all-today" class="btn ${state.todayOnly?'btn-dark':'btn-outline'}" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:14px" title="今日来院のみ">📅 今日</button>
-        <span class="kaiin-all-facility-slot" title="医院"></span>
-        <span class="kaiin-all-status-slot" title="状態"></span>
-        <span class="kaiin-all-promo-slot" title="プロモ"></span>
-        <span class="kaiin-all-service-slot" title="相談"></span>
-        <span class="kaiin-all-contract-slot" title="成約商材"></span>
-        <span class="kaiin-all-tool-slot" title="ツール"></span>
-        <span style="flex:1"></span>
-        <button id="kaiin-all-reset" class="btn btn-outline" style="min-height:28px;padding:4px 12px;font-size:11px;border-radius:14px" title="全フィルタをクリア">🔄 リセット</button>
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px;margin-bottom:14px">
-      ${catCards}
-    </div>
-    <div style="font-size:11px;color:var(--text-sub);text-align:center;padding:6px;margin-bottom:10px">
-      ↑ 治療タイプをクリックで詳細一覧へ
+    ${cardsToShow ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:8px">${cardsToShow}</div>` : ''}
+    ${state.viewMode === 'treatment' ? `<div style="font-size:10px;color:var(--text-sub);text-align:center;padding:4px;margin-bottom:8px">↑ 治療タイプをクリックで詳細一覧へ</div>` : ''}
+    ` : ''}
+    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px;padding:6px 10px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
+      <span style="font-size:10px;font-weight:700;color:#666;letter-spacing:1px">🎯 絞込</span>
+      <input type="text" id="kaiin-all-search" class="form-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:120px;padding:5px 8px;font-size:11px">
+      <button id="kaiin-all-today" class="btn ${state.todayOnly?'btn-dark':'btn-outline'}" style="min-height:28px;padding:4px 10px;font-size:11px;border-radius:14px" title="今日来院のみ">📅 今日</button>
+      <input type="month" id="kaiin-all-month" class="form-input" value="${escapeHtml(month||'')}" style="width:auto;padding:5px 8px;font-size:11px" title="月直接指定" placeholder="月指定">
+      <select id="kaiin-all-basis" class="form-select" style="width:auto;padding:5px 8px;font-size:11px" title="日付基準">
+        <option value="book" ${basis==='book'?'selected':''}>来院日基準</option>
+        <option value="apply" ${basis==='apply'?'selected':''}>登録日基準</option>
+      </select>
+      <span class="kaiin-all-facility-slot" title="医院"></span>
+      <span class="kaiin-all-status-slot" title="状態"></span>
+      <span class="kaiin-all-promo-slot" title="プロモ"></span>
+      <span class="kaiin-all-service-slot" title="相談"></span>
+      <span class="kaiin-all-contract-slot" title="成約商材"></span>
+      <span class="kaiin-all-tool-slot" title="ツール"></span>
+      <span style="flex:1"></span>
+      <button id="kaiin-all-reset" class="btn btn-outline" style="min-height:28px;padding:4px 12px;font-size:11px;border-radius:14px" title="全フィルタをクリア">🔄 リセット</button>
     </div>
     <div class="card" style="padding:10px">
       <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">来院一覧 <span style="font-weight:400;color:var(--text-muted)">${totalCount}件</span></div>
@@ -8909,6 +8918,20 @@ async function renderKaiinAll(containerId) {
   // === 今日来院トグル ===
   el.querySelector('#kaiin-all-today')?.addEventListener('click', () => {
     _kaiinAllPeriodState.todayOnly = !_kaiinAllPeriodState.todayOnly;
+    renderKaiinAll(containerId);
+  });
+
+  // === viewMode タブ (全治療/治療別/医院別) ===
+  el.querySelectorAll('.kaiin-all-view-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _kaiinAllPeriodState.viewMode = btn.dataset.view;
+      renderKaiinAll(containerId);
+    });
+  });
+
+  // === ダッシュボード表示/非表示 ===
+  el.querySelector('#kaiin-all-dashboard-toggle')?.addEventListener('click', () => {
+    _kaiinAllPeriodState.dashboardOpen = !_kaiinAllPeriodState.dashboardOpen;
     renderKaiinAll(containerId);
   });
 
