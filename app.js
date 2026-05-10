@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v370';
+const APP_VERSION = 'v371';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8604,6 +8604,7 @@ function getStatusesForTreatment(treatment) {
 
 // 来院タブ「一覧」レンダラー (全治療タイプまとめて表示)
 // v273: 来院一覧の期間フィルタ状態 (デフォルト今月、来院日基準)
+// v371: dashboardOpen / filterOpen の初期値を sessionStorage から復元 (ユーザーの選択を維持)
 let _kaiinAllPeriodState = {
   period: 'thisMonth',
   month: '',
@@ -8617,7 +8618,8 @@ let _kaiinAllPeriodState = {
   status: new Set(),
   contract: new Set(),
   viewMode: 'all', // 'all' | 'treatment' | 'facility'
-  dashboardOpen: true,
+  dashboardOpen: (() => { try { return sessionStorage.getItem('kaiin-all-dashboard') === '1'; } catch(_) { return false; } })(),
+  filterOpen: (() => { try { return sessionStorage.getItem('kaiin-all-filter') === '1'; } catch(_) { return false; } })(),
 };
 let _kaiinAllDD = null;
 
@@ -8760,30 +8762,14 @@ async function renderKaiinAll(containerId) {
        : '全期間');
 
   el.innerHTML = `
-    <div id="kaiin-all-period-banner" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;padding:4px 0">
-      <strong style="color:#1a1a1a;font-size:16px;font-weight:700;letter-spacing:0.5px">🏥 来院管理</strong>
-      <span style="font-size:11px;color:var(--text-sub)">${escapeHtml(periodLabel)}</span>
-      <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
-        <span style="font-size:11px;color:var(--text-sub)">${totalCount}件</span>
-        <button id="kaiin-all-dashboard-toggle" class="filter-btn" title="サマリー(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ サマリーを隠す':'▼ サマリーを表示'}</button>
+    <div id="kaiin-all-period-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0">
+      <strong style="color:#1a1a1a;font-size:14px;font-weight:700">🏥 来院管理</strong>
+      <span style="font-size:11px;color:var(--text-sub)">${escapeHtml(periodLabel)} ・ ${totalCount}件</span>
+      <input type="text" id="kaiin-all-search" class="filter-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:140px;font-size:11px;padding:3px 8px">
+      <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
+        <button id="kaiin-all-filter-toggle" class="filter-btn ${state.filterOpen?'is-active':''}" title="絞込フィルタを表示/非表示">${state.filterOpen?'▲ 絞込':'▼ 絞込'}</button>
+        <button id="kaiin-all-dashboard-toggle" class="filter-btn ${state.dashboardOpen?'is-active':''}" title="サマリー(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ サマリー':'▼ サマリー'}</button>
       </span>
-    </div>
-    <div class="filter-bar" style="margin-bottom:6px">
-      <div class="filter-row">
-        <span class="filter-label">期間</span>
-        ${(() => {
-          const isPb = (v) => !month && period === v;
-          const btn = (v, l) => `<button class="kaiin-all-period-btn filter-btn ${isPb(v)?'is-active':''}" data-period="${v}">${l}</button>`;
-          return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
-        })()}
-        <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
-        <span class="filter-label">表示</span>
-        ${(() => {
-          const isVb = (v) => state.viewMode === v;
-          const btn = (v, l) => `<button class="kaiin-all-view-btn filter-btn filter-btn-dark ${isVb(v)?'is-active':''}" data-view="${v}">${l}</button>`;
-          return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
-        })()}
-      </div>
     </div>
     ${state.dashboardOpen ? `
     <div class="stats-row" style="gap:6px;margin-bottom:8px">
@@ -8799,16 +8785,30 @@ async function renderKaiinAll(containerId) {
     ${cardsToShow ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:8px">${cardsToShow}</div>` : ''}
     ${state.viewMode === 'treatment' ? `<div style="font-size:10px;color:var(--text-sub);text-align:center;padding:4px;margin-bottom:8px">↑ 治療タイプをクリックで詳細一覧へ</div>` : ''}
     ` : ''}
-    <div class="filter-bar">
+    ${state.filterOpen ? `
+    <div class="filter-bar" style="margin-bottom:4px">
       <div class="filter-row">
-        <span class="filter-label">🎯 絞込</span>
-        <input type="text" id="kaiin-all-search" class="filter-input" placeholder="🔍 名前" value="${escapeHtml(state.search||'')}" style="width:140px">
+        <span class="filter-label">期間</span>
+        ${(() => {
+          const isPb = (v) => !month && period === v;
+          const btn = (v, l) => `<button class="kaiin-all-period-btn filter-btn ${isPb(v)?'is-active':''}" data-period="${v}">${l}</button>`;
+          return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
+        })()}
         <button id="kaiin-all-today" class="filter-btn filter-btn-dark ${state.todayOnly?'is-active':''}" title="今日来院のみ">📅 今日</button>
-        <input type="month" id="kaiin-all-month" class="filter-input" value="${escapeHtml(month||'')}" title="月直接指定" placeholder="月指定">
-        <select id="kaiin-all-basis" class="filter-select" title="日付基準">
-          <option value="book" ${basis==='book'?'selected':''}>来院日基準</option>
-          <option value="apply" ${basis==='apply'?'selected':''}>登録日基準</option>
+        <input type="month" id="kaiin-all-month" class="filter-input" value="${escapeHtml(month||'')}" title="月直接指定" placeholder="月指定" style="font-size:11px;padding:3px 6px">
+        <select id="kaiin-all-basis" class="filter-select" title="日付基準" style="font-size:11px;padding:3px 6px">
+          <option value="book" ${basis==='book'?'selected':''}>来院日</option>
+          <option value="apply" ${basis==='apply'?'selected':''}>登録日</option>
         </select>
+        <span style="width:1px;height:18px;background:var(--border);margin:0 2px"></span>
+        <span class="filter-label">表示</span>
+        ${(() => {
+          const isVb = (v) => state.viewMode === v;
+          const btn = (v, l) => `<button class="kaiin-all-view-btn filter-btn filter-btn-dark ${isVb(v)?'is-active':''}" data-view="${v}">${l}</button>`;
+          return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
+        })()}
+      </div>
+      <div class="filter-row" style="margin-top:4px">
         <span class="kaiin-all-facility-slot" title="医院"></span>
         <span class="kaiin-all-status-slot" title="ステータス"></span>
         <span class="kaiin-all-promo-slot" title="プロモ"></span>
@@ -8819,9 +8819,9 @@ async function renderKaiinAll(containerId) {
         <button id="kaiin-all-reset" class="filter-btn" title="全フィルタをクリア">🔄 リセット</button>
       </div>
     </div>
-    <div class="card" style="padding:10px">
-      <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:8px">来院一覧 <span style="font-weight:400;color:var(--text-muted)">${totalCount}件</span></div>
-      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${state.dashboardOpen ? 360 : 220}px);overflow-y:auto">
+    ` : ''}
+    <div class="card" style="padding:6px">
+      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${(state.dashboardOpen?160:0) + (state.filterOpen?80:0) + 100}px);overflow-y:auto">
         <table class="data-table compact kaiin-all-list-table" style="width:100%">
           <thead><tr>
             <th style="text-align:left">来院</th>
@@ -8960,9 +8960,16 @@ async function renderKaiinAll(containerId) {
     });
   });
 
-  // === ダッシュボード表示/非表示 ===
+  // === ダッシュボード(サマリー) 表示/非表示 (sessionStorage で永続化) ===
   el.querySelector('#kaiin-all-dashboard-toggle')?.addEventListener('click', () => {
     _kaiinAllPeriodState.dashboardOpen = !_kaiinAllPeriodState.dashboardOpen;
+    try { sessionStorage.setItem('kaiin-all-dashboard', _kaiinAllPeriodState.dashboardOpen ? '1' : '0'); } catch(_){}
+    renderKaiinAll(containerId);
+  });
+  // === 絞込フィルタ 表示/非表示 (sessionStorage で永続化) ===
+  el.querySelector('#kaiin-all-filter-toggle')?.addEventListener('click', () => {
+    _kaiinAllPeriodState.filterOpen = !_kaiinAllPeriodState.filterOpen;
+    try { sessionStorage.setItem('kaiin-all-filter', _kaiinAllPeriodState.filterOpen ? '1' : '0'); } catch(_){}
     renderKaiinAll(containerId);
   });
 
@@ -9319,8 +9326,9 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF出力</button>
       </div>
     </div>
-    <!-- v365: 予約管理と同じ8カードまとめ (予約数/要対応/未来予約/進行中/キャンセル/来院済/成約/成約金額) -->
-    <div class="stats-row kaiin-summary-row" style="gap:6px;margin-bottom:8px">
+    <!-- v365: 予約管理と同じ8カードまとめ (予約数/要対応/未来予約/進行中/キャンセル/来院済/成約/成約金額)
+         v371: サマリートグルで非表示にできるよう display:none 初期化 (sessionStorageで復元) -->
+    <div class="stats-row kaiin-summary-row" style="gap:6px;margin-bottom:8px;display:none">
       <div class="stat-card" title="予約数 = 来院済 + キャンセル + 未来予約 + 進行中 (要対応はキャンセル内)"><span class="stat-label">予約数</span><span class="stat-num kaiin-sum-total">${sum.total}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
       <div class="stat-card ${sum.overdue>0?'is-warning':''}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数"><span class="stat-label">⚠ 要対応</span><span class="stat-num kaiin-sum-overdue">${sum.overdue}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
       <div class="stat-card" title="未来予約 = 未対応のまま予約日がまだ未来"><span class="stat-label">未来予約</span><span class="stat-num kaiin-sum-pending">${sum.pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">未対応で予約日<br>がまだ未来</span></div>
@@ -9342,7 +9350,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     </div>
     <div class="card" style="padding:6px">
       <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">一覧 <span class="kaiin-count">${rows.length}件</span></div>
-      <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 320px);overflow-y:auto">
+      <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 180px);overflow-y:auto">
         <table class="data-table compact">
           <thead><tr>
             <th style="width:55px">来院</th>
@@ -9395,18 +9403,27 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     }
   } catch(_){}
 
-  // v369: 治療別サマリー (kaiin-header-wrap) の表示トグルのみ。
+  // v371: 治療別サマリー (8カード + 旧詳細header) を一括トグル。
+  // 状態は sessionStorage に保存 (タブ切替で維持)。
   // グローバル.headerと.kaiin-sub-navの表示切替は Aladdinロゴ (#header-logo-toggle) に集約。
+  const summaryRow = el.querySelector('.kaiin-summary-row');
+  const headerWrap = el.querySelector('.kaiin-header-wrap');
+  const tableWrap = el.querySelector('.kaiin-table-wrap');
+  const SUMMARY_KEY = 'kaiin-' + treatment + '-summary';
+  const applySummary = (open) => {
+    if (summaryRow) summaryRow.style.display = open ? '' : 'none';
+    if (headerWrap) headerWrap.style.display = open ? '' : 'none';
+    if (tableWrap) tableWrap.style.maxHeight = open ? 'calc(100vh - 320px)' : 'calc(100vh - 180px)';
+    if (toggleBtn) toggleBtn.textContent = open ? '▲ サマリーを隠す' : '▼ サマリーを表示';
+    try { sessionStorage.setItem(SUMMARY_KEY, open ? '1' : '0'); } catch(_){}
+  };
+  // 初期状態を sessionStorage から復元 (デフォルト: 非表示=コンパクト)
+  let _initOpen = false;
+  try { _initOpen = sessionStorage.getItem(SUMMARY_KEY) === '1'; } catch(_){}
+  applySummary(_initOpen);
   toggleBtn?.addEventListener('click', () => {
-    const w = el.querySelector('.kaiin-header-wrap');
-    const shown = w.style.display !== 'none';
-    if (shown) {
-      w.style.display = 'none';
-      toggleBtn.textContent = '▼ サマリーを表示';
-    } else {
-      w.style.display = '';
-      toggleBtn.textContent = '▲ サマリーを隠す';
-    }
+    const isOpen = summaryRow && summaryRow.style.display !== 'none';
+    applySummary(!isOpen);
   });
   // === マルチセレクトフィルター初期化 ===
   // プロモの値をrowsから抽出
