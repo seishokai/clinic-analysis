@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v388';
+const APP_VERSION = 'v389';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9027,15 +9027,23 @@ async function renderKaiinAll(containerId) {
                 const nextDate = info?.bf_next_date || '';
                 const contractSvc = d.contractService || '';
                 const amt = _amt(d);
-                // 来院日 MM/DD (v376: BFタブと同じく YYYY/MM/DD と短縮形式 "M/D" の両方に対応 — セレクトタイプ等は短縮形式)
-                const _b = String(d.bookDate || '');
-                let bdMatch = _b.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-                let bdYear = '', bdMonth = '', bdDay = '';
-                if (bdMatch) { bdYear = bdMatch[1]; bdMonth = bdMatch[2]; bdDay = bdMatch[3]; }
-                else {
-                  const m2 = _b.match(/^(\d{1,2})\/(\d{1,2})/);
-                  if (m2) { bdYear = String(new Date().getFullYear()); bdMonth = m2[1]; bdDay = m2[2]; }
+                // 来院日 MM/DD (v389: bookDate を最優先、空ならapplyDateにフォールバック — セレクトタイプは bookDate 未設定が多いので)
+                const _parseAnyDate = (raw) => {
+                  const s = String(raw || '').trim();
+                  if (!s) return { y:'', m:'', d:'' };
+                  let mm = s.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                  if (mm) return { y: mm[1], m: mm[2], d: mm[3] };
+                  mm = s.match(/^(\d{1,2})[\/\-](\d{1,2})/);
+                  if (mm) return { y: String(new Date().getFullYear()), m: mm[1], d: mm[2] };
+                  return { y:'', m:'', d:'' };
+                };
+                let parsed = _parseAnyDate(d.bookDate);
+                let bookFromApply = false;  // applyDate にフォールバックしたか
+                if (!parsed.m || !parsed.d) {
+                  const apl = _parseAnyDate(d.applyDate);
+                  if (apl.m && apl.d) { parsed = apl; bookFromApply = true; }
                 }
+                const bdYear = parsed.y, bdMonth = parsed.m, bdDay = parsed.d;
                 const bookMMDD = (bdMonth && bdDay) ? `${parseInt(bdMonth)}/${parseInt(bdDay)}` : '-';
                 // 次回予定 MM/DD
                 const ndMatch = String(nextDate).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
@@ -9067,14 +9075,21 @@ async function renderKaiinAll(containerId) {
                   <option value="">未設定</option>
                   ${stOptions.map(s => { const lbl = statusPillLabel(s); return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
                 </select>`;
-                // 来院日 (v376: 短縮形式 "M/D" は今年として扱う)
+                // 来院日 (v376: 短縮形式 "M/D" は今年として扱う / v389: applyDate フォールバック時は淡色 + ✱印)
                 const bookDateISO = (bdYear && bdMonth && bdDay)
                   ? `${bdYear}-${String(bdMonth).padStart(2,'0')}-${String(bdDay).padStart(2,'0')}`
                   : '';
-                const bookBtnStyle = bookDateISO
-                  ? 'background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600'
-                  : 'background:#fff;border:1px solid var(--border);color:var(--text-muted)';
-                const bookChip = `<button type="button" class="kaiin-all-bookdate-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${bookDateISO}" style="font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;cursor:pointer;${bookBtnStyle}">${bookMMDD!=='-'?bookMMDD:'年/月/日'}</button><input type="date" class="kaiin-all-bookdate-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${bookDateISO}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`;
+                // v389: bookDate 由来 = 通常の青、applyDate フォールバック = 淡色グレー (実来院日は未確定の意)
+                const bookBtnStyle = !bookDateISO
+                  ? 'background:#fff;border:1px solid var(--border);color:var(--text-muted)'
+                  : bookFromApply
+                    ? 'background:#f8fafc;border:1px dashed #94a3b8;color:#64748b;font-weight:500'
+                    : 'background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600';
+                const bookLabel = bookMMDD !== '-'
+                  ? (bookFromApply ? `✱${bookMMDD}` : bookMMDD)
+                  : '年/月/日';
+                const bookTitle = bookFromApply ? '申込日 (来院日未設定)' : '';
+                const bookChip = `<button type="button" class="kaiin-all-bookdate-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${bookFromApply ? '' : bookDateISO}" title="${bookTitle}" style="font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;cursor:pointer;${bookBtnStyle}">${bookLabel}</button><input type="date" class="kaiin-all-bookdate-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${bookFromApply ? '' : bookDateISO}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`;
                 // 次回予定 (編集可能ボタン + 隠し date input)
                 const nextDateStyle = nextMMDD
                   ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
