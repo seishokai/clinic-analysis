@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v368';
+const APP_VERSION = 'v369';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1371,6 +1371,9 @@ function setupEventListeners() {
   // === v264 キーボードショートカット ===
   // Ctrl/Cmd+K: 検索 / Alt+1〜6 (Ctrl+1〜6 はブラウザに奪われる場合あり): タブ切替 / ?: ヘルプ
   setupKeyboardShortcuts();
+
+  // === v369: グローバルヘッダー圧縮トグル (Aladdin ロゴクリック) ===
+  setupHeaderLogoToggle();
 
   // === v264 スワイプアクション (モバイル) ===
   // 左→確認済 / 右→メモ
@@ -4276,6 +4279,43 @@ function switchView(view) {
         if (typeof renderAvailability === 'function') renderAvailability();
       }
     }, 50);
+  }
+}
+
+// === v369: Aladdinロゴ クリックでグローバルヘッダー圧縮 ===
+// 全タブ共通でヘッダー表示/非表示をトグル。状態は sessionStorage に保存。
+// 圧縮中は左上に小さい復元ボタン (#header-restore-btn) を表示。
+function setupHeaderLogoToggle() {
+  const logo = document.getElementById('header-logo-toggle');
+  const restoreBtn = document.getElementById('header-restore-btn');
+  const KEY = 'header-collapsed';
+
+  const apply = (collapsed) => {
+    document.body.classList.toggle('header-collapsed', collapsed);
+    try { sessionStorage.setItem(KEY, collapsed ? '1' : '0'); } catch(_){}
+  };
+
+  // 初期状態を復元
+  try {
+    const saved = sessionStorage.getItem(KEY) === '1';
+    if (saved) apply(true);
+  } catch(_){}
+
+  if (logo && !logo._toggleBound) {
+    logo._toggleBound = true;
+    logo.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      apply(!document.body.classList.contains('header-collapsed'));
+    });
+  }
+  if (restoreBtn && !restoreBtn._toggleBound) {
+    restoreBtn._toggleBound = true;
+    restoreBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      apply(false);
+    });
   }
 }
 
@@ -8781,15 +8821,15 @@ async function renderKaiinAll(containerId) {
       <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${state.dashboardOpen ? 360 : 220}px);overflow-y:auto">
         <table class="data-table compact kaiin-all-list-table" style="width:100%">
           <thead><tr>
-            <th style="text-align:left">来院日</th>
+            <th style="text-align:left">来院</th>
             <th style="text-align:left">名前</th>
             <th>治療</th>
             <th>医院</th>
             <th>プロモ</th>
-            <th>状態</th>
+            <th>ステータス</th>
             <th>次回予定</th>
             <th>成約商材</th>
-            <th style="text-align:right">金額(税抜)</th>
+            <th style="text-align:right">売上</th>
             <th style="text-align:left">メモ</th>
           </tr></thead>
           <tbody>
@@ -8851,15 +8891,15 @@ async function renderKaiinAll(containerId) {
                   ? `<span style="display:inline-block;padding:3px 8px;background:#fff8e1;border:1px dashed #f9a825;border-radius:4px;font-size:11px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="${escapeHtml(memo)}">${escapeHtml(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 40) : memo.slice(0,40))}</span>`
                   : '<span style="color:var(--text-muted);font-size:10px">-</span>';
                 return `<tr>
-                  <td data-label="来院日" style="text-align:center">${bookChip}</td>
+                  <td data-label="来院" style="text-align:center">${bookChip}</td>
                   <td data-label="名前" style="font-size:12px;font-weight:600;text-align:left">${escapeHtml(d.name || '-')}</td>
                   <td data-label="治療" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(cat)}</td>
                   <td data-label="医院" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(fac)}</td>
                   <td data-label="プロモ" style="text-align:center">${promoChip}</td>
-                  <td data-label="状態" style="text-align:center">${stBadge}</td>
+                  <td data-label="ステータス" style="text-align:center">${stBadge}</td>
                   <td data-label="次回予定" style="text-align:center;position:relative">${nextChip}</td>
                   <td data-label="成約商材" style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
-                  <td data-label="金額" style="text-align:right"><input type="text" inputmode="numeric" class="kaiin-all-money" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${amt ? Number(amt).toLocaleString() : ''}" placeholder="0" style="font-size:11px;padding:3px 8px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;font-weight:600;box-sizing:border-box"></td>
+                  <td data-label="売上" style="text-align:right"><input type="text" inputmode="numeric" class="kaiin-all-money" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${amt ? Number(amt).toLocaleString() : ''}" placeholder="0" style="font-size:11px;padding:3px 8px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;font-weight:600;box-sizing:border-box"></td>
                   <td class="kaiin-all-memo-cell" data-label="メモ" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;text-align:left">${memoCell}</td>
                 </tr>`;
               }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
@@ -9170,7 +9210,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const CONSULT_TYPES = ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー','その他'];
 
   el.innerHTML = `
-    <button class="kaiin-header-toggle filter-btn">▼ ヘッダーを表示</button>
+    <button class="kaiin-header-toggle filter-btn">▼ サマリーを表示</button>
     <div class="kaiin-topbar filter-bar" style="margin-bottom:10px">
       <div class="filter-row">
         <input type="text" class="kaiin-filter-search filter-input" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px">
@@ -9271,33 +9311,17 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     }
   } catch(_){}
 
-  // ヘッダー (サマリーカウント) の表示トグル + トップナビ圧縮
-  const topHdr = document.querySelector('.header');
-  const subNav = document.getElementById('kaiin-sub-nav');
-  const applyCompact = (compact) => {
-    if (compact) {
-      if (topHdr) topHdr.style.display = 'none';
-      if (subNav) subNav.style.display = 'none';
-      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 110px)';
-    } else {
-      if (topHdr) topHdr.style.display = '';
-      if (subNav) subNav.style.display = '';
-      const tw = el.querySelector('.kaiin-table-wrap'); if (tw) tw.style.maxHeight = 'calc(100vh - 260px)';
-    }
-  };
-  // 初期はヘッダー非表示(コンパクト)
-  applyCompact(true);
+  // v369: 治療別サマリー (kaiin-header-wrap) の表示トグルのみ。
+  // グローバル.headerと.kaiin-sub-navの表示切替は Aladdinロゴ (#header-logo-toggle) に集約。
   toggleBtn?.addEventListener('click', () => {
     const w = el.querySelector('.kaiin-header-wrap');
     const shown = w.style.display !== 'none';
     if (shown) {
       w.style.display = 'none';
-      toggleBtn.textContent = '▼ ヘッダーを表示';
-      applyCompact(true);
+      toggleBtn.textContent = '▼ サマリーを表示';
     } else {
       w.style.display = '';
-      toggleBtn.textContent = '▲ ヘッダーを隠す';
-      applyCompact(false);
+      toggleBtn.textContent = '▲ サマリーを隠す';
     }
   });
   // === マルチセレクトフィルター初期化 ===

@@ -219,6 +219,31 @@ body {
 .sub-nav-btn.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .sub-nav .sub-divider { width: 1px; background: var(--border); margin: 6px 4px; flex-shrink: 0; }
 
+/* === v369: グローバルヘッダー圧縮 (Aladdin ロゴクリックでトグル) === */
+body.header-collapsed .header { display: none !important; }
+body.header-collapsed .sub-nav,
+body.header-collapsed #kaiin-sub-nav { display: none !important; }
+#header-restore-btn {
+  position: fixed;
+  top: 6px; left: 8px;
+  z-index: 9999;
+  display: none;
+  padding: 4px 10px;
+  font-family: 'Great Vibes', cursive;
+  font-size: 18px;
+  letter-spacing: 1px;
+  color: var(--text);
+  background: rgba(255,255,255,0.92);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0,0,0,.08);
+  transition: background .15s, transform .15s;
+}
+#header-restore-btn:hover { background: #fff; transform: scale(1.03); }
+body.header-collapsed #header-restore-btn { display: inline-block; }
+#header-logo-toggle:hover { opacity: 0.7; }
+
 /* Bottom Nav */
 .bottom-nav {
   display: none;
