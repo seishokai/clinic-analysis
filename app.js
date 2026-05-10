@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v386';
+const APP_VERSION = 'v387';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -91,6 +91,19 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => setTimeout(syncSharedQuickChips, 800));
 } else {
   setTimeout(syncSharedQuickChips, 800);
+}
+
+// === v387: 連続編集 race condition 防止 (#11) ===
+// 同じセルを連打したとき、古い保存リクエストが後から到着して新しい値を上書きするのを防ぐ。
+// 各セル (name|apply|field) ごとに editId をインクリメントし、save 完了時に最新かチェック。
+const _editIdMap = new Map();
+function bumpEditId(cellKey) {
+  const id = (_editIdMap.get(cellKey) || 0) + 1;
+  _editIdMap.set(cellKey, id);
+  return id;
+}
+function isLatestEdit(cellKey, myId) {
+  return _editIdMap.get(cellKey) === myId;
 }
 
 // === v374: クロスタブ再描画ヘルパー (一覧タブ等で編集した値を予約/電話前確認/BF/治療別タブに即反映) ===
@@ -6994,17 +7007,32 @@ function renderBookings() {
       }
       inp.addEventListener('change', () => {
         const rawVal = inp.classList.contains('bk-amt-input') ? String(inp.value).replace(/,/g,'') : inp.value;
+        // v387: 手動編集マーカー (#2 二重計算防止)
+        // ユーザーが直接 incentiveAmount を編集した場合、bk-extra に manualIncentive=true を立てて
+        // contractAmount 変更時の自動計算が上書きしないようにする。
+        if (inp.dataset.field === 'incentiveAmount') {
+          try {
+            const ex = (typeof loadData==='function') ? loadData('bk-extra', {}) : {};
+            const k = inp.dataset.name + '|' + inp.dataset.apply;
+            if (!ex[k]) ex[k] = {};
+            ex[k].manualIncentive = true;
+            saveData('bk-extra', ex);
+          } catch(_){}
+        }
         saveExtra(inp.dataset.name, inp.dataset.apply, inp.dataset.field, rawVal);
         inp.style.borderColor = 'var(--green)';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
-        // 成約金額変更時にインセを自動計算
+        // 成約金額変更時にインセを自動計算 (manualIncentive が立っていない場合のみ)
         if (inp.dataset.field === 'contractAmount') {
           const name = inp.dataset.name;
           const apply = inp.dataset.apply;
           const row = bookingsData.find(b => b.name === name && b.applyDate === apply);
           if (row) {
             row.contractAmount = Number(rawVal) || 0;
-            const inc = calcIncentive(row.source, row.contractAmount);
+            // v387: 手動編集済の incentiveAmount は上書きしない
+            const exCur = (typeof loadData==='function') ? loadData('bk-extra', {}) : {};
+            const isManual = exCur[name + '|' + apply]?.manualIncentive === true;
+            const inc = isManual ? 0 : calcIncentive(row.source, row.contractAmount);
             if (inc) {
               row.incentiveAmount = inc;
               const incInp = tbody.querySelector(`input[data-field="incentiveAmount"][data-name="${CSS.escape(name)}"][data-apply="${CSS.escape(apply)}"]`);
