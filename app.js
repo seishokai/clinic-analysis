@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v357';
+const APP_VERSION = 'v358';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2473,6 +2473,11 @@ let _homeAnalysisDim = (() => {
 })();
 function _saveHomeView()  { try { sessionStorage.setItem('home-analysis-view', _homeAnalysisView); } catch(_){} }
 function _saveHomeDim()   { try { sessionStorage.setItem('home-analysis-dim', _homeAnalysisDim); } catch(_){} }
+let _homeAnalysisSort = (() => {
+  try { const s = sessionStorage.getItem('home-analysis-sort'); return s ? JSON.parse(s) : { key: 'booking', dir: 'desc' }; }
+  catch(_) { return { key: 'booking', dir: 'desc' }; }
+})();
+function _saveHomeSort()  { try { sessionStorage.setItem('home-analysis-sort', JSON.stringify(_homeAnalysisSort)); } catch(_){} }
 
 // v292: 分析タブ用 (ホームダッシュボードと同じコンテンツを #analytics-dashboard-content に表示)
 function renderAnalyticsDashboard() {
@@ -2772,21 +2777,44 @@ function renderHomeDashboard() {
             const dim = _homeAnalysisDim;
             const data = dim==='facility' ? byFacMonth : dim==='treatment' ? byTreatMonth : byPromoMonth;
             const prev = dim==='facility' ? byFacPrev : dim==='treatment' ? byTreatPrev : byPromoPrev;
-            const list = dim==='facility' ? facList : dim==='treatment' ? treatList : promoList;
+            const baseList = dim==='facility' ? facList : dim==='treatment' ? treatList : promoList;
             const dimLabel = dim==='facility' ? '医院' : dim==='treatment' ? '治療' : 'プロモ';
-            if (!list.length) return '<div style="padding:20px;text-align:center;color:var(--text-sub)">データなし</div>';
+            if (!baseList.length) return '<div style="padding:20px;text-align:center;color:var(--text-sub)">データなし</div>';
+            // 各キーごとの metric 値を取得
+            const metric = (k, key) => {
+              const v = data[k] || { booking:0, visited:0, contracted:0, amount:0 };
+              const p = prev[k] || { booking:0, visited:0, contracted:0, amount:0 };
+              switch (key) {
+                case 'name':       return k;
+                case 'booking':    return v.booking;
+                case 'visited':    return v.visited;
+                case 'visitRate':  return v.booking ? v.visited/v.booking : -1;
+                case 'contracted': return v.contracted;
+                case 'decideRate': return v.visited ? v.contracted/v.visited : -1;
+                case 'amount':     return v.amount;
+                case 'deltaAmt':   return p.amount ? (v.amount - p.amount)/p.amount : (v.amount > 0 ? 999 : -999);
+                default:           return 0;
+              }
+            };
+            // ソート適用
+            const sort = _homeAnalysisSort;
+            const list = [...baseList].sort((a,b) => {
+              const va = metric(a, sort.key), vb = metric(b, sort.key);
+              if (typeof va === 'string') return sort.dir==='asc' ? va.localeCompare(vb,'ja') : vb.localeCompare(va,'ja');
+              return sort.dir==='asc' ? va - vb : vb - va;
+            });
             // 合計行 (footer)
-            const tot = list.reduce((s,k) => {
+            const tot = baseList.reduce((s,k) => {
               const v = data[k] || { booking:0, visited:0, contracted:0, amount:0 };
               s.booking += v.booking; s.visited += v.visited; s.contracted += v.contracted; s.amount += v.amount;
               return s;
             }, { booking:0, visited:0, contracted:0, amount:0 });
-            const totPrev = list.reduce((s,k) => {
+            const totPrev = baseList.reduce((s,k) => {
               const v = prev[k] || { booking:0, visited:0, contracted:0, amount:0 };
               s.booking += v.booking; s.visited += v.visited; s.contracted += v.contracted; s.amount += v.amount;
               return s;
             }, { booking:0, visited:0, contracted:0, amount:0 });
-            // 統合テーブル: 予約 / 来院 / 来院率 / 成約 / 決定率 / 金額 / 前期比金額 を1つに
+            // 統合テーブル: 予約 / 来院 / 来院率 / 成約 / 決定率 / 金額 / 前期比金額
             const cols = (cur, prv) => {
               const visitRate = cur.booking ? Math.round(cur.visited/cur.booking*100) : 0;
               const decideRate = cur.visited ? Math.round(cur.contracted/cur.visited*100) : 0;
@@ -2808,169 +2836,15 @@ function renderHomeDashboard() {
               return `<tr><td style="font-weight:600;text-align:left">${escapeHtml(k)}</td>${cols(cur, prv).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
             }).join('');
             const totalHtml = `<tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border)"><td style="text-align:left">合計</td>${cols(tot, totPrev).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
-            return `<table class="data-table"><thead><tr><th>${dimLabel}</th><th style="text-align:right">予約</th><th style="text-align:right">来院</th><th style="text-align:right">来院率</th><th style="text-align:right">成約</th><th style="text-align:right">決定率</th><th style="text-align:right">金額</th><th style="text-align:right">前期比金額</th></tr></thead><tbody>${rowsHtml}${totalHtml}</tbody></table>`;
+            // ソート可能ヘッダー
+            const sortHdr = (key, label, align='right') => {
+              const isActive = sort.key === key;
+              const arrow = isActive ? (sort.dir==='asc' ? ' ▲' : ' ▼') : '';
+              const color = isActive ? '#1d4ed8' : 'var(--text-sub)';
+              return `<th class="home-sort-th" data-sortkey="${key}" style="text-align:${align};cursor:pointer;color:${color};user-select:none" title="クリックでソート">${label}${arrow}</th>`;
+            };
+            return `<table class="data-table"><thead><tr>${sortHdr('name', dimLabel, 'left')}${sortHdr('booking', '予約')}${sortHdr('visited', '来院')}${sortHdr('visitRate', '来院率')}${sortHdr('contracted', '成約')}${sortHdr('decideRate', '決定率')}${sortHdr('amount', '金額')}${sortHdr('deltaAmt', '前期比金額')}</tr></thead><tbody>${rowsHtml}${totalHtml}</tbody></table>`;
           })()}
-        </div>
-      </div>
-      <!-- 旧: 医院別カード (互換のため非表示残置) -->
-      <div style="display:none">
-        ${facList.map(f => {
-          const v = byFacMonth[f];
-          const visitRate = v.booking ? Math.round(v.visited/v.booking*100) : 0;
-          const decideRate = v.visited ? Math.round(v.contracted/v.visited*100) : 0;
-            const amt = rangeRows.filter(d => normFac(d.facility) === f && d.status === '成約').reduce((s,d)=>s+Number(d.contractAmount||0),0);
-            return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:#fff;transition:all .15s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#1d4ed8'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'">
-              <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">${escapeHtml(f)}</div>
-              <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
-                <div><span style="font-size:22px;font-weight:700;color:#1a1a1a">${v.booking}</span><span style="font-size:11px;color:var(--text-sub);margin-left:3px">件</span></div>
-                <div style="font-size:11px;color:var(--text-sub)">来院 <span style="color:#1d4ed8;font-weight:700">${v.visited}</span> <span style="color:${visitRate>=70?'#059669':visitRate>=50?'#d97706':'#dc2626'}">(${visitRate}%)</span></div>
-                <div style="font-size:11px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:700">${v.contracted}</span> <span style="color:${decideRate>=40?'#059669':decideRate>=20?'#d97706':'#dc2626'}">(${decideRate}%)</span></div>
-                ${amt > 0 ? `<div style="font-size:11px;color:#0e7490;font-weight:700">${fmtYen(amt)}</div>` : ''}
-              </div>
-            </div>`;
-          }).join('')}
-        </div>
-      </div>
-      <!-- v317: 医院×プロモ クロス集計表 -->
-      ${(() => {
-        // 医院×プロモのマトリックス
-        const matrix = {};   // matrix[fac][promo] = { booking, visited, contracted }
-        const promoSet = new Set();
-        rangeRows.forEach(d => {
-          const f = normFac(d.facility) || '-';
-          const p = (d.source || '(無し)').trim() || '(無し)';
-          promoSet.add(p);
-          if (!matrix[f]) matrix[f] = {};
-          if (!matrix[f][p]) matrix[f][p] = { booking: 0, visited: 0, contracted: 0 };
-          matrix[f][p].booking++;
-          if (isVisited(d.status)) matrix[f][p].visited++;
-          if (d.status === '成約') matrix[f][p].contracted++;
-        });
-        // プロモを件数順でソート (上位10 + その他)
-        const promoCount = {};
-        rangeRows.forEach(d => {
-          const p = (d.source || '(無し)').trim() || '(無し)';
-          promoCount[p] = (promoCount[p] || 0) + 1;
-        });
-        const sortedPromos = Object.keys(promoCount).sort((a,b) => promoCount[b] - promoCount[a]);
-        const topPromos = sortedPromos.slice(0, 10);
-        const otherPromos = sortedPromos.slice(10);
-        const showPromos = otherPromos.length > 0 ? [...topPromos, '__OTHER__'] : topPromos;
-        const facListSorted = facList.length > 0 ? facList : Object.keys(matrix);
-        if (facListSorted.length === 0 || sortedPromos.length === 0) return '';
-        const cellVal = (f, p) => {
-          if (p === '__OTHER__') {
-            return otherPromos.reduce((acc, pp) => {
-              const v = matrix[f]?.[pp];
-              if (v) { acc.booking += v.booking; acc.visited += v.visited; acc.contracted += v.contracted; }
-              return acc;
-            }, { booking:0, visited:0, contracted:0 });
-          }
-          return matrix[f]?.[p] || { booking:0, visited:0, contracted:0 };
-        };
-        // v318: 「その他」の中身を window に格納してモーダル展開できるようにする
-        window._otherPromosData = { otherPromos, matrix, facListSorted };
-        const _basisLbl = _homeAnalysisBasis === 'apply' ? '登録数' : '予約数';
-        return `
-        <div style="background:#fff;border:1px solid var(--border);border-radius:12px;padding:14px;margin-bottom:14px;overflow-x:auto">
-          <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap">
-            🎯 ${escapeHtml(rangeLabel)} 医院×プロモ別 ${_basisLbl}
-            <span style="font-size:10px;color:var(--text-sub);font-weight:500">(数字 = 件数 / 来院 / 成約)</span>
-          </div>
-          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:600px">
-            <thead>
-              <tr>
-                <th style="text-align:left;padding:6px 8px;background:#f9fafb;border-bottom:2px solid var(--border);position:sticky;left:0;z-index:1;min-width:90px">医院＼プロモ</th>
-                ${showPromos.map(p => {
-                  if (p === '__OTHER__') {
-                    return `<th class="cross-other-header" style="text-align:center;padding:6px 8px;background:#fef3c7;border-bottom:2px solid var(--border);font-size:10px;font-weight:600;white-space:nowrap;cursor:pointer;color:#92400e;text-decoration:underline" title="クリックで内訳表示">📋 その他${otherPromos.length}件</th>`;
-                  }
-                  const lbl = p.length > 14 ? p.slice(0,14)+'…' : p;
-                  return `<th style="text-align:center;padding:6px 8px;background:#f9fafb;border-bottom:2px solid var(--border);font-size:10px;font-weight:600;white-space:nowrap" title="${escapeHtml(p)}">${escapeHtml(lbl)}</th>`;
-                }).join('')}
-                <th style="text-align:center;padding:6px 8px;background:#1f2937;color:#fff;border-bottom:2px solid var(--border);font-weight:700">合計</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${facListSorted.map(f => {
-                const facTotal = byFacMonth[f] || { booking:0, visited:0, contracted:0 };
-                return `<tr>
-                  <td style="padding:6px 8px;font-weight:700;border-bottom:1px solid var(--border);background:#f9fafb;position:sticky;left:0;white-space:nowrap">${escapeHtml(f)}</td>
-                  ${showPromos.map(p => {
-                    const v = cellVal(f, p);
-                    const isOther = p === '__OTHER__';
-                    if (v.booking === 0) {
-                      const baseStyle = 'text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);color:#d1d5db';
-                      return isOther
-                        ? `<td class="cross-other-cell" data-fac="${escapeHtml(f)}" style="${baseStyle};background:#fffbeb;cursor:pointer">-</td>`
-                        : `<td style="${baseStyle}">-</td>`;
-                    }
-                    const cellStyle = isOther
-                      ? 'text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums;background:#fffbeb;cursor:pointer'
-                      : 'text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);font-variant-numeric:tabular-nums';
-                    const clickAttr = isOther ? `class="cross-other-cell" data-fac="${escapeHtml(f)}" title="クリックで内訳表示"` : '';
-                    return `<td ${clickAttr} style="${cellStyle}">
-                      <div style="font-weight:700;color:#1a1a1a">${v.booking}${isOther?' 🔍':''}</div>
-                      <div style="font-size:9px;color:var(--text-sub)">${v.visited}<span style="color:#059669"> / ${v.contracted}</span></div>
-                    </td>`;
-                  }).join('')}
-                  <td style="text-align:center;padding:6px 8px;border-bottom:1px solid var(--border);background:#f0f9ff;font-variant-numeric:tabular-nums">
-                    <div style="font-weight:800;color:#1d4ed8;font-size:13px">${facTotal.booking}</div>
-                    <div style="font-size:9px;color:var(--text-sub)">${facTotal.visited}<span style="color:#059669"> / ${facTotal.contracted}</span></div>
-                  </td>
-                </tr>`;
-              }).join('')}
-              <!-- 合計行 -->
-              <tr style="background:#1f2937;color:#fff">
-                <td style="padding:8px;font-weight:800;position:sticky;left:0;background:#1f2937">合計</td>
-                ${showPromos.map(p => {
-                  const isOther = p === '__OTHER__';
-                  const total = facListSorted.reduce((acc, f) => {
-                    const v = cellVal(f, p);
-                    acc.booking += v.booking; acc.visited += v.visited; acc.contracted += v.contracted;
-                    return acc;
-                  }, { booking:0, visited:0, contracted:0 });
-                  if (total.booking === 0) {
-                    return isOther
-                      ? `<td class="cross-other-cell" data-fac="__ALL__" style="text-align:center;padding:8px;color:#9ca3af;cursor:pointer;background:#3f4b5b">-</td>`
-                      : `<td style="text-align:center;padding:8px;color:#9ca3af">-</td>`;
-                  }
-                  const clickAttr = isOther ? `class="cross-other-cell" data-fac="__ALL__" style="text-align:center;padding:8px;font-variant-numeric:tabular-nums;cursor:pointer;background:#3f4b5b" title="全医院その他の内訳"` : `style="text-align:center;padding:8px;font-variant-numeric:tabular-nums"`;
-                  return `<td ${clickAttr}>
-                    <div style="font-weight:800">${total.booking}${isOther?' 🔍':''}</div>
-                    <div style="font-size:9px;color:#d1d5db">${total.visited} / ${total.contracted}</div>
-                  </td>`;
-                }).join('')}
-                <td style="text-align:center;padding:8px;background:#0f172a;font-variant-numeric:tabular-nums">
-                  <div style="font-weight:800;font-size:14px">${rangeRows.length}</div>
-                  <div style="font-size:9px;color:#d1d5db">${rangeRows.filter(d=>isVisited(d.status)).length} / ${rangeRows.filter(d=>d.status==='成約').length}</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-          <div style="font-size:10px;color:var(--text-sub);margin-top:6px">※ 数字: ${_basisLbl} / 来院数 / 成約数  •  📋 「その他」をクリックで内訳表示</div>
-        </div>`;
-      })()}
-
-      <!-- 治療別 -->
-      <div style="margin-bottom:14px">
-        <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px">🦷 ${escapeHtml(rangeLabel)} 治療別</div>
-        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px">
-          ${treatList.map(t => {
-            const v = byTreatMonth[t];
-            const visitRate = v.booking ? Math.round(v.visited/v.booking*100) : 0;
-            const decideRate = v.visited ? Math.round(v.contracted/v.visited*100) : 0;
-            const amt = rangeRows.filter(d => (normSvc(d.service)||'-') === t && d.status === '成約').reduce((s,d)=>s+Number(d.contractAmount||0),0);
-            return `<div style="border:1px solid var(--border);border-radius:10px;padding:14px;background:#fff;transition:all .15s" onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#059669'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'">
-              <div style="font-size:13px;font-weight:700;margin-bottom:8px;color:var(--text)">${escapeHtml(t)}</div>
-              <div style="display:flex;gap:12px;align-items:baseline;flex-wrap:wrap">
-                <div><span style="font-size:22px;font-weight:700;color:#1a1a1a">${v.booking}</span><span style="font-size:11px;color:var(--text-sub);margin-left:3px">件</span></div>
-                <div style="font-size:11px;color:var(--text-sub)">来院 <span style="color:#1d4ed8;font-weight:700">${v.visited}</span> <span style="color:${visitRate>=70?'#059669':visitRate>=50?'#d97706':'#dc2626'}">(${visitRate}%)</span></div>
-                <div style="font-size:11px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:700">${v.contracted}</span> <span style="color:${decideRate>=40?'#059669':decideRate>=20?'#d97706':'#dc2626'}">(${decideRate}%)</span></div>
-                ${amt > 0 ? `<div style="font-size:11px;color:#0e7490;font-weight:700">${fmtYen(amt)}</div>` : ''}
-              </div>
-            </div>`;
-          }).join('')}
         </div>
       </div>
     ` : ''}
@@ -2997,99 +2871,6 @@ function renderHomeDashboard() {
       </div>
     ` : ''}
 
-    <!-- v273: 医院 × 治療 クロス集計 (個人名は出さず数字のみ) -->
-    <!-- v312: 11医院を常時表示 (フィルタで0件になっても行を出す) -->
-    ${treatList.length > 0 ? (() => {
-      // 11医院を常時表示するための正規化済みリスト
-      const STANDARD_FACILITIES = ['BF銀座','大森','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','京都'];
-      const allFacSet = new Set([...STANDARD_FACILITIES, ...Object.keys(byFacMonth)]);
-      const crossFacList = [...allFacSet].sort((a,b) => {
-        const ba = (byFacMonth[a]||{}).booking || 0;
-        const bb = (byFacMonth[b]||{}).booking || 0;
-        if (bb !== ba) return bb - ba;
-        return STANDARD_FACILITIES.indexOf(a) - STANDARD_FACILITIES.indexOf(b);
-      });
-
-      // 各医院 × 各治療 の予約 / 来院 / 成約 件数
-      const cross = {};
-      rangeRows.forEach(d => {
-        const f = normFac(d.facility) || '-';
-        const t = (typeof normSvc === 'function' ? normSvc(d.service) : d.service) || '-';
-        const key = f + '|' + t;
-        if (!cross[key]) cross[key] = { booking:0, visited:0, contracted:0 };
-        cross[key].booking++;
-        if (isVisited(d.status)) cross[key].visited++;
-        if (d.status === '成約') cross[key].contracted++;
-      });
-      const cellHtml = (f, t) => {
-        const v = cross[f + '|' + t];
-        if (!v || v.booking === 0) return '<span style="color:#cbd5e1">-</span>';
-        return `<div style="line-height:1.3">
-          <div style="font-size:13px;font-weight:700;color:#1a1a1a">${v.booking}</div>
-          <div style="font-size:9px;color:var(--text-sub)">来 <span style="color:#1d4ed8;font-weight:600">${v.visited}</span> / 約 <span style="color:#059669;font-weight:600">${v.contracted}</span></div>
-        </div>`;
-      };
-      // 行/列の合計
-      const colTotal = (t) => {
-        const r = { booking:0, visited:0, contracted:0 };
-        crossFacList.forEach(f => {
-          const v = cross[f + '|' + t];
-          if (v) { r.booking+=v.booking; r.visited+=v.visited; r.contracted+=v.contracted; }
-        });
-        return r;
-      };
-      const rowTotal = (f) => {
-        const r = { booking:0, visited:0, contracted:0 };
-        treatList.forEach(t => {
-          const v = cross[f + '|' + t];
-          if (v) { r.booking+=v.booking; r.visited+=v.visited; r.contracted+=v.contracted; }
-        });
-        return r;
-      };
-      return `<div style="margin-bottom:14px">
-        <div style="font-size:13px;font-weight:700;color:#1a1a1a;margin-bottom:10px;display:flex;align-items:center;gap:6px">📋 ${escapeHtml(rangeLabel)} 医院 × 治療 クロス集計</div>
-        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;overflow-x:auto">
-          <table style="width:100%;border-collapse:collapse;font-size:11px;min-width:560px">
-            <thead>
-              <tr style="background:#f9fafb">
-                <th style="padding:8px;text-align:left;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);position:sticky;left:0;background:#f9fafb">医院＼治療</th>
-                ${treatList.map(t => `<th style="padding:8px;text-align:center;font-size:10px;color:var(--text-sub);font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);min-width:70px">${escapeHtml(t)}</th>`).join('')}
-                <th style="padding:8px;text-align:center;font-size:10px;color:#1a1a1a;font-weight:700;letter-spacing:1px;border-bottom:1px solid var(--border);background:#f3f4f6;min-width:70px">合計</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${crossFacList.map(f => {
-                const tot = rowTotal(f);
-                return `<tr style="border-top:1px solid #f3f4f6">
-                  <td style="padding:8px;text-align:left;font-weight:600;background:#fff;position:sticky;left:0">${escapeHtml(f)}</td>
-                  ${treatList.map(t => `<td style="padding:6px;text-align:center;border-left:1px solid #f3f4f6">${cellHtml(f, t)}</td>`).join('')}
-                  <td style="padding:8px;text-align:center;background:#f9fafb;font-weight:700;color:${tot.booking === 0 ? '#9ca3af' : '#1a1a1a'}">
-                    <div style="font-size:14px">${tot.booking}</div>
-                    <div style="font-size:9px;color:var(--text-sub)">来 <span style="color:#1d4ed8">${tot.visited}</span>/約 <span style="color:#059669">${tot.contracted}</span></div>
-                  </td>
-                </tr>`;
-              }).join('')}
-              <!-- 列合計 -->
-              <tr style="border-top:2px solid #d1d5db;background:#f9fafb;font-weight:700">
-                <td style="padding:8px;background:#f3f4f6;color:#1a1a1a;position:sticky;left:0">合計</td>
-                ${treatList.map(t => {
-                  const tot = colTotal(t);
-                  return `<td style="padding:6px;text-align:center;border-left:1px solid #f3f4f6">
-                    <div style="font-size:14px;color:#1a1a1a">${tot.booking}</div>
-                    <div style="font-size:9px;color:var(--text-sub)">来 <span style="color:#1d4ed8">${tot.visited}</span>/約 <span style="color:#059669">${tot.contracted}</span></div>
-                  </td>`;
-                }).join('')}
-                <td style="padding:8px;text-align:center;background:#dbeafe;font-weight:700;color:#1d4ed8">
-                  <div style="font-size:15px">${kpiRange.booking}</div>
-                  <div style="font-size:9px">来 ${kpiRange.visited} / 約 ${kpiRange.contracted}</div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
-        <div style="font-size:10px;color:var(--text-sub);margin-top:6px">※ 数字: 予約件数 / 「来N/約N」: 来院数・成約数</div>
-      </div>`;
-    })() : ''}
 
     <!-- ショートカット -->
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
@@ -3167,6 +2948,20 @@ function renderHomeDashboard() {
     btn.addEventListener('click', () => {
       _homeAnalysisDim = btn.dataset.dim;
       _saveHomeDim();
+      renderHomeDashboard();
+      if (typeof renderAnalyticsDashboard === 'function') renderAnalyticsDashboard();
+    });
+  });
+  // Phase1: 列クリックでソート
+  el.querySelectorAll('.home-sort-th').forEach(th => {
+    th.addEventListener('click', () => {
+      const key = th.dataset.sortkey;
+      if (_homeAnalysisSort.key === key) {
+        _homeAnalysisSort.dir = _homeAnalysisSort.dir === 'asc' ? 'desc' : 'asc';
+      } else {
+        _homeAnalysisSort = { key, dir: key === 'name' ? 'asc' : 'desc' };
+      }
+      _saveHomeSort();
       renderHomeDashboard();
       if (typeof renderAnalyticsDashboard === 'function') renderAnalyticsDashboard();
     });
