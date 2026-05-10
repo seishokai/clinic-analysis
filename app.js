@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v379';
+const APP_VERSION = 'v380';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11341,6 +11341,7 @@ let _promoTabState = {
   filterPeriod: '',               // '' | 'thisMonth' | 'lastMonth' | 'thisYear'
   showPaidOnly: false,            // 支給済みのみ
   showUnpaidOnly: false,          // 未支給のみ
+  selected: new Set(),            // v380: 通知書作成用に選択中の {name|applyDate}
 };
 
 function renderPromo() {
@@ -11530,9 +11531,201 @@ function renderPromo() {
       }
     });
   });
+
+  // === v380: 行選択チェックボックス ===
+  el.querySelectorAll('.promo-row-select').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const key = cb.dataset.key;
+      if (cb.checked) _promoTabState.selected.add(key);
+      else _promoTabState.selected.delete(key);
+      renderPromo();
+    });
+  });
+  // 全選択 (テーブル先頭のチェックボックス)
+  el.querySelectorAll('.promo-select-all').forEach(cb => {
+    cb.addEventListener('change', () => {
+      const src = cb.dataset.source;
+      const promo = sortedPromos.find(p => p.source === src);
+      if (!promo) return;
+      promo.bookings.filter(b => b.status === '成約').forEach(d => {
+        const key = d.name + '|' + d.applyDate;
+        const ex = _bkEx[key] || {};
+        const noticeCreated = ex.paymentNoticeCreated === true || ex.paymentNoticeCreated === 'true';
+        if (noticeCreated) return; // 通知済はスキップ
+        if (cb.checked) _promoTabState.selected.add(key);
+        else _promoTabState.selected.delete(key);
+      });
+      renderPromo();
+    });
+  });
+  // 未通知を全選択
+  el.querySelectorAll('.promo-select-unpaid').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const src = btn.dataset.source;
+      const promo = sortedPromos.find(p => p.source === src);
+      if (!promo) return;
+      promo.bookings.filter(b => b.status === '成約').forEach(d => {
+        const key = d.name + '|' + d.applyDate;
+        const ex = _bkEx[key] || {};
+        const noticeCreated = ex.paymentNoticeCreated === true || ex.paymentNoticeCreated === 'true';
+        if (!noticeCreated) _promoTabState.selected.add(key);
+      });
+      renderPromo();
+    });
+  });
+  // 選択解除
+  el.querySelectorAll('.promo-clear-select').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _promoTabState.selected.clear();
+      renderPromo();
+    });
+  });
+  // 支払い通知書作成
+  el.querySelectorAll('.promo-create-notice').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const src = btn.dataset.source;
+      const promo = sortedPromos.find(p => p.source === src);
+      if (!promo) return;
+      const selectedBookings = promo.bookings.filter(b => {
+        return b.status === '成約' && _promoTabState.selected.has(b.name + '|' + b.applyDate);
+      });
+      if (!selectedBookings.length) return;
+      _openPaymentNoticeModal(src, selectedBookings, _bkEx);
+    });
+  });
 }
 
-// プロモコード展開時の詳細テーブル (各予約 + 支給チェック)
+// === v380: 支払い通知書モーダル (印刷可能 + 確定で paymentNoticeCreated 保存) ===
+function _openPaymentNoticeModal(source, bookings, _bkEx) {
+  // 既存モーダルがあれば削除
+  const existing = document.getElementById('payment-notice-modal');
+  if (existing) existing.remove();
+  const _amt = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+  };
+  const _inc = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return Number(ex.incentiveAmount) || Number(d.incentiveAmount) || calcIncentive(d.source, _amt(d));
+  };
+  const totalInc = bookings.reduce((s, d) => s + _inc(d), 0);
+  const totalAmt = bookings.reduce((s, d) => s + _amt(d), 0);
+  const issueDate = new Date();
+  const issueDateStr = `${issueDate.getFullYear()}年${issueDate.getMonth()+1}月${issueDate.getDate()}日`;
+  const issueIso = `${issueDate.getFullYear()}-${String(issueDate.getMonth()+1).padStart(2,'0')}-${String(issueDate.getDate()).padStart(2,'0')}`;
+
+  const modal = document.createElement('div');
+  modal.id = 'payment-notice-modal';
+  modal.className = 'modal';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:99998;display:flex;align-items:flex-start;justify-content:center;padding:20px;overflow-y:auto';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:10px;max-width:760px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:inherit">
+      <!-- アクションバー (印刷時非表示) -->
+      <div class="notice-actions" style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:#f9fafb;border-radius:10px 10px 0 0">
+        <strong style="font-size:14px">📄 支払い通知書</strong>
+        <span style="margin-left:auto;display:flex;gap:6px">
+          <button id="notice-print-btn" class="filter-btn" title="印刷">🖨 印刷</button>
+          <button id="notice-confirm-btn" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:600" title="作成確定 (作成済みフラグを保存)">✓ 作成確定</button>
+          <button id="notice-cancel-btn" class="filter-btn" title="閉じる">✕ 閉じる</button>
+        </span>
+      </div>
+      <!-- 印刷対象 -->
+      <div id="notice-printable" style="padding:30px 36px;font-family:'Hiragino Mincho ProN',serif;color:#111">
+        <div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:6px;margin-bottom:8px">支払通知書</div>
+        <div style="text-align:right;font-size:12px;color:#444;margin-bottom:30px">発行日: ${issueDateStr}</div>
+        <div style="font-size:14px;margin-bottom:6px"><strong>${escapeHtml(source)}</strong> 様</div>
+        <div style="font-size:11px;color:#666;margin-bottom:24px">下記の通り、紹介報酬をお支払いいたします。</div>
+        <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">
+          <thead><tr style="background:#f3f4f6">
+            <th style="border:1px solid #999;padding:6px 8px;text-align:left">案件 (患者名)</th>
+            <th style="border:1px solid #999;padding:6px 8px;text-align:center;width:80px">申込日</th>
+            <th style="border:1px solid #999;padding:6px 8px;text-align:left;width:100px">医院</th>
+            <th style="border:1px solid #999;padding:6px 8px;text-align:center;width:90px">商材</th>
+            <th style="border:1px solid #999;padding:6px 8px;text-align:right;width:100px">成約金額</th>
+            <th style="border:1px solid #999;padding:6px 8px;text-align:right;width:100px">報酬額</th>
+          </tr></thead>
+          <tbody>
+            ${bookings.map(d => {
+              const fmtYMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${m[1]}/${m[2]}/${m[3]}` : '-'; };
+              return `<tr>
+                <td style="border:1px solid #999;padding:6px 8px">${escapeHtml(d.name||'')}</td>
+                <td style="border:1px solid #999;padding:6px 8px;text-align:center">${escapeHtml(fmtYMD(d.applyDate))}</td>
+                <td style="border:1px solid #999;padding:6px 8px">${escapeHtml(typeof normFac==='function'?(normFac(d.facility)||'-'):(d.facility||'-'))}</td>
+                <td style="border:1px solid #999;padding:6px 8px;text-align:center">${escapeHtml(d.contractService||'-')}</td>
+                <td style="border:1px solid #999;padding:6px 8px;text-align:right">¥${fmt(_amt(d))}</td>
+                <td style="border:1px solid #999;padding:6px 8px;text-align:right;font-weight:600">¥${fmt(_inc(d))}</td>
+              </tr>`;
+            }).join('')}
+            <tr style="background:#fef3c7">
+              <td colspan="4" style="border:1px solid #999;padding:8px;text-align:right;font-weight:700">合計</td>
+              <td style="border:1px solid #999;padding:8px;text-align:right;font-weight:700">¥${fmt(totalAmt)}</td>
+              <td style="border:1px solid #999;padding:8px;text-align:right;font-weight:700;font-size:13px">¥${fmt(totalInc)}</td>
+            </tr>
+          </tbody>
+        </table>
+        <div style="font-size:11px;color:#444;margin-top:24px;line-height:1.7">
+          ・報酬総額: <strong>¥${fmt(totalInc)}</strong> (税抜)<br>
+          ・件数: ${bookings.length}件<br>
+          ・お振込日は別途ご連絡いたします。
+        </div>
+        <div style="margin-top:50px;text-align:right;font-size:11px;line-height:1.6">
+          医療法人 清翔会<br>
+          発行責任者: ＿＿＿＿＿＿＿＿
+        </div>
+      </div>
+    </div>
+    <style>
+      @media print {
+        body * { visibility: hidden; }
+        #payment-notice-modal, #payment-notice-modal * { visibility: visible; }
+        #payment-notice-modal { position:absolute;inset:0;background:#fff;padding:0;display:block;overflow:visible }
+        #payment-notice-modal .notice-actions { display:none !important }
+        #payment-notice-modal > div { box-shadow:none;border-radius:0;max-width:100% }
+      }
+    </style>
+  `;
+  document.body.appendChild(modal);
+
+  modal.querySelector('#notice-cancel-btn').addEventListener('click', () => modal.remove());
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+  modal.querySelector('#notice-print-btn').addEventListener('click', () => window.print());
+  modal.querySelector('#notice-confirm-btn').addEventListener('click', async () => {
+    // 全件に paymentNoticeCreated=true + paymentNoticeDate 保存
+    try {
+      const bkEx = loadData('bk-extra', {});
+      const updates = [];
+      for (const d of bookings) {
+        const key = d.name + '|' + d.applyDate;
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].paymentNoticeCreated = true;
+        bkEx[key].paymentNoticeDate = issueIso;
+        const target = (bookingsData || []).find(b => b.name === d.name && b.applyDate === d.applyDate);
+        if (target) {
+          target.paymentNoticeCreated = true;
+          target.paymentNoticeDate = issueIso;
+        }
+        updates.push(safeSave({
+          type: 'upsert',
+          table: 'booking_status',
+          payload: { name: d.name, apply_date: d.applyDate, payment_notice_created: true, payment_notice_date: issueIso },
+          options: { onConflict: 'name,apply_date' }
+        }));
+      }
+      saveData('bk-extra', bkEx);
+      await Promise.all(updates);
+      _promoTabState.selected.clear();
+      modal.remove();
+      showToast(`支払い通知書を ${bookings.length}件 作成しました`);
+      renderPromo();
+      if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+    } catch (e) {
+      console.warn('payment notice save failed', e);
+      showToast('通知書作成の保存に失敗', true);
+    }
+  });
+}
+
+// プロモコード展開時の詳細テーブル (各予約 + 支給チェック + 通知書作成)
 function _renderPromoDetail(p, _bkEx) {
   const _amt = (d) => {
     const ex = _bkEx[d.name + '|' + d.applyDate] || {};
@@ -11550,6 +11743,16 @@ function _renderPromoDetail(p, _bkEx) {
     const ex = _bkEx[d.name + '|' + d.applyDate] || {};
     return ex.incentiveMonth || d.incentiveMonth || '';
   };
+  // v380: 通知書作成済みフラグ + 作成日
+  const _noticeCreated = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return ex.paymentNoticeCreated === true || ex.paymentNoticeCreated === 'true' || d.paymentNoticeCreated === true;
+  };
+  const _noticeDate = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return ex.paymentNoticeDate || d.paymentNoticeDate || '';
+  };
+  const _isSelected = (d) => _promoTabState.selected.has(d.name + '|' + d.applyDate);
   // 成約のみ表示 (インセ管理対象)
   const contracted = p.bookings.filter(b => b.status === '成約').sort((a, b) => {
     const ad = parseDate(a.applyDate)?.getTime() || 0;
@@ -11561,29 +11764,51 @@ function _renderPromoDetail(p, _bkEx) {
     const bd = parseDate(b.bookDate || b.applyDate)?.getTime() || 0;
     return bd - ad;
   });
+  // v380: 選択件数とインセ合計を計算 (この promo 内のみ)
+  let selectedCount = 0;
+  let selectedInc = 0;
+  contracted.forEach(d => { if (_isSelected(d)) { selectedCount++; selectedInc += _inc(d); } });
   return `<div style="padding:8px">
-    <div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:6px">📋 ${escapeHtml(p.source)} の成約案件 (${contracted.length}件) - インセ支給管理</div>
+    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+      <span style="font-size:11px;font-weight:600;color:var(--text-sub)">📋 ${escapeHtml(p.source)} の成約案件 (${contracted.length}件) - インセ支給管理</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        <span style="font-size:11px;color:${selectedCount>0?'#7c3aed':'var(--text-muted)'};font-weight:${selectedCount>0?'600':'400'}">選択 ${selectedCount}件 ${selectedCount>0?`/ ¥${fmt(selectedInc)}`:''}</span>
+        <button class="promo-select-unpaid filter-btn" data-source="${escapeHtml(p.source)}" title="未通知の成約を全選択">未通知を全選択</button>
+        <button class="promo-clear-select filter-btn" data-source="${escapeHtml(p.source)}" title="選択クリア" ${selectedCount===0?'disabled':''}>選択解除</button>
+        <button class="promo-create-notice filter-btn" data-source="${escapeHtml(p.source)}" style="background:${selectedCount>0?'#7c3aed':'#e5e7eb'};color:${selectedCount>0?'#fff':'var(--text-muted)'};font-weight:600" ${selectedCount===0?'disabled':''}>📄 支払い通知書作成 (${selectedCount})</button>
+      </span>
+    </div>
     <table class="data-table compact" style="width:100%;font-size:11px;margin-bottom:10px">
       <thead><tr style="background:#fff">
-        <th style="width:80px">申込</th>
-        <th style="width:80px">来院</th>
-        <th style="text-align:left;width:120px">名前</th>
-        <th style="width:80px">医院</th>
-        <th style="width:80px">商材</th>
-        <th style="text-align:right;width:90px">成約金額</th>
-        <th style="text-align:right;width:90px">インセ</th>
-        <th style="width:90px">入金月</th>
-        <th style="width:90px">インセ月</th>
-        <th style="width:60px;text-align:center">支給済</th>
+        <th style="width:36px;text-align:center"><input type="checkbox" class="promo-select-all" data-source="${escapeHtml(p.source)}" title="全選択/解除" style="width:14px;height:14px;cursor:pointer"></th>
+        <th style="width:75px">申込</th>
+        <th style="width:75px">来院</th>
+        <th style="text-align:left;width:110px">名前</th>
+        <th style="width:75px">医院</th>
+        <th style="width:75px">商材</th>
+        <th style="text-align:right;width:85px">成約金額</th>
+        <th style="text-align:right;width:85px">インセ</th>
+        <th style="width:75px">入金月</th>
+        <th style="width:90px">通知書</th>
+        <th style="width:55px;text-align:center">支給済</th>
       </tr></thead>
       <tbody>
         ${contracted.map(d => {
           const inc = _inc(d);
           const paid = _isPaid(d);
-          const imLbl = _imLbl(d) || '－';
+          const noticeCreated = _noticeCreated(d);
+          const noticeDate = _noticeDate(d);
+          const selected = _isSelected(d);
           const pmLbl = d.paymentMonth || '－';
           const fmtMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${parseInt(m[2])}/${parseInt(m[3])}` : '－'; };
-          return `<tr style="background:${paid?'#f0fdf4':'#fff'}">
+          // 通知書セルの表示内容
+          const noticeCell = noticeCreated
+            ? `<span style="display:inline-block;padding:2px 6px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #86efac" title="${escapeHtml(noticeDate)}">📄 作成済</span>`
+            : `<span style="color:var(--text-muted);font-size:10px">未作成</span>`;
+          // 行背景: 選択中=#ede9fe / 支給済=#f0fdf4 / 通知済=#f0f9ff / 未=#fff
+          const rowBg = selected ? '#ede9fe' : paid ? '#f0fdf4' : noticeCreated ? '#f0f9ff' : '#fff';
+          return `<tr style="background:${rowBg}">
+            <td style="text-align:center"><input type="checkbox" class="promo-row-select" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-key="${escapeHtml(d.name + '|' + d.applyDate)}" ${selected?'checked':''} ${noticeCreated?'disabled title="既に通知書作成済"':''} style="width:14px;height:14px;cursor:${noticeCreated?'not-allowed':'pointer'};accent-color:#7c3aed"></td>
             <td style="text-align:center">${escapeHtml(fmtMD(d.applyDate))}</td>
             <td style="text-align:center">${escapeHtml(fmtMD(d.bookDate))}</td>
             <td style="text-align:left;font-weight:500">${escapeHtml(d.name||'')}</td>
@@ -11592,10 +11817,10 @@ function _renderPromoDetail(p, _bkEx) {
             <td style="text-align:right;font-variant-numeric:tabular-nums">¥${fmt(_amt(d))}</td>
             <td style="text-align:right;font-variant-numeric:tabular-nums;color:#7c3aed;font-weight:600">¥${fmt(inc)}</td>
             <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(pmLbl)}</td>
-            <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(imLbl)}</td>
+            <td style="text-align:center">${noticeCell}</td>
             <td style="text-align:center"><input type="checkbox" class="promo-paid-chk" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" ${paid?'checked':''} title="支給済みならチェック" style="width:16px;height:16px;cursor:pointer;accent-color:#16a34a"></td>
           </tr>`;
-        }).join('') || '<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--text-muted)">成約案件はまだありません</td></tr>'}
+        }).join('') || '<tr><td colspan="11" style="text-align:center;padding:14px;color:var(--text-muted)">成約案件はまだありません</td></tr>'}
       </tbody>
     </table>
     ${others.length ? `<details style="margin-top:8px">
