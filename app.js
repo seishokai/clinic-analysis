@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v378';
+const APP_VERSION = 'v379';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4284,12 +4284,16 @@ function switchView(view) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
   window.scrollTo(0, 0);
-  const titles = {home:'ホーム',tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
+  const titles = {home:'ホーム',tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',promo:'プロモ',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
   try { sessionStorage.setItem('lastView', view); } catch(_){}
   // v359: ホームタブ切替時にダッシュボードを描画 (旧: 分析タブ + 予約サブタブ統合)
   if (view === 'home') {
     setTimeout(() => { if (typeof renderHomeDashboard === 'function') renderHomeDashboard(); }, 50);
+  }
+  // v379: プロモタブ切替時に renderPromo
+  if (view === 'promo') {
+    setTimeout(() => { if (typeof renderPromo === 'function') renderPromo(); }, 50);
   }
   // 管理タブ切替時: 権限管理を自動で表示
   if (view === 'admin') {
@@ -11328,6 +11332,283 @@ async function deleteAdBudget(id) {
   await sb.from('ad_budget_headers').delete().eq('id', id);
   showToast('削除しました');
   renderAdBudgets();
+}
+
+// === v379: プロモタブ ===
+// プロモコード別に予約→来院→成約を集計し、計算インセンティブと支給状況を管理
+let _promoTabState = {
+  expandedSource: null,           // 展開中のプロモコード
+  filterPeriod: '',               // '' | 'thisMonth' | 'lastMonth' | 'thisYear'
+  showPaidOnly: false,            // 支給済みのみ
+  showUnpaidOnly: false,          // 未支給のみ
+};
+
+function renderPromo() {
+  const el = document.getElementById('promo-content');
+  if (!el) return;
+  const data = (typeof getFilteredBookingsData === 'function' ? getFilteredBookingsData() : (bookingsData || []));
+
+  // === 期間フィルタ ===
+  const period = _promoTabState.filterPeriod;
+  const now = new Date();
+  const ym = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const lastMonth = new Date(now); lastMonth.setMonth(lastMonth.getMonth()-1);
+  const lym = `${lastMonth.getFullYear()}-${String(lastMonth.getMonth()+1).padStart(2,'0')}`;
+  const yyyy = String(now.getFullYear());
+  const ymOf = (d) => {
+    const src = d.bookDate || d.applyDate || '';
+    const m = String(src).match(/(\d{4})\D+(\d{1,2})/);
+    return m ? m[1] + '-' + String(parseInt(m[2])).padStart(2, '0') : '';
+  };
+  let rows = data.filter(d => d.status !== '除外');
+  if (period === 'thisMonth') rows = rows.filter(d => ymOf(d) === ym);
+  else if (period === 'lastMonth') rows = rows.filter(d => ymOf(d) === lym);
+  else if (period === 'thisYear') rows = rows.filter(d => ymOf(d).startsWith(yyyy));
+
+  // === bk-extra (incentive_paid フラグ含む) ===
+  const _bkEx = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
+  const _amt = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+  };
+  const _inc = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return Number(ex.incentiveAmount) || Number(d.incentiveAmount) || calcIncentive(d.source, _amt(d));
+  };
+  const _isPaid = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return ex.incentivePaid === true || ex.incentivePaid === 'true' || d.incentivePaid === true;
+  };
+
+  // === プロモコード別に集計 ===
+  const byPromo = {};
+  rows.forEach(d => {
+    const src = (d.source || '').trim();
+    if (!src || src === '?') return;
+    if (!byPromo[src]) byPromo[src] = {
+      source: src,
+      total: 0,
+      visited: 0,
+      contracted: 0,
+      cancelled: 0,
+      contractAmount: 0,
+      incentiveTotal: 0,
+      incentivePaid: 0,
+      incentiveUnpaid: 0,
+      bookings: [],
+    };
+    const p = byPromo[src];
+    p.total++;
+    p.bookings.push(d);
+    if (typeof isVisitedStatus === 'function' && isVisitedStatus(d.status || '')) p.visited++;
+    if (d.status === '成約') {
+      p.contracted++;
+      p.contractAmount += _amt(d);
+      const inc = _inc(d);
+      p.incentiveTotal += inc;
+      if (_isPaid(d)) p.incentivePaid += inc;
+      else p.incentiveUnpaid += inc;
+    } else if (d.status === 'キャンセル') {
+      p.cancelled++;
+    }
+  });
+  const sortedPromos = Object.values(byPromo).sort((a, b) => b.total - a.total);
+
+  // 全体集計
+  const allTotal = rows.length;
+  const allContracted = sortedPromos.reduce((s, p) => s + p.contracted, 0);
+  const allContractAmt = sortedPromos.reduce((s, p) => s + p.contractAmount, 0);
+  const allIncTotal = sortedPromos.reduce((s, p) => s + p.incentiveTotal, 0);
+  const allIncPaid = sortedPromos.reduce((s, p) => s + p.incentivePaid, 0);
+  const allIncUnpaid = sortedPromos.reduce((s, p) => s + p.incentiveUnpaid, 0);
+
+  const periodLabel = period === 'thisMonth' ? `今月 (${ym})`
+                    : period === 'lastMonth' ? `先月 (${lym})`
+                    : period === 'thisYear' ? `今年 (${yyyy})`
+                    : '全期間';
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px;padding:2px 0">
+      <strong style="font-size:14px;font-weight:700">📣 プロモ管理</strong>
+      <span style="font-size:11px;color:var(--text-sub)">${escapeHtml(periodLabel)} ・ ${sortedPromos.length}コード ・ ${allTotal}件</span>
+      <span style="margin-left:auto;display:flex;gap:4px">
+        ${['', 'thisMonth', 'lastMonth', 'thisYear'].map(p => {
+          const lbl = p === '' ? '全期間' : p === 'thisMonth' ? '今月' : p === 'lastMonth' ? '先月' : '今年';
+          return `<button class="promo-period-btn filter-btn ${period===p?'is-active':''}" data-period="${p}">${lbl}</button>`;
+        }).join('')}
+      </span>
+    </div>
+    <!-- v379: 集計サマリー -->
+    <div class="stats-row" style="gap:6px;margin-bottom:8px">
+      <div class="stat-card"><span class="stat-label">予約合計</span><span class="stat-num">${allTotal}</span></div>
+      <div class="stat-card is-success"><span class="stat-label">成約</span><span class="stat-num">${allContracted}</span><span class="stat-yoy" style="font-size:10px;color:var(--text-sub)">¥${fmt(allContractAmt)}</span></div>
+      <div class="stat-card"><span class="stat-label">インセ計</span><span class="stat-num" style="color:#7c3aed">¥${fmt(allIncTotal)}</span></div>
+      <div class="stat-card is-info"><span class="stat-label">支給済</span><span class="stat-num" style="color:#059669">¥${fmt(allIncPaid)}</span></div>
+      <div class="stat-card ${allIncUnpaid>0?'is-warning':''}"><span class="stat-label">未支給</span><span class="stat-num" style="color:${allIncUnpaid>0?'#b45309':'inherit'}">¥${fmt(allIncUnpaid)}</span></div>
+    </div>
+    <div class="card" style="padding:6px">
+      <div class="data-table-wrap" style="max-height:calc(100vh - 200px);overflow-y:auto">
+        <table class="data-table compact" style="width:100%">
+          <thead><tr>
+            <th style="text-align:left;width:160px">プロモコード</th>
+            <th style="width:60px">予約</th>
+            <th style="width:60px">来院</th>
+            <th style="width:60px">成約</th>
+            <th style="width:50px">成約率</th>
+            <th style="width:60px">CV取消</th>
+            <th style="text-align:right;width:100px">成約金額</th>
+            <th style="text-align:right;width:100px">インセ計</th>
+            <th style="text-align:right;width:100px">支給済</th>
+            <th style="text-align:right;width:100px">未支給</th>
+            <th style="width:40px"></th>
+          </tr></thead>
+          <tbody>
+            ${sortedPromos.map(p => {
+              const cvRate = p.visited ? Math.round(p.contracted / p.visited * 100) : 0;
+              const expanded = _promoTabState.expandedSource === p.source;
+              return `<tr class="promo-row" data-source="${escapeHtml(p.source)}" style="cursor:pointer;background:${expanded?'#eff6ff':''}">
+                <td style="font-weight:600;text-align:left">${escapeHtml(p.source)}</td>
+                <td style="text-align:center">${p.total}</td>
+                <td style="text-align:center;color:#0369a1">${p.visited}</td>
+                <td style="text-align:center;color:#059669;font-weight:600">${p.contracted}</td>
+                <td style="text-align:center;font-size:10px;color:${cvRate>=30?'#059669':'#d97706'}">${cvRate}%</td>
+                <td style="text-align:center;color:#dc2626">${p.cancelled}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums">¥${fmt(p.contractAmount)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;color:#7c3aed;font-weight:600">¥${fmt(p.incentiveTotal)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;color:#059669">¥${fmt(p.incentivePaid)}</td>
+                <td style="text-align:right;font-variant-numeric:tabular-nums;color:${p.incentiveUnpaid>0?'#b45309':'var(--text-muted)'};font-weight:${p.incentiveUnpaid>0?'600':'400'}">¥${fmt(p.incentiveUnpaid)}</td>
+                <td style="text-align:center;font-size:14px;color:var(--text-sub)">${expanded?'▼':'▶'}</td>
+              </tr>
+              ${expanded ? `<tr class="promo-detail"><td colspan="11" style="padding:0;background:#fafafa">
+                ${_renderPromoDetail(p, _bkEx)}
+              </td></tr>` : ''}`;
+            }).join('') || '<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-sub)">該当データがありません</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // === イベント結合 ===
+  el.querySelectorAll('.promo-period-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _promoTabState.filterPeriod = btn.dataset.period;
+      renderPromo();
+    });
+  });
+  el.querySelectorAll('.promo-row').forEach(row => {
+    row.addEventListener('click', (e) => {
+      // 詳細行内のクリックは無視
+      if (e.target.closest('.promo-detail')) return;
+      const src = row.dataset.source;
+      _promoTabState.expandedSource = (_promoTabState.expandedSource === src) ? null : src;
+      renderPromo();
+    });
+  });
+  el.querySelectorAll('.promo-paid-chk').forEach(cb => {
+    cb.addEventListener('change', async () => {
+      const name = cb.dataset.name, apply = cb.dataset.apply, paid = cb.checked;
+      try {
+        const bkEx = loadData('bk-extra', {});
+        const key = name + '|' + apply;
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].incentivePaid = paid;
+        saveData('bk-extra', bkEx);
+        const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+        if (target) target.incentivePaid = paid;
+        await safeSave({
+          type: 'upsert',
+          table: 'booking_status',
+          payload: { name, apply_date: apply, incentive_paid: paid },
+          options: { onConflict: 'name,apply_date' }
+        });
+        renderPromo();
+        if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+      } catch (e) {
+        console.warn('incentive paid save failed', e);
+        showToast('支給状況の保存に失敗', true);
+      }
+    });
+  });
+}
+
+// プロモコード展開時の詳細テーブル (各予約 + 支給チェック)
+function _renderPromoDetail(p, _bkEx) {
+  const _amt = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+  };
+  const _inc = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return Number(ex.incentiveAmount) || Number(d.incentiveAmount) || calcIncentive(d.source, _amt(d));
+  };
+  const _isPaid = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return ex.incentivePaid === true || ex.incentivePaid === 'true' || d.incentivePaid === true;
+  };
+  const _imLbl = (d) => {
+    const ex = _bkEx[d.name + '|' + d.applyDate] || {};
+    return ex.incentiveMonth || d.incentiveMonth || '';
+  };
+  // 成約のみ表示 (インセ管理対象)
+  const contracted = p.bookings.filter(b => b.status === '成約').sort((a, b) => {
+    const ad = parseDate(a.applyDate)?.getTime() || 0;
+    const bd = parseDate(b.applyDate)?.getTime() || 0;
+    return bd - ad;
+  });
+  const others = p.bookings.filter(b => b.status !== '成約').sort((a, b) => {
+    const ad = parseDate(a.bookDate || a.applyDate)?.getTime() || 0;
+    const bd = parseDate(b.bookDate || b.applyDate)?.getTime() || 0;
+    return bd - ad;
+  });
+  return `<div style="padding:8px">
+    <div style="font-size:11px;font-weight:600;color:var(--text-sub);margin-bottom:6px">📋 ${escapeHtml(p.source)} の成約案件 (${contracted.length}件) - インセ支給管理</div>
+    <table class="data-table compact" style="width:100%;font-size:11px;margin-bottom:10px">
+      <thead><tr style="background:#fff">
+        <th style="width:80px">申込</th>
+        <th style="width:80px">来院</th>
+        <th style="text-align:left;width:120px">名前</th>
+        <th style="width:80px">医院</th>
+        <th style="width:80px">商材</th>
+        <th style="text-align:right;width:90px">成約金額</th>
+        <th style="text-align:right;width:90px">インセ</th>
+        <th style="width:90px">入金月</th>
+        <th style="width:90px">インセ月</th>
+        <th style="width:60px;text-align:center">支給済</th>
+      </tr></thead>
+      <tbody>
+        ${contracted.map(d => {
+          const inc = _inc(d);
+          const paid = _isPaid(d);
+          const imLbl = _imLbl(d) || '－';
+          const pmLbl = d.paymentMonth || '－';
+          const fmtMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${parseInt(m[2])}/${parseInt(m[3])}` : '－'; };
+          return `<tr style="background:${paid?'#f0fdf4':'#fff'}">
+            <td style="text-align:center">${escapeHtml(fmtMD(d.applyDate))}</td>
+            <td style="text-align:center">${escapeHtml(fmtMD(d.bookDate))}</td>
+            <td style="text-align:left;font-weight:500">${escapeHtml(d.name||'')}</td>
+            <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(typeof normFac==='function'?(normFac(d.facility)||'-'):(d.facility||'-'))}</td>
+            <td style="text-align:center;font-size:10px">${escapeHtml(d.contractService||'-')}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums">¥${fmt(_amt(d))}</td>
+            <td style="text-align:right;font-variant-numeric:tabular-nums;color:#7c3aed;font-weight:600">¥${fmt(inc)}</td>
+            <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(pmLbl)}</td>
+            <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(imLbl)}</td>
+            <td style="text-align:center"><input type="checkbox" class="promo-paid-chk" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" ${paid?'checked':''} title="支給済みならチェック" style="width:16px;height:16px;cursor:pointer;accent-color:#16a34a"></td>
+          </tr>`;
+        }).join('') || '<tr><td colspan="10" style="text-align:center;padding:14px;color:var(--text-muted)">成約案件はまだありません</td></tr>'}
+      </tbody>
+    </table>
+    ${others.length ? `<details style="margin-top:8px">
+      <summary style="cursor:pointer;font-size:11px;color:var(--text-sub);padding:4px 0">▶ 未成約 (${others.length}件) を表示</summary>
+      <table class="data-table compact" style="width:100%;font-size:10px;margin-top:6px">
+        <thead><tr><th>申込</th><th>来院</th><th style="text-align:left">名前</th><th>医院</th><th>ステータス</th></tr></thead>
+        <tbody>${others.map(d => {
+          const fmtMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${parseInt(m[2])}/${parseInt(m[3])}` : '－'; };
+          return `<tr><td style="text-align:center">${escapeHtml(fmtMD(d.applyDate))}</td><td style="text-align:center">${escapeHtml(fmtMD(d.bookDate))}</td><td style="text-align:left">${escapeHtml(d.name||'')}</td><td style="text-align:center;font-size:10px">${escapeHtml(typeof normFac==='function'?(normFac(d.facility)||'-'):(d.facility||'-'))}</td><td style="text-align:center;font-size:10px">${escapeHtml(d.status||'未設定')}</td></tr>`;
+        }).join('')}</tbody>
+      </table>
+    </details>` : ''}
+  </div>`;
 }
 
 async function renderAdBudgets() {
