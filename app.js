@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v371';
+const APP_VERSION = 'v372';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8821,18 +8821,18 @@ async function renderKaiinAll(containerId) {
     </div>
     ` : ''}
     <div class="card" style="padding:6px">
-      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${(state.dashboardOpen?160:0) + (state.filterOpen?80:0) + 100}px);overflow-y:auto">
+      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${(state.dashboardOpen?160:0) + (state.filterOpen?80:0) + 90}px);overflow-y:auto">
         <table class="data-table compact kaiin-all-list-table" style="width:100%">
           <thead><tr>
-            <th style="text-align:left">来院</th>
-            <th style="text-align:left">名前</th>
-            <th>治療</th>
-            <th>医院</th>
-            <th>プロモ</th>
-            <th>ステータス</th>
-            <th>次回予定</th>
-            <th>成約商材</th>
-            <th style="text-align:right">売上</th>
+            <th style="width:55px">来院</th>
+            <th style="text-align:left;width:130px">名前</th>
+            <th style="width:60px">治療</th>
+            <th style="width:75px">医院</th>
+            <th style="width:90px">プロモ</th>
+            <th style="width:130px">ステータス</th>
+            <th style="width:75px">次回予定</th>
+            <th style="width:90px">成約商材</th>
+            <th style="width:85px">売上</th>
             <th style="text-align:left">メモ</th>
           </tr></thead>
           <tbody>
@@ -9300,12 +9300,23 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const setFacOpts = ['BF銀座','ルミナス','中日'];
   const CONSULT_TYPES = ['BF相談','矯正相談','インプラント相談','ラブリエ相談','自費補綴相談','自費根治相談','ホワイトニング','リップアート','ティースジュエリー','その他'];
 
+  // v372: 一覧タブと同じコンパクトバナー (絞込/サマリーは独立トグル)
+  const FILTER_KEY_TR = 'kaiin-' + treatment + '-filter';
+  let _initFilterOpen = false;
+  try { _initFilterOpen = sessionStorage.getItem(FILTER_KEY_TR) === '1'; } catch(_){}
   el.innerHTML = `
-    <button class="kaiin-header-toggle filter-btn">▼ サマリーを表示</button>
-    <div class="kaiin-topbar filter-bar" style="margin-bottom:10px">
+    <div class="kaiin-tr-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0">
+      <strong style="color:#1a1a1a;font-size:14px;font-weight:700">${treatment} 来院管理</strong>
+      <span style="font-size:11px;color:var(--text-sub)">${rows.length}件</span>
+      <input type="text" class="kaiin-filter-search filter-input" data-treatment="${treatment}" placeholder="🔍 名前" style="width:140px;font-size:11px;padding:3px 8px">
+      <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
+        <button class="kaiin-tr-filter-toggle filter-btn ${_initFilterOpen?'is-active':''}" title="絞込フィルタを表示/非表示">${_initFilterOpen?'▲ 絞込':'▼ 絞込'}</button>
+        <button class="kaiin-header-toggle filter-btn" title="サマリー(統計+カード)を表示/非表示">▼ サマリーを表示</button>
+      </span>
+    </div>
+    <div class="kaiin-topbar filter-bar" style="margin-bottom:4px;display:${_initFilterOpen?'block':'none'}">
       <div class="filter-row">
-        <input type="text" class="kaiin-filter-search filter-input" data-treatment="${treatment}" placeholder="🔍 名前検索" style="width:140px">
-        <select class="kaiin-filter-period filter-select" data-treatment="${treatment}">
+        <select class="kaiin-filter-period filter-select" data-treatment="${treatment}" style="font-size:11px;padding:3px 6px">
           <option value="">期間:全て</option>
           <option value="thisMonth" selected>今月（来院日基準）</option>
           <option value="thisMonthApply">今月（登録日基準）</option>
@@ -9317,13 +9328,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         <span class="kaiin-filter-setfac-slot"></span>
         <span class="kaiin-filter-consult-slot"></span>
         <span class="kaiin-filter-status-slot"></span>
-        <select class="kaiin-sort filter-select" data-treatment="${treatment}">
-          <option value="date-desc" selected>ソート:来院日(新→古)</option>
-          <option value="date-asc">来院日(古→新)</option>
+        <span style="flex:1"></span>
+        <select class="kaiin-sort filter-select" data-treatment="${treatment}" style="font-size:11px;padding:3px 6px">
+          <option value="date-desc" selected>ソート:新→古</option>
+          <option value="date-asc">古→新</option>
           <option value="status">ステータス順</option>
           <option value="name">名前順</option>
         </select>
-        <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF出力</button>
+        <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF</button>
       </div>
     </div>
     <!-- v365: 予約管理と同じ8カードまとめ (予約数/要対応/未来予約/進行中/キャンセル/来院済/成約/成約金額)
@@ -9349,8 +9361,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       </div>
     </div>
     <div class="card" style="padding:6px">
-      <div style="font-size:11px;color:var(--text-sub);margin-bottom:4px">一覧 <span class="kaiin-count">${rows.length}件</span></div>
-      <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 180px);overflow-y:auto">
+      <span class="kaiin-count" style="display:none">${rows.length}件</span>
+      <div class="data-table-wrap kaiin-table-wrap" style="max-height:calc(100vh - 130px);overflow-y:auto">
         <table class="data-table compact">
           <thead><tr>
             <th style="width:55px">来院</th>
@@ -9371,37 +9383,24 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     </div>
   `;
 
-  // トグル + フィルター群を page-header に移動してタイトル横に1行で並べる
+  // v372: タイトル + トグルは el 内のバナーに集約済み。page-header は非表示に。
   let toggleBtn = el.querySelector('.kaiin-header-toggle');
   let topbar = el.querySelector('.kaiin-topbar');
+  let filterToggle = el.querySelector('.kaiin-tr-filter-toggle');
   try {
     const parentSub = el.closest('[id^="sub-kaiin-"]');
     const pageHeader = parentSub?.querySelector('.page-header');
-    if (pageHeader) {
-      pageHeader.style.display = 'flex';
-      pageHeader.style.alignItems = 'center';
-      pageHeader.style.gap = '8px';
-      pageHeader.style.flexWrap = 'nowrap';
-      pageHeader.style.overflowX = 'auto';
-      pageHeader.style.padding = '6px 8px';
-      pageHeader.querySelectorAll('.kaiin-header-toggle, .kaiin-topbar').forEach(n => {
-        if (n !== toggleBtn && n !== topbar) n.remove();
-      });
-      const h2 = pageHeader.querySelector('h2');
-      if (h2) { h2.style.margin = '0'; h2.style.flex = '0 0 auto'; h2.style.whiteSpace = 'nowrap'; h2.style.fontSize = '16px'; }
-      if (toggleBtn) pageHeader.appendChild(toggleBtn);
-      if (topbar) {
-        topbar.style.margin = '0';
-        topbar.style.padding = '0';
-        topbar.style.background = 'transparent';
-        topbar.style.border = 'none';
-        topbar.style.flexWrap = 'nowrap';
-        topbar.style.flex = '1';
-        topbar.style.minWidth = '0';
-        pageHeader.appendChild(topbar);
-      }
-    }
+    if (pageHeader) pageHeader.style.display = 'none';
   } catch(_){}
+
+  // === v372: 絞込トグルで topbar 表示/非表示 (sessionStorage 永続化) ===
+  filterToggle?.addEventListener('click', () => {
+    const isOpen = topbar && topbar.style.display !== 'none';
+    if (topbar) topbar.style.display = isOpen ? 'none' : 'block';
+    filterToggle.textContent = isOpen ? '▼ 絞込' : '▲ 絞込';
+    filterToggle.classList.toggle('is-active', !isOpen);
+    try { sessionStorage.setItem(FILTER_KEY_TR, isOpen ? '0' : '1'); } catch(_){}
+  });
 
   // v371: 治療別サマリー (8カード + 旧詳細header) を一括トグル。
   // 状態は sessionStorage に保存 (タブ切替で維持)。
