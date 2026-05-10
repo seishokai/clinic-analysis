@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v358';
+const APP_VERSION = 'v359';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1305,9 +1305,6 @@ function setupEventListeners() {
         try { sessionStorage.setItem('lastSub:' + el.id, sub); } catch(_){}
       }
       // タブ切替時にデータ更新
-      if (sub === 'bk-home') {
-        if (typeof renderHomeDashboard === 'function') renderHomeDashboard();
-      }
       if (sub === 'bk-phone') {
         if (typeof renderPhoneCheck === 'function') renderPhoneCheck();
       }
@@ -2293,12 +2290,12 @@ function restoreLastView() {
     }
 
     // ロールごとに許可されたビューしか復元しない (Phase 6: currentRole ベース)
-    // v292: 全ロールで analytics 解放 + agency も kaiin/analytics 見せる
+    // v359: home を全ロールに解放 (旧 analytics 廃止)
     const isAllowed = (v) => {
-      if (isAdminRole()) return ['bookings','kaiin','analytics','tc','adbudget','admin','sales'].includes(v);
-      if (isStaffPromoRole()) return ['bookings','kaiin','analytics'].includes(v);
-      if (isAgencyRole()) return ['bookings','kaiin','analytics'].includes(v);
-      return v === 'bookings';
+      if (isAdminRole()) return ['home','bookings','kaiin','tc','adbudget','admin','sales'].includes(v);
+      if (isStaffPromoRole()) return ['home','bookings','kaiin'].includes(v);
+      if (isAgencyRole()) return ['home','bookings','kaiin'].includes(v);
+      return v === 'home' || v === 'bookings';
     };
 
     // v270: ポータルからのリダイレクト (例: ユーザー管理ボタン → admin/権限管理)
@@ -2320,8 +2317,10 @@ function restoreLastView() {
     }
 
     const lastView = sessionStorage.getItem('lastView');
-    if (lastView && isAllowed(lastView)) {
+    if (lastView && lastView !== 'analytics' && isAllowed(lastView)) {
       switchView(lastView);
+    } else if (isAllowed('home')) {
+      switchView('home');
     }
     // 各ビューのサブタブ位置を復元
     document.querySelectorAll('main.view').forEach(main => {
@@ -2480,21 +2479,8 @@ let _homeAnalysisSort = (() => {
 function _saveHomeSort()  { try { sessionStorage.setItem('home-analysis-sort', JSON.stringify(_homeAnalysisSort)); } catch(_){} }
 
 // v292: 分析タブ用 (ホームダッシュボードと同じコンテンツを #analytics-dashboard-content に表示)
-function renderAnalyticsDashboard() {
-  const home = document.getElementById('home-dashboard-content');
-  const ana  = document.getElementById('analytics-dashboard-content');
-  if (!ana) return;
-  // ホーム側を一度描画 → クローンして分析タブにも反映
-  if (typeof renderHomeDashboardCore === 'function') {
-    renderHomeDashboardCore(ana);
-  } else {
-    // フォールバック: 既存の renderHomeDashboard を借用してクローン
-    renderHomeDashboard();
-    if (home && home.innerHTML.trim()) {
-      ana.innerHTML = home.innerHTML;
-    }
-  }
-}
+// v359: 分析タブ削除に伴い renderAnalyticsDashboard を no-op に変更 (互換のため残置)
+function renderAnalyticsDashboard() { /* 分析タブは v359 で削除されホームに統合 */ }
 
 function renderHomeDashboard() {
   const el = document.getElementById('home-dashboard-content');
@@ -4239,12 +4225,12 @@ function switchView(view) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
   window.scrollTo(0, 0);
-  const titles = {tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
+  const titles = {home:'ホーム',tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
   try { sessionStorage.setItem('lastView', view); } catch(_){}
-  // v292: 分析タブ切替時に分析ダッシュボードを描画
-  if (view === 'analytics') {
-    setTimeout(() => { if (typeof renderAnalyticsDashboard === 'function') renderAnalyticsDashboard(); }, 50);
+  // v359: ホームタブ切替時にダッシュボードを描画 (旧: 分析タブ + 予約サブタブ統合)
+  if (view === 'home') {
+    setTimeout(() => { if (typeof renderHomeDashboard === 'function') renderHomeDashboard(); }, 50);
   }
   // 管理タブ切替時: 権限管理を自動で表示
   if (view === 'admin') {
@@ -12674,21 +12660,21 @@ function _showCredModal(info) {
   document.addEventListener('keydown', function esc(e){ if (e.key==='Escape'){ close(); document.removeEventListener('keydown', esc); } });
 }
 
-// Phase 8: タブ定義
+// Phase 8: タブ定義 (v359: 分析タブ廃止 → ホームタブ追加)
 const AUTH_TAB_DEFS = [
+  { key: 'home',      label: 'ホーム' },
   { key: 'bookings',  label: '予約' },
   { key: 'kaiin',     label: '来院' },
   { key: 'monshin',   label: '問診票' },
-  { key: 'analytics', label: '分析' },
   { key: 'tc',        label: 'TC' },
   { key: 'sales',     label: '売上' },
   { key: 'adbudget',  label: '広告' },
   { key: 'admin',     label: '管理' },
 ];
 function _defaultTabsForRole(role) {
-  if (role === 'admin')       return { bookings:true, kaiin:true,  monshin:true,  analytics:true,  tc:true,  sales:true,  adbudget:true,  admin:true  };
-  if (role === 'staff_promo') return { bookings:true, kaiin:true,  monshin:true,  analytics:false, tc:false, sales:false, adbudget:false, admin:false };
-  return                             { bookings:true, kaiin:false, monshin:false, analytics:false, tc:false, sales:false, adbudget:false, admin:false };
+  if (role === 'admin')       return { home:true, bookings:true, kaiin:true,  monshin:true,  tc:true,  sales:true,  adbudget:true,  admin:true  };
+  if (role === 'staff_promo') return { home:true, bookings:true, kaiin:true,  monshin:true,  tc:false, sales:false, adbudget:false, admin:false };
+  return                             { home:true, bookings:true, kaiin:false, monshin:false, tc:false, sales:false, adbudget:false, admin:false };
 }
 function _tabsToBadges(vt) {
   if (!vt || typeof vt !== 'object') return '<span style="color:var(--text-muted);font-size:11px">-</span>';
