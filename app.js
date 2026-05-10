@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v382';
+const APP_VERSION = 'v383';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11345,6 +11345,7 @@ let _promoTabState = {
   mode: 'all',                    // v381: 'all' = プロモ管理 / 'incentive' = インセンティブ管理 (rate>0のみ)
   hideZeroIncentive: true,        // v382: インセ¥0は非表示 (デフォルトON)
   hidePaid: true,                 // v382: 支給済は非表示 (デフォルトON)
+  hideNoticeCreated: true,        // v383: 通知書作成済も非表示 (月1回バッチ発行、二重発行防止)
 };
 
 function renderPromo() {
@@ -11614,23 +11615,30 @@ function renderPromo() {
       renderPromo();
     });
   });
-  // 支払い通知書作成
+  el.querySelectorAll('.promo-hide-notice').forEach(cb => {
+    cb.addEventListener('change', () => {
+      _promoTabState.hideNoticeCreated = cb.checked;
+      renderPromo();
+    });
+  });
+  // 支払い通知書作成 (v383: 確認ダイアログ + 対象月)
   el.querySelectorAll('.promo-create-notice').forEach(btn => {
     btn.addEventListener('click', () => {
       const src = btn.dataset.source;
+      const targetMonth = btn.dataset.targetMonth || '';
       const promo = sortedPromos.find(p => p.source === src);
       if (!promo) return;
       const selectedBookings = promo.bookings.filter(b => {
         return b.status === '成約' && _promoTabState.selected.has(b.name + '|' + b.applyDate);
       });
       if (!selectedBookings.length) return;
-      _openPaymentNoticeModal(src, selectedBookings, _bkEx);
+      _openPaymentNoticeModal(src, selectedBookings, _bkEx, targetMonth);
     });
   });
 }
 
-// === v380: 支払い通知書モーダル (印刷可能 + 確定で paymentNoticeCreated 保存) ===
-function _openPaymentNoticeModal(source, bookings, _bkEx) {
+// === v380/383: 支払い通知書モーダル (月1バッチ印刷 + 確定で paymentNoticeCreated 保存) ===
+function _openPaymentNoticeModal(source, bookings, _bkEx, targetMonth) {
   // 既存モーダルがあれば削除
   const existing = document.getElementById('payment-notice-modal');
   if (existing) existing.remove();
@@ -11647,6 +11655,10 @@ function _openPaymentNoticeModal(source, bookings, _bkEx) {
   const issueDate = new Date();
   const issueDateStr = `${issueDate.getFullYear()}年${issueDate.getMonth()+1}月${issueDate.getDate()}日`;
   const issueIso = `${issueDate.getFullYear()}-${String(issueDate.getMonth()+1).padStart(2,'0')}-${String(issueDate.getDate()).padStart(2,'0')}`;
+  // v383: 対象月のラベル (ボタンから受け取った targetMonth='YYYY-MM' または現在月)
+  const tm = targetMonth || `${issueDate.getFullYear()}-${String(issueDate.getMonth()+1).padStart(2,'0')}`;
+  const tmParts = tm.split('-');
+  const targetMonthLabel = `${tmParts[0]}年${parseInt(tmParts[1])}月分`;
 
   const modal = document.createElement('div');
   modal.id = 'payment-notice-modal';
@@ -11656,19 +11668,20 @@ function _openPaymentNoticeModal(source, bookings, _bkEx) {
     <div style="background:#fff;border-radius:10px;max-width:760px;width:100%;box-shadow:0 12px 40px rgba(0,0,0,.35);font-family:inherit">
       <!-- アクションバー (印刷時非表示) -->
       <div class="notice-actions" style="display:flex;align-items:center;gap:8px;padding:12px 16px;border-bottom:1px solid var(--border);background:#f9fafb;border-radius:10px 10px 0 0">
-        <strong style="font-size:14px">📄 支払い通知書</strong>
+        <strong style="font-size:14px">📄 ${escapeHtml(targetMonthLabel)} 支払い通知書 - ${bookings.length}件 / ¥${fmt(totalInc)}</strong>
         <span style="margin-left:auto;display:flex;gap:6px">
           <button id="notice-print-btn" class="filter-btn" title="印刷">🖨 印刷</button>
-          <button id="notice-confirm-btn" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:600" title="作成確定 (作成済みフラグを保存)">✓ 作成確定</button>
-          <button id="notice-cancel-btn" class="filter-btn" title="閉じる">✕ 閉じる</button>
+          <button id="notice-confirm-btn" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:600" title="この内容で確定 (確認ダイアログあり)">✓ 作成確定</button>
+          <button id="notice-cancel-btn" class="filter-btn" title="閉じる (確定しない)">✕ 閉じる</button>
         </span>
       </div>
       <!-- 印刷対象 -->
       <div id="notice-printable" style="padding:30px 36px;font-family:'Hiragino Mincho ProN',serif;color:#111">
         <div style="text-align:center;font-size:22px;font-weight:700;letter-spacing:6px;margin-bottom:8px">支払通知書</div>
+        <div style="text-align:center;font-size:14px;color:#7c3aed;font-weight:700;margin-bottom:8px">${escapeHtml(targetMonthLabel)}</div>
         <div style="text-align:right;font-size:12px;color:#444;margin-bottom:30px">発行日: ${issueDateStr}</div>
         <div style="font-size:14px;margin-bottom:6px"><strong>${escapeHtml(source)}</strong> 様</div>
-        <div style="font-size:11px;color:#666;margin-bottom:24px">下記の通り、紹介報酬をお支払いいたします。</div>
+        <div style="font-size:11px;color:#666;margin-bottom:24px">下記の通り、${escapeHtml(targetMonthLabel)}の紹介報酬をお支払いいたします。</div>
         <table style="width:100%;border-collapse:collapse;font-size:11px;margin-bottom:16px">
           <thead><tr style="background:#f3f4f6">
             <th style="border:1px solid #999;padding:6px 8px;text-align:left">案件 (患者名)</th>
@@ -11724,7 +11737,17 @@ function _openPaymentNoticeModal(source, bookings, _bkEx) {
   modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
   modal.querySelector('#notice-print-btn').addEventListener('click', () => window.print());
   modal.querySelector('#notice-confirm-btn').addEventListener('click', async () => {
-    // 全件に paymentNoticeCreated=true + paymentNoticeDate 保存
+    // v383: 確認ダイアログ (取り消し不可の警告)
+    const ok = window.confirm(
+      `${targetMonthLabel} 支払い通知書を作成します。\n\n` +
+      `宛先: ${source}\n` +
+      `件数: ${bookings.length}件\n` +
+      `合計: ¥${fmt(totalInc)}\n\n` +
+      `※ 確定後、これらの案件は通知書作成済みとなり、再発行できなくなります。\n` +
+      `本当によろしいですか?`
+    );
+    if (!ok) return;
+    // 全件に paymentNoticeCreated=true + paymentNoticeDate + paymentNoticeMonth 保存
     try {
       const bkEx = loadData('bk-extra', {});
       const updates = [];
@@ -11733,15 +11756,17 @@ function _openPaymentNoticeModal(source, bookings, _bkEx) {
         if (!bkEx[key]) bkEx[key] = {};
         bkEx[key].paymentNoticeCreated = true;
         bkEx[key].paymentNoticeDate = issueIso;
+        bkEx[key].paymentNoticeMonth = tm;  // v383: '2026-05' バッチ識別用
         const target = (bookingsData || []).find(b => b.name === d.name && b.applyDate === d.applyDate);
         if (target) {
           target.paymentNoticeCreated = true;
           target.paymentNoticeDate = issueIso;
+          target.paymentNoticeMonth = tm;
         }
         updates.push(safeSave({
           type: 'upsert',
           table: 'booking_status',
-          payload: { name: d.name, apply_date: d.applyDate, payment_notice_created: true, payment_notice_date: issueIso },
+          payload: { name: d.name, apply_date: d.applyDate, payment_notice_created: true, payment_notice_date: issueIso, payment_notice_month: tm },
           options: { onConflict: 'name,apply_date' }
         }));
       }
@@ -11749,7 +11774,7 @@ function _openPaymentNoticeModal(source, bookings, _bkEx) {
       await Promise.all(updates);
       _promoTabState.selected.clear();
       modal.remove();
-      showToast(`支払い通知書を ${bookings.length}件 作成しました`);
+      showToast(`✓ ${targetMonthLabel} 通知書を ${bookings.length}件 作成しました (¥${fmt(totalInc)})`);
       renderPromo();
       if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
     } catch (e) {
@@ -11788,10 +11813,10 @@ function _renderPromoDetail(p, _bkEx) {
   };
   const _isSelected = (d) => _promoTabState.selected.has(d.name + '|' + d.applyDate);
   // 成約のみ表示 (インセ管理対象)
-  // v382: hideZeroIncentive / hidePaid でフィルタ
+  // v382/383: hideZeroIncentive / hidePaid / hideNoticeCreated でフィルタ
   let contracted = p.bookings.filter(b => b.status === '成約');
   const totalContracted = contracted.length;
-  let hiddenZero = 0, hiddenPaid = 0;
+  let hiddenZero = 0, hiddenPaid = 0, hiddenNotice = 0;
   if (_promoTabState.hideZeroIncentive) {
     contracted = contracted.filter(b => {
       const inc = _inc(b);
@@ -11802,6 +11827,12 @@ function _renderPromoDetail(p, _bkEx) {
   if (_promoTabState.hidePaid) {
     contracted = contracted.filter(b => {
       if (_isPaid(b)) { hiddenPaid++; return false; }
+      return true;
+    });
+  }
+  if (_promoTabState.hideNoticeCreated) {
+    contracted = contracted.filter(b => {
+      if (_noticeCreated(b)) { hiddenNotice++; return false; }
       return true;
     });
   }
@@ -11819,24 +11850,34 @@ function _renderPromoDetail(p, _bkEx) {
   let selectedCount = 0;
   let selectedInc = 0;
   contracted.forEach(d => { if (_isSelected(d)) { selectedCount++; selectedInc += _inc(d); } });
+  // v383: 対象月 = 現在の年月 (バッチ発行用)
+  const _now = new Date();
+  const _targetMonth = `${_now.getFullYear()}-${String(_now.getMonth()+1).padStart(2,'0')}`;
+  const _targetMonthLabel = `${_now.getFullYear()}年${_now.getMonth()+1}月分`;
+  // 表示中の全件分インセ合計
+  const visibleInc = contracted.reduce((s, d) => s + _inc(d), 0);
   return `<div style="padding:8px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
-      <span style="font-size:11px;font-weight:600;color:var(--text-sub)">📋 ${escapeHtml(p.source)} の成約案件 (${contracted.length}/${totalContracted}件)${hiddenZero?` <span style="color:var(--text-muted);font-weight:400">・インセ¥0=${hiddenZero}件 非表示</span>`:''}${hiddenPaid?` <span style="color:var(--text-muted);font-weight:400">・支給済=${hiddenPaid}件 非表示</span>`:''}</span>
+      <span style="font-size:11px;font-weight:600;color:var(--text-sub)">📋 ${escapeHtml(p.source)} 未支給 ${contracted.length}件 / ¥${fmt(visibleInc)}${hiddenZero||hiddenPaid||hiddenNotice?` <span style="color:var(--text-muted);font-weight:400">(全${totalContracted}件中: ${hiddenZero?`インセ¥0=${hiddenZero} `:''}${hiddenPaid?`支給済=${hiddenPaid} `:''}${hiddenNotice?`通知済=${hiddenNotice} `:''}非表示)</span>`:''}</span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <!-- v382: 表示フィルタ -->
+        <!-- v383: 表示フィルタ (3種) -->
         <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;user-select:none" title="インセ金額が¥0の案件を非表示にする">
           <input type="checkbox" class="promo-hide-zero" ${_promoTabState.hideZeroIncentive?'checked':''} style="cursor:pointer">
-          <span>インセ¥0非表示</span>
+          <span>¥0</span>
         </label>
-        <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;user-select:none" title="支給済の案件を非表示にする">
+        <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;user-select:none" title="既に支払い済みの案件を非表示にする (二重支払い防止)">
           <input type="checkbox" class="promo-hide-paid" ${_promoTabState.hidePaid?'checked':''} style="cursor:pointer">
-          <span>支給済非表示</span>
+          <span>支給済</span>
+        </label>
+        <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;user-select:none" title="通知書作成済の案件を非表示にする (月1回まとめ発行・二重通知防止)">
+          <input type="checkbox" class="promo-hide-notice" ${_promoTabState.hideNoticeCreated?'checked':''} style="cursor:pointer">
+          <span>通知済</span>
         </label>
         <span style="width:1px;height:18px;background:var(--border)"></span>
         <span style="font-size:11px;color:${selectedCount>0?'#7c3aed':'var(--text-muted)'};font-weight:${selectedCount>0?'600':'400'}">選択 ${selectedCount}件 ${selectedCount>0?`/ ¥${fmt(selectedInc)}`:''}</span>
-        <button class="promo-select-unpaid filter-btn" data-source="${escapeHtml(p.source)}" title="未通知の成約を全選択">未通知を全選択</button>
+        <button class="promo-select-unpaid filter-btn" data-source="${escapeHtml(p.source)}" title="表示中の全件を選択">表示中を全選択</button>
         <button class="promo-clear-select filter-btn" data-source="${escapeHtml(p.source)}" title="選択クリア" ${selectedCount===0?'disabled':''}>選択解除</button>
-        <button class="promo-create-notice filter-btn" data-source="${escapeHtml(p.source)}" style="background:${selectedCount>0?'#7c3aed':'#e5e7eb'};color:${selectedCount>0?'#fff':'var(--text-muted)'};font-weight:600" ${selectedCount===0?'disabled':''}>📄 支払い通知書作成 (${selectedCount})</button>
+        <button class="promo-create-notice filter-btn" data-source="${escapeHtml(p.source)}" data-target-month="${_targetMonth}" style="background:${selectedCount>0?'#7c3aed':'#e5e7eb'};color:${selectedCount>0?'#fff':'var(--text-muted)'};font-weight:600" ${selectedCount===0?'disabled':''} title="${escapeHtml(_targetMonthLabel)}の通知書をまとめて発行 (確認ダイアログ後に確定)">📄 ${_targetMonthLabel} 通知書作成 (${selectedCount})</button>
       </span>
     </div>
     <table class="data-table compact" style="width:100%;font-size:11px;margin-bottom:10px">
@@ -11862,9 +11903,11 @@ function _renderPromoDetail(p, _bkEx) {
           const selected = _isSelected(d);
           const pmLbl = d.paymentMonth || '－';
           const fmtMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${parseInt(m[2])}/${parseInt(m[3])}` : '－'; };
-          // 通知書セルの表示内容
+          // 通知書セルの表示内容 (v383: 対象月もラベル表示)
+          const noticeMonth = ((_bkEx[d.name + '|' + d.applyDate] || {}).paymentNoticeMonth) || d.paymentNoticeMonth || '';
+          const noticeMonthLbl = noticeMonth ? noticeMonth.replace(/^\d{2}(\d{2})-(\d{2})$/, '$1/$2') : '';
           const noticeCell = noticeCreated
-            ? `<span style="display:inline-block;padding:2px 6px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #86efac" title="${escapeHtml(noticeDate)}">📄 作成済</span>`
+            ? `<span style="display:inline-block;padding:2px 6px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #86efac" title="発行日: ${escapeHtml(noticeDate)} / 対象月: ${escapeHtml(noticeMonth)}">📄 ${escapeHtml(noticeMonthLbl||'作成済')}</span>`
             : `<span style="color:var(--text-muted);font-size:10px">未作成</span>`;
           // 行背景: 選択中=#ede9fe / 支給済=#f0fdf4 / 通知済=#f0f9ff / 未=#fff
           const rowBg = selected ? '#ede9fe' : paid ? '#f0fdf4' : noticeCreated ? '#f0f9ff' : '#fff';
