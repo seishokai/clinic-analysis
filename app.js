@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v397';
+const APP_VERSION = 'v398';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -98,6 +98,76 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => setTimeout(_startVersionCheck, 1000));
 } else {
   setTimeout(_startVersionCheck, 1000);
+}
+
+// === v398: Service Worker 登録 (PWA化) ===
+// network-first 戦略でコードは常に最新、フォント/画像はキャッシュ
+// 新SW が waiting 状態になったら skipWaiting + clients.claim で即時更新
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js')
+      .then(reg => {
+        console.debug('[SW] registered:', reg.scope);
+        // 新バージョンの SW が見つかったとき
+        reg.addEventListener('updatefound', () => {
+          const newSW = reg.installing;
+          if (!newSW) return;
+          newSW.addEventListener('statechange', () => {
+            if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+              // 既存ページが古いSWで動いてる状態 → 新SWに切り替え要求
+              console.debug('[SW] new SW installed, sending SKIP_WAITING');
+              newSW.postMessage({ type: 'SKIP_WAITING' });
+            }
+          });
+        });
+      })
+      .catch(err => console.warn('[SW] registration failed:', err));
+    // SW が controlling 切替 → ページリロード (新SWの fetch ハンドラを反映)
+    let _swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (_swReloaded) return;
+      _swReloaded = true;
+      console.debug('[SW] controller changed, reloading');
+      // 即時リロードはユーザー操作中だと困るので、バージョンチェックバナーに任せる
+      // (checkLatestVersion がすぐ実行されるはず)
+    });
+  });
+}
+
+// v398: iOS Safari でホーム画面追加促進バナー (初回スマホアクセス時のみ)
+function _showInstallPromptForIOS() {
+  try {
+    const ua = navigator.userAgent.toLowerCase();
+    const isIOS = /iphone|ipad|ipod/.test(ua);
+    if (!isIOS) return;
+    // 既にホーム画面から起動済み (standalone) なら不要
+    if (window.navigator.standalone === true) return;
+    // 既に閉じた人には表示しない (1週間)
+    const dismissed = Number(localStorage.getItem('pwa-install-dismissed') || 0);
+    if (dismissed && Date.now() - dismissed < 7 * 24 * 3600 * 1000) return;
+    // バナー
+    const banner = document.createElement('div');
+    banner.id = 'pwa-install-banner';
+    banner.style.cssText = 'position:fixed;bottom:80px;left:10px;right:10px;z-index:99998;background:linear-gradient(135deg,#1a1a1a 0%,#3d3d3d 100%);color:#fef3c7;padding:14px 16px;display:flex;align-items:center;gap:10px;font-size:12px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.3);font-family:inherit';
+    banner.innerHTML = `
+      <span style="font-size:24px">📲</span>
+      <span style="flex:1;line-height:1.4">
+        <strong style="font-size:13px">ホーム画面に追加して使うと便利!</strong><br>
+        <span style="opacity:.85;font-size:11px">下のシェア⬆ボタン → 「ホーム画面に追加」</span>
+      </span>
+      <button id="pwa-install-dismiss" style="padding:6px 12px;background:transparent;border:1px solid #fbbf24;color:#fbbf24;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;font-size:12px">OK</button>
+    `;
+    document.body.appendChild(banner);
+    document.getElementById('pwa-install-dismiss').addEventListener('click', () => {
+      banner.remove();
+      try { localStorage.setItem('pwa-install-dismissed', String(Date.now())); } catch(_){}
+    });
+  } catch(_){}
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(_showInstallPromptForIOS, 3000));
+} else {
+  setTimeout(_showInstallPromptForIOS, 3000);
 }
 
 // === v293: app_settings テーブル経由で全ユーザー共有設定 ===

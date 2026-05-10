@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1a1a1a"/>
+      <stop offset="100%" stop-color="#3d3d3d"/>
+    </linearGradient>
+    <linearGradient id="lamp" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fbbf24"/>
+      <stop offset="100%" stop-color="#d97706"/>
+    </linearGradient>
+  </defs>
+  <!-- 背景 -->
+  <rect width="512" height="512" rx="100" fill="url(#bg)"/>
+  <!-- 中央のランプ風シンボル (簡略化) -->
+  <g transform="translate(256 256)">
+    <!-- ランプ本体 (楕円) -->
+    <ellipse cx="0" cy="20" rx="120" ry="60" fill="url(#lamp)" stroke="#fef3c7" stroke-width="3"/>
+    <!-- ハンドル -->
+    <path d="M-115 5 Q-150 -20 -130 -45 Q-100 -55 -85 -25" fill="none" stroke="url(#lamp)" stroke-width="14" stroke-linecap="round"/>
+    <!-- 注ぎ口 -->
+    <path d="M115 0 L160 -15 L155 5 Z" fill="url(#lamp)" stroke="#fef3c7" stroke-width="2"/>
+    <!-- 蓋 -->
+    <circle cx="0" cy="-45" r="22" fill="url(#lamp)" stroke="#fef3c7" stroke-width="2"/>
+    <circle cx="0" cy="-67" r="8" fill="#fef3c7"/>
+    <!-- 光のキラメキ -->
+    <g fill="#fef3c7" opacity="0.9">
+      <circle cx="50" cy="-90" r="4"/>
+      <circle cx="-60" cy="-100" r="3"/>
+      <circle cx="80" cy="-50" r="2.5"/>
+    </g>
+  </g>
+  <!-- "Aladdin" テキスト (筆記体風) -->
+  <text x="256" y="430" text-anchor="middle"
+        font-family="Georgia, 'Times New Roman', serif"
+        font-size="48" font-style="italic" font-weight="400"
+        fill="#fef3c7" letter-spacing="2">Aladdin</text>
+</svg>
