@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v376';
+const APP_VERSION = 'v377';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8757,16 +8757,15 @@ async function renderKaiinAll(containerId) {
   });
   const catOrder = ['BF','矯正','インプラント','ラブリエ','自費補綴','自費根治','ホワイトニング','リップアート','ティースジュエリー','その他'];
   const subNavMap = {'BF':'kaiin-bf','矯正':'kaiin-kyosei','インプラント':'kaiin-implant','ラブリエ':'kaiin-labrie','自費補綴':'kaiin-hotetsu','自費根治':'kaiin-konchi','ホワイトニング':'kaiin-whitening','リップアート':'kaiin-lipart','ティースジュエリー':'kaiin-jewelry','その他':'kaiin-other'};
+  // v377: 横並び表示用にコンパクト化 (1行表示で件数/率/金額)
   const renderCard = (label, info, target) => {
     const rate = info.count ? Math.round(info.contracted / info.count * 100) : 0;
-    return `<div class="kaiin-all-card" ${target?`data-target="${target}"`:''} style="border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:${target?'pointer':'default'};background:#fff;transition:all .15s" ${target?`onmouseover="this.style.boxShadow='0 4px 12px rgba(0,0,0,.08)';this.style.borderColor='#6366f1'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'"`:''}>
-      <div style="font-size:12px;font-weight:700;margin-bottom:4px;color:var(--text)">${escapeHtml(label)}</div>
-      <div style="display:flex;gap:10px;align-items:baseline;flex-wrap:wrap">
-        <div><span style="font-size:18px;font-weight:700;color:#111">${info.count}</span><span style="font-size:10px;color:var(--text-sub);margin-left:2px">件</span></div>
-        <div style="font-size:10px;color:var(--text-sub)">成約 <span style="color:#059669;font-weight:600">${info.contracted}</span></div>
-        <div style="font-size:10px;color:var(--text-sub)">率 <span style="color:${rate>=30?'#059669':'#d97706'};font-weight:600">${rate}%</span></div>
-        <div style="font-size:10px;color:var(--text-sub)">¥${fmt(info.contractAmt)}</div>
-      </div>
+    return `<div class="kaiin-all-card" ${target?`data-target="${target}"`:''} style="border:1px solid var(--border);border-radius:6px;padding:3px 8px;cursor:${target?'pointer':'default'};background:#fff;transition:all .15s;display:inline-flex;align-items:center;gap:6px;flex-shrink:0;white-space:nowrap" ${target?`onmouseover="this.style.boxShadow='0 2px 8px rgba(0,0,0,.08)';this.style.borderColor='#6366f1'" onmouseout="this.style.boxShadow='';this.style.borderColor='var(--border)'"`:''}>
+      <span style="font-size:11px;font-weight:700;color:var(--text)">${escapeHtml(label)}</span>
+      <span style="font-size:13px;font-weight:700;color:#111">${info.count}</span><span style="font-size:9px;color:var(--text-sub);margin-left:-3px">件</span>
+      <span style="font-size:10px;color:var(--text-sub);border-left:1px solid var(--border);padding-left:6px">成約 <span style="color:#059669;font-weight:600">${info.contracted}</span></span>
+      <span style="font-size:10px;color:var(--text-sub)">率 <span style="color:${rate>=30?'#059669':'#d97706'};font-weight:600">${rate}%</span></span>
+      <span style="font-size:10px;color:var(--text-sub)">¥${fmt(info.contractAmt)}</span>
     </div>`;
   };
   const catCards = catOrder.filter(c => byCat[c]).map(c => renderCard(c, byCat[c], subNavMap[c])).join('');
@@ -8826,6 +8825,13 @@ async function renderKaiinAll(containerId) {
         <button id="kaiin-all-dashboard-toggle" class="filter-btn ${state.dashboardOpen?'is-active':''}" title="サマリー(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ サマリー':'▼ サマリー'}</button>
       </span>
     </div>
+    <!-- v377: 2行目 = 治療別/医院別 トグル + 押したらカードが横に並ぶ -->
+    <div id="kaiin-all-breakdown" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:4px;padding:2px 0;min-height:32px">
+      <button class="kaiin-all-view-btn filter-btn ${state.viewMode==='treatment'?'is-active':''}" data-view="treatment" title="治療別の件数・成約率を横並びで表示">🩺 治療別</button>
+      <button class="kaiin-all-view-btn filter-btn ${state.viewMode==='facility'?'is-active':''}" data-view="facility" title="医院別の件数・成約率を横並びで表示">🏢 医院別</button>
+      ${state.viewMode==='treatment' || state.viewMode==='facility' ? `<button class="kaiin-all-view-btn filter-btn" data-view="all" title="閉じる" style="font-size:10px;padding:2px 6px">✕</button>` : ''}
+      ${cardsToShow ? `<div style="display:flex;gap:6px;flex:1;overflow-x:auto;padding-bottom:2px">${cardsToShow}</div>` : '<span style="font-size:10px;color:var(--text-muted)">↑ ボタンを押すと内訳カードが並びます</span>'}
+    </div>
     ${state.dashboardOpen ? `
     <div class="stats-row" style="gap:6px;margin-bottom:8px">
       <div class="stat-card" title="予約数 = 来院済 + キャンセル + 未来予約 + 進行中 (要対応はキャンセル内)"><span class="stat-label">予約数</span><span class="stat-num">${totalCount}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
@@ -8837,8 +8843,6 @@ async function renderKaiinAll(containerId) {
       <div class="stat-card ${contracted>0?'is-success':''}" title="成約済"><span class="stat-label">成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%（${contracted}/${visited}）</span></div>
       <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
     </div>
-    ${cardsToShow ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:8px">${cardsToShow}</div>` : ''}
-    ${state.viewMode === 'treatment' ? `<div style="font-size:10px;color:var(--text-sub);text-align:center;padding:4px;margin-bottom:8px">↑ 治療タイプをクリックで詳細一覧へ</div>` : ''}
     ` : ''}
     ${state.filterOpen ? `
     <div class="filter-bar" style="margin-bottom:4px">
@@ -8849,13 +8853,6 @@ async function renderKaiinAll(containerId) {
           <option value="book" ${basis==='book'?'selected':''}>来院日</option>
           <option value="apply" ${basis==='apply'?'selected':''}>登録日</option>
         </select>
-        <span style="width:1px;height:18px;background:var(--border);margin:0 2px"></span>
-        <span class="filter-label">表示</span>
-        ${(() => {
-          const isVb = (v) => state.viewMode === v;
-          const btn = (v, l) => `<button class="kaiin-all-view-btn filter-btn filter-btn-dark ${isVb(v)?'is-active':''}" data-view="${v}">${l}</button>`;
-          return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
-        })()}
         <span style="flex:1"></span>
         <button id="kaiin-all-reset" class="filter-btn" title="全フィルタをクリア">🔄 リセット</button>
       </div>
@@ -8869,7 +8866,7 @@ async function renderKaiinAll(containerId) {
     </div>
     ` : ''}
     <div class="card" style="padding:6px">
-      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${(state.dashboardOpen?160:0) + (state.filterOpen?80:0) + 90}px);overflow-y:auto">
+      <div class="data-table-wrap kaiin-all-list-wrap" style="max-height:calc(100vh - ${(state.dashboardOpen?160:0) + (state.filterOpen?80:0) + 130}px);overflow-y:auto">
         <table class="data-table compact kaiin-all-list-table" style="width:100%">
           <thead><tr>
             <th style="width:55px">来院</th>
