@@ -1,7 +1,7 @@
 {
-  "lastUpdated": "2026-05-09T22:34:26.391Z",
-  "checkRangeFrom": "2026-05-24",
-  "checkRangeTo": "2026-06-09",
+  "lastUpdated": "2026-05-10T22:37:33.860Z",
+  "checkRangeFrom": "2026-05-25",
+  "checkRangeTo": "2026-06-10",
   "treatment": "矯正無料相談",
   "source": "https://reserve.shareconnect.co.jp/?r=u5iewf&treatment_ids=1766627271947",
   "clinics": [
@@ -9,16 +9,15 @@
       "name": "BF銀座",
       "available": true,
       "availableDays": 4,
-      "totalSlots": 27,
+      "totalSlots": 21,
       "earliestDate": "2026-05-27",
       "latestDate": "2026-05-31",
       "slotsByDate": {
-        "2026-05-24": 0,
         "2026-05-26": 0,
         "2026-05-27": 9,
         "2026-05-29": 10,
-        "2026-05-30": 4,
-        "2026-05-31": 4
+        "2026-05-30": 1,
+        "2026-05-31": 1
       }
     },
     {
@@ -39,12 +38,11 @@
     {
       "name": "エスカ",
       "available": true,
-      "availableDays": 7,
-      "totalSlots": 120,
-      "earliestDate": "2026-05-24",
+      "availableDays": 6,
+      "totalSlots": 105,
+      "earliestDate": "2026-05-25",
       "latestDate": "2026-05-30",
       "slotsByDate": {
-        "2026-05-24": 15,
         "2026-05-25": 18,
         "2026-05-26": 18,
         "2026-05-27": 18,
@@ -56,12 +54,11 @@
     {
       "name": "アール",
       "available": true,
-      "availableDays": 8,
-      "totalSlots": 78,
-      "earliestDate": "2026-05-24",
+      "availableDays": 7,
+      "totalSlots": 69,
+      "earliestDate": "2026-05-25",
       "latestDate": "2026-06-02",
       "slotsByDate": {
-        "2026-05-24": 9,
         "2026-05-25": 5,
         "2026-05-26": 17,
         "2026-05-27": 5,
@@ -107,12 +104,11 @@
     {
       "name": "茶屋",
       "available": true,
-      "availableDays": 11,
-      "totalSlots": 141,
-      "earliestDate": "2026-05-24",
+      "availableDays": 10,
+      "totalSlots": 129,
+      "earliestDate": "2026-05-25",
       "latestDate": "2026-06-06",
       "slotsByDate": {
-        "2026-05-24": 12,
         "2026-05-25": 14,
         "2026-05-26": 14,
         "2026-05-27": 14,
@@ -129,11 +125,10 @@
       "name": "小牧",
       "available": true,
       "availableDays": 14,
-      "totalSlots": 213,
-      "earliestDate": "2026-05-24",
-      "latestDate": "2026-06-08",
+      "totalSlots": 216,
+      "earliestDate": "2026-05-25",
+      "latestDate": "2026-06-10",
       "slotsByDate": {
-        "2026-05-24": 14,
         "2026-05-25": 14,
         "2026-05-27": 14,
         "2026-05-28": 14,
@@ -146,18 +141,18 @@
         "2026-06-05": 17,
         "2026-06-06": 15,
         "2026-06-07": 15,
-        "2026-06-08": 17
+        "2026-06-08": 17,
+        "2026-06-10": 17
       }
     },
     {
       "name": "知立",
       "available": true,
-      "availableDays": 5,
-      "totalSlots": 55,
-      "earliestDate": "2026-05-24",
+      "availableDays": 4,
+      "totalSlots": 44,
+      "earliestDate": "2026-05-28",
       "latestDate": "2026-05-31",
       "slotsByDate": {
-        "2026-05-24": 11,
         "2026-05-28": 11,
         "2026-05-29": 11,
         "2026-05-30": 11,
@@ -169,10 +164,9 @@
       "available": true,
       "availableDays": 12,
       "totalSlots": 115,
-      "earliestDate": "2026-05-24",
-      "latestDate": "2026-06-09",
+      "earliestDate": "2026-05-27",
+      "latestDate": "2026-06-10",
       "slotsByDate": {
-        "2026-05-24": 10,
         "2026-05-27": 9,
         "2026-05-28": 6,
         "2026-05-29": 10,
@@ -183,18 +177,18 @@
         "2026-06-03": 10,
         "2026-06-04": 9,
         "2026-06-05": 11,
-        "2026-06-09": 7
+        "2026-06-09": 7,
+        "2026-06-10": 10
       }
     },
     {
       "name": "京都",
       "available": true,
-      "availableDays": 7,
-      "totalSlots": 56,
-      "earliestDate": "2026-05-24",
+      "availableDays": 6,
+      "totalSlots": 55,
+      "earliestDate": "2026-05-25",
       "latestDate": "2026-05-31",
       "slotsByDate": {
-        "2026-05-24": 1,
         "2026-05-25": 9,
         "2026-05-26": 9,
         "2026-05-27": 13,
