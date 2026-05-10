@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v359';
+const APP_VERSION = 'v360';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6597,28 +6597,29 @@ function renderBookings() {
         saveData('bk-extra', bkEx);
         // DB保存
         const upsertData = { name, apply_date: applyDate, status: newStatus };
-        // === 連動: BFなら bf_status も自動設定 ===
-        if (match && isBFBooking(match) && STATUS_TO_BF[newStatus] !== undefined) {
-          const targetBF = STATUS_TO_BF[newStatus];
-          // 成約/キャンセル系は常に上書き、来院済は進行中でなければ上書き
-          const curBF = bfLifecycleCache[key]?.bf_status;
-          // 来院済 の場合: 未設定 / 離脱 / キャンセル / '' は上書き可 (進行中は保護)
-          const resettable = !curBF || curBF === '離脱' || curBF === 'キャンセル';
-          const shouldUpdate = (newStatus === '成約' || newStatus === 'キャンセル' || resettable);
-          if (shouldUpdate && targetBF !== null) {
+        // === 連動: status 変更を bf_status にも同期 (タブ間整合性のため) ===
+        // v360 以前は「進行中 bf_status の保護」ロジックで一部ケースのみ同期していたが、
+        // 結果としてタブ間でステータスが食い違う原因になっていた。
+        // v360: 常に bf_status も同じ値にする。BF lifecycle 詳細(CT/診断 等)は BF タブで再設定可。
+        if (newStatus) {
+          const targetBF = STATUS_TO_BF[newStatus] !== undefined ? STATUS_TO_BF[newStatus] : newStatus;
+          if (targetBF !== null) {
+            const curBF = bfLifecycleCache[key]?.bf_status;
             upsertData.bf_status = targetBF;
             if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
             bfLifecycleCache[key].bf_status = targetBF;
-            // 履歴記録 (失敗時は warn のみ)
-            (async () => {
-              try {
-                await sb.from('bf_history').insert({
-                  booking_name: name, booking_apply_date: applyDate,
-                  from_status: curBF || null, to_status: targetBF,
-                  changed_by: getLoggedUserName() + '(自動連動:状態→BF)'
-                });
-              } catch(e) { console.warn('bf_history insert failed:', e); }
-            })();
+            // BF行のみ履歴記録
+            if (match && isBFBooking(match) && curBF !== targetBF) {
+              (async () => {
+                try {
+                  await sb.from('bf_history').insert({
+                    booking_name: name, booking_apply_date: applyDate,
+                    from_status: curBF || null, to_status: targetBF,
+                    changed_by: getLoggedUserName() + '(自動連動:状態→BF)'
+                  });
+                } catch(e) { console.warn('bf_history insert failed:', e); }
+              })();
+            }
           }
         }
         // A2+A3: 楽観的ロック付き保存 + リトライキュー
@@ -8799,7 +8800,13 @@ async function renderKaiinAll(containerId) {
                   promoChip = `<span style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
                 }
                 // 状態 (編集可能なセレクト, 統一クラス .status-pill 使用)
-                const st = d.status || '';
+                // v360: BF特有ライフサイクル(CT/診断等)が設定されている場合のみ bf_status を優先表示。
+                // 標準ステータス(来院済等)が両方にあれば status を canonical として表示。
+                const _bfInfo = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
+                const _BF_LIFECYCLE_ONLY = new Set(['CT/診断','P処置','C処置','ガイド印象','手術予定','治癒期間','印象','セット','完了','ローン審査中','ローン審査落','矯正決定(BF保留)','ラブリエ決定(BF保留)','インプラント決定(BF保留)','印象待ち(治療無)','印象待ち(治療有)','治療中','セット日確定待ち','セット待ち','セット完了','離脱']);
+                const st = (_bfInfo && _bfInfo.bf_status && _BF_LIFECYCLE_ONLY.has(_bfInfo.bf_status))
+                  ? _bfInfo.bf_status
+                  : (d.status || '');
                 const stOptions = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル'];
                 const stBadge = `<select class="kaiin-all-status-sel status-pill ${statusPillClass(st)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:10px;width:100%;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
                   <option value="">未設定</option>
@@ -8946,12 +8953,25 @@ async function renderKaiinAll(containerId) {
     });
   });
 
-  // === 編集: 状態 (DB upsert + bookingsData同期) ===
+  // === 編集: 状態 (DB upsert + bookingsData同期 + bf_status 同期) ===
+  // v360: 来院一覧で status を変更したら bf_status も同じ値にする (タブ間整合性)
   el.querySelectorAll('.kaiin-all-status-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
       const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || null;
       try {
-        await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: val }, options: { onConflict:'name,apply_date' } });
+        const payload = { name, apply_date: apply, status: val };
+        if (val && typeof STATUS_TO_BF !== 'undefined') {
+          const targetBF = STATUS_TO_BF[val] !== undefined ? STATUS_TO_BF[val] : val;
+          if (targetBF !== null) {
+            payload.bf_status = targetBF;
+            const key = name + '|' + apply;
+            if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
+              if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
+              bfLifecycleCache[key].bf_status = targetBF;
+            }
+          }
+        }
+        await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
         const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
         if (target) target.status = val || '';
         sel.style.outline = '2px solid #16a34a';
