@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v356';
+const APP_VERSION = 'v357';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2759,14 +2759,6 @@ function renderHomeDashboard() {
       <div style="margin-bottom:14px;padding:12px;background:var(--card);border:1px solid var(--border);border-radius:var(--radius-sm)">
         <div style="display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:10px">
           <span style="font-size:13px;font-weight:700;color:#1a1a1a">📊 詳細分析</span>
-          <span style="font-size:11px;color:var(--text-sub)">${escapeHtml(rangeLabel)}</span>
-          <span style="margin:0 8px;font-size:10px;color:#999">|</span>
-          <span style="font-size:10px;color:#666;font-weight:700;letter-spacing:1px">視点</span>
-          ${(() => {
-            const view = _homeAnalysisView;
-            const btn = (v, l) => `<button class="home-view-btn filter-btn ${view===v?'is-active':''}" data-view="${v}">${l}</button>`;
-            return btn('booking', '予約') + btn('visit', '来院') + btn('contract', '成約');
-          })()}
           <span style="margin:0 8px;font-size:10px;color:#999">|</span>
           <span style="font-size:10px;color:#666;font-weight:700;letter-spacing:1px">軸</span>
           ${(() => {
@@ -2777,7 +2769,6 @@ function renderHomeDashboard() {
         </div>
         <div class="data-table-wrap">
           ${(() => {
-            const view = _homeAnalysisView;
             const dim = _homeAnalysisDim;
             const data = dim==='facility' ? byFacMonth : dim==='treatment' ? byTreatMonth : byPromoMonth;
             const prev = dim==='facility' ? byFacPrev : dim==='treatment' ? byTreatPrev : byPromoPrev;
@@ -2795,46 +2786,29 @@ function renderHomeDashboard() {
               s.booking += v.booking; s.visited += v.visited; s.contracted += v.contracted; s.amount += v.amount;
               return s;
             }, { booking:0, visited:0, contracted:0, amount:0 });
-            const rowsHtml = (cols) => list.map(k => {
+            // 統合テーブル: 予約 / 来院 / 来院率 / 成約 / 決定率 / 金額 / 前期比金額 を1つに
+            const cols = (cur, prv) => {
+              const visitRate = cur.booking ? Math.round(cur.visited/cur.booking*100) : 0;
+              const decideRate = cur.visited ? Math.round(cur.contracted/cur.visited*100) : 0;
+              const visitColor = visitRate>=50?'#059669':visitRate>=30?'#d97706':'#dc2626';
+              const decideColor = decideRate>=40?'#059669':decideRate>=20?'#d97706':'#dc2626';
+              return [
+                `${cur.booking}`,
+                `<span style="color:#1d4ed8;font-weight:700">${cur.visited}</span>`,
+                cur.booking ? `<span style="color:${visitColor};font-weight:700">${visitRate}%</span>` : '<span style="color:var(--text-muted)">-</span>',
+                `<span style="color:#059669;font-weight:700">${cur.contracted}</span>`,
+                cur.visited ? `<span style="color:${decideColor};font-weight:700">${decideRate}%</span>` : '<span style="color:var(--text-muted)">-</span>',
+                cur.amount ? `<span style="color:#0e7490;font-weight:700">${fmtYen(cur.amount)}</span>` : '<span style="color:var(--text-muted)">-</span>',
+                fmtDelta(cur.amount, prv.amount) || '<span style="color:var(--text-muted);font-size:10px">-</span>',
+              ];
+            };
+            const rowsHtml = list.map(k => {
               const cur = data[k] || { booking:0, visited:0, contracted:0, amount:0 };
               const prv = prev[k] || { booking:0, visited:0, contracted:0, amount:0 };
               return `<tr><td style="font-weight:600;text-align:left">${escapeHtml(k)}</td>${cols(cur, prv).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
             }).join('');
-            const totalHtml = (cols) => `<tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border)"><td style="text-align:left">合計</td>${cols(tot, totPrev).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
-            if (view === 'booking') {
-              const cols = (cur, prv) => [
-                `<span style="font-size:14px">${cur.booking}</span>`,
-                fmtDelta(cur.booking, prv.booking) || '<span style="color:var(--text-muted);font-size:10px">-</span>',
-              ];
-              return `<table class="data-table"><thead><tr><th>${dimLabel}</th><th style="text-align:right">予約数</th><th style="text-align:right">前期比</th></tr></thead><tbody>${rowsHtml(cols)}${totalHtml(cols)}</tbody></table>`;
-            } else if (view === 'visit') {
-              const cols = (cur, prv) => {
-                const rate = cur.booking ? Math.round(cur.visited/cur.booking*100) : 0;
-                const prvRate = prv.booking ? Math.round(prv.visited/prv.booking*100) : 0;
-                const rateColor = rate>=50?'#059669':rate>=30?'#d97706':'#dc2626';
-                return [
-                  `${cur.booking}`,
-                  `<span style="color:#1d4ed8;font-weight:700">${cur.visited}</span>`,
-                  `<span style="color:${rateColor};font-weight:700">${rate}%</span>`,
-                  fmtDelta(rate, prvRate) || '<span style="color:var(--text-muted);font-size:10px">-</span>',
-                ];
-              };
-              return `<table class="data-table"><thead><tr><th>${dimLabel}</th><th style="text-align:right">予約</th><th style="text-align:right">来院</th><th style="text-align:right">来院率</th><th style="text-align:right">前期比</th></tr></thead><tbody>${rowsHtml(cols)}${totalHtml(cols)}</tbody></table>`;
-            } else { // contract
-              const cols = (cur, prv) => {
-                const rate = cur.visited ? Math.round(cur.contracted/cur.visited*100) : 0;
-                const prvRate = prv.visited ? Math.round(prv.contracted/prv.visited*100) : 0;
-                const rateColor = rate>=40?'#059669':rate>=20?'#d97706':'#dc2626';
-                return [
-                  `${cur.visited}`,
-                  `<span style="color:#059669;font-weight:700">${cur.contracted}</span>`,
-                  `<span style="color:${rateColor};font-weight:700">${rate}%</span>`,
-                  `<span style="color:#0e7490;font-weight:700">${cur.amount?fmtYen(cur.amount):'-'}</span>`,
-                  fmtDelta(cur.amount, prv.amount) || '<span style="color:var(--text-muted);font-size:10px">-</span>',
-                ];
-              };
-              return `<table class="data-table"><thead><tr><th>${dimLabel}</th><th style="text-align:right">来院</th><th style="text-align:right">成約</th><th style="text-align:right">決定率</th><th style="text-align:right">金額</th><th style="text-align:right">前期比金額</th></tr></thead><tbody>${rowsHtml(cols)}${totalHtml(cols)}</tbody></table>`;
-            }
+            const totalHtml = `<tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border)"><td style="text-align:left">合計</td>${cols(tot, totPrev).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
+            return `<table class="data-table"><thead><tr><th>${dimLabel}</th><th style="text-align:right">予約</th><th style="text-align:right">来院</th><th style="text-align:right">来院率</th><th style="text-align:right">成約</th><th style="text-align:right">決定率</th><th style="text-align:right">金額</th><th style="text-align:right">前期比金額</th></tr></thead><tbody>${rowsHtml}${totalHtml}</tbody></table>`;
           })()}
         </div>
       </div>
