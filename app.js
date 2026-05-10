@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v372';
+const APP_VERSION = 'v373';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8856,16 +8856,19 @@ async function renderKaiinAll(containerId) {
                 // 次回予定 MM/DD
                 const ndMatch = String(nextDate).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
                 const nextMMDD = ndMatch ? `${parseInt(ndMatch[2])}/${parseInt(ndMatch[3])}` : '';
-                // プロモチップ (BFスタイル)
+                // プロモチップ (v373: 手動はinput編集可、それ以外は読み取り専用バッジ)
                 let promoChip = '<span style="font-size:10px;color:var(--text-muted)">-</span>';
-                if (d.source) {
-                  const isManual = d.tool === '手動';
+                if (d.tool === '手動') {
+                  // 手動 = inline input で編集可
+                  const hasVal = !!d.source;
+                  promoChip = `<input type="text" class="kaiin-all-promo-input" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(d.source||'')}" placeholder="プロモ入力" title="手動登録: 編集可" style="width:100%;padding:3px 8px;font-size:10px;border:1px dashed ${hasVal?'#0369a1':'#cbd5e1'};border-radius:12px;box-sizing:border-box;background:${hasVal?'#e0f2fe':'#fff'};color:${hasVal?'#0369a1':'#94a3b8'};font-weight:${hasVal?'600':'400'};text-align:center">`;
+                } else if (d.source) {
                   const isSelect = d.tool === 'セレクト';
                   const bgC = isSelect ? '#fef3c7' : '#e0f2fe';
                   const fgC = isSelect ? '#b45309' : '#0369a1';
                   const bdC = isSelect ? '#fde68a' : '#bae6fd';
                   const lbl = d.source.length > 14 ? d.source.slice(0,14) + '…' : d.source;
-                  promoChip = `<span style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
+                  promoChip = `<span title="${isSelect?'セレクトタイプ予約 (変更不可)':'DXHUB予約 (自動取得・変更不可)'}" style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
                 }
                 // 状態 (編集可能なセレクト, 統一クラス .status-pill 使用)
                 // v360: BF特有ライフサイクル(CT/診断等)が設定されている場合のみ bf_status を優先表示。
@@ -8880,10 +8883,14 @@ async function renderKaiinAll(containerId) {
                   <option value="">未設定</option>
                   ${stOptions.map(s => { const lbl = statusPillLabel(s); return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
                 </select>`;
-                // 来院日チップ
-                const bookChip = bookMMDD !== '-'
-                  ? `<span style="display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600;border-radius:4px;font-size:11px">${bookMMDD}</span>`
-                  : '<span style="color:var(--text-muted);font-size:10px">-</span>';
+                // 来院日 (v373: button + 隠しdate input で編集可、BFタブと同じパターン)
+                const bookDateISO = bdMatch
+                  ? `${bdMatch[1]}-${String(bdMatch[2]).padStart(2,'0')}-${String(bdMatch[3]).padStart(2,'0')}`
+                  : '';
+                const bookBtnStyle = bookDateISO
+                  ? 'background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600'
+                  : 'background:#fff;border:1px solid var(--border);color:var(--text-muted)';
+                const bookChip = `<button type="button" class="kaiin-all-bookdate-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${bookDateISO}" style="font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;cursor:pointer;${bookBtnStyle}">${bookMMDD!=='-'?bookMMDD:'年/月/日'}</button><input type="date" class="kaiin-all-bookdate-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${bookDateISO}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`;
                 // 次回予定 (編集可能ボタン + 隠し date input)
                 const nextDateStyle = nextMMDD
                   ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
@@ -8910,11 +8917,16 @@ async function renderKaiinAll(containerId) {
                 const nameCell = (typeof _isPII_MaskNeeded === 'function' && _isPII_MaskNeeded())
                   ? `<span style="font-weight:500;font-size:12px">${escapeHtml(typeof maskName === 'function' ? maskName(d.name) : d.name || '-')}</span>`
                   : `<input type="text" class="kaiin-all-name" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(d.name||'')}" style="font-weight:500;font-size:12px;padding:3px 6px;width:100%;border:1px solid transparent;border-radius:4px;background:transparent;box-sizing:border-box" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'">`;
+                // 医院 select (v373: 編集可)
+                const FAC_OPTS = ['','エスカ','アール','ウィズ','ルミナス','茶屋','アサノ','知立','小牧','八事','岩田','大森','京都','銀座','BF銀座','訪問'];
+                const facSel = `<select class="kaiin-all-fac-sel" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:1px solid transparent;border-radius:4px;cursor:pointer;text-align:center;text-align-last:center;color:var(--text-sub)" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'">
+                  ${FAC_OPTS.map(o => `<option value="${o}" ${fac===o?'selected':''}>${o||'-'}</option>`).join('')}
+                </select>`;
                 return `<tr>
-                  <td data-label="来院" style="text-align:center">${bookChip}</td>
+                  <td data-label="来院" style="text-align:center;position:relative">${bookChip}</td>
                   <td data-label="名前" style="text-align:left">${nameCell}</td>
                   <td data-label="治療" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(cat)}</td>
-                  <td data-label="医院" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(fac)}</td>
+                  <td data-label="医院" style="text-align:center">${facSel}</td>
                   <td data-label="プロモ" style="text-align:center">${promoChip}</td>
                   <td data-label="ステータス" style="text-align:center">${stBadge}</td>
                   <td data-label="次回予定" style="text-align:center;position:relative">${nextChip}</td>
@@ -9146,6 +9158,100 @@ async function renderKaiinAll(containerId) {
       } catch (e) {
         console.warn('contract_service save failed', e);
         showToast('成約商材の保存に失敗', true);
+      }
+    });
+  });
+
+  // === v373 編集: 来院日 (button + 隠しdate input → bk-extra.editedBookDate + DB.edited_book_date) ===
+  el.querySelectorAll('.kaiin-all-bookdate-mmdd').forEach(btn => {
+    const hidden = btn.parentElement?.querySelector('.kaiin-all-bookdate-hidden');
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!hidden) return;
+      if (typeof hidden.showPicker === 'function') {
+        try { hidden.showPicker(); return; } catch(_){}
+      }
+      hidden.focus();
+      hidden.click();
+    });
+    if (hidden) {
+      hidden.addEventListener('change', async () => {
+        const iso = hidden.value || '';
+        const name = btn.dataset.name, apply = btn.dataset.apply;
+        try {
+          const bkEx = loadData('bk-extra', {});
+          const key = name + '|' + apply;
+          if (!bkEx[key]) bkEx[key] = {};
+          bkEx[key].editedBookDate = iso;
+          saveData('bk-extra', bkEx);
+          const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+          if (target) target.bookDate = iso ? iso.replace(/-/g, '/') : target.bookDate;
+          await safeSave({
+            type: 'upsert',
+            table: 'booking_status',
+            payload: { name, apply_date: apply, edited_book_date: iso || null },
+            options: { onConflict: 'name,apply_date' }
+          });
+          btn.style.outline = '2px solid #16a34a';
+          setTimeout(() => { btn.style.outline = ''; renderKaiinAll(containerId); }, 400);
+        } catch (e) {
+          console.warn('book date save failed', e);
+          showToast('来院日の保存に失敗', true);
+        }
+      });
+    }
+  });
+
+  // === v373 編集: 医院 (bk-extra.facility + bookingsData.facility) ===
+  el.querySelectorAll('.kaiin-all-fac-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || '';
+      try {
+        const bkEx = loadData('bk-extra', {});
+        const key = name + '|' + apply;
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].editedFacility = val;
+        saveData('bk-extra', bkEx);
+        const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+        if (target) target.facility = val;
+        await safeSave({
+          type: 'upsert',
+          table: 'booking_status',
+          payload: { name, apply_date: apply, edited_facility: val || null },
+          options: { onConflict: 'name,apply_date' }
+        });
+        sel.style.outline = '2px solid #16a34a';
+        setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
+      } catch (e) {
+        console.warn('facility save failed', e);
+        showToast('医院の保存に失敗', true);
+      }
+    });
+  });
+
+  // === v373 編集: プロモ (手動のみ — bk-extra.editedSource + bookingsData.source) ===
+  el.querySelectorAll('.kaiin-all-promo-input').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const name = inp.dataset.name, apply = inp.dataset.apply, val = (inp.value||'').trim();
+      try {
+        const bkEx = loadData('bk-extra', {});
+        const key = name + '|' + apply;
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].editedSource = val;
+        saveData('bk-extra', bkEx);
+        const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+        if (target) target.source = val;
+        await safeSave({
+          type: 'upsert',
+          table: 'booking_status',
+          payload: { name, apply_date: apply, edited_source: val || null },
+          options: { onConflict: 'name,apply_date' }
+        });
+        inp.style.borderColor = '#16a34a';
+        setTimeout(() => { inp.style.borderColor = ''; renderKaiinAll(containerId); }, 600);
+      } catch (e) {
+        console.warn('promo save failed', e);
+        showToast('プロモの保存に失敗', true);
       }
     });
   });
