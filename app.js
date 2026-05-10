@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v369';
+const APP_VERSION = 'v370';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8760,27 +8760,30 @@ async function renderKaiinAll(containerId) {
        : '全期間');
 
   el.innerHTML = `
-    <div id="kaiin-all-period-banner" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 12px;background:linear-gradient(90deg,#eff6ff 0%,#fff 100%);border:1px solid #bfdbfe;border-left:4px solid #3b82f6;border-radius:8px">
+    <div id="kaiin-all-period-banner" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:6px;padding:4px 0">
       <strong style="color:#1a1a1a;font-size:16px;font-weight:700;letter-spacing:0.5px">🏥 来院管理</strong>
-      <span style="font-size:10px;color:#999">|</span>
-      <span style="font-size:11px;color:var(--text-sub)">📅</span>
-      <strong style="color:var(--text);font-size:13px">${escapeHtml(periodLabel)}</strong>
-      ${(() => {
-        const isPb = (v) => !month && period === v;
-        const btn = (v, l) => `<button class="kaiin-all-period-btn filter-btn ${isPb(v)?'is-active':''}" data-period="${v}">${l}</button>`;
-        return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
-      })()}
-      <span style="margin:0 4px;font-size:10px;color:#999">|</span>
-      <span style="font-size:10px;color:#666;font-weight:600">表示:</span>
-      ${(() => {
-        const isVb = (v) => state.viewMode === v;
-        const btn = (v, l) => `<button class="kaiin-all-view-btn filter-btn filter-btn-dark ${isVb(v)?'is-active':''}" data-view="${v}">${l}</button>`;
-        return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
-      })()}
-      <span style="margin-left:auto;display:flex;align-items:center;gap:8px">
+      <span style="font-size:11px;color:var(--text-sub)">${escapeHtml(periodLabel)}</span>
+      <span style="margin-left:auto;display:flex;align-items:center;gap:6px">
         <span style="font-size:11px;color:var(--text-sub)">${totalCount}件</span>
-        <button id="kaiin-all-dashboard-toggle" class="filter-btn" title="ダッシュボード(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ ダッシュボード隠す':'▼ ダッシュボード表示'}</button>
+        <button id="kaiin-all-dashboard-toggle" class="filter-btn" title="サマリー(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ サマリーを隠す':'▼ サマリーを表示'}</button>
       </span>
+    </div>
+    <div class="filter-bar" style="margin-bottom:6px">
+      <div class="filter-row">
+        <span class="filter-label">期間</span>
+        ${(() => {
+          const isPb = (v) => !month && period === v;
+          const btn = (v, l) => `<button class="kaiin-all-period-btn filter-btn ${isPb(v)?'is-active':''}" data-period="${v}">${l}</button>`;
+          return btn('', '全期間') + btn('thisMonth', '今月') + btn('lastMonth', '先月') + btn('fiscal', '今期');
+        })()}
+        <span style="width:1px;height:20px;background:var(--border);margin:0 2px"></span>
+        <span class="filter-label">表示</span>
+        ${(() => {
+          const isVb = (v) => state.viewMode === v;
+          const btn = (v, l) => `<button class="kaiin-all-view-btn filter-btn filter-btn-dark ${isVb(v)?'is-active':''}" data-view="${v}">${l}</button>`;
+          return btn('all', '全治療') + btn('treatment', '治療別') + btn('facility', '医院別');
+        })()}
+      </div>
     </div>
     ${state.dashboardOpen ? `
     <div class="stats-row" style="gap:6px;margin-bottom:8px">
@@ -8807,7 +8810,7 @@ async function renderKaiinAll(containerId) {
           <option value="apply" ${basis==='apply'?'selected':''}>登録日基準</option>
         </select>
         <span class="kaiin-all-facility-slot" title="医院"></span>
-        <span class="kaiin-all-status-slot" title="状態"></span>
+        <span class="kaiin-all-status-slot" title="ステータス"></span>
         <span class="kaiin-all-promo-slot" title="プロモ"></span>
         <span class="kaiin-all-service-slot" title="相談"></span>
         <span class="kaiin-all-contract-slot" title="成約商材"></span>
@@ -8887,20 +8890,37 @@ async function renderKaiinAll(containerId) {
                   : 'background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e';
                 const nextChip = `<button type="button" class="kaiin-all-next-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${escapeHtml(nextDate)}" style="font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;${nextDateStyle}">${nextMMDD || '年/月/日'}</button><input type="date" class="kaiin-all-next-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(nextDate)}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">`;
                 const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
-                const memoCell = memo
-                  ? `<span style="display:inline-block;padding:3px 8px;background:#fff8e1;border:1px dashed #f9a825;border-radius:4px;font-size:11px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="${escapeHtml(memo)}">${escapeHtml(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 40) : memo.slice(0,40))}</span>`
-                  : '<span style="color:var(--text-muted);font-size:10px">-</span>';
+                // BFタブと同じ「+ メモ」プレースホルダースタイル
+                const memoStyle = memo
+                  ? 'background:#fff8e1;border:1px dashed #f9a825'
+                  : 'background:transparent;border:1px dashed var(--border)';
+                const memoInner = memo
+                  ? escapeHtml(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo.slice(0, 60))
+                  : '<span style="color:var(--text-muted)">+ メモ</span>';
+                // 成約商材 select (予約管理と同じ bk-field-select パターン)
+                const contractOpts = ['BF','矯正(表)','矯正(裏)','矯正(ﾋﾟｰｽ)','ﾗﾌﾞﾘｴ','ｲﾝﾌﾟﾗﾝﾄ'];
+                const contractStyle = contractSvc
+                  ? 'background:#dcfce7;color:#15803d;border-color:#86efac'
+                  : (d.status === '成約' ? 'background:#fee2e2;color:#b91c1c;border-color:#ef4444' : 'background:#fff;color:var(--text)');
+                const contractSel = `<select class="kaiin-all-contract-sel" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:11px;padding:3px 6px;width:100%;border:1px solid var(--border);border-radius:4px;cursor:pointer;${contractStyle}">
+                  <option value="">-</option>
+                  ${contractOpts.map(o => `<option value="${o}" ${contractSvc===o?'selected':''}>${o}</option>`).join('')}
+                </select>`;
+                // 名前 (PIIマスク不要時はインライン編集可)
+                const nameCell = (typeof _isPII_MaskNeeded === 'function' && _isPII_MaskNeeded())
+                  ? `<span style="font-weight:500;font-size:12px">${escapeHtml(typeof maskName === 'function' ? maskName(d.name) : d.name || '-')}</span>`
+                  : `<input type="text" class="kaiin-all-name" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(d.name||'')}" style="font-weight:500;font-size:12px;padding:3px 6px;width:100%;border:1px solid transparent;border-radius:4px;background:transparent;box-sizing:border-box" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'">`;
                 return `<tr>
                   <td data-label="来院" style="text-align:center">${bookChip}</td>
-                  <td data-label="名前" style="font-size:12px;font-weight:600;text-align:left">${escapeHtml(d.name || '-')}</td>
+                  <td data-label="名前" style="text-align:left">${nameCell}</td>
                   <td data-label="治療" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(cat)}</td>
                   <td data-label="医院" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(fac)}</td>
                   <td data-label="プロモ" style="text-align:center">${promoChip}</td>
                   <td data-label="ステータス" style="text-align:center">${stBadge}</td>
                   <td data-label="次回予定" style="text-align:center;position:relative">${nextChip}</td>
-                  <td data-label="成約商材" style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
+                  <td data-label="成約商材" style="text-align:center">${contractSel}</td>
                   <td data-label="売上" style="text-align:right"><input type="text" inputmode="numeric" class="kaiin-all-money" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${amt ? Number(amt).toLocaleString() : ''}" placeholder="0" style="font-size:11px;padding:3px 8px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;font-weight:600;box-sizing:border-box"></td>
-                  <td class="kaiin-all-memo-cell" data-label="メモ" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;text-align:left">${memoCell}</td>
+                  <td class="kaiin-all-memo-cell" data-label="メモ" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;${memoStyle}" title="${escapeHtml(memo)}">${memoInner}</td>
                 </tr>`;
               }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
           </tbody>
@@ -8966,7 +8986,7 @@ async function renderKaiinAll(containerId) {
   const facDD = createMultiSelectDropdown({ label: '医院', options: facilityOpts, selected: state.facility, onChange: triggerRedraw });
   const promoDD = createMultiSelectDropdown({ label: 'プロモ', options: promoOpts, selected: state.promo, onChange: triggerRedraw });
   const svcDD = createMultiSelectDropdown({ label: '相談', options: serviceOpts, selected: state.service, onChange: triggerRedraw });
-  const statusDD = createMultiSelectDropdown({ label: '状態', options: statusOpts, selected: state.status, onChange: triggerRedraw });
+  const statusDD = createMultiSelectDropdown({ label: 'ステータス', options: statusOpts, selected: state.status, onChange: triggerRedraw });
   const contractDD = createMultiSelectDropdown({ label: '成約商材', options: contractOpts, selected: state.contract, onChange: triggerRedraw });
 
   const fillSlot = (sel, dd) => { const s = el.querySelector(sel); if (s) s.replaceWith(dd.buttonElement); };
@@ -9088,6 +9108,70 @@ async function renderKaiinAll(containerId) {
     cell.addEventListener('click', () => {
       if (typeof openMemoModal === 'function') {
         openMemoModal(cell.dataset.name, cell.dataset.apply, () => renderKaiinAll(containerId));
+      }
+    });
+  });
+
+  // === v370 編集: 成約商材 (予約管理と同じく contract_service を Supabase に upsert) ===
+  el.querySelectorAll('.kaiin-all-contract-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || null;
+      try {
+        // bk-extra にも保存 (予約管理と同期)
+        try {
+          const bkEx = loadData('bk-extra', {});
+          const key = name + '|' + apply;
+          if (!bkEx[key]) bkEx[key] = {};
+          bkEx[key].contractService = val || '';
+          saveData('bk-extra', bkEx);
+        } catch(_){}
+        // メモリ内 bookingsData も更新
+        const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+        if (target) target.contractService = val || '';
+        await safeSave({
+          type: 'upsert',
+          table: 'booking_status',
+          payload: { name, apply_date: apply, contract_service: val },
+          options: { onConflict: 'name,apply_date' }
+        });
+        sel.style.outline = '2px solid #16a34a';
+        setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
+      } catch (e) {
+        console.warn('contract_service save failed', e);
+        showToast('成約商材の保存に失敗', true);
+      }
+    });
+  });
+
+  // === v370 編集: 名前 (bk-extra.editedName 経由で永続化) ===
+  el.querySelectorAll('.kaiin-all-name').forEach(inp => {
+    let _orig = inp.value;
+    inp.addEventListener('focus', () => { _orig = inp.value; });
+    inp.addEventListener('change', async () => {
+      const oldName = inp.dataset.name;
+      const apply = inp.dataset.apply;
+      const newName = (inp.value || '').trim();
+      if (!newName || newName === oldName) return;
+      try {
+        const bkEx = loadData('bk-extra', {});
+        const key = oldName + '|' + apply;
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].editedName = newName;
+        saveData('bk-extra', bkEx);
+        const target = (bookingsData || []).find(b => b.name === oldName && b.applyDate === apply);
+        if (target) target.name = newName;
+        await safeSave({
+          type: 'upsert',
+          table: 'booking_status',
+          payload: { name: oldName, apply_date: apply, edited_name: newName },
+          options: { onConflict: 'name,apply_date' }
+        });
+        inp.style.borderColor = '#16a34a';
+        setTimeout(() => { inp.style.borderColor = ''; renderKaiinAll(containerId); }, 600);
+      } catch (e) {
+        console.warn('name save failed', e);
+        inp.value = _orig;
+        showToast('名前の保存に失敗', true);
       }
     });
   });
