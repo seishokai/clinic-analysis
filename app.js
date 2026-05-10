@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v362';
+const APP_VERSION = 'v363';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -190,9 +190,15 @@ async function processQueue(force) {
       if (error) throw error;
       // 成功
     } catch(e) {
+      const errMsg = e.message || String(e);
+      // v363: RLS拒否(権限不足)はリトライ無駄 → 即諦めて捨てる (キュー肥大化防止)
+      if (/row-level security|permission denied|policy/i.test(errMsg)) {
+        console.warn('Save queue: RLS拒否のため即諦め', { table: op.table, type: op.type, error: errMsg });
+        continue; // remaining に push しない = 捨てる
+      }
       op.attempts = (op.attempts || 0) + 1;
       op.lastAttempt = now;
-      op.lastError = e.message || String(e);
+      op.lastError = errMsg;
       if (op.attempts < 10) remaining.push(op);
       else console.error('Save queue: abandoned after 10 attempts', op);
     }
