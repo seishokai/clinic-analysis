@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v384';
+const APP_VERSION = 'v385';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9193,28 +9193,24 @@ async function renderKaiinAll(containerId) {
     });
   });
 
-  // === 編集: 状態 (DB upsert + bookingsData同期 + bf_status 同期 BF意図保護) ===
-  // v361: BFスタッフが既に意図的に設定済み bf_status は予約系編集からは保護する
+  // === 編集: 状態 (DB upsert + bookingsData同期 + bf_status 同期) ===
+  // v385: ユーザーが明示的にドロップダウンから選んだ時は必ず反映する。
+  // BF意図保護はクロスタブ自動同期のためであり、ユーザーの直接編集には適用しない。
+  // (旧v361では shouldUpdate ガードで来院済選択が無視され、画面に反映されないバグ発生)
   el.querySelectorAll('.kaiin-all-status-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
       const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || null;
       try {
         const payload = { name, apply_date: apply, status: val };
         if (val && typeof STATUS_TO_BF !== 'undefined') {
+          // STATUS_TO_BF: 来院済→検討中, 成約→成約, キャンセル→キャンセル, 除外→null, 他→val そのまま
           const targetBF = STATUS_TO_BF[val] !== undefined ? STATUS_TO_BF[val] : val;
-          if (targetBF !== null) {
+          // null の場合は bf_status を空にする (除外時)、それ以外は強制上書き
+          payload.bf_status = targetBF;
+          if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
             const key = name + '|' + apply;
-            const curBF = (typeof bfLifecycleCache === 'object' && bfLifecycleCache && bfLifecycleCache[key]) ? bfLifecycleCache[key].bf_status : null;
-            const isResettable = !curBF || curBF === '離脱' || curBF === 'キャンセル';
-            const isTerminal = (val === '成約' || val === 'キャンセル' || val === '除外');
-            const shouldUpdate = isResettable || isTerminal;
-            if (shouldUpdate) {
-              payload.bf_status = targetBF;
-              if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
-                if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
-                bfLifecycleCache[key].bf_status = targetBF;
-              }
-            }
+            if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
+            bfLifecycleCache[key].bf_status = targetBF;
           }
         }
         await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
