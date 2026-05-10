@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v367';
+const APP_VERSION = 'v368';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8684,19 +8684,30 @@ async function renderKaiinAll(containerId) {
   const cardsToShow = state.viewMode === 'facility' ? facCards
                     : state.viewMode === 'treatment' ? catCards
                     : '';
-  // === 全体統計 (来院は全て過去予約。予約数は表示しない) ===
+  // === 全体統計 (v368: BFタブと同じ8カード方式) ===
+  const _today2 = new Date(); _today2.setHours(0,0,0,0);
+  const isUnhandled2 = (d) => !d.status || d.status === '未対応';
+  const isPast2 = (d) => { const bd = parseDate(d.bookDate); return bd && bd < _today2; };
+  const isFuture2 = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= _today2; };
   const totalCount = allRows.length;
   const visited = allRows.filter(d => isVisitedStatus(d.status || '')).length;
   const contracted = allRows.filter(d => d.status === '成約').length;
   const formalCancelled = allRows.filter(d => d.status === 'キャンセル').length;
-  const noShow = allRows.filter(d => {
-    const s = d.status || '';
-    return s !== 'キャンセル' && !isVisitedStatus(s) && s !== '未対応' && s !== '';
-  }).length;
+  const noShow = allRows.filter(d => d.status !== 'キャンセル' && !isVisitedStatus(d.status || '') && isPast2(d)).length;
   const cancelled = formalCancelled + noShow;
-  const overdue = allRows.filter(d => !d.status || d.status === '未対応').length;
+  const overdue = allRows.filter(d => isUnhandled2(d) && isPast2(d)).length;
+  const pending = allRows.filter(d => isUnhandled2(d) && isFuture2(d)).length;
+  const inProgress = allRows.filter(d => {
+    const s = d.status || '';
+    if (isUnhandled2(d)) return false;
+    if (s === 'キャンセル') return false;
+    if (isVisitedStatus(s)) return false;
+    return isFuture2(d);
+  }).length;
   const totalAmt = allRows.reduce((s, d) => s + _amt(d), 0);
-  const visitRate = totalCount ? Math.round(visited / totalCount * 100) : 0;
+  const pastBookings = allRows.filter(isPast2);
+  const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status || '')).length;
+  const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
   const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
 
   // 期間ラベル
@@ -8732,32 +8743,15 @@ async function renderKaiinAll(containerId) {
       </span>
     </div>
     ${state.dashboardOpen ? `
-    <div class="stats-row stats-row-compact">
-      <div class="stat-card ${overdue>0?'is-warning':''}" title="未対応のまま予約日を過ぎた緊急対応必要件数">
-        <span class="stat-label">⚠ 要対応</span>
-        <span class="stat-num">${overdue}</span>
-        <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">未対応のまま</span>
-      </div>
-      <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル(取消) + 未来店(連絡途絶)">
-        <span class="stat-label">キャンセル</span>
-        <span class="stat-num">${cancelled}</span>
-        <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600">取消${formalCancelled}+未来店${noShow}</span>
-      </div>
-      <div class="stat-card ${visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階">
-        <span class="stat-label">来院済</span>
-        <span class="stat-num">${visited}</span>
-        <span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%</span>
-      </div>
-      <div class="stat-card ${contracted>0?'is-success':''}" title="成約済の予約 (来院後に契約に至った件数)">
-        <span class="stat-label">成約</span>
-        <span class="stat-num">${contracted}</span>
-        <span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%</span>
-      </div>
-      <div class="stat-card" title="成約金額の合計 (税抜)">
-        <span class="stat-label">成約金額</span>
-        <span class="stat-num">¥${fmt(totalAmt)}</span>
-        <span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span>
-      </div>
+    <div class="stats-row" style="gap:6px;margin-bottom:8px">
+      <div class="stat-card" title="予約数 = 来院済 + キャンセル + 未来予約 + 進行中 (要対応はキャンセル内)"><span class="stat-label">予約数</span><span class="stat-num">${totalCount}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">合計件数</span></div>
+      <div class="stat-card ${overdue>0?'is-warning':''}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数"><span class="stat-label">⚠ 要対応</span><span class="stat-num">${overdue}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
+      <div class="stat-card" title="未来予約 = 未対応のまま予約日がまだ未来"><span class="stat-label">未来予約</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">未対応で予約日<br>がまだ未来</span></div>
+      <div class="stat-card" title="進行中 = 未来予約で 確認済/連絡待ち/予約変更等"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
+      <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
+      <div class="stat-card ${visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
+      <div class="stat-card ${contracted>0?'is-success':''}" title="成約済"><span class="stat-label">成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%（${contracted}/${visited}）</span></div>
+      <div class="stat-card" title="成約金額の合計 (税抜)"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
     </div>
     ${cardsToShow ? `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;margin-bottom:8px">${cardsToShow}</div>` : ''}
     ${state.viewMode === 'treatment' ? `<div style="font-size:10px;color:var(--text-sub);text-align:center;padding:4px;margin-bottom:8px">↑ 治療タイプをクリックで詳細一覧へ</div>` : ''}
