@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v394';
+const APP_VERSION = 'v395';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1154,24 +1154,24 @@ Object.defineProperty(globalThis, 'SMS_TEMPLATES', {
   get() { return loadSmsTemplates(); }
 });
 
-// === v394: 医院正式名称マッピング ===
-// SMSテンプレ内の {clinic} は短縮名 (BF銀座/アール等) ではなく正式名称で送りたい。
-// localStorage 'facility-formal-names' = { 'BF銀座': '医療法人清翔会 BF銀座歯科', ... }
+// === v394/395: 医院正式名称マッピング ===
+// SMSテンプレ内の {clinic} は短縮名ではなく正式医院名で送りたい (法人名は含めず医院名のみ)。
+// localStorage 'facility-formal-names' = { 'BF銀座': 'BF銀座歯科', ... }
 const FACILITY_FORMAL_DEFAULTS = {
-  'BF銀座': '清翔会 BF銀座歯科',
-  'アール': '清翔会 アール歯科',
-  'ウィズ': '清翔会 ウィズ歯科',
-  'エスカ': '清翔会 エスカ歯科',
-  'ルミナス': '清翔会 ルミナス歯科',
-  '茶屋': '清翔会 茶屋ヶ坂歯科',
-  '知立': '清翔会 知立歯科',
-  '小牧': '清翔会 小牧歯科',
-  '八事': '清翔会 八事歯科',
-  '大森': '清翔会 大森歯科',
-  '京都': '清翔会 京都歯科',
-  'アサノ': '清翔会 アサノ歯科',
-  '岩田': '清翔会 岩田歯科',
-  '訪問': '清翔会 訪問歯科',
+  'BF銀座': 'BF銀座歯科',
+  'アール': 'アール歯科',
+  'ウィズ': 'ウィズ歯科',
+  'エスカ': 'エスカ歯科',
+  'ルミナス': 'ルミナス歯科',
+  '茶屋': '茶屋ヶ坂歯科',
+  '知立': '知立歯科',
+  '小牧': '小牧歯科',
+  '八事': '八事歯科',
+  '大森': '大森歯科',
+  '京都': '京都歯科',
+  'アサノ': 'アサノ歯科',
+  '岩田': '岩田歯科',
+  '訪問': '訪問歯科',
 };
 function loadFacilityFormalNames() {
   let custom = {};
@@ -1183,6 +1183,24 @@ function getFacilityFormalName(shortName) {
   if (!shortName) return '';
   const map = loadFacilityFormalNames();
   return map[shortName] || shortName;
+}
+
+// === v395: 汎用 SMSカスタム変数 ===
+// localStorage 'sms-vars-custom' = [{ key, value, desc }]
+// テンプレ本文の {key} を value に置換 (clinic 以外の任意変数)
+// 例: {sign}='清翔会 受付係' {hours}='平日10時〜19時' {address}='東京都...'
+function loadSmsCustomVars() {
+  let vars = [];
+  try { vars = (typeof loadData === 'function') ? loadData('sms-vars-custom', []) : []; } catch(_){}
+  if (!Array.isArray(vars)) vars = [];
+  return vars;
+}
+function smsCustomVarsMap() {
+  const m = {};
+  loadSmsCustomVars().forEach(v => {
+    if (v && v.key) m[v.key] = v.value || '';
+  });
+  return m;
 }
 
 // === v394: SMS文字カウンタ ===
@@ -1229,12 +1247,15 @@ function openSmsModal(name, phone, bookDate, facility) {
     return;
   }
   const { date, time } = _smsParseDate(bookDate);
+  // v395: 組み込み変数 + 医院正式名称 + カスタム変数 をマージ
   const ctx = {
+    // カスタム変数を先に展開 (組み込みが優先されるよう ↓ 後で上書き)
+    ...(typeof smsCustomVarsMap === 'function' ? smsCustomVarsMap() : {}),
+    // 組み込み (booking から自動入力)
     name: name || 'お客',
     date: date || '近日中',
     time: time || '',
-    // v394: {clinic} は正式名称で出す (短縮名 BF銀座 → 「清翔会 BF銀座歯科」)
-    clinic: (typeof getFacilityFormalName === 'function' && facility) ? getFacilityFormalName(facility) : (facility || '清翔会')
+    clinic: (typeof getFacilityFormalName === 'function' && facility) ? getFacilityFormalName(facility) : (facility || '')
   };
 
   const modal = document.createElement('div');
@@ -1340,16 +1361,18 @@ function renderSmsTemplatesAdmin() {
   // v394: 医院正式名称の現在マッピング
   const facMap = loadFacilityFormalNames();
   const facKeys = Object.keys(facMap).sort();
+  // v395: カスタム変数
+  const customVars = loadSmsCustomVars();
 
   el.innerHTML = `
-    <div class="page-header"><h2>📱 SMS定型文</h2><p class="page-desc">電話前確認・キャンセル後追い等で使うSMSテンプレートを編集できます。プレースホルダー: <code>{name}</code> {date} {time} {clinic}</p></div>
+    <div class="page-header"><h2>📱 SMS定型文</h2><p class="page-desc">電話前確認・キャンセル後追い等で使うSMSテンプレートを編集できます。<br>組み込み変数: <code>{name}</code> <code>{date}</code> <code>{time}</code> <code>{clinic}</code> ＋ カスタム変数を自由に定義可能</p></div>
 
-    <!-- v394: 医院正式名称マッピング -->
-    <details style="margin-bottom:16px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
-      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#92400e">🏥 医院正式名称マッピング (SMS本文の {clinic} で使用)</summary>
+    <!-- v394/395: 医院正式名称マッピング -->
+    <details style="margin-bottom:12px;padding:10px 12px;background:#fffbeb;border:1px solid #fde68a;border-radius:8px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#92400e">🏥 医院正式名称マッピング (SMS本文の <code>{clinic}</code> で使用)</summary>
       <div style="font-size:11px;color:var(--text-sub);margin:8px 0">
-        SMS送信時、テンプレ内の <code>{clinic}</code> はここで設定した正式名称に置換されます。<br>
-        例: 「BF銀座」(短縮名) → 「清翔会 BF銀座歯科」(正式名称・SMS用)
+        SMS送信時、テンプレ内の <code>{clinic}</code> はここで設定した医院名に置換されます。法人名なしの医院名がベスト。<br>
+        例: 「BF銀座」(短縮名) → 「BF銀座歯科」
       </div>
       <div id="facility-formal-list" style="display:grid;grid-template-columns:140px 1fr;gap:6px 12px;align-items:center;margin-top:10px">
         ${facKeys.map(k => `
@@ -1358,9 +1381,44 @@ function renderSmsTemplatesAdmin() {
         `).join('')}
       </div>
       <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-        <button id="facility-formal-save" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:700;padding:6px 14px">💾 正式名称を保存</button>
+        <button id="facility-formal-save" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:700;padding:6px 14px">💾 医院名を保存</button>
         <button id="facility-formal-reset" class="filter-btn" style="padding:6px 14px" title="デフォルトに戻す">🔄 デフォルトに戻す</button>
         <span id="facility-formal-msg" style="font-size:11px;color:var(--text-sub)"></span>
+      </div>
+    </details>
+
+    <!-- v395: カスタム変数 (任意フォーマット) -->
+    <details style="margin-bottom:16px;padding:10px 12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px">
+      <summary style="cursor:pointer;font-size:13px;font-weight:700;color:#0369a1">✨ カスタム変数 (好きな <code>{キー}</code> を定義してテンプレで使える)</summary>
+      <div style="font-size:11px;color:var(--text-sub);margin:8px 0">
+        署名 / 営業時間 / 住所 / URL など、よく使う文言を変数化できます。<br>
+        例: <code>{sign}</code> = 「○○受付一同」、<code>{hours}</code> = 「平日10:00〜19:00」<br>
+        テンプレ本文に <code>{sign}</code> と書いておけば自動で置換。
+      </div>
+      <div style="overflow-x:auto;margin-top:8px">
+        <table class="data-table" id="sms-vars-table" style="margin:0;font-size:12px;width:100%">
+          <thead><tr>
+            <th style="width:140px;text-align:left">変数キー</th>
+            <th style="text-align:left">値 (置換される内容)</th>
+            <th style="width:180px;text-align:left">説明 (任意)</th>
+            <th style="width:60px"></th>
+          </tr></thead>
+          <tbody id="sms-vars-tbody">
+            ${customVars.map((v, idx) => `
+              <tr>
+                <td><input type="text" class="sms-var-key" data-idx="${idx}" value="${escapeHtml(v.key||'')}" placeholder="例: sign" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;width:100%;font-family:ui-monospace,monospace"></td>
+                <td><input type="text" class="sms-var-value" data-idx="${idx}" value="${escapeHtml(v.value||'')}" placeholder="例: 清翔会 受付一同" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;width:100%"></td>
+                <td><input type="text" class="sms-var-desc" data-idx="${idx}" value="${escapeHtml(v.desc||'')}" placeholder="例: SMS末尾の署名" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;width:100%;color:var(--text-sub)"></td>
+                <td style="text-align:center"><button class="sms-var-del filter-btn" data-idx="${idx}" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#b91c1c;border-color:#fecaca">削除</button></td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:10px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button id="sms-vars-add" class="filter-btn" style="padding:6px 14px">＋ 行を追加</button>
+        <button id="sms-vars-save" class="filter-btn" style="background:#16a34a;color:#fff;font-weight:700;padding:6px 14px">💾 カスタム変数を保存</button>
+        <span id="sms-vars-msg" style="font-size:11px;color:var(--text-sub)"></span>
       </div>
     </details>
 
@@ -1430,6 +1488,61 @@ function renderSmsTemplatesAdmin() {
     if (!confirm('医院正式名称をデフォルトに戻しますか?')) return;
     saveData('facility-formal-names', {});
     renderSmsTemplatesAdmin();
+  });
+
+  // === v395: カスタム変数 CRUD ===
+  el.querySelector('#sms-vars-add')?.addEventListener('click', () => {
+    const tbody = el.querySelector('#sms-vars-tbody');
+    const idx = tbody.querySelectorAll('tr').length;
+    const row = document.createElement('tr');
+    row.innerHTML = `
+      <td><input type="text" class="sms-var-key" data-idx="${idx}" value="" placeholder="例: sign" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;width:100%;font-family:ui-monospace,monospace"></td>
+      <td><input type="text" class="sms-var-value" data-idx="${idx}" value="" placeholder="例: 清翔会 受付一同" style="font-size:12px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;width:100%"></td>
+      <td><input type="text" class="sms-var-desc" data-idx="${idx}" value="" placeholder="例: SMS末尾の署名" style="font-size:11px;padding:5px 8px;border:1px solid var(--border);border-radius:5px;width:100%;color:var(--text-sub)"></td>
+      <td style="text-align:center"><button class="sms-var-del filter-btn" data-idx="${idx}" style="font-size:10px;padding:3px 8px;background:#fee2e2;color:#b91c1c;border-color:#fecaca">削除</button></td>
+    `;
+    tbody.appendChild(row);
+    row.querySelector('.sms-var-del').addEventListener('click', () => row.remove());
+    row.querySelector('.sms-var-key').focus();
+  });
+  el.querySelectorAll('.sms-var-del').forEach(btn => {
+    btn.addEventListener('click', () => btn.closest('tr').remove());
+  });
+  el.querySelector('#sms-vars-save')?.addEventListener('click', () => {
+    const rows = el.querySelectorAll('#sms-vars-tbody tr');
+    const next = [];
+    const seenKeys = new Set();
+    let dup = '';
+    rows.forEach(row => {
+      const key = (row.querySelector('.sms-var-key')?.value || '').trim();
+      const value = row.querySelector('.sms-var-value')?.value || '';
+      const desc = (row.querySelector('.sms-var-desc')?.value || '').trim();
+      if (!key) return;
+      // 組み込み変数とは被らないように
+      if (['name','date','time','clinic'].includes(key)) {
+        dup = key;
+        return;
+      }
+      if (seenKeys.has(key)) { dup = key; return; }
+      seenKeys.add(key);
+      next.push({ key, value, desc });
+    });
+    if (dup) {
+      const msg = el.querySelector('#sms-vars-msg');
+      if (msg) {
+        msg.textContent = `⚠️ キー「${dup}」は重複または予約語のため保存できません`;
+        msg.style.color = '#b91c1c';
+        setTimeout(() => { msg.textContent = ''; msg.style.color = ''; }, 3000);
+      }
+      return;
+    }
+    saveData('sms-vars-custom', next);
+    const msg = el.querySelector('#sms-vars-msg');
+    if (msg) {
+      msg.textContent = `✓ ${next.length}件のカスタム変数を保存しました`;
+      msg.style.color = '#16a34a';
+      setTimeout(() => { msg.textContent = ''; }, 2000);
+    }
   });
 
   // === ハンドラー ===
