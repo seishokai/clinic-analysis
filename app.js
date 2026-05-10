@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v389';
+const APP_VERSION = 'v390';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2937,13 +2937,6 @@ function renderHomeDashboard() {
     ` : ''}
 
 
-    <!-- ショートカット -->
-    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">
-      <button class="home-shortcut" data-view="bookings" data-sub="bk-phone" style="padding:14px;background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);border:1.5px solid #f59e0b;border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:700;color:#b45309">📞 電話前確認へ</button>
-      <button class="home-shortcut" data-view="bookings" data-sub="bk-list" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">📋 予約一覧へ</button>
-      <button class="home-shortcut" data-view="kaiin" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">🏥 来院管理へ</button>
-      <button class="home-shortcut" data-view="tc" style="padding:14px;background:#fff;border:1px solid var(--border);border-radius:12px;cursor:pointer;text-align:left;font-size:13px;font-weight:600;color:#1a1a1a">💬 TCへ</button>
-    </div>
   `;
 
   // インタラクション
