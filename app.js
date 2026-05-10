@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v348';
+const APP_VERSION = 'v349';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8873,23 +8873,57 @@ async function renderKaiinAll(containerId) {
               .map(d => {
                 const cat = getTreatmentCategory(d) || '-';
                 const fac = normFac(d.facility) || '-';
-                const promo = d.source || '-';
-                const st = d.status || '未設定';
-                const stColor = st === '成約' ? '#059669' : st === 'キャンセル' ? '#dc2626' : st === '未対応' || st === '未設定' ? '#f97316' : '#475569';
                 const info = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
                 const nextDate = info?.bf_next_date || '';
                 const contractSvc = d.contractService || '';
                 const amt = _amt(d);
+                // 来院日 MM/DD
+                const bdMatch = String(d.bookDate || '').match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                const bookMMDD = bdMatch ? `${parseInt(bdMatch[2])}/${parseInt(bdMatch[3])}` : '-';
+                // 次回予定 MM/DD
+                const ndMatch = String(nextDate).match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                const nextMMDD = ndMatch ? `${parseInt(ndMatch[2])}/${parseInt(ndMatch[3])}` : '';
+                // プロモチップ (BFスタイル)
+                let promoChip = '<span style="font-size:10px;color:var(--text-muted)">-</span>';
+                if (d.source) {
+                  const isManual = d.tool === '手動';
+                  const isSelect = d.tool === 'セレクト';
+                  const bgC = isSelect ? '#fef3c7' : '#e0f2fe';
+                  const fgC = isSelect ? '#b45309' : '#0369a1';
+                  const bdC = isSelect ? '#fde68a' : '#bae6fd';
+                  const lbl = d.source.length > 14 ? d.source.slice(0,14) + '…' : d.source;
+                  promoChip = `<span style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
+                }
+                // 状態バッジ (BFスタイル: 丸形・色付き)
+                const st = d.status || '';
+                const stMap = {
+                  '成約': '#059669', 'キャンセル': '#dc2626', '未対応': '#f97316',
+                  '来院済': '#1d4ed8', '検討中': '#7c3aed', '予約変更': '#0891b2',
+                  '確認済': '#0369a1', '後追いLINE済み': '#0e7490', '予約連絡待ち': '#a855f7'
+                };
+                const stColor = stMap[st] || '#475569';
+                const stLabel = st === '予約連絡待ち' ? '次回予約連絡待ち' : (st || '未設定');
+                const stBadge = st
+                  ? `<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:${stColor}22;color:${stColor};border:1.5px solid ${stColor};font-weight:700;font-size:10px;white-space:nowrap">${escapeHtml(stLabel)}</span>`
+                  : '<span style="display:inline-block;padding:3px 10px;border-radius:20px;background:#f3f4f6;color:#9ca3af;border:1.5px solid #d4d4d8;font-weight:600;font-size:10px">未設定</span>';
+                // 来院日チップ
+                const bookChip = bookMMDD !== '-'
+                  ? `<span style="display:inline-block;padding:3px 8px;background:#eff6ff;border:1px solid #3b82f6;color:#1d4ed8;font-weight:600;border-radius:4px;font-size:11px">${bookMMDD}</span>`
+                  : '<span style="color:var(--text-muted);font-size:10px">-</span>';
+                // 次回予定チップ
+                const nextChip = nextMMDD
+                  ? `<span style="display:inline-block;padding:3px 8px;background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600;border-radius:4px;font-size:10px">${nextMMDD}</span>`
+                  : '<span style="display:inline-block;padding:3px 8px;background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e;border-radius:4px;font-size:10px">年/月/日</span>';
                 return `<tr>
-                  <td data-label="来院日" style="font-size:11px;white-space:nowrap">${escapeHtml(d.bookDate || '-')}</td>
-                  <td data-label="名前" style="font-size:11px;font-weight:600">${escapeHtml(d.name || '-')}</td>
-                  <td data-label="治療" style="font-size:11px;text-align:center">${escapeHtml(cat)}</td>
-                  <td data-label="医院" style="font-size:11px;text-align:center">${escapeHtml(fac)}</td>
-                  <td data-label="プロモ" style="font-size:10px;text-align:center">${escapeHtml(promo)}</td>
-                  <td data-label="状態" style="font-size:11px;text-align:center;color:${stColor};font-weight:600">${escapeHtml(st)}</td>
-                  <td data-label="次回予定" style="font-size:10px;text-align:center;color:var(--text-sub)">${escapeHtml(nextDate || '-')}</td>
+                  <td data-label="来院日" style="text-align:center">${bookChip}</td>
+                  <td data-label="名前" style="font-size:12px;font-weight:600;text-align:left">${escapeHtml(d.name || '-')}</td>
+                  <td data-label="治療" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(cat)}</td>
+                  <td data-label="医院" style="font-size:11px;text-align:center;color:var(--text-sub)">${escapeHtml(fac)}</td>
+                  <td data-label="プロモ" style="text-align:center">${promoChip}</td>
+                  <td data-label="状態" style="text-align:center">${stBadge}</td>
+                  <td data-label="次回予定" style="text-align:center">${nextChip}</td>
                   <td data-label="成約商材" style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
-                  <td data-label="金額" style="font-size:11px;text-align:right;font-variant-numeric:tabular-nums">${amt ? '¥' + fmt(amt) : '-'}</td>
+                  <td data-label="金額" style="font-size:11px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${amt ? '¥' + fmt(amt) : '<span style="color:var(--text-muted);font-weight:400">-</span>'}</td>
                 </tr>`;
               }).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
           </tbody>
