@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v395';
+const APP_VERSION = 'v396';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1158,10 +1158,12 @@ Object.defineProperty(globalThis, 'SMS_TEMPLATES', {
 // SMSテンプレ内の {clinic} は短縮名ではなく正式医院名で送りたい (法人名は含めず医院名のみ)。
 // localStorage 'facility-formal-names' = { 'BF銀座': 'BF銀座歯科', ... }
 const FACILITY_FORMAL_DEFAULTS = {
-  'BF銀座': 'BF銀座歯科',
-  'アール': 'アール歯科',
-  'ウィズ': 'ウィズ歯科',
-  'エスカ': 'エスカ歯科',
+  // v396: 確定済の正式名称 (ユーザー指定)
+  'BF銀座': 'BF銀座歯科・矯正歯科',
+  'ウィズ': '名古屋ウィズ歯科・矯正歯科',
+  'エスカ': 'エスカ歯科・矯正歯科',
+  'アール': '名駅アール歯科・矯正歯科',
+  // 未確定 (短縮名 + 歯科 の仮置き、UIで編集可)
   'ルミナス': 'ルミナス歯科',
   '茶屋': '茶屋ヶ坂歯科',
   '知立': '知立歯科',
