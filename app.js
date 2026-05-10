@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v349';
+const APP_VERSION = 'v350';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8861,6 +8861,7 @@ async function renderKaiinAll(containerId) {
             <th>次回予定</th>
             <th>成約商材</th>
             <th style="text-align:right">金額(税抜)</th>
+            <th style="text-align:left">メモ</th>
           </tr></thead>
           <tbody>
             ${allRows
@@ -8914,6 +8915,10 @@ async function renderKaiinAll(containerId) {
                 const nextChip = nextMMDD
                   ? `<span style="display:inline-block;padding:3px 8px;background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600;border-radius:4px;font-size:10px">${nextMMDD}</span>`
                   : '<span style="display:inline-block;padding:3px 8px;background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e;border-radius:4px;font-size:10px">年/月/日</span>';
+                const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+                const memoCell = memo
+                  ? `<span style="display:inline-block;padding:3px 8px;background:#fff8e1;border:1px dashed #f9a825;border-radius:4px;font-size:11px;max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle" title="${escapeHtml(memo)}">${escapeHtml(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 40) : memo.slice(0,40))}</span>`
+                  : '<span style="color:var(--text-muted);font-size:10px">-</span>';
                 return `<tr>
                   <td data-label="来院日" style="text-align:center">${bookChip}</td>
                   <td data-label="名前" style="font-size:12px;font-weight:600;text-align:left">${escapeHtml(d.name || '-')}</td>
@@ -8924,8 +8929,9 @@ async function renderKaiinAll(containerId) {
                   <td data-label="次回予定" style="text-align:center">${nextChip}</td>
                   <td data-label="成約商材" style="font-size:11px;text-align:center">${escapeHtml(contractSvc || '-')}</td>
                   <td data-label="金額" style="font-size:11px;text-align:right;font-variant-numeric:tabular-nums;font-weight:600">${amt ? '¥' + fmt(amt) : '<span style="color:var(--text-muted);font-weight:400">-</span>'}</td>
+                  <td data-label="メモ" style="text-align:left">${memoCell}</td>
                 </tr>`;
-              }).join('') || '<tr><td colspan="9" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
+              }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
           </tbody>
         </table>
       </div>
