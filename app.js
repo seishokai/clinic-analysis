@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v392';
+const APP_VERSION = 'v393';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4671,7 +4671,7 @@ function switchView(view) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
   window.scrollTo(0, 0);
-  const titles = {home:'ホーム',tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',promo:'プロモ',admin:'管理',reviews:'口コミ',settings:'設定'};
+  const titles = {home:'ホーム',tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',promo:'プロモ',followup:'追いかけ',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
   try { sessionStorage.setItem('lastView', view); } catch(_){}
   // v359: ホームタブ切替時にダッシュボードを描画 (旧: 分析タブ + 予約サブタブ統合)
@@ -4681,6 +4681,10 @@ function switchView(view) {
   // v379: プロモタブ切替時に renderPromo
   if (view === 'promo') {
     setTimeout(() => { if (typeof renderPromo === 'function') renderPromo(); }, 50);
+  }
+  // v393: 追いかけタブ切替時に renderFollowup
+  if (view === 'followup') {
+    setTimeout(() => { if (typeof renderFollowup === 'function') renderFollowup(); }, 50);
   }
   // 管理タブ切替時: 権限管理を自動で表示
   if (view === 'admin') {
@@ -11779,6 +11783,233 @@ let _promoTabState = {
   hidePaid: true,                 // v382: 支給済は非表示 (デフォルトON)
   hideNoticeCreated: true,        // v383: 通知書作成済も非表示 (月1回バッチ発行、二重発行防止)
 };
+
+// === v393: 追いかけタブ ===
+// キャンセル/無断キャンセル/検討中で長期動きなし の患者を再アプローチ
+let _followupState = {
+  category: 'cancelled',  // 'cancelled' | 'noshow' | 'considering' | 'all'
+  search: '',
+  hideWithRebooking: false,  // 再予約済を非表示
+};
+
+function renderFollowup() {
+  const el = document.getElementById('followup-content');
+  if (!el) return;
+  const data = (typeof getFilteredBookingsData === 'function' ? getFilteredBookingsData() : (bookingsData || []));
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayMs = today.getTime();
+
+  // SMS履歴をマップ化
+  const smsHist = (typeof loadData === 'function') ? loadData('sms-history', []) : [];
+  const smsByPhone = {};
+  smsHist.forEach(h => {
+    const k = String(h.phone || '').replace(/[^0-9+]/g,'');
+    if (!k) return;
+    if (!smsByPhone[k]) smsByPhone[k] = [];
+    smsByPhone[k].push(h);
+  });
+
+  // 各患者の最新の予約 (再予約検出のため)
+  // 同じ name + phone でグルーピング → 最新の applyDate を見る
+  const bookingsByKey = {};
+  data.forEach(d => {
+    const k = String(d.name || '').trim();
+    if (!k) return;
+    if (!bookingsByKey[k]) bookingsByKey[k] = [];
+    bookingsByKey[k].push(d);
+  });
+
+  // 候補を集計
+  const candidates = [];
+  data.forEach(d => {
+    const status = d.status || '';
+    const bd = (typeof parseDate === 'function') ? parseDate(d.bookDate) : null;
+    const isPastBd = bd && bd.getTime() < todayMs;
+    let category = null;
+    let reason = '';
+    if (status === 'キャンセル') {
+      category = 'cancelled';
+      reason = '正式キャンセル';
+    } else if (status !== 'キャンセル' && (typeof isVisitedStatus === 'function' ? !isVisitedStatus(status) : !['来院済','成約','検討中'].includes(status)) && status !== '除外' && isPastBd) {
+      // 過去予約で来院もキャンセルもしてない = 無断キャンセル
+      category = 'noshow';
+      reason = '無断キャンセル';
+    } else if (status === '検討中') {
+      // 検討中で 2週間以上動きなし
+      const lastEdit = bd ? bd.getTime() : 0;
+      const daysSince = lastEdit ? Math.floor((todayMs - lastEdit) / 86400000) : 999;
+      if (daysSince > 14) {
+        category = 'considering';
+        reason = `検討中 (${daysSince}日経過)`;
+      }
+    }
+    if (!category) return;
+
+    // 同名の他の予約で applyDate がより新しいもの (再予約検出)
+    const myApply = (typeof parseDate === 'function') ? parseDate(d.applyDate) : null;
+    const myApplyMs = myApply ? myApply.getTime() : 0;
+    const sameName = bookingsByKey[String(d.name || '').trim()] || [];
+    const rebooking = sameName.find(b => {
+      if (b === d) return false;
+      const ba = (typeof parseDate === 'function') ? parseDate(b.applyDate) : null;
+      const baMs = ba ? ba.getTime() : 0;
+      // 自分より後に申し込まれていて、キャンセル以外
+      if (baMs <= myApplyMs) return false;
+      if (b.status === 'キャンセル' || b.status === '除外') return false;
+      return true;
+    });
+
+    // SMS履歴
+    const phoneKey = String(d.phone || '').replace(/[^0-9+]/g,'');
+    const sms = smsByPhone[phoneKey] || [];
+
+    candidates.push({
+      d, category, reason,
+      rebooking,
+      sms,
+      lastSms: sms.length ? sms[sms.length-1] : null,
+    });
+  });
+
+  // フィルタ
+  const cat = _followupState.category;
+  let filtered = candidates;
+  if (cat !== 'all') filtered = filtered.filter(c => c.category === cat);
+  if (_followupState.hideWithRebooking) filtered = filtered.filter(c => !c.rebooking);
+  if (_followupState.search) {
+    const s = _followupState.search.toLowerCase();
+    filtered = filtered.filter(c => (c.d.name || '').toLowerCase().includes(s));
+  }
+
+  // 並べ替え: 再予約あり優先 (成果) → SMS済み → 未送信
+  filtered.sort((a, b) => {
+    if (!!a.rebooking !== !!b.rebooking) return a.rebooking ? -1 : 1;
+    if (!!a.lastSms !== !!b.lastSms) return a.lastSms ? -1 : 1;
+    const ad = (typeof parseDate === 'function') ? (parseDate(a.d.bookDate)?.getTime() || 0) : 0;
+    const bd = (typeof parseDate === 'function') ? (parseDate(b.d.bookDate)?.getTime() || 0) : 0;
+    return bd - ad;
+  });
+
+  // 集計
+  const byCat = { cancelled: 0, noshow: 0, considering: 0 };
+  candidates.forEach(c => byCat[c.category]++);
+  const totalSent = candidates.filter(c => c.lastSms).length;
+  const totalRebooked = candidates.filter(c => c.rebooking).length;
+  const conversionRate = totalSent > 0 ? Math.round(totalRebooked / totalSent * 100) : 0;
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <strong style="font-size:14px;font-weight:700">🎯 追いかけ</strong>
+      <span style="font-size:11px;color:var(--text-sub)">${filtered.length}件 / 全 ${candidates.length}件</span>
+      <input type="text" id="followup-search" class="filter-input" placeholder="🔍 名前" value="${escapeHtml(_followupState.search||'')}" style="width:120px;font-size:11px;padding:3px 8px">
+      <label style="font-size:11px;display:inline-flex;align-items:center;gap:3px;cursor:pointer;user-select:none" title="再予約してくれた人を非表示">
+        <input type="checkbox" id="followup-hide-rebooked" ${_followupState.hideWithRebooking?'checked':''}>
+        <span>再予約済を非表示</span>
+      </label>
+    </div>
+    <!-- 集計 1行 -->
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;font-size:11px">
+      <span><span style="color:var(--text-sub)">対象</span> <strong style="font-size:13px">${candidates.length}</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">SMS送信済</span> <strong style="color:#7c3aed;font-size:13px">${totalSent}</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">再予約 (成果)</span> <strong style="color:#059669;font-size:13px">${totalRebooked}</strong> <span style="color:var(--text-sub)">/ ${totalSent} 中 = ${conversionRate}%</span></span>
+    </div>
+    <!-- カテゴリトグル -->
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
+      <span style="font-size:11px;color:var(--text-sub)">対象:</span>
+      ${[
+        { key: 'all', label: '全て', count: candidates.length, color: '#6b7280' },
+        { key: 'cancelled', label: '💔 キャンセル', count: byCat.cancelled, color: '#dc2626' },
+        { key: 'noshow', label: '⚠️ 無断キャンセル', count: byCat.noshow, color: '#b45309' },
+        { key: 'considering', label: '🤔 検討中(2週間+)', count: byCat.considering, color: '#7c3aed' },
+      ].map(b => `<button class="followup-cat-btn filter-btn ${cat===b.key?'is-active':''}" data-cat="${b.key}" style="${cat===b.key?`background:${b.color};color:#fff;font-weight:700`:''}">${b.label} <span style="font-size:10px;opacity:.8">${b.count}</span></button>`).join('')}
+    </div>
+    <div class="card" style="padding:6px">
+      <div class="data-table-wrap" style="max-height:calc(100vh - 200px);overflow-y:auto">
+        <table class="data-table compact" style="width:100%;font-size:12px">
+          <thead><tr>
+            <th style="text-align:left;width:130px">名前</th>
+            <th style="width:90px">状況</th>
+            <th style="width:70px">予約日</th>
+            <th style="width:70px">医院</th>
+            <th style="text-align:left;width:160px">連絡先</th>
+            <th style="width:100px">SMS履歴</th>
+            <th style="width:120px">再予約</th>
+            <th style="text-align:left">メモ</th>
+          </tr></thead>
+          <tbody>
+            ${filtered.map(c => {
+              const d = c.d;
+              const phone = (typeof maskPhone === 'function' && typeof _isPII_MaskNeeded === 'function')
+                ? (_isPII_MaskNeeded() ? maskPhone(d.phone) : (d.phone ? (typeof _normalizePhoneForDisplay === 'function' ? _normalizePhoneForDisplay(d.phone) : d.phone) : ''))
+                : (d.phone || '');
+              const phoneDigits = String(phone).replace(/[^0-9]/g, '');
+              const fmtMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${parseInt(m[2])}/${parseInt(m[3])}` : '-'; };
+              const fac = typeof normFac === 'function' ? (normFac(d.facility) || '-') : (d.facility || '-');
+              const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+              // 状況バッジ
+              const catColor = c.category === 'cancelled' ? { bg: '#fee2e2', fg: '#b91c1c' }
+                            : c.category === 'noshow' ? { bg: '#fed7aa', fg: '#9a3412' }
+                            : { bg: '#ede9fe', fg: '#7c3aed' };
+              // SMS 履歴サマリー
+              const smsCell = c.lastSms
+                ? `<span title="${escapeHtml(c.sms.length + '回送信。最終: ' + new Date(c.lastSms.sentAt).toLocaleDateString())}" style="display:inline-block;padding:2px 7px;background:#ede9fe;color:#7c3aed;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #c4b5fd">📱 ${c.sms.length}回</span><div style="font-size:9px;color:var(--text-muted);margin-top:1px">最終: ${escapeHtml(new Date(c.lastSms.sentAt).toLocaleDateString().slice(5))}</div>`
+                : '<span style="color:var(--text-muted);font-size:10px">未送信</span>';
+              // 再予約セル
+              const rebookCell = c.rebooking
+                ? `<span style="display:inline-block;padding:2px 7px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:700;border:1px solid #86efac" title="再予約日: ${escapeHtml(c.rebooking.applyDate||'')} / ステータス: ${escapeHtml(c.rebooking.status||'')}">✅ 再予約 ${escapeHtml(fmtMD(c.rebooking.applyDate))}</span>`
+                : '<span style="color:var(--text-muted);font-size:10px">なし</span>';
+              return `<tr style="background:${c.rebooking?'#f0fdf4':''}">
+                <td style="font-weight:600">${escapeHtml(d.name||'')}</td>
+                <td><span style="display:inline-block;padding:2px 6px;background:${catColor.bg};color:${catColor.fg};border-radius:8px;font-size:10px;font-weight:600">${escapeHtml(c.reason)}</span></td>
+                <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fmtMD(d.bookDate))}</td>
+                <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fac)}</td>
+                <td>${phone && phoneDigits ? `<span style="display:inline-flex;align-items:stretch;gap:0;border-radius:6px;overflow:hidden;border:1px solid #86efac;line-height:1"><a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#dcfce7;color:#15803d;font-weight:700;text-decoration:none;font-size:11px">📞 ${escapeHtml(phone)}</a><button type="button" class="followup-sms-btn" data-name="${escapeHtml(d.name||'')}" data-phone="${escapeHtml(d.phone||'')}" data-bookdate="${escapeHtml(d.bookDate||'')}" data-facility="${escapeHtml(d.facility||'')}" title="SMSを送る" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;background:#ede9fe;color:#7c3aed;border:none;border-left:1px solid #c4b5fd;font-weight:700;font-size:13px;cursor:pointer">📱</button></span>` : '<span style="color:var(--text-muted)">-</span>'}</td>
+                <td style="text-align:center">${smsCell}</td>
+                <td style="text-align:center">${rebookCell}</td>
+                <td style="font-size:10px;color:var(--text-sub);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(memo||'')}">${escapeHtml((typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo.slice(0, 60)) || '-')}</td>
+              </tr>`;
+            }).join('') || '<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  // === イベント結合 ===
+  el.querySelectorAll('.followup-cat-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _followupState.category = btn.dataset.cat;
+      renderFollowup();
+    });
+  });
+  const searchEl = el.querySelector('#followup-search');
+  if (searchEl) {
+    let _t;
+    searchEl.addEventListener('input', () => {
+      clearTimeout(_t);
+      _t = setTimeout(() => {
+        _followupState.search = searchEl.value;
+        renderFollowup();
+      }, 250);
+    });
+    if (_followupState.search) { searchEl.focus(); searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length); }
+  }
+  el.querySelector('#followup-hide-rebooked')?.addEventListener('change', (e) => {
+    _followupState.hideWithRebooking = e.target.checked;
+    renderFollowup();
+  });
+  el.querySelectorAll('.followup-sms-btn').forEach(btn => {
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      ev.preventDefault();
+      if (typeof openSmsModal === 'function') {
+        openSmsModal(btn.dataset.name, btn.dataset.phone, btn.dataset.bookdate, btn.dataset.facility);
+      }
+    });
+  });
+}
 
 function renderPromo() {
   const el = document.getElementById('promo-content');

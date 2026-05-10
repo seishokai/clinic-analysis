@@ -423,10 +423,11 @@
         <button class="nav-btn" data-view="bookings">予約</button>
         <button class="nav-btn" data-view="kaiin">来院</button>
         <button class="nav-btn" data-view="monshin">問診票</button>
-        <button class="nav-btn" data-view="tc">TC</button>
-        <button class="nav-btn" data-view="sales">売上</button>
         <button class="nav-btn" data-view="adbudget">広告</button>
         <button class="nav-btn" data-view="promo">プロモ</button>
+        <button class="nav-btn" data-view="followup" style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);color:#b45309;font-weight:700;border:1px solid #f59e0b">🎯 追いかけ</button>
+        <button class="nav-btn" data-view="tc">TC</button>
+        <button class="nav-btn" data-view="sales">売上</button>
         <button class="nav-btn" data-view="admin">管理</button>
       </nav>
       <div class="nav-spacer"></div>
@@ -472,6 +473,10 @@
       <button class="bottom-nav-btn" data-view="promo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         <span>プロモ</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="followup">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+        <span>追いかけ</span>
       </button>
       <button class="bottom-nav-btn" data-view="admin">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
@@ -1255,6 +1260,11 @@
       <div id="promo-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
     </main>
 
+    <!-- ==================== 追いかけ (v393) ==================== -->
+    <main id="view-followup" class="view view-wide" hidden>
+      <div id="followup-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
+    </main>
+
     <!-- ==================== 管理 ==================== -->
     <main id="view-admin" class="view" hidden>
       <div class="sub-nav">
@@ -1458,7 +1468,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=392"></script>
+  <script src="app.js?v=393"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
