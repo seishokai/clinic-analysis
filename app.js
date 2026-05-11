@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v405';
+const APP_VERSION = 'v406';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4126,11 +4126,22 @@ function renderPhoneCheck() {
   const canViewPII = !_isPII_MaskNeeded();
   const memos = loadData('bk-memos', {});
 
-  // v405: 今月荷電した患者一覧 (booking_status.updated_at と status から)
+  // v406: 今月「実際に荷電した」患者一覧 (booking_status.updated_at と status から)
+  // ※ キャンセルは電話以外の経路 (DXHUB自動取得・メール・LINE等) でも入るため除外
+  //   電話起因と確実に分かる status のみ集計対象:
+  //   - 確認OK / 確認済 (電話で確認できた)
+  //   - 1〜3コール留守電有/無 (電話したが繋がらず)
+  //   - 予約日変更 (電話で日程変更)
   const _curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
-  const _phoneCallStates = new Set(['確認OK', '確認済', '予約日変更', 'キャンセル']);
   const _phoneCallStatesRe = /^[1-3]コール留守電(有|無)$/;
-  const _isPhoneAction = (status) => _phoneCallStates.has(status) || _phoneCallStatesRe.test(status);
+  const _isPhoneAction = (status) => {
+    if (!status) return false;
+    if (status === '確認OK' || status === '確認済') return true;
+    if (_phoneCallStatesRe.test(status)) return true;
+    if (status === '予約日変更') return true;
+    // キャンセル は他経路もあるので除外
+    return false;
+  };
   // 今月荷電した患者リスト (updated_at が今月 かつ status が荷電系)
   const _calledThisMonth = (bookingsData || []).filter(d => {
     const u = d.updatedAt || d.updated_at;
@@ -4142,15 +4153,20 @@ function renderPhoneCheck() {
     const ub = b.updatedAt || b.updated_at || '';
     return ub.localeCompare(ua);  // 新しい順
   });
-  // ステータス別カウント
-  const _calledStats = { confirmed: 0, called: 0, rescheduled: 0, cancelled: 0 };
+  // ステータス別カウント (キャンセルは集計外なので参考値)
+  const _calledStats = { confirmed: 0, called: 0, rescheduled: 0 };
   _calledThisMonth.forEach(d => {
     const s = d.status || '';
     if (s === '確認OK' || s === '確認済') _calledStats.confirmed++;
     else if (_phoneCallStatesRe.test(s)) _calledStats.called++;
     else if (s === '予約日変更') _calledStats.rescheduled++;
-    else if (s === 'キャンセル') _calledStats.cancelled++;
   });
+  // 参考: 今月キャンセルになった件数 (荷電とは限らない)
+  const _cancelledThisMonth = (bookingsData || []).filter(d => {
+    const u = d.updatedAt || d.updated_at;
+    if (!u || !String(u).startsWith(_curYM)) return false;
+    return d.status === 'キャンセル';
+  }).length;
   // 月初〜今日の日数で 1日平均
   const _dayOfMonth = Math.max(1, now.getDate());
   const _avgPerDay = Math.round(_calledThisMonth.length / _dayOfMonth);
@@ -4169,12 +4185,13 @@ function renderPhoneCheck() {
       <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0;padding:8px 12px;background:#fff;border:1px solid #bae6fd;border-radius:8px;font-size:11px">
         <strong style="color:#0369a1;font-size:13px">今月 (${escapeHtml(_curYM)})</strong>
         <span style="color:var(--border)">|</span>
-        <span><span style="color:var(--text-sub)">合計</span> <strong style="font-size:14px">${_calledThisMonth.length}</strong> <span style="font-size:10px;color:var(--text-muted)">/ 1日平均 ${_avgPerDay}件</span></span>
+        <span><span style="color:var(--text-sub)">荷電合計</span> <strong style="font-size:14px">${_calledThisMonth.length}</strong> <span style="font-size:10px;color:var(--text-muted)">/ 1日平均 ${_avgPerDay}件</span></span>
         <span style="color:var(--border)">|</span>
         <span><span style="color:var(--text-sub)">✅確認OK</span> <strong style="color:#1d4ed8;font-size:13px">${_calledStats.confirmed}</strong></span>
-        <span><span style="color:var(--text-sub)">📞電話済</span> <strong style="color:#92400e;font-size:13px">${_calledStats.called}</strong></span>
+        <span><span style="color:var(--text-sub)">📞電話済(留守電)</span> <strong style="color:#92400e;font-size:13px">${_calledStats.called}</strong></span>
         <span><span style="color:var(--text-sub)">📅予約変更</span> <strong style="color:#7c3aed;font-size:13px">${_calledStats.rescheduled}</strong></span>
-        <span><span style="color:var(--text-sub)">❌キャンセル</span> <strong style="color:#b91c1c;font-size:13px">${_calledStats.cancelled}</strong></span>
+        <span style="color:var(--border)">|</span>
+        <span title="電話以外の経路 (DXHUB自動・メール等) も含む参考値"><span style="color:var(--text-muted)">参考: 今月キャンセル</span> <strong style="color:var(--text-sub);font-size:12px">${_cancelledThisMonth}</strong></span>
       </div>
       <!-- 患者リスト -->
       <div style="background:#fff;border:1px solid #bae6fd;border-radius:8px;max-height:320px;overflow-y:auto">
@@ -4196,7 +4213,7 @@ function renderPhoneCheck() {
               const statusInfo = s === '確認OK' || s === '確認済' ? { color: '#1d4ed8', bg: '#dbeafe', icon: '✅' }
                               : _phoneCallStatesRe.test(s) ? { color: '#92400e', bg: '#fef3c7', icon: '📞' }
                               : s === '予約日変更' ? { color: '#7c3aed', bg: '#f5f3ff', icon: '📅' }
-                              : { color: '#b91c1c', bg: '#fee2e2', icon: '❌' };
+                              : { color: '#6b7280', bg: '#f3f4f6', icon: '•' };
               const bdMatch = String(d.bookDate || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
               const bookLabel = bdMatch ? `${parseInt(bdMatch[2])}/${parseInt(bdMatch[3])}` : '-';
               const fac = typeof normFac === 'function' ? (normFac(d.facility) || '-') : (d.facility || '-');
@@ -4214,7 +4231,7 @@ function renderPhoneCheck() {
         </table>
       </div>
       ${_calledThisMonth.length > 100 ? `<div style="font-size:10px;color:var(--text-muted);text-align:center;margin-top:6px">最新 100件を表示中 (全${_calledThisMonth.length}件)</div>` : ''}
-      <div style="font-size:10px;color:var(--text-muted);margin-top:6px">※ booking_status.updated_at が今月 + 荷電系ステータス (確認OK/留守電/予約変更/キャンセル) の患者</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-top:6px">※ 電話起因のステータス変更のみ表示 (確認OK / 1〜3コール留守電 / 予約日変更)。キャンセルは他経路もあるため除外</div>
     </details>
 
     <!-- v273: ヘッダーアクション -->
