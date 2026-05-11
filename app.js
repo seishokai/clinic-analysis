@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v403';
+const APP_VERSION = 'v404';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4126,12 +4126,92 @@ function renderPhoneCheck() {
   const canViewPII = !_isPII_MaskNeeded();
   const memos = loadData('bk-memos', {});
 
+  // v404: 月別の荷電・入力集計 (bookingsData の updated_at + status から推定)
+  // booking_status の各レコードで、status が phone-related (確認OK/Nコール留守電X/予約日変更/キャンセル)
+  // かつ updated_at が指定月のものをカウント
+  const _phoneStats = (() => {
+    const result = { byMonth: {}, total: { confirmed: 0, called: 0, rescheduled: 0, cancelled: 0 } };
+    const phoneStates = new Set(['確認OK', '確認済']);
+    const callStates = /^[1-3]コール留守電(有|無)$/;
+    // 過去6ヶ月分のキー生成
+    for (let i = 5; i >= 0; i--) {
+      const dt = new Date(now); dt.setMonth(dt.getMonth() - i);
+      const ym = `${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`;
+      result.byMonth[ym] = { confirmed: 0, called: 0, rescheduled: 0, cancelled: 0, total: 0 };
+    }
+    (bookingsData || []).forEach(d => {
+      if (!d.updatedAt && !d.updated_at) return;
+      const u = d.updatedAt || d.updated_at;
+      const m = String(u).match(/(\d{4})-(\d{2})/);
+      if (!m) return;
+      const ym = m[1] + '-' + m[2];
+      if (!result.byMonth[ym]) return;  // 過去6ヶ月外
+      const status = d.status || '';
+      let bucket = null;
+      if (phoneStates.has(status)) bucket = 'confirmed';
+      else if (callStates.test(status)) bucket = 'called';
+      else if (status === '予約日変更') bucket = 'rescheduled';
+      else if (status === 'キャンセル') bucket = 'cancelled';
+      if (!bucket) return;
+      result.byMonth[ym][bucket]++;
+      result.byMonth[ym].total++;
+      result.total[bucket]++;
+    });
+    return result;
+  })();
+  const _phoneMonths = Object.keys(_phoneStats.byMonth);
+  const _phoneMaxTotal = Math.max(1, ...Object.values(_phoneStats.byMonth).map(v => v.total));
+  const _curYM = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}`;
+  const _thisMonth = _phoneStats.byMonth[_curYM] || { confirmed: 0, called: 0, rescheduled: 0, cancelled: 0, total: 0 };
+
   el.innerHTML = `
     <!-- ヘッダー -->
     <div style="margin-bottom:12px">
       <h2 style="font-size:17px;font-weight:700;color:#1a1a1a;margin-bottom:4px">📞 電話前確認</h2>
       <p style="font-size:11px;color:var(--text-sub);margin:0">今日・明日の予約を優先度順に整理。電話後はステータス・メモを即更新。</p>
     </div>
+
+    <!-- v404: 月別 荷電・入力集計 -->
+    <details style="margin-bottom:12px;background:#f0f9ff;border:1px solid #bae6fd;border-radius:10px;padding:10px 12px" open>
+      <summary style="cursor:pointer;font-size:12px;font-weight:700;color:#0369a1">📊 月別 荷電・入力集計 (直近6ヶ月)</summary>
+      <!-- 今月サマリー -->
+      <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin:10px 0 12px;padding:8px 12px;background:#fff;border:1px solid #bae6fd;border-radius:8px;font-size:11px">
+        <strong style="color:#0369a1;font-size:13px">今月 (${escapeHtml(_curYM)})</strong>
+        <span style="color:var(--border)">|</span>
+        <span><span style="color:var(--text-sub)">合計</span> <strong style="font-size:14px">${_thisMonth.total}</strong></span>
+        <span style="color:var(--border)">|</span>
+        <span><span style="color:var(--text-sub)">確認OK</span> <strong style="color:#1d4ed8;font-size:13px">${_thisMonth.confirmed}</strong></span>
+        <span><span style="color:var(--text-sub)">電話済</span> <strong style="color:#92400e;font-size:13px">${_thisMonth.called}</strong></span>
+        <span><span style="color:var(--text-sub)">予約変更</span> <strong style="color:#7c3aed;font-size:13px">${_thisMonth.rescheduled}</strong></span>
+        <span><span style="color:var(--text-sub)">キャンセル</span> <strong style="color:#b91c1c;font-size:13px">${_thisMonth.cancelled}</strong></span>
+      </div>
+      <!-- 6ヶ月推移バー -->
+      <div style="display:flex;gap:8px;align-items:flex-end;height:120px;padding:8px 4px 24px;background:#fff;border:1px solid #bae6fd;border-radius:8px;overflow-x:auto">
+        ${_phoneMonths.map(ym => {
+          const v = _phoneStats.byMonth[ym];
+          const pct = (n) => v.total ? Math.round(n / v.total * 100) : 0;
+          const h = Math.max(2, Math.round(v.total / _phoneMaxTotal * 90));
+          const isCur = ym === _curYM;
+          return `<div style="flex:1;min-width:60px;display:flex;flex-direction:column;align-items:center;gap:4px;position:relative">
+            <div style="font-size:10px;font-weight:${isCur?'700':'500'};color:${isCur?'#0369a1':'var(--text-sub)'}">${v.total}</div>
+            <div style="width:80%;height:${h}px;display:flex;flex-direction:column;border-radius:4px;overflow:hidden;background:#f3f4f6;border:1px solid ${isCur?'#0284c7':'transparent'}" title="${escapeHtml(ym)}: 確認OK=${v.confirmed} 電話済=${v.called} 予約変更=${v.rescheduled} キャンセル=${v.cancelled}">
+              ${v.cancelled ? `<div style="background:#dc2626;height:${pct(v.cancelled)}%" title="キャンセル ${v.cancelled}"></div>` : ''}
+              ${v.rescheduled ? `<div style="background:#7c3aed;height:${pct(v.rescheduled)}%" title="予約変更 ${v.rescheduled}"></div>` : ''}
+              ${v.called ? `<div style="background:#f59e0b;height:${pct(v.called)}%" title="電話済 ${v.called}"></div>` : ''}
+              ${v.confirmed ? `<div style="background:#1d4ed8;height:${pct(v.confirmed)}%" title="確認OK ${v.confirmed}"></div>` : ''}
+            </div>
+            <div style="font-size:9px;color:${isCur?'#0284c7':'var(--text-muted)'};font-weight:${isCur?'700':'400'}">${escapeHtml(ym.replace(/^\d{2}(\d{2})-/, '$1/'))}</div>
+          </div>`;
+        }).join('')}
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;font-size:10px;color:var(--text-sub);margin-top:8px">
+        <span><span style="display:inline-block;width:10px;height:10px;background:#1d4ed8;vertical-align:middle;border-radius:2px"></span> 確認OK</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#f59e0b;vertical-align:middle;border-radius:2px"></span> 電話済 (留守電)</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#7c3aed;vertical-align:middle;border-radius:2px"></span> 予約日変更</span>
+        <span><span style="display:inline-block;width:10px;height:10px;background:#dc2626;vertical-align:middle;border-radius:2px"></span> キャンセル</span>
+        <span style="margin-left:auto;color:var(--text-muted)">※ booking_status.updated_at から算出</span>
+      </div>
+    </details>
 
     <!-- v273: ヘッダーアクション -->
     <div style="display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap">
@@ -6646,6 +6726,8 @@ async function loadBookings() {
             if (dbRow.paid_by !== undefined) d.paidBy = dbRow.paid_by;
             if (dbRow.memo) d._memo = dbRow.memo;
             else if (dbRow.bf_memo) d._memo = dbRow.bf_memo;
+            // v404: 電話前確認の月別集計用に updated_at を保持
+            if (dbRow.updated_at) d.updated_at = dbRow.updated_at;
             if (dbRow.book_date) d.bookDate = dbRow.book_date;
           }
           // メモだけは名前だけのフォールバック: 同じ正規化名+医院 の booking_status 行からメモを取得
