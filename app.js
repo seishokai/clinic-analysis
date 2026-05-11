@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v402';
+const APP_VERSION = 'v403';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12366,6 +12366,17 @@ function renderFollowup() {
                             : c.category === 'noshow' ? { bg: '#fed7aa', fg: '#9a3412' }
                             : c.category === 'review' ? { bg: '#dbeafe', fg: '#0369a1' }
                             : { bg: '#ede9fe', fg: '#7c3aed' };
+              // v403: 状況セルを編集可能ドロップダウンに
+              const curStatus = d.status || '';
+              const statusOpts = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル'];
+              const statusSelHtml = `<select class="followup-status-sel" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="font-size:10px;padding:3px 4px;border:1px solid ${catColor.fg}55;border-radius:8px;background:${catColor.bg};color:${catColor.fg};font-weight:600;cursor:pointer;width:100%;min-width:90px">
+                <option value="" ${!curStatus?'selected':''}>未設定</option>
+                ${statusOpts.map(s => `<option value="${escapeHtml(s)}" ${curStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+              </select>`;
+              // 補助情報 (メモあり / N日経過 等)
+              const reasonHint = c.reason !== curStatus && c.reason !== (curStatus + '(メモあり)')
+                ? `<div style="font-size:9px;color:var(--text-muted);margin-top:2px;text-align:center">${escapeHtml(c.reason.replace(curStatus, '').replace(/[()（）]/g,'').trim() || c.reason)}</div>`
+                : '';
               // SMS 履歴サマリー
               const smsCell = c.lastSms
                 ? `<span title="${escapeHtml(c.sms.length + '回送信。最終: ' + new Date(c.lastSms.sentAt).toLocaleDateString())}" style="display:inline-block;padding:2px 7px;background:#ede9fe;color:#7c3aed;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #c4b5fd">📱 ${c.sms.length}回</span><div style="font-size:9px;color:var(--text-muted);margin-top:1px">最終: ${escapeHtml(new Date(c.lastSms.sentAt).toLocaleDateString().slice(5))}</div>`
@@ -12384,7 +12395,7 @@ function renderFollowup() {
               return `<tr style="background:${isSelected?'#ede9fe':c.rebooking?'#f0fdf4':c.category==='review'?'#f0f9ff':''}">
                 <td style="text-align:center"><input type="checkbox" class="followup-row-check" data-key="${escapeHtml(rowKey)}" ${isSelected?'checked':''} style="width:14px;height:14px;cursor:pointer;accent-color:#7c3aed"></td>
                 <td style="font-weight:600"><a href="#" class="followup-name-link" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="color:#1d4ed8;text-decoration:none;display:inline-flex;align-items:center;gap:2px" title="予約一覧で詳細を見る">${escapeHtml(d.name||'')} <span style="font-size:9px;opacity:.6">↗</span></a></td>
-                <td><span style="display:inline-block;padding:2px 6px;background:${catColor.bg};color:${catColor.fg};border-radius:8px;font-size:10px;font-weight:600">${escapeHtml(c.reason)}</span></td>
+                <td>${statusSelHtml}${reasonHint}</td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fmtMD(d.bookDate))}</td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fac)}</td>
                 <td>${phone && phoneDigits ? `<span style="display:inline-flex;align-items:stretch;gap:0;border-radius:6px;overflow:hidden;border:1px solid #86efac;line-height:1"><a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#dcfce7;color:#15803d;font-weight:700;text-decoration:none;font-size:11px">📞 ${escapeHtml(phone)}</a><button type="button" class="followup-sms-btn" data-name="${escapeHtml(d.name||'')}" data-phone="${escapeHtml(d.phone||'')}" data-bookdate="${escapeHtml(d.bookDate||'')}" data-facility="${escapeHtml(d.facility||'')}" title="SMSを送る" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;background:#ede9fe;color:#7c3aed;border:none;border-left:1px solid #c4b5fd;font-weight:700;font-size:13px;cursor:pointer">📱</button></span>` : '<span style="color:var(--text-muted)">-</span>'}</td>
@@ -12477,6 +12488,20 @@ function renderFollowup() {
   };
   el.querySelectorAll('.followup-quick-visited').forEach(btn => {
     btn.addEventListener('click', () => _quickStatusFix(btn.dataset.name, btn.dataset.apply, '来院済'));
+  });
+  // v403: 状況プルダウンで任意ステータスに変更
+  el.querySelectorAll('.followup-status-sel').forEach(sel => {
+    sel.addEventListener('change', () => {
+      const name = sel.dataset.name;
+      const apply = sel.dataset.apply;
+      const newStatus = sel.value || '';
+      if (!newStatus) {
+        // 空 = 未設定。bookingsData.status を空に
+        _quickStatusFix(name, apply, '');
+        return;
+      }
+      _quickStatusFix(name, apply, newStatus);
+    });
   });
   el.querySelectorAll('.followup-quick-cancel').forEach(btn => {
     btn.addEventListener('click', () => {
