@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v400';
+const APP_VERSION = 'v401';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3325,6 +3325,20 @@ function renderHomeDashboard() {
   const confirmed = active.filter(d => d.status === '確認済' || d.status === '来院済' || d.status === '成約').length;
   const todayPending = today.filter(d => !d.status || d.status === '未対応').length;
 
+  // v401: 状況確認 = 過去予約 + メモあり + 未対応/キャンセル (取りこぼし疑い)
+  const todayMsForReview = todayStart.getTime();
+  const needReview = active.filter(d => {
+    const bd = parseDate(d.bookDate);
+    if (!bd || bd.getTime() >= todayMsForReview) return false;  // 過去のみ
+    const status = d.status || '';
+    if (status === '来院済' || status === '成約' || status === '検討中' || status === '除外') return false;
+    // 未対応 or キャンセル or 空
+    if (!(status === '' || status === '未対応' || status === 'キャンセル')) return false;
+    // メモあり判定
+    const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+    return !!memo;
+  }).length;
+
   // 今日の予約 時間順
   const todaySorted = today.slice().sort((a,b) => (a.bookDate||'').localeCompare(b.bookDate||''));
 
@@ -3492,6 +3506,12 @@ function renderHomeDashboard() {
         <span style="font-size:10px;color:#92400e;font-weight:600">⏳ 要対応</span>
         <span style="font-size:18px;font-weight:800;color:#b45309;line-height:1">${pending}<span style="font-size:10px;color:var(--text-sub);margin-left:1px">件</span></span>
       </div>
+      ${needReview > 0 ? `
+      <div class="home-card" data-action="status-review" style="flex:0 0 auto;background:#f0f9ff;border:1px solid #0284c7;border-radius:10px;padding:6px 12px;cursor:pointer;display:flex;align-items:center;gap:6px" title="メモあり + 未対応/キャンセル の取りこぼし疑い">
+        <span style="font-size:10px;color:#0369a1;font-weight:600">🤝 状況確認</span>
+        <span style="font-size:18px;font-weight:800;color:#0284c7;line-height:1">${needReview}<span style="font-size:10px;color:var(--text-sub);margin-left:1px">件</span></span>
+      </div>
+      ` : ''}
     </div>
 
     <!-- v273 期間分析: クイック選択 + カスタム範囲 + KPI -->
@@ -3650,6 +3670,19 @@ function renderHomeDashboard() {
   el.querySelectorAll('.home-card, .home-alert').forEach(c => {
     c.addEventListener('click', () => {
       const action = c.dataset.action;
+      // v401: 状況確認カード → 追いかけタブの「状態確認必要」へジャンプ
+      if (action === 'status-review') {
+        try {
+          switchView('followup');
+          setTimeout(() => {
+            if (typeof _followupState !== 'undefined') {
+              _followupState.category = 'review';
+              if (typeof renderFollowup === 'function') renderFollowup();
+            }
+          }, 100);
+        } catch(_) {}
+        return;
+      }
       switchBookingSub('bk-list');
       setTimeout(() => {
         if (action === 'today' || action === 'today-pending') {
