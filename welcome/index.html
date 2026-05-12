@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>Welcome to 清翔会 | ご入社おめでとうございます</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Great+Vibes&family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  :root {
+    --ink: #1a1a1a;
+    --gold: #c9a55c;
+    --gold-soft: #e8d4a5;
+    --cream: #fdfaf3;
+    --paper: #f7f3e8;
+    --border: #e5dcc0;
+    --text: #2a2620;
+    --sub: #6b6357;
+  }
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Noto Serif JP', 'Cormorant Garamond', serif;
+    background: var(--cream);
+    color: var(--text);
+    line-height: 1.8;
+    font-weight: 300;
+    overflow-x: hidden;
+  }
+
+  /* ── Hero ── */
+  .hero {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    text-align: center;
+    padding: 40px 20px;
+    background:
+      radial-gradient(ellipse at top, rgba(201, 165, 92, 0.12) 0%, transparent 60%),
+      linear-gradient(180deg, #fdfaf3 0%, #f7f3e8 100%);
+    position: relative;
+  }
+  .hero::before {
+    content: '';
+    position: absolute;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%);
+    width: 100%;
+    max-width: 600px;
+    height: 600px;
+    background: radial-gradient(circle, rgba(201, 165, 92, 0.06) 0%, transparent 70%);
+    pointer-events: none;
+  }
+  .hero-script {
+    font-family: 'Great Vibes', cursive;
+    font-size: clamp(56px, 12vw, 110px);
+    color: var(--gold);
+    line-height: 1;
+    margin-bottom: 14px;
+    letter-spacing: 0.02em;
+    opacity: 0;
+    animation: fadeUp 1.2s ease-out 0.3s forwards;
+  }
+  .hero-line {
+    width: 60px;
+    height: 1px;
+    background: var(--gold);
+    margin: 20px auto;
+    opacity: 0;
+    animation: expandLine 0.8s ease-out 1s forwards;
+  }
+  .hero-jp {
+    font-size: clamp(20px, 4vw, 28px);
+    font-weight: 400;
+    color: var(--ink);
+    letter-spacing: 0.4em;
+    margin-bottom: 20px;
+    opacity: 0;
+    animation: fadeUp 1.2s ease-out 0.8s forwards;
+  }
+  .hero-sub {
+    font-size: clamp(13px, 2.4vw, 15px);
+    color: var(--sub);
+    letter-spacing: 0.15em;
+    font-weight: 300;
+    max-width: 540px;
+    opacity: 0;
+    animation: fadeUp 1.2s ease-out 1.2s forwards;
+  }
+  .hero-scroll {
+    position: absolute;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 10px;
+    color: var(--sub);
+    letter-spacing: 0.3em;
+    opacity: 0;
+    animation: fadeIn 1s ease-out 2s forwards;
+  }
+  .hero-scroll::after {
+    content: '';
+    display: block;
+    width: 1px;
+    height: 30px;
+    background: var(--gold);
+    margin: 8px auto 0;
+    animation: scrollHint 2s ease-in-out infinite;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fadeIn { to { opacity: 1; } }
+  @keyframes expandLine {
+    from { width: 0; opacity: 0; }
+    to { width: 60px; opacity: 1; }
+  }
+  @keyframes scrollHint {
+    0%, 100% { transform: scaleY(1); transform-origin: top; }
+    50% { transform: scaleY(0.4); }
+  }
+
+  /* ── Section ── */
+  section {
+    padding: 80px 24px;
+    max-width: 880px;
+    margin: 0 auto;
+  }
+  .section-label {
+    text-align: center;
+    font-family: 'Great Vibes', cursive;
+    font-size: 38px;
+    color: var(--gold);
+    margin-bottom: 4px;
+    line-height: 1;
+  }
+  .section-title {
+    text-align: center;
+    font-size: clamp(20px, 3.6vw, 26px);
+    font-weight: 500;
+    letter-spacing: 0.25em;
+    margin-bottom: 50px;
+    color: var(--ink);
+  }
+  .section-title::after {
+    content: '';
+    display: block;
+    width: 40px;
+    height: 1px;
+    background: var(--gold);
+    margin: 16px auto 0;
+  }
+
+  /* ── Message ── */
+  .message {
+    text-align: center;
+    font-size: clamp(15px, 2.6vw, 17px);
+    line-height: 2.4;
+    color: var(--text);
+    font-weight: 400;
+    letter-spacing: 0.08em;
+    max-width: 680px;
+    margin: 0 auto;
+  }
+  .message strong {
+    color: var(--gold);
+    font-weight: 500;
+    font-size: 1.05em;
+  }
+
+  /* ── Steps ── */
+  .steps {
+    display: flex;
+    flex-direction: column;
+    gap: 40px;
+    margin-top: 40px;
+  }
+  .step {
+    display: flex;
+    gap: 28px;
+    padding: 32px 28px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    position: relative;
+    box-shadow: 0 2px 24px rgba(201, 165, 92, 0.06);
+    transition: transform .4s ease, box-shadow .4s ease;
+  }
+  .step:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 32px rgba(201, 165, 92, 0.12);
+  }
+  .step-num {
+    flex: 0 0 64px;
+    height: 64px;
+    border: 1px solid var(--gold);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 24px;
+    font-weight: 500;
+    color: var(--gold);
+    letter-spacing: 0.02em;
+  }
+  .step-body { flex: 1; min-width: 0; }
+  .step-title {
+    font-size: clamp(16px, 2.6vw, 19px);
+    font-weight: 500;
+    letter-spacing: 0.1em;
+    margin-bottom: 10px;
+    color: var(--ink);
+  }
+  .step-desc {
+    font-size: 13px;
+    line-height: 2;
+    color: var(--text);
+    margin-bottom: 16px;
+    font-weight: 300;
+  }
+  .step-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  .step-list li {
+    padding: 6px 0 6px 24px;
+    position: relative;
+    font-size: 13px;
+    line-height: 1.8;
+    color: var(--text);
+  }
+  .step-list li::before {
+    content: '✦';
+    position: absolute;
+    left: 0;
+    top: 8px;
+    color: var(--gold);
+    font-size: 10px;
+  }
+  .step-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 14px;
+    padding: 10px 22px;
+    background: var(--ink);
+    color: var(--cream);
+    text-decoration: none;
+    border-radius: 2px;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    font-weight: 400;
+    transition: all .3s ease;
+    border: 1px solid var(--ink);
+  }
+  .step-btn:hover {
+    background: var(--gold);
+    border-color: var(--gold);
+    color: #fff;
+    transform: translateX(2px);
+  }
+  .step-btn::after {
+    content: '→';
+    transition: transform .3s ease;
+  }
+  .step-btn:hover::after { transform: translateX(2px); }
+  .step-note {
+    margin-top: 12px;
+    padding: 10px 14px;
+    background: var(--paper);
+    border-left: 2px solid var(--gold);
+    font-size: 12px;
+    color: var(--sub);
+    line-height: 1.8;
+  }
+
+  /* ── Items ── */
+  .items-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 20px;
+    margin-top: 30px;
+  }
+  .item-card {
+    text-align: center;
+    padding: 30px 20px;
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    transition: transform .4s ease;
+  }
+  .item-card:hover { transform: translateY(-2px); }
+  .item-icon {
+    font-size: 32px;
+    color: var(--gold);
+    margin-bottom: 14px;
+    line-height: 1;
+  }
+  .item-name {
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.15em;
+    margin-bottom: 6px;
+  }
+  .item-desc {
+    font-size: 11px;
+    color: var(--sub);
+    line-height: 1.7;
+    letter-spacing: 0.05em;
+  }
+
+  /* ── Closing ── */
+  .closing {
+    text-align: center;
+    padding: 100px 24px 120px;
+    background: linear-gradient(180deg, var(--paper) 0%, var(--cream) 100%);
+  }
+  .closing-quote {
+    font-family: 'Great Vibes', cursive;
+    font-size: clamp(36px, 8vw, 64px);
+    color: var(--gold);
+    margin-bottom: 24px;
+    line-height: 1.2;
+  }
+  .closing-text {
+    font-size: clamp(14px, 2.4vw, 16px);
+    color: var(--text);
+    line-height: 2.4;
+    max-width: 580px;
+    margin: 0 auto;
+    letter-spacing: 0.1em;
+  }
+  .signature {
+    margin-top: 50px;
+    font-size: 12px;
+    color: var(--sub);
+    letter-spacing: 0.3em;
+    line-height: 2;
+  }
+  .signature strong {
+    font-size: 14px;
+    color: var(--ink);
+    font-weight: 500;
+  }
+
+  /* ── Footer ── */
+  footer {
+    text-align: center;
+    padding: 30px 20px;
+    font-size: 10px;
+    color: var(--sub);
+    letter-spacing: 0.2em;
+    border-top: 1px solid var(--border);
+    background: #fff;
+  }
+
+  /* ── Reveal on scroll ── */
+  .reveal {
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity .8s ease, transform .8s ease;
+  }
+  .reveal.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+
+  /* ── Mobile ── */
+  @media (max-width: 640px) {
+    section { padding: 60px 18px; }
+    .step { padding: 22px 18px; gap: 16px; flex-direction: column; }
+    .step-num { width: 56px; height: 56px; font-size: 20px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-script">Welcome</div>
+  <div class="hero-line"></div>
+  <h1 class="hero-jp">清翔会へようこそ</h1>
+  <p class="hero-sub">私たちのご縁に、心からの感謝を込めて。</p>
+  <div class="hero-scroll">SCROLL</div>
+</section>
+
+<!-- メッセージ -->
+<section class="reveal">
+  <div class="section-label">Message</div>
+  <h2 class="section-title">はじめに</h2>
+  <div class="message">
+    数ある選択肢の中から、清翔会を選んでいただき<br>
+    <strong>本当にありがとうございます</strong><br><br>
+    あなたを迎えられること、私たち一同 心より楽しみにしております。<br>
+    一緒に「歯科の新しいスタンダード」を作っていきましょう。<br><br>
+    このページでは、入社までに必要な手続きを<br>
+    順を追ってご案内しています。<br>
+    分からないことがあれば、いつでもお気軽にご連絡ください。
+  </div>
+</section>
+
+<!-- ステップ -->
+<section class="reveal">
+  <div class="section-label">Onboarding</div>
+  <h2 class="section-title">入社までの流れ</h2>
+  <div class="steps">
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="step-num">01</div>
+      <div class="step-body">
+        <div class="step-title">入社フォームのご記入</div>
+        <p class="step-desc">基本情報・連絡先・銀行口座等を専用フォームよりご登録ください。所要時間およそ10分。</p>
+        <a class="step-btn" href="#" target="_blank" rel="noopener" data-action="form-入社">入社フォームへ</a>
+        <div class="step-note">※ お手元に <strong>身分証明書 / 銀行口座 / マイナンバー</strong> をご用意ください。</div>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="step-num">02</div>
+      <div class="step-body">
+        <div class="step-title">通勤経路のご登録</div>
+        <p class="step-desc">通勤手当 算定のため、通勤手段とルートをご登録ください。</p>
+        <ul class="step-list">
+          <li>公共交通機関 → 月額定期代をご記入</li>
+          <li>車・バイク通勤 → 片道距離(km)をご記入 (支給額表をご参照)</li>
+          <li>複数医院勤務 → 別途「通勤申請書」をご記入</li>
+        </ul>
+        <a class="step-btn" href="#" target="_blank" rel="noopener" data-action="form-通勤">通勤経路フォームへ</a>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <div class="step-title">必要書類のLINE送付</div>
+        <p class="step-desc">下記書類の写真を、清翔会公式LINEまでお送りください。</p>
+        <ul class="step-list">
+          <li>身分証明書 (運転免許証または保険証)</li>
+          <li>年金手帳 (基礎年金番号がわかるページ)</li>
+          <li>雇用保険被保険者証 (前職にあった場合)</li>
+          <li>通帳の写真 (給与振込先・銀行名/支店名/口座番号が見えるページ)</li>
+          <li>通勤定期の領収書 (公共交通機関ご利用の方のみ)</li>
+          <li>歯科医師の方 → 歯科医師免許証等の専門資格書類</li>
+        </ul>
+        <a class="step-btn" href="#" target="_blank" rel="noopener" data-action="line">公式LINEを開く</a>
+      </div>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step">
+      <div class="step-num">04</div>
+      <div class="step-body">
+        <div class="step-title">入社書類のご返送</div>
+        <p class="step-desc">入社書類を後日 ご自宅へ郵送いたします。内容をご確認のうえ、同封の返信用封筒にてご返送ください。</p>
+        <div class="step-note">📮 返送先: 同封の宛先ラベルをそのままお使いいただけます。</div>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step">
+      <div class="step-num">05</div>
+      <div class="step-body">
+        <div class="step-title">マイナンバーカードの取得</div>
+        <p class="step-desc">入社後の各種手続きに必須となります。お手元にお持ちでない方は、お早めにお手続きください。</p>
+        <ul class="step-list">
+          <li>マイナンバーカードの取得</li>
+          <li>マイナ保険証への紐づけ (健康保険証として使用)</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+</section>
+
+<!-- 持ち物 -->
+<section class="reveal">
+  <div class="section-label">Items</div>
+  <h2 class="section-title">初日の持ち物</h2>
+  <div class="items-grid">
+    <div class="item-card">
+      <div class="item-icon">✎</div>
+      <div class="item-name">筆記用具</div>
+      <div class="item-desc">メモ帳・ボールペン<br>研修中の記録用に</div>
+    </div>
+    <div class="item-card">
+      <div class="item-icon">⊙</div>
+      <div class="item-name">制服</div>
+      <div class="item-desc">配布済みのものを<br>ご着用ください</div>
+    </div>
+    <div class="item-card">
+      <div class="item-icon">⌖</div>
+      <div class="item-name">印鑑</div>
+      <div class="item-desc">書類確認用<br>(認印で結構です)</div>
+    </div>
+    <div class="item-card">
+      <div class="item-icon">✦</div>
+      <div class="item-name">明るい笑顔</div>
+      <div class="item-desc">これが一番大切<br>です</div>
+    </div>
+  </div>
+</section>
+
+<!-- Closing -->
+<section class="closing reveal">
+  <div class="closing-quote">Thank you</div>
+  <p class="closing-text">
+    新しい一歩を、私たちと共に。<br>
+    あなたの個性と情熱が、清翔会を<br>
+    より良い場所にしてくれると信じています。<br><br>
+    ご不明な点がございましたら、<br>
+    いつでもお気軽にご連絡ください。
+  </p>
+  <div class="signature">
+    <strong>医療法人 清翔会</strong><br>
+    人事 一同
+  </div>
+</section>
+
+<footer>© 清翔会 — Welcome Aboard</footer>
+
+<script>
+  // Reveal on scroll
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.classList.add('visible');
+        io.unobserve(e.target);
+      }
+    });
+  }, { threshold: 0.15 });
+  document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+</script>
+
+</body>
+</html>
