@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v411';
+const APP_VERSION = 'v412';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
