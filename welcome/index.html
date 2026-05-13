@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>Welcome to 清翔会 | ご入社おめでとうございます</title>
+<title>Welcome to 清翔会 | 入社手続きのご案内</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Great+Vibes&family=Noto+Serif+JP:wght@300;400;500;600;700&display=swap">
@@ -19,6 +19,7 @@
     --border: #e5dcc0;
     --text: #2a2620;
     --sub: #6b6357;
+    --line: #15c465;
   }
   html { scroll-behavior: smooth; }
   body {
@@ -129,7 +130,7 @@
   /* ── Section ── */
   section {
     padding: 80px 24px;
-    max-width: 880px;
+    max-width: 900px;
     margin: 0 auto;
   }
   .section-label {
@@ -219,10 +220,10 @@
     color: var(--ink);
   }
   .step-desc {
-    font-size: 13px;
+    font-size: 13.5px;
     line-height: 2;
     color: var(--text);
-    margin-bottom: 16px;
+    margin-bottom: 14px;
     font-weight: 300;
   }
   .step-list {
@@ -249,77 +250,137 @@
     align-items: center;
     gap: 8px;
     margin-top: 14px;
-    padding: 10px 22px;
-    background: var(--ink);
-    color: var(--cream);
+    padding: 12px 26px;
+    background: var(--line);
+    color: #fff;
     text-decoration: none;
     border-radius: 2px;
-    font-size: 12px;
-    letter-spacing: 0.2em;
-    font-weight: 400;
+    font-size: 13px;
+    letter-spacing: 0.15em;
+    font-weight: 500;
     transition: all .3s ease;
-    border: 1px solid var(--ink);
+    border: 1px solid var(--line);
   }
   .step-btn:hover {
-    background: var(--gold);
-    border-color: var(--gold);
-    color: #fff;
+    background: #0fa550;
+    border-color: #0fa550;
     transform: translateX(2px);
+    box-shadow: 0 4px 14px rgba(21, 196, 101, 0.3);
+  }
+  .step-btn.line-btn::before {
+    content: '💬';
+    font-size: 16px;
   }
   .step-btn::after {
     content: '→';
     transition: transform .3s ease;
   }
   .step-btn:hover::after { transform: translateX(2px); }
+  .step-btn.alt {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+  .step-btn.alt:hover {
+    background: var(--gold);
+    border-color: var(--gold);
+  }
   .step-note {
-    margin-top: 12px;
-    padding: 10px 14px;
+    margin-top: 14px;
+    padding: 12px 16px;
     background: var(--paper);
     border-left: 2px solid var(--gold);
     font-size: 12px;
     color: var(--sub);
     line-height: 1.8;
   }
-
-  /* ── Items ── */
-  .items-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 20px;
-    margin-top: 30px;
+  .step-note strong { color: var(--ink); font-weight: 500; }
+  .step-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    background: var(--paper);
+    border-radius: 999px;
+    font-size: 10px;
+    color: var(--sub);
+    letter-spacing: 0.05em;
+    margin-left: 6px;
+    font-weight: 400;
   }
-  .item-card {
-    text-align: center;
-    padding: 30px 20px;
-    background: #fff;
+
+  /* ── Docs Table ── */
+  .docs-table {
+    margin-top: 16px;
     border: 1px solid var(--border);
     border-radius: 4px;
-    transition: transform .4s ease;
+    overflow: hidden;
+    background: #fff;
   }
-  .item-card:hover { transform: translateY(-2px); }
-  .item-icon {
-    font-size: 32px;
-    color: var(--gold);
-    margin-bottom: 14px;
-    line-height: 1;
+  .docs-row {
+    display: grid;
+    grid-template-columns: 40px 1fr 1.2fr;
+    align-items: center;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
   }
-  .item-name {
-    font-size: 14px;
+  .docs-row:last-child { border-bottom: none; }
+  .docs-row.header {
+    background: var(--paper);
     font-weight: 500;
-    letter-spacing: 0.15em;
-    margin-bottom: 6px;
-  }
-  .item-desc {
     font-size: 11px;
+    letter-spacing: 0.1em;
     color: var(--sub);
-    line-height: 1.7;
+  }
+  .docs-row > div {
+    padding: 12px 14px;
+    border-right: 1px solid var(--border);
+  }
+  .docs-row > div:last-child { border-right: none; }
+  .docs-row .docs-num {
+    text-align: center;
+    font-family: 'Cormorant Garamond', serif;
+    color: var(--gold);
+    font-size: 16px;
+    font-weight: 500;
+  }
+  .docs-row .docs-target {
+    font-size: 11.5px;
+    color: var(--sub);
+    line-height: 1.6;
+  }
+
+  /* ── Bank Table ── */
+  .bank-table {
+    margin-top: 16px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+    background: #fff;
+  }
+  .bank-row {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    border-bottom: 1px solid var(--border);
+    font-size: 12.5px;
+  }
+  .bank-row:last-child { border-bottom: none; }
+  .bank-row.header {
+    background: var(--paper);
+    font-weight: 500;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    color: var(--sub);
+  }
+  .bank-row > div { padding: 12px 14px; border-right: 1px solid var(--border); }
+  .bank-row > div:last-child { border-right: none; }
+  .bank-row .bank-name {
+    color: var(--ink);
+    font-weight: 500;
     letter-spacing: 0.05em;
   }
 
   /* ── Closing ── */
   .closing {
     text-align: center;
-    padding: 100px 24px 120px;
+    padding: 100px 24px 80px;
     background: linear-gradient(180deg, var(--paper) 0%, var(--cream) 100%);
   }
   .closing-quote {
@@ -337,8 +398,13 @@
     margin: 0 auto;
     letter-spacing: 0.1em;
   }
+  .closing-line {
+    width: 50px;
+    height: 1px;
+    background: var(--gold);
+    margin: 36px auto;
+  }
   .signature {
-    margin-top: 50px;
     font-size: 12px;
     color: var(--sub);
     letter-spacing: 0.3em;
@@ -377,6 +443,11 @@
     section { padding: 60px 18px; }
     .step { padding: 22px 18px; gap: 16px; flex-direction: column; }
     .step-num { width: 56px; height: 56px; font-size: 20px; }
+    .docs-row { grid-template-columns: 32px 1fr 1.2fr; font-size: 11.5px; }
+    .docs-row > div { padding: 10px 8px; }
+    .bank-row { grid-template-columns: 1fr; }
+    .bank-row.header { display: none; }
+    .bank-row > div:first-child { border-bottom: 1px dashed var(--border); border-right: none; font-weight: 600; }
   }
 </style>
 </head>
@@ -396,30 +467,31 @@
   <div class="section-label">Message</div>
   <h2 class="section-title">はじめに</h2>
   <div class="message">
-    数ある選択肢の中から、清翔会を選んでいただき<br>
-    <strong>本当にありがとうございます</strong><br><br>
-    あなたを迎えられること、私たち一同 心より楽しみにしております。<br>
-    一緒に「歯科の新しいスタンダード」を作っていきましょう。<br><br>
-    このページでは、入社までに必要な手続きを<br>
-    順を追ってご案内しています。<br>
-    分からないことがあれば、いつでもお気軽にご連絡ください。
+    ご入社、誠におめでとうございます。<br>
+    数ある選択肢の中から、<strong>清翔会</strong>を選んでくださり<br>
+    本当にありがとうございます。<br><br>
+    このページでは、入社までに必要なお手続きを<br>
+    5つのステップでご案内しております。<br>
+    すべて<strong>ピノキオ社労システム</strong> (公式LINE) より<br>
+    お手続きいただけます。<br><br>
+    ご不明な点がございましたら、<br>
+    お気軽にピノキオまでお問い合わせください。
   </div>
 </section>
 
 <!-- ステップ -->
 <section class="reveal">
   <div class="section-label">Onboarding</div>
-  <h2 class="section-title">入社までの流れ</h2>
+  <h2 class="section-title">入社までの 5 ステップ</h2>
   <div class="steps">
 
     <!-- STEP 1 -->
     <div class="step">
       <div class="step-num">01</div>
       <div class="step-body">
-        <div class="step-title">入社フォームのご記入</div>
-        <p class="step-desc">基本情報・連絡先・銀行口座等を専用フォームよりご登録ください。所要時間およそ10分。</p>
-        <a class="step-btn" href="#" target="_blank" rel="noopener" data-action="form-入社">入社フォームへ</a>
-        <div class="step-note">※ お手元に <strong>身分証明書 / 銀行口座 / マイナンバー</strong> をご用意ください。</div>
+        <div class="step-title">ピノキオ LINE 公式アカウントを友だち追加</div>
+        <p class="step-desc">下記のリンクまたは QR コードから、ピノキオ公式LINEを友だち登録してください。すべての入社手続きはこちらから進みます。</p>
+        <a class="step-btn line-btn" href="https://lin.ee/m9cRa0b" target="_blank" rel="noopener">公式LINEを友だち追加</a>
       </div>
     </div>
 
@@ -427,14 +499,16 @@
     <div class="step">
       <div class="step-num">02</div>
       <div class="step-body">
-        <div class="step-title">通勤経路のご登録</div>
-        <p class="step-desc">通勤手当 算定のため、通勤手段とルートをご登録ください。</p>
+        <div class="step-title">トーク画面に基本情報を送信</div>
+        <p class="step-desc">ピノキオのトーク画面に、下記の情報をご送信ください。</p>
         <ul class="step-list">
-          <li>公共交通機関 → 月額定期代をご記入</li>
-          <li>車・バイク通勤 → 片道距離(km)をご記入 (支給額表をご参照)</li>
-          <li>複数医院勤務 → 別途「通勤申請書」をご記入</li>
+          <li>名前 (漢字)</li>
+          <li>名前 (ふりがな)</li>
+          <li>職種 (Dr / DH / DA / 事務)</li>
+          <li>所属医院</li>
+          <li>電話番号</li>
         </ul>
-        <a class="step-btn" href="#" target="_blank" rel="noopener" data-action="form-通勤">通勤経路フォームへ</a>
+        <div class="step-note">※ ドクターや所属が決まっていない方は、<strong>所属医院欄は空白で構いません</strong>。</div>
       </div>
     </div>
 
@@ -442,17 +516,13 @@
     <div class="step">
       <div class="step-num">03</div>
       <div class="step-body">
-        <div class="step-title">必要書類のLINE送付</div>
-        <p class="step-desc">下記書類の写真を、清翔会公式LINEまでお送りください。</p>
+        <div class="step-title">メニュー「入社が決まった方」から各種フォームを入力</div>
+        <p class="step-desc">LINE メニュー下部の <strong>「入社が決まった方」</strong> をタップし、下記2つのフォームをご入力ください。</p>
         <ul class="step-list">
-          <li>身分証明書 (運転免許証または保険証)</li>
-          <li>年金手帳 (基礎年金番号がわかるページ)</li>
-          <li>雇用保険被保険者証 (前職にあった場合)</li>
-          <li>通帳の写真 (給与振込先・銀行名/支店名/口座番号が見えるページ)</li>
-          <li>通勤定期の領収書 (公共交通機関ご利用の方のみ)</li>
-          <li>歯科医師の方 → 歯科医師免許証等の専門資格書類</li>
+          <li><strong>入社フォーム</strong> (2026年入社の方はこちら)</li>
+          <li><strong>通勤経路フォーム</strong></li>
         </ul>
-        <a class="step-btn" href="#" target="_blank" rel="noopener" data-action="line">公式LINEを開く</a>
+        <div class="step-note">※ <strong>歯科医師の方</strong>: 通勤経路は <strong>名古屋駅まで</strong> をご入力ください。名古屋駅以外の医院への通勤経路は、別途「通勤申請書」を入社書類と一緒にお送りいたします。</div>
       </div>
     </div>
 
@@ -460,9 +530,53 @@
     <div class="step">
       <div class="step-num">04</div>
       <div class="step-body">
-        <div class="step-title">入社書類のご返送</div>
-        <p class="step-desc">入社書類を後日 ご自宅へ郵送いたします。内容をご確認のうえ、同封の返信用封筒にてご返送ください。</p>
-        <div class="step-note">📮 返送先: 同封の宛先ラベルをそのままお使いいただけます。</div>
+        <div class="step-title">必要書類の写真を LINE で送付</div>
+        <p class="step-desc">下記の書類を写真に撮り、ピノキオ LINE のトーク画面へ送信してください。</p>
+
+        <div class="docs-table">
+          <div class="docs-row header">
+            <div>#</div>
+            <div>書類名</div>
+            <div>対象者・備考</div>
+          </div>
+          <div class="docs-row">
+            <div class="docs-num">①</div>
+            <div>身分証明書</div>
+            <div class="docs-target">マイナンバーカード以外</div>
+          </div>
+          <div class="docs-row">
+            <div class="docs-num">②</div>
+            <div>年金手帳<br><span style="font-size:10px;color:var(--sub)">(基礎年金番号 記載ページ)</span><br>または 基礎年金番号通知書</div>
+            <div class="docs-target">全員</div>
+          </div>
+          <div class="docs-row">
+            <div class="docs-num">③</div>
+            <div>雇用保険被保険者証<br><span style="font-size:10px;color:var(--sub)">※被保険者番号は11桁(4桁-6桁-1桁)</span></div>
+            <div class="docs-target">お持ちの方</div>
+          </div>
+          <div class="docs-row">
+            <div class="docs-num">④</div>
+            <div>通帳の見開きページ</div>
+            <div class="docs-target">STEP 5 で開設後</div>
+          </div>
+          <div class="docs-row">
+            <div class="docs-num">⑤</div>
+            <div>通勤定期の領収書 と 購入した定期券の写真</div>
+            <div class="docs-target">歯科医師以外で公共交通機関 通勤の方</div>
+          </div>
+          <div class="docs-row">
+            <div class="docs-num">⑥</div>
+            <div>歯科医師免許証 / 歯科医師臨床研修修了登録証 / 保険医登録票</div>
+            <div class="docs-target">歯科医師の方</div>
+          </div>
+          <div class="docs-row">
+            <div class="docs-num">⑦</div>
+            <div>歯科衛生士免許証</div>
+            <div class="docs-target">歯科衛生士の方</div>
+          </div>
+        </div>
+
+        <div class="step-note">※ パート・アルバイトで出勤頻度が少なく、定期代の方が高くなる方は <strong>⑤は不要</strong> です。</div>
       </div>
     </div>
 
@@ -470,43 +584,41 @@
     <div class="step">
       <div class="step-num">05</div>
       <div class="step-body">
-        <div class="step-title">マイナンバーカードの取得</div>
-        <p class="step-desc">入社後の各種手続きに必須となります。お手元にお持ちでない方は、お早めにお手続きください。</p>
+        <div class="step-title">銀行口座の開設</div>
+        <p class="step-desc">所属医院により、開設する銀行が異なります。下記の表をご確認のうえ口座開設をお願いいたします。</p>
+
+        <div class="bank-table">
+          <div class="bank-row header">
+            <div>医院</div>
+            <div>開設先銀行</div>
+          </div>
+          <div class="bank-row">
+            <div class="bank-name">エスカ / アール / ウィズ / ルミナス / 茶屋 / 知立 / 小牧 / 八事 / アサノ / 中日</div>
+            <div>岐阜信用金庫 名古屋支店</div>
+          </div>
+          <div class="bank-row">
+            <div class="bank-name">大森 / 銀座 / 京都河原町</div>
+            <div>ゆうちょ銀行</div>
+          </div>
+          <div class="bank-row">
+            <div class="bank-name">岩田</div>
+            <div>どちらの口座でも可</div>
+          </div>
+        </div>
+
+        <p class="step-desc" style="margin-top:14px">口座開設の方法は、LINE 内のリンクをご参照ください。</p>
         <ul class="step-list">
-          <li>マイナンバーカードの取得</li>
-          <li>マイナ保険証への紐づけ (健康保険証として使用)</li>
+          <li>岐阜信 スマートフォン口座開設の仕方</li>
+          <li>ゆうちょ スマートフォン口座開設の仕方</li>
         </ul>
+
+        <div class="step-note">
+          ※ 勤務先名入力欄は、<strong>所属医院名</strong> をご入力ください。所属不明時や医院名が入りきらない場合は <strong>「医療法人清翔会」</strong> とご入力ください。<br>
+          ※ 入社翌月の <strong>10日まで</strong> に口座開設・通帳写真の送付をいただければ問題ございません。
+        </div>
       </div>
     </div>
 
-  </div>
-</section>
-
-<!-- 持ち物 -->
-<section class="reveal">
-  <div class="section-label">Items</div>
-  <h2 class="section-title">初日の持ち物</h2>
-  <div class="items-grid">
-    <div class="item-card">
-      <div class="item-icon">✎</div>
-      <div class="item-name">筆記用具</div>
-      <div class="item-desc">メモ帳・ボールペン<br>研修中の記録用に</div>
-    </div>
-    <div class="item-card">
-      <div class="item-icon">⊙</div>
-      <div class="item-name">制服</div>
-      <div class="item-desc">配布済みのものを<br>ご着用ください</div>
-    </div>
-    <div class="item-card">
-      <div class="item-icon">⌖</div>
-      <div class="item-name">印鑑</div>
-      <div class="item-desc">書類確認用<br>(認印で結構です)</div>
-    </div>
-    <div class="item-card">
-      <div class="item-icon">✦</div>
-      <div class="item-name">明るい笑顔</div>
-      <div class="item-desc">これが一番大切<br>です</div>
-    </div>
   </div>
 </section>
 
@@ -518,11 +630,13 @@
     あなたの個性と情熱が、清翔会を<br>
     より良い場所にしてくれると信じています。<br><br>
     ご不明な点がございましたら、<br>
-    いつでもお気軽にご連絡ください。
+    いつでも <strong>ピノキオ</strong> までお気軽にご連絡ください。
   </p>
+  <a class="step-btn line-btn" href="https://lin.ee/m9cRa0b" target="_blank" rel="noopener" style="margin-top:30px">ピノキオに問い合わせる</a>
+  <div class="closing-line"></div>
   <div class="signature">
     <strong>医療法人 清翔会</strong><br>
-    人事 一同
+    ピノキオ社労システム
   </div>
 </section>
 
