@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v413';
+const APP_VERSION = 'v414';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -21,7 +21,8 @@ const STATUS_PILL_CLASS = {
   'キャンセル': 'status-pill-red',
 };
 const statusPillClass = (s) => STATUS_PILL_CLASS[s || ''] || 'status-pill-mut';
-const statusPillLabel = (s) => s === '予約連絡待ち' ? '次回予約連絡待ち' : (s || '未設定');
+// v414: 除外は実質「削除(リストから外す)」なので UI 上は明示
+const statusPillLabel = (s) => s === '予約連絡待ち' ? '次回予約連絡待ち' : (s === '除外' ? '🗑 除外(削除)' : (s || '未設定'));
 const statusPillHtml = (s) => `<span class="status-pill ${statusPillClass(s)}">${escapeHtml(statusPillLabel(s))}</span>`;
 // 治療別ステータス (BF/矯正/インプラント等の lifecycle 含む) では status が標準9種に
 // 該当しないことがある。その場合は構造クラス .status-pill だけ付与し、色は inline 指定。
@@ -2232,10 +2233,34 @@ function setupEventListeners() {
     document.getElementById('ps-result-count').textContent = '';
   });
   document.getElementById('np-save').addEventListener('click', registerNewPatient);
-  // Enter key for search
+  // v414: 患者検索をライブ検索化 (input debounce + IMEガード)
+  // 旧実装: Enterキー or 検索ボタンクリックのみ → ユーザー体感「2文字くらいしか打てない」(検索結果が更新されないので入力が効いていないように見える)
+  let _psSearchTimer;
+  let _psIsComposing = false;
   ['ps-name','ps-phone','ps-email'].forEach(id => {
-    document.getElementById(id).addEventListener('keydown', e => { if (e.key === 'Enter') searchPatients(); });
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener('compositionstart', () => { _psIsComposing = true; });
+    el.addEventListener('compositionend', () => {
+      _psIsComposing = false;
+      clearTimeout(_psSearchTimer);
+      _psSearchTimer = setTimeout(searchPatients, 250);
+    });
+    el.addEventListener('input', () => {
+      if (_psIsComposing) return; // IME変換中は検索しない (途中でEnter押下しても誤発火しない)
+      clearTimeout(_psSearchTimer);
+      _psSearchTimer = setTimeout(searchPatients, 250);
+    });
+    el.addEventListener('keydown', e => {
+      // IME変換確定のEnterは無視 (isComposing=true / keyCode=229)
+      if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+        e.preventDefault();
+        clearTimeout(_psSearchTimer);
+        searchPatients();
+      }
+    });
   });
+  document.getElementById('ps-facility')?.addEventListener('change', searchPatients);
 
   // BF booking list filters
   let _bfAllData = [];
@@ -7611,7 +7636,7 @@ function renderBookings() {
       ` : ''}
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
       ${isImplantBooking(d) ? `<option ${d.status==='お断り'?'selected':''}>お断り</option>` : ''}
-      <option ${d.status==='除外'?'selected':''}>除外</option>
+      <option value="除外" ${d.status==='除外'?'selected':''}>🗑 除外(削除)</option>
     </select>`) : statusBadge(isBFBooking(d) ? (getBFInfo(d.name, d.applyDate)?.bf_status || d.status) : d.status)}</td>
     <td style="text-align:center">${(() => {
       const key = d.name + '|' + d.applyDate;
@@ -8717,10 +8742,20 @@ function searchPatients() {
 
   document.getElementById('ps-result-count').textContent = results.length + '件';
 
-  const statusBadge = (s) => !s||s==='未対応' ? '<span class="badge badge-default">未対応</span>' : s==='キャンセル' ? '<span class="badge badge-danger">キャンセル</span>' : s==='来院済' ? '<span class="badge badge-warning">来院済</span>' : s==='成約' ? '<span class="badge badge-success">成約</span>' : s==='除外' ? '<span class="badge badge-default" style="opacity:0.5">除外</span>' : `<span class="badge badge-default">${s}</span>`;
+  // v414: ステータス select (除外/削除を含む) と memo セルを編集可能に
+  const PS_STATUS_OPTS = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','来院済','検討中','成約','キャンセル','除外'];
+  const statusStyle = (s) => s==='来院済'?'background:#dbeafe;color:#1d4ed8':s==='成約'?'background:#dcfce7;color:#15803d':s==='キャンセル'?'background:#fee2e2;color:#b91c1c':s==='確認済'?'background:#f3e8ff;color:#7c3aed':s==='予約連絡待ち'?'background:#f5f3ff;color:#7c3aed':s==='後追いLINE済み'?'background:#ecfeff;color:#0891b2':s==='予約変更'?'background:#fef3c7;color:#b45309':s==='除外'?'background:#f5f5f5;color:#9ca3af':'';
+  const statusLabel = (s) => s === '予約連絡待ち' ? '次回予約連絡待ち' : (s === '除外' ? '🗑 除外(削除)' : s);
 
   const sorted = [...results].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
-  document.getElementById('ps-tbody').innerHTML = sorted.slice(0, 100).map(d => `<tr>
+  document.getElementById('ps-tbody').innerHTML = sorted.slice(0, 100).map(d => {
+    const cur = d.status || '';
+    const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+    const memoShort = memo ? (typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 30) : memo.slice(0, 30)) : '';
+    const memoStyle = memo
+      ? 'background:#fff8e1;border:1px dashed #f9a825;color:#92400e'
+      : 'background:transparent;border:1px dashed var(--border);color:var(--text-muted)';
+    return `<tr data-ps-name="${escapeHtml(d.name||'')}" data-ps-apply="${escapeHtml(d.applyDate||'')}" ${cur==='除外'?'style="opacity:0.45"':''}>
     <td style="font-size:10px">${d.applyDate ? d.applyDate.match(/(\d{1,2})\D+(\d{1,2})/) ? RegExp.$1+'/'+RegExp.$2 : d.applyDate.slice(5) : '-'}</td>
     <td style="font-size:10px">${fmtBookDate(d.bookDate)}</td>
     <td style="font-size:11px;font-weight:500">${maskName(d.name)}</td>
@@ -8728,10 +8763,63 @@ function searchPatients() {
     <td style="font-size:10px">${normFac(d.facility)}</td>
     <td style="font-size:10px">${maskPhone(d.phone) || '-'}</td>
     <td style="font-size:10px;max-width:120px;overflow:hidden;text-overflow:ellipsis">${maskEmail(d.email) || '-'}</td>
-    <td style="font-size:9px;color:var(--text-sub)">${(d.source||'-').slice(0,15)}</td>
-    <td>${statusBadge(d.status)}</td>
+    <td style="font-size:9px;color:var(--text-sub)">${escapeHtml((d.source||'-').slice(0,15))}</td>
+    <td><select class="ps-status-sel" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="font-size:10px;padding:2px 4px;min-width:90px;border:1px solid var(--border);border-radius:4px;cursor:pointer;${statusStyle(cur)}">
+      <option value="">未設定</option>
+      ${PS_STATUS_OPTS.map(s => `<option value="${s}" ${cur===s?'selected':''}>${statusLabel(s)}</option>`).join('')}
+    </select></td>
+    <td class="ps-memo-cell" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="${escapeHtml(memo)}" style="cursor:pointer;padding:3px 6px;font-size:10px;text-align:left;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;${memoStyle}">${memo ? escapeHtml(memoShort) : '<span style="font-size:10px">+ メモ</span>'}</td>
     <td style="font-size:9px"><span class="badge ${d.tool==='手動'?'badge-warning':'badge-default'}" style="font-size:8px">${d.tool||'DX'}</span></td>
-  </tr>`).join('') || '<tr><td colspan="10" style="text-align:center;color:var(--text-muted)">該当なし</td></tr>';
+  </tr>`;
+  }).join('') || '<tr><td colspan="11" style="text-align:center;color:var(--text-muted)">該当なし</td></tr>';
+
+  // 編集ハンドラ: ステータス変更
+  document.querySelectorAll('#ps-tbody .ps-status-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const name = sel.dataset.name;
+      const apply = sel.dataset.apply;
+      const newStatus = sel.value || '';
+      const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
+      if ((newStatus === 'キャンセル' || newStatus === '除外') && !confirm(`${name} を「${newStatus === '除外' ? '🗑 除外(削除)' : newStatus}」に変更しますか?`)) {
+        sel.value = match ? (match.status || '') : '';
+        return;
+      }
+      try {
+        const payload = { name, apply_date: apply, status: newStatus };
+        if (typeof STATUS_TO_BF !== 'undefined' && newStatus) {
+          const targetBF = STATUS_TO_BF[newStatus] !== undefined ? STATUS_TO_BF[newStatus] : newStatus;
+          payload.bf_status = targetBF;
+          const key = name + '|' + apply;
+          if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
+          bfLifecycleCache[key].bf_status = targetBF;
+        }
+        await safeSave({ type:'upsert', table:'booking_status', payload, options:{ onConflict:'name,apply_date' } });
+        if (match) match.status = newStatus;
+        // bk-extra にも反映 (予約一覧との整合)
+        const bkEx = loadData('bk-extra', {});
+        const key = name + '|' + apply;
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].editedStatus = newStatus;
+        saveData('bk-extra', bkEx);
+        sel.style.outline = '2px solid #16a34a';
+        setTimeout(() => { sel.style.outline = ''; searchPatients(); }, 400);
+        if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+        showToast(`✓ ${name} を「${newStatus || '未設定'}」に変更`);
+      } catch (e) {
+        console.warn('ps-status save failed', e);
+        showToast('状態の保存に失敗', true);
+      }
+    });
+  });
+
+  // 編集ハンドラ: メモクリックでモーダル
+  document.querySelectorAll('#ps-tbody .ps-memo-cell').forEach(cell => {
+    cell.addEventListener('click', () => {
+      if (typeof openMemoModal === 'function') {
+        openMemoModal(cell.dataset.name, cell.dataset.apply, cell);
+      }
+    });
+  });
 }
 
 async function registerNewPatient() {
@@ -9013,7 +9101,8 @@ const BF_STATUSES = [
   { value: 'セット日確定待ち', color: '#0891b2' },
   { value: 'セット待ち', color: '#0e7490' },
   { value: 'セット完了', color: '#059669' },
-  { value: 'キャンセル', color: '#dc2626' }
+  { value: 'キャンセル', color: '#dc2626' },
+  { value: '除外', color: '#6b7280' } // v414: 重複・削除用
 ];
 let bfLifecycleCache = {}; // key: name|applyDate → {bf_status, bf_next_date, ...}
 let bfHistoryCache = {}; // key: name|applyDate → [events]
@@ -9651,7 +9740,8 @@ const TREATMENT_STATUSES = {
     { value: '治療中', color: '#1d4ed8' },
     { value: '保定', color: '#0891b2' },
     { value: '完了', color: '#059669' },
-    { value: 'キャンセル', color: '#dc2626' }
+    { value: 'キャンセル', color: '#dc2626' },
+    { value: '除外', color: '#6b7280' } // v414: 重複・削除用
   ],
   'インプラント': [
     { value: '未対応', color: '#9ca3af' },
@@ -9683,7 +9773,8 @@ const TREATMENT_STATUSES = {
     { value: '成約', color: '#10b981' },
     { value: '治療中', color: '#1d4ed8' },
     { value: '完了', color: '#059669' },
-    { value: 'キャンセル', color: '#dc2626' }
+    { value: 'キャンセル', color: '#dc2626' },
+    { value: '除外', color: '#6b7280' } // v414: 重複・削除用
   ]
 };
 function getStatusesForTreatment(treatment) {
@@ -9971,7 +10062,8 @@ async function renderKaiinAll(containerId) {
                 const st = (_bfInfo && _bfInfo.bf_status && _BF_LIFECYCLE_ONLY.has(_bfInfo.bf_status))
                   ? _bfInfo.bf_status
                   : (d.status || '');
-                const stOptions = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル'];
+                // v414: 除外 (重複・削除扱い) を追加
+                const stOptions = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル','除外'];
                 const stBadge = `<select class="kaiin-all-status-sel status-pill ${statusPillClass(st)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:10px;width:100%;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
                   <option value="">未設定</option>
                   ${stOptions.map(s => { const lbl = statusPillLabel(s); return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
@@ -10931,7 +11023,7 @@ function drawKaiinRows(treatment, rows, container) {
       </select></td>
       <td><select class="kaiin-status-sel ${stPill.c}" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:10px;width:100%;${stPill.s ? stPill.s + ';' : ''}background-image:url('data:image/svg+xml;utf8,<svg xmlns=&quot;http://www.w3.org/2000/svg&quot; viewBox=&quot;0 0 24 24&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;2&quot;><path d=&quot;M6 9l6 6 6-6&quot;/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
         <option value="">未設定</option>
-        ${statuses.map(s => { const lbl = s.value === '予約連絡待ち' ? '次回予約連絡待ち' : s.value; return `<option value="${esc(s.value)}" ${st===s.value?'selected':''}>${esc(lbl)}</option>`; }).join('')}
+        ${statuses.map(s => { const lbl = s.value === '予約連絡待ち' ? '次回予約連絡待ち' : (s.value === '除外' ? '🗑 除外(削除)' : s.value); return `<option value="${esc(s.value)}" ${st===s.value?'selected':''}>${esc(lbl)}</option>`; }).join('')}
       </select></td>
       <td style="position:relative"><button type="button" class="kaiin-next-date-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${nextDate}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;cursor:pointer;${nextDateStyle}">${nextDate?nextDate.substring(5).replace('-','/'):'年/月/日'}</button><input type="date" class="kaiin-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${nextDate}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"></td>
       ${treatment === 'BF' ? `<td><select class="kaiin-setfac-sel kaiin-plain-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:none;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center;color:${setFac?'var(--text)':'var(--text-muted)'}">
