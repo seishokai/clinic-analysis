@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v416';
+const APP_VERSION = 'v417';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9802,6 +9802,9 @@ let _kaiinAllPeriodState = {
   status: new Set(),
   contract: new Set(),
   viewMode: 'all', // 'all' | 'treatment' | 'facility'
+  // v416: 売上関連 (sortBy: '' | 'sales-desc' | 'sales-asc' | 'book-desc' | 'book-asc')
+  hasSalesOnly: false,
+  sortBy: '',
   dashboardOpen: (() => { try { return sessionStorage.getItem('kaiin-all-dashboard') === '1'; } catch(_) { return false; } })(),
   filterOpen: (() => { try { return sessionStorage.getItem('kaiin-all-filter') === '1'; } catch(_) { return false; } })(),
 };
@@ -9878,6 +9881,8 @@ async function renderKaiinAll(containerId) {
     const ex = _bkExtra[d.name + '|' + d.applyDate] || {};
     return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
   };
+  // v416: 売上ありフィルタ
+  if (state.hasSalesOnly) allRows = allRows.filter(d => _amt(d) > 0);
   // v416: 「実成約」は累計成約 (status=成約 = BF/インプラント治療進行中の人も含む)
   // 「見込み」は来院済だがまだ成約していない (検討中/後追いLINE済み/予約変更/予約連絡待ち)
   const _is実成約 = (d) => d.status === '成約';
@@ -9991,6 +9996,15 @@ async function renderKaiinAll(containerId) {
           <option value="book" ${basis==='book'?'selected':''}>来院日</option>
           <option value="apply" ${basis==='apply'?'selected':''}>登録日</option>
         </select>
+        <!-- v416: 売上ありフィルタ + 売上順ソート -->
+        <button id="kaiin-all-has-sales" class="filter-btn ${state.hasSalesOnly?'is-active':''}" title="売上が入力されている人のみ表示">💰 売上あり</button>
+        <select id="kaiin-all-sort" class="filter-select" title="並び順" style="font-size:11px;padding:3px 6px">
+          <option value="" ${!state.sortBy?'selected':''}>並び:来院日(新→古)</option>
+          <option value="book-asc" ${state.sortBy==='book-asc'?'selected':''}>来院日(古→新)</option>
+          <option value="sales-desc" ${state.sortBy==='sales-desc'?'selected':''}>💰 売上(高→低)</option>
+          <option value="sales-asc" ${state.sortBy==='sales-asc'?'selected':''}>💰 売上(低→高)</option>
+          <option value="name" ${state.sortBy==='name'?'selected':''}>名前順</option>
+        </select>
         <span style="flex:1"></span>
         <button id="kaiin-all-reset" class="filter-btn" title="全フィルタをクリア">🔄 リセット</button>
       </div>
@@ -10022,9 +10036,23 @@ async function renderKaiinAll(containerId) {
             ${allRows
               .slice()
               .sort((a,b) => {
+                // v416: ソートモード切替 ('' = 来院日新→古 / book-asc / sales-desc / sales-asc / name)
+                const sortMode = state.sortBy || '';
+                if (sortMode === 'sales-desc' || sortMode === 'sales-asc') {
+                  const av = _amt(a);
+                  const bv = _amt(b);
+                  if (av !== bv) return sortMode === 'sales-desc' ? bv - av : av - bv;
+                  // 同額なら来院日 新→古
+                  const ad2 = parseDate(a.bookDate)?.getTime() || 0;
+                  const bd2 = parseDate(b.bookDate)?.getTime() || 0;
+                  return bd2 - ad2;
+                }
+                if (sortMode === 'name') {
+                  return (a.name || '').localeCompare(b.name || '', 'ja');
+                }
                 const ad = parseDate(a.bookDate)?.getTime() || 0;
                 const bd = parseDate(b.bookDate)?.getTime() || 0;
-                return bd - ad;
+                return sortMode === 'book-asc' ? ad - bd : bd - ad;
               })
               .map(d => {
                 const cat = getTreatmentCategory(d) || '-';
@@ -10176,6 +10204,16 @@ async function renderKaiinAll(containerId) {
     renderKaiinAll(containerId);
   });
 
+  // === v416: 売上ありフィルタ + 売上順ソート ===
+  el.querySelector('#kaiin-all-has-sales')?.addEventListener('click', () => {
+    _kaiinAllPeriodState.hasSalesOnly = !_kaiinAllPeriodState.hasSalesOnly;
+    renderKaiinAll(containerId);
+  });
+  el.querySelector('#kaiin-all-sort')?.addEventListener('change', (e) => {
+    _kaiinAllPeriodState.sortBy = e.target.value || '';
+    renderKaiinAll(containerId);
+  });
+
   // === viewMode タブ (全治療/治療別/医院別) ===
   el.querySelectorAll('.kaiin-all-view-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -10256,6 +10294,9 @@ async function renderKaiinAll(containerId) {
     _kaiinAllPeriodState.service.clear();
     _kaiinAllPeriodState.status.clear();
     _kaiinAllPeriodState.contract.clear();
+    // v416: 売上関連もリセット
+    _kaiinAllPeriodState.hasSalesOnly = false;
+    _kaiinAllPeriodState.sortBy = '';
     renderKaiinAll(containerId);
   });
 
