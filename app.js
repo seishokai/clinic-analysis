@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v417';
+const APP_VERSION = 'v418';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9920,23 +9920,32 @@ async function renderKaiinAll(containerId) {
                     : state.viewMode === 'treatment' ? catCards
                     : '';
   // === 全体統計 (v368: BFタブと同じ8カード方式) ===
+  // v417: 予約管理と同じ _effSt (BF aware) で判定 → 両タブの数字が一致
+  // 例外: 実成約 (contracted) のみ d.status の broad 判定 (BF治療進行中も累計成約に算入)
+  const _effSt2 = (d) => {
+    if (typeof isBFBooking === 'function' && isBFBooking(d)) {
+      const bfst = (getBFInfo(d.name, d.applyDate) || {}).bf_status;
+      return bfst || d.status || '';
+    }
+    return d.status || '';
+  };
   const _today2 = new Date(); _today2.setHours(0,0,0,0);
-  const isUnhandled2 = (d) => !d.status || d.status === '未対応';
+  const isUnhandled2 = (d) => { const e = _effSt2(d); return !e || e === '未対応'; };
   const isPast2 = (d) => { const bd = parseDate(d.bookDate); return bd && bd < _today2; };
   const isFuture2 = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= _today2; };
   const totalCount = allRows.length;
-  const visited = allRows.filter(d => isVisitedStatus(d.status || '')).length;
-  // v416: 実成約 = 累計 (status=成約、BF治療進行中も含む)
+  const visited = allRows.filter(d => isVisitedStatus(_effSt2(d))).length;
+  // v416: 実成約 = 累計 (status=成約、BF治療進行中も含む) ← broad 維持
   const contracted = allRows.filter(_is実成約).length;
   // v416: 見込み = 来院済だが未成約 (検討中/後追いLINE済み/予約変更/予約連絡待ち)
   const prospective = allRows.filter(_is見込み).length;
-  const formalCancelled = allRows.filter(d => d.status === 'キャンセル').length;
-  const noShow = allRows.filter(d => d.status !== 'キャンセル' && !isVisitedStatus(d.status || '') && isPast2(d)).length;
+  const formalCancelled = allRows.filter(d => _effSt2(d) === 'キャンセル').length;
+  const noShow = allRows.filter(d => { const e = _effSt2(d); return e !== 'キャンセル' && !isVisitedStatus(e) && isPast2(d); }).length;
   const cancelled = formalCancelled + noShow;
   const overdue = allRows.filter(d => isUnhandled2(d) && isPast2(d)).length;
   const pending = allRows.filter(d => isUnhandled2(d) && isFuture2(d)).length;
   const inProgress = allRows.filter(d => {
-    const s = d.status || '';
+    const s = _effSt2(d);
     if (isUnhandled2(d)) return false;
     if (s === 'キャンセル') return false;
     if (isVisitedStatus(s)) return false;
@@ -9944,7 +9953,7 @@ async function renderKaiinAll(containerId) {
   }).length;
   const totalAmt = allRows.reduce((s, d) => s + _amt(d), 0);
   const pastBookings = allRows.filter(isPast2);
-  const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status || '')).length;
+  const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
   const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
   const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
 
@@ -10623,25 +10632,33 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   // v416: 実成約 = 累計成約 (broad) / 見込み = 来院済だが未成約
   const _is実成約 = (d) => d.status === '成約';
   const _is見込み = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
+  // v417: 予約管理と数字を一致させるため _effSt (BF aware) で判定
+  const _effSt2 = (d) => {
+    if (typeof isBFBooking === 'function' && isBFBooking(d)) {
+      const bfst = (getBFInfo(d.name, d.applyDate) || {}).bf_status;
+      return bfst || d.status || '';
+    }
+    return d.status || '';
+  };
   const _summaryFor = (rs) => {
     const today = new Date(); today.setHours(0,0,0,0);
     const total = rs.length;
-    const visited = rs.filter(d => isVisitedStatus(d.status || '')).length;
+    const visited = rs.filter(d => isVisitedStatus(_effSt2(d))).length;
     const contracted = rs.filter(_is実成約).length;
     const prospective = rs.filter(_is見込み).length;
-    const formalCancelled = rs.filter(d => d.status === 'キャンセル').length;
-    const isUnhandled = (d) => !d.status || d.status === '未対応';
+    const formalCancelled = rs.filter(d => _effSt2(d) === 'キャンセル').length;
+    const isUnhandled = (d) => { const e = _effSt2(d); return !e || e === '未対応'; };
     const isPast = (d) => { const bd = parseDate(d.bookDate); return bd && bd < today; };
     const isFuture = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= today; };
     const noShow = rs.filter(d => {
-      const s = d.status || '';
+      const s = _effSt2(d);
       return s !== 'キャンセル' && !isVisitedStatus(s) && isPast(d);
     }).length;
     const cancelled = formalCancelled + noShow;
     const overdue = rs.filter(d => isUnhandled(d) && isPast(d)).length;
     const pending = rs.filter(d => isUnhandled(d) && isFuture(d)).length;
     const inProgress = rs.filter(d => {
-      const s = d.status || '';
+      const s = _effSt2(d);
       if (isUnhandled(d)) return false;
       if (s === 'キャンセル') return false;
       if (isVisitedStatus(s)) return false;
@@ -10649,7 +10666,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     }).length;
     const totalAmt = rs.reduce((s, d) => s + _amtSL(d), 0);
     const pastBookings = rs.filter(d => isPast(d));
-    const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status || '')).length;
+    const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
     const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
     const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
     return { total, overdue, pending, inProgress, cancelled, formalCancelled, noShow, visited, pastVisited, pastBookings, contracted, prospective, totalAmt, visitRate, contractRate };
@@ -10965,23 +10982,31 @@ function drawKaiinRows(treatment, rows, container) {
         return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
       };
       const today = new Date(); today.setHours(0,0,0,0);
-      const isUnhandled = (d) => !d.status || d.status === '未対応';
+      // v417: _effSt (BF aware) で判定 → 予約管理と一致
+      const _effStDR = (d) => {
+        if (typeof isBFBooking === 'function' && isBFBooking(d)) {
+          const bfst = (getBFInfo(d.name, d.applyDate) || {}).bf_status;
+          return bfst || d.status || '';
+        }
+        return d.status || '';
+      };
+      const isUnhandled = (d) => { const e = _effStDR(d); return !e || e === '未対応'; };
       const isPast = (d) => { const bd = parseDate(d.bookDate); return bd && bd < today; };
       const isFuture = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= today; };
       // v416: 実成約 = broad (status=成約) / 見込み = 検討中等
       const _is実成約DR = (d) => d.status === '成約';
       const _is見込みDR = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
       const total = filtered.length;
-      const visited = filtered.filter(d => isVisitedStatus(d.status || '')).length;
+      const visited = filtered.filter(d => isVisitedStatus(_effStDR(d))).length;
       const contracted = filtered.filter(_is実成約DR).length;
       const prospective = filtered.filter(_is見込みDR).length;
-      const formalCancelled = filtered.filter(d => d.status === 'キャンセル').length;
-      const noShow = filtered.filter(d => d.status !== 'キャンセル' && !isVisitedStatus(d.status || '') && isPast(d)).length;
+      const formalCancelled = filtered.filter(d => _effStDR(d) === 'キャンセル').length;
+      const noShow = filtered.filter(d => { const e = _effStDR(d); return e !== 'キャンセル' && !isVisitedStatus(e) && isPast(d); }).length;
       const cancelled = formalCancelled + noShow;
       const overdue = filtered.filter(d => isUnhandled(d) && isPast(d)).length;
       const pending = filtered.filter(d => isUnhandled(d) && isFuture(d)).length;
       const inProgress = filtered.filter(d => {
-        const s = d.status || '';
+        const s = _effStDR(d);
         if (isUnhandled(d)) return false;
         if (s === 'キャンセル') return false;
         if (isVisitedStatus(s)) return false;
@@ -10989,7 +11014,7 @@ function drawKaiinRows(treatment, rows, container) {
       }).length;
       const totalAmt = filtered.reduce((s, d) => s + _amtDR(d), 0);
       const pastBookings = filtered.filter(isPast);
-      const pastVisited = pastBookings.filter(d => isVisitedStatus(d.status || '')).length;
+      const pastVisited = pastBookings.filter(d => isVisitedStatus(_effStDR(d))).length;
       const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
       const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
       const setN = (sel, n) => { const e = container.querySelector(sel); if (e) e.textContent = n; };
