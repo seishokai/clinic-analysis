@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v421';
+const APP_VERSION = 'v422';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10806,11 +10806,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         <span class="kaiin-filter-consult-slot"></span>
         <span class="kaiin-filter-status-slot"></span>
         <span style="flex:1"></span>
+        <button class="kaiin-has-sales-btn filter-btn" data-treatment="${treatment}" title="売上が入力されている人のみ表示">💰 売上あり</button>
         <select class="kaiin-sort filter-select" data-treatment="${treatment}" style="font-size:11px;padding:3px 6px">
           <option value="date-desc" selected>ソート:新→古</option>
           <option value="date-asc">古→新</option>
           <option value="status">ステータス順</option>
           <option value="name">名前順</option>
+          <option value="sales-desc">💰 売上(高→低)</option>
+          <option value="sales-asc">💰 売上(低→高)</option>
         </select>
         <button class="kaiin-csv-btn filter-btn" data-treatment="${treatment}" title="現在の絞込結果をCSVダウンロード">📥 CSV</button>
         <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF</button>
@@ -10918,6 +10921,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     setfac: new Set(),
     consult: new Set(),
     status: defaultStatusSelected,
+    hasSalesOnly: false, // v422: 売上ありフィルタ
   };
   el._kaiinFilterState = state;
 
@@ -10947,6 +10951,13 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   filterScope.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-filter-period')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
+  // v422: 売上ありトグル
+  filterScope.querySelector('.kaiin-has-sales-btn')?.addEventListener('click', (e) => {
+    const st = el._kaiinFilterState = (el._kaiinFilterState || {});
+    st.hasSalesOnly = !st.hasSalesOnly;
+    e.currentTarget.classList.toggle('is-active', st.hasSalesOnly);
+    drawKaiinRows(treatment, rows, el);
+  });
   filterScope.querySelector('.kaiin-pdf-btn')?.addEventListener('click', () => {
     const prevTitle = document.title;
     const today = new Date().toISOString().slice(0,10);
@@ -11084,6 +11095,13 @@ function drawKaiinRows(treatment, rows, container) {
       return statusSet.has(s);
     });
   }
+  // v422: 売上ありフィルタ
+  const _bkExtraDR2 = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
+  const _amtDR2 = (d) => {
+    const ex = _bkExtraDR2[d.name + '|' + d.applyDate] || {};
+    return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+  };
+  if (state.hasSalesOnly) filtered = filtered.filter(d => _amtDR2(d) > 0);
   // ソート (来院日 = bookDate を使う。parseDateでISO化して比較)
   const statusOrder = (s) => { const i = statuses.findIndex(x => x.value === s); return i < 0 ? 999 : i; };
   const bookKey = (d) => {
@@ -11096,6 +11114,9 @@ function drawKaiinRows(treatment, rows, container) {
   if (sortBy === 'date-asc') filtered.sort((a,b) => bookKey(a) - bookKey(b));
   else if (sortBy === 'status') filtered.sort((a,b) => statusOrder(getSt(a)) - statusOrder(getSt(b)) || bookKey(b) - bookKey(a));
   else if (sortBy === 'name') filtered.sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
+  // v422: 売上順ソート (同額時は来院日新→古でフォールバック)
+  else if (sortBy === 'sales-desc') filtered.sort((a,b) => (_amtDR2(b) - _amtDR2(a)) || (bookKey(b) - bookKey(a)));
+  else if (sortBy === 'sales-asc') filtered.sort((a,b) => (_amtDR2(a) - _amtDR2(b)) || (bookKey(b) - bookKey(a)));
   else filtered.sort((a,b) => bookKey(b) - bookKey(a));
   // v421: CSV出力用に絞込結果を保持
   container._lastFiltered = filtered;
