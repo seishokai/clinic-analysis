@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v423';
+const APP_VERSION = 'v424';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10682,13 +10682,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const statuses = getStatusesForTreatment(treatment);
   // カウント
   // v275: インプラントは d.status を使う (bf_status ではない)
+  // v424: 矯正/BF/その他 で bf_status が空なら d.status にフォールバック
   const byStatus = {};
   statuses.forEach(s => byStatus[s.value] = 0);
   let noSt = 0;
   rows.forEach(d => {
     const st = (treatment === 'インプラント')
       ? (d.status || '')
-      : ((getBFInfo(d.name, d.applyDate) || {}).bf_status || '');
+      : (((getBFInfo(d.name, d.applyDate) || {}).bf_status) || d.status || '');
     if (st && byStatus[st] !== undefined) byStatus[st]++;
     else noSt++;
   });
@@ -10787,7 +10788,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         <span class="kaiin-filter-consult-slot"></span>
         <span class="kaiin-filter-status-slot"></span>
         <span style="flex:1"></span>
-        <button class="kaiin-has-sales-btn filter-btn" data-treatment="${treatment}" title="売上が入力されている人のみ表示">💰 売上あり</button>
+        <button class="kaiin-has-sales-btn filter-btn" data-treatment="${treatment}" title="売上が入力されている人のみ表示 (もう一度クリックで解除)" style="border-color:#f59e0b">💰 売上あり</button>
         <select class="kaiin-sort filter-select" data-treatment="${treatment}" style="font-size:11px;padding:3px 6px">
           <option value="date-desc" selected>ソート:新→古</option>
           <option value="date-asc">古→新</option>
@@ -11065,9 +11066,12 @@ function drawKaiinRows(treatment, rows, container) {
   });
   // ステータスフィルター (multi-select)
   // v275: インプラントは d.status を使う (bf_status ではない)
+  // v424: 矯正/BF/その他 で bf_status が空なら d.status にフォールバック
+  //   → 予約タブで「成約」「来院済」になっている人が、治療タブで「未設定」と
+  //     表示されてしまう不整合を解消
   const getSt = (d) => {
     if (treatment === 'インプラント') return d.status || '';
-    return (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
+    return (getBFInfo(d.name, d.applyDate)||{}).bf_status || d.status || '';
   };
   if (statusSet.size) {
     filtered = filtered.filter(d => {
@@ -11104,6 +11108,7 @@ function drawKaiinRows(treatment, rows, container) {
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
   // サマリー数値もフィルター結果で更新
   // v275: インプラントは d.status を使う
+  // v424: 矯正/BF/その他 で bf_status が空なら d.status にフォールバック
   (function updateSummary(){
     const byStatusF = {};
     statuses.forEach(s => byStatusF[s.value] = 0);
@@ -11111,7 +11116,7 @@ function drawKaiinRows(treatment, rows, container) {
     filtered.forEach(d => {
       const st = (treatment === 'インプラント')
         ? (d.status || '')
-        : ((getBFInfo(d.name, d.applyDate) || {}).bf_status || '');
+        : (((getBFInfo(d.name, d.applyDate) || {}).bf_status) || d.status || '');
       if (st && byStatusF[st] !== undefined) byStatusF[st]++; else unsetF++;
     });
     const elTotal = container.querySelector('.kaiin-count-total');
