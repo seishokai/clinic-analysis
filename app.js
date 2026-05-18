@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v428';
+const APP_VERSION = 'v429';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -7412,11 +7412,10 @@ function renderBookings() {
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt(d))).length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
-  // v427: 実成約金額 = _is実成約Bk (治療カテゴリ別) の人の売上合計のみ
+  // v429: 金額カードには 実成約 + 見込み の合計 (= 売上が入力されている人全員)
   const bkExtraStats = _bkExtra;
   let totalAmount = 0;
   active.forEach(d => {
-    if (!_is実成約Bk(d)) return; // 実成約のみ
     const key = d.name + '|' + d.applyDate;
     const extra = bkExtraStats[key] || {};
     const amt = Number(extra.contractAmount) || Number(d.contractAmount) || 0;
@@ -7438,7 +7437,7 @@ function renderBookings() {
     <div class="stat-card ${visited>0?'is-info':''}" title="来院済 = 来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
     <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
     <div class="stat-card ${contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
-    <div class="stat-card" title="実成約金額の合計 (税抜)"><span class="stat-label">実成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
+    <div class="stat-card" title="成約 + 見込みの金額合計 (税抜)。売上が入力されている人全員"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">実成約+見込み</span></div>
   `;
   // インセ金額は別途集計不要（各行で入力）
 
@@ -9969,8 +9968,9 @@ async function renderKaiinAll(containerId) {
     if (isVisitedStatus(s)) return false;
     return isFuture2(d);
   }).length;
-  // v427: 実成約金額 = _is実成約(治療カテゴリ別) の人の売上合計のみ
-  const totalAmt = allRows.reduce((s, d) => _is実成約(d) ? s + _amt(d) : s, 0);
+  // v429: 金額カードには 実成約 + 見込み の合計 (= 売上が入力されている全員)
+  // (ユーザー要望: 「金額は見込みの合計もいれてほしい」)
+  const totalAmt = allRows.reduce((s, d) => (_is実成約(d) || _is見込み(d)) ? s + _amt(d) : s, 0);
   const pastBookings = allRows.filter(isPast2);
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
   const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
@@ -10013,7 +10013,7 @@ async function renderKaiinAll(containerId) {
       <div class="stat-card ${visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
       <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
       <div class="stat-card ${contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%（${contracted}/${visited}）</span></div>
-      <div class="stat-card" title="実成約金額の合計 (税抜)"><span class="stat-label">実成約金額</span><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
+      <div class="stat-card" title="成約 + 見込みの金額合計 (税抜)。売上が入力されている人全員"><span class="stat-label">成約金額</span><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">実成約+見込み</span></div>
     </div>
     ` : ''}
     ${state.filterOpen ? `
@@ -10760,8 +10760,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       if (isVisitedStatus(s)) return false;
       return isFuture(d);
     }).length;
-    // v427: 実成約金額 = _is実成約 (治療カテゴリ別) の人の売上合計のみ
-    const totalAmt = rs.reduce((s, d) => _is実成約(d) ? s + _amtSL(d) : s, 0);
+    // v429: 金額カードには 実成約 + 見込み の合計 (= 売上が入力されている全員)
+    const totalAmt = rs.reduce((s, d) => (_is実成約(d) || _is見込み(d)) ? s + _amtSL(d) : s, 0);
     const pastBookings = rs.filter(d => isPast(d));
     const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
     const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
@@ -10839,7 +10839,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       <div class="stat-card ${sum.visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 治療段階"><span class="stat-label">来院済</span><span class="stat-num kaiin-sum-visited">${sum.visited}</span><span class="stat-yoy kaiin-sum-visited-rate" style="color:var(--text-sub);font-size:11px">来院率 ${sum.visitRate}%（${sum.pastVisited}/${sum.pastBookings.length}）</span></div>
       <div class="stat-card ${sum.prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num kaiin-sum-prospective" style="color:#d97706">${sum.prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
       <div class="stat-card ${sum.contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num kaiin-sum-contracted">${sum.contracted}</span><span class="stat-yoy kaiin-sum-contracted-rate" style="color:var(--text-sub);font-size:11px">成約率 ${sum.contractRate}%（${sum.contracted}/${sum.visited}）</span></div>
-      <div class="stat-card" title="実成約金額の合計 (税抜)"><span class="stat-label">実成約金額</span><span class="stat-num kaiin-sum-amt">¥${fmt(sum.totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
+      <div class="stat-card" title="成約 + 見込みの金額合計 (税抜)。売上が入力されている人全員"><span class="stat-label">成約金額</span><span class="stat-num kaiin-sum-amt">¥${fmt(sum.totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">実成約+見込み</span></div>
     </div>
     <div class="kaiin-header-wrap" style="display:none">
       <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;overflow-x:auto;align-items:center">
@@ -11199,8 +11199,8 @@ function drawKaiinRows(treatment, rows, container) {
         if (isVisitedStatus(s)) return false;
         return isFuture(d);
       }).length;
-      // v427: 実成約金額 = _is実成約DR (治療カテゴリ別) の人の売上合計のみ
-      const totalAmt = filtered.reduce((s, d) => _is実成約DR(d) ? s + _amtDR(d) : s, 0);
+      // v429: 金額カードには 実成約 + 見込み の合計 (= 売上が入力されている全員)
+      const totalAmt = filtered.reduce((s, d) => (_is実成約DR(d) || _is見込みDR(d)) ? s + _amtDR(d) : s, 0);
       const pastBookings = filtered.filter(isPast);
       const pastVisited = pastBookings.filter(d => isVisitedStatus(_effStDR(d))).length;
       const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
