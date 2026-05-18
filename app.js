@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v420';
+const APP_VERSION = 'v421';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10812,6 +10812,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
           <option value="status">ステータス順</option>
           <option value="name">名前順</option>
         </select>
+        <button class="kaiin-csv-btn filter-btn" data-treatment="${treatment}" title="現在の絞込結果をCSVダウンロード">📥 CSV</button>
         <button class="kaiin-pdf-btn filter-btn" data-treatment="${treatment}">📄 PDF</button>
       </div>
     </div>
@@ -10954,6 +10955,61 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       () => { document.title = prevTitle; }
     );
   });
+  // v421: CSV ダウンロード (現在の絞込結果)
+  filterScope.querySelector('.kaiin-csv-btn')?.addEventListener('click', () => {
+    try {
+      const filtered = el._lastFiltered || rows;
+      const _bkExtraCSV = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
+      const _amtCSV = (d) => {
+        const ex = _bkExtraCSV[d.name + '|' + d.applyDate] || {};
+        return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+      };
+      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','売上','次回予定','メモ','電話','メール','ツール'];
+      const _csvEsc = (v) => {
+        const s = String(v == null ? '' : v);
+        if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
+      };
+      const csvRows = [headers.join(',')];
+      filtered.forEach(d => {
+        const info = bfLifecycleCache[d.name + '|' + d.applyDate] || {};
+        const memo = d._memo || info.bf_memo || info.memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+        csvRows.push([
+          d.bookDate || '',
+          d.applyDate || '',
+          d.name || '',
+          treatment,
+          normFac(d.facility) || '',
+          d.source || '',
+          d.status || '',
+          info.bf_status || '',
+          d.contractService || info.contract_service || '',
+          _amtCSV(d) || 0,
+          info.bf_next_date || '',
+          (memo || '').replace(/\r?\n/g, ' '),
+          d.phone || '',
+          d.email || '',
+          d.tool || ''
+        ].map(_csvEsc).join(','));
+      });
+      const csv = '﻿' + csvRows.join('\r\n'); // UTF-8 BOM
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const today = new Date();
+      const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+      a.download = `来院管理_${treatment}_${ymd}_${filtered.length}件.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ ${treatment} ${filtered.length}件 CSV出力`);
+    } catch (e) {
+      console.warn('CSV export failed', e);
+      showToast('CSV出力に失敗', true);
+    }
+  });
 }
 
 function drawKaiinRows(treatment, rows, container) {
@@ -11041,6 +11097,8 @@ function drawKaiinRows(treatment, rows, container) {
   else if (sortBy === 'status') filtered.sort((a,b) => statusOrder(getSt(a)) - statusOrder(getSt(b)) || bookKey(b) - bookKey(a));
   else if (sortBy === 'name') filtered.sort((a,b) => (a.name||'').localeCompare(b.name||'','ja'));
   else filtered.sort((a,b) => bookKey(b) - bookKey(a));
+  // v421: CSV出力用に絞込結果を保持
+  container._lastFiltered = filtered;
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
   // サマリー数値もフィルター結果で更新
   // v275: インプラントは d.status を使う
