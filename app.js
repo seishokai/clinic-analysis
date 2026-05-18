@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v426';
+const APP_VERSION = 'v427';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -7368,9 +7368,16 @@ function renderBookings() {
   const _isFutureBooking = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= todayForRate; };
 
   const visited = active.filter(d => isVisitedStatus(_effSt(d))).length;
-  // v416: 実成約 = 累計成約 (status=成約 / BF治療進行中の人も含む)
-  // 予約管理は _effSt 経由だと BF治療中が除外されるので、 d.status を直接見る
-  const contracted = active.filter(d => d.status === '成約').length;
+  // v427: 実成約 = 治療カテゴリ別 (BFは bf_status=成約 のみ, それ以外は d.status=成約)
+  const _is実成約Bk = (d) => {
+    const t = getTreatmentCategory(d);
+    if (t === 'BF') {
+      const bf = (getBFInfo(d.name, d.applyDate) || {}).bf_status || '';
+      return bf === '成約';
+    }
+    return d.status === '成約';
+  };
+  const contracted = active.filter(_is実成約Bk).length;
   // v416: 見込み = 来院済だがまだ成約していない (検討中/後追いLINE済み/予約変更/予約連絡待ち)
   const prospective = active.filter(d => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '')).length;
   // 正式キャンセル件数
@@ -7401,12 +7408,11 @@ function renderBookings() {
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt(d))).length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
-  // v426: 実成約金額 = status='成約' の人の売上合計のみ
-  // (検討中/来院済等で売上入力されている人は除外)
+  // v427: 実成約金額 = _is実成約Bk (治療カテゴリ別) の人の売上合計のみ
   const bkExtraStats = _bkExtra;
   let totalAmount = 0;
   active.forEach(d => {
-    if (d.status !== '成約') return; // 実成約のみ
+    if (!_is実成約Bk(d)) return; // 実成約のみ
     const key = d.name + '|' + d.applyDate;
     const extra = bkExtraStats[key] || {};
     const amt = Number(extra.contractAmount) || Number(d.contractAmount) || 0;
@@ -9881,9 +9887,19 @@ async function renderKaiinAll(containerId) {
   };
   // v416: 売上ありフィルタ
   if (state.hasSalesOnly) allRows = allRows.filter(d => _amt(d) > 0);
-  // v416: 「実成約」は累計成約 (status=成約 = BF/インプラント治療進行中の人も含む)
+  // v427: 「実成約」を治療カテゴリ別に厳密化
+  //   - BF の人: bf_status='成約' のみ (印象前の純粋成約のみ。治療進行中は除外)
+  //   - 矯正/インプラント/その他: d.status='成約'
+  //   → BFタブの「ステータス内訳 成約 N」と「実成約カード N」が一致する
+  const _is実成約 = (d) => {
+    const t = getTreatmentCategory(d);
+    if (t === 'BF') {
+      const bf = (getBFInfo(d.name, d.applyDate) || {}).bf_status || '';
+      return bf === '成約';
+    }
+    return d.status === '成約';
+  };
   // 「見込み」は来院済だがまだ成約していない (検討中/後追いLINE済み/予約変更/予約連絡待ち)
-  const _is実成約 = (d) => d.status === '成約';
   const _is見込み = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
   const byCat = {};
   const byFac = {};
@@ -9949,8 +9965,8 @@ async function renderKaiinAll(containerId) {
     if (isVisitedStatus(s)) return false;
     return isFuture2(d);
   }).length;
-  // v426: 実成約金額 = status='成約' の人の売上合計のみ
-  const totalAmt = allRows.reduce((s, d) => d.status === '成約' ? s + _amt(d) : s, 0);
+  // v427: 実成約金額 = _is実成約(治療カテゴリ別) の人の売上合計のみ
+  const totalAmt = allRows.reduce((s, d) => _is実成約(d) ? s + _amt(d) : s, 0);
   const pastBookings = allRows.filter(isPast2);
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
   const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
@@ -10698,8 +10714,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     const ex = _bkExtraSL[d.name + '|' + d.applyDate] || {};
     return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
   };
-  // v416: 実成約 = 累計成約 (broad) / 見込み = 来院済だが未成約
-  const _is実成約 = (d) => d.status === '成約';
+  // v427: 実成約 = 治療カテゴリ別 (BFは bf_status=成約 のみ, それ以外は d.status=成約)
+  const _is実成約 = (d) => {
+    if (treatment === 'BF') {
+      const bf = (getBFInfo(d.name, d.applyDate) || {}).bf_status || '';
+      return bf === '成約';
+    }
+    return d.status === '成約';
+  };
   const _is見込み = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
   // v417: 予約管理と数字を一致させるため _effSt (BF aware) で判定
   const _effSt2 = (d) => {
@@ -10733,8 +10755,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       if (isVisitedStatus(s)) return false;
       return isFuture(d);
     }).length;
-    // v426: 実成約金額 = status='成約' の人の売上合計のみ
-    const totalAmt = rs.reduce((s, d) => d.status === '成約' ? s + _amtSL(d) : s, 0);
+    // v427: 実成約金額 = _is実成約 (治療カテゴリ別) の人の売上合計のみ
+    const totalAmt = rs.reduce((s, d) => _is実成約(d) ? s + _amtSL(d) : s, 0);
     const pastBookings = rs.filter(d => isPast(d));
     const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
     const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
@@ -11146,8 +11168,14 @@ function drawKaiinRows(treatment, rows, container) {
       const isUnhandled = (d) => { const e = _effStDR(d); return !e || e === '未対応'; };
       const isPast = (d) => { const bd = parseDate(d.bookDate); return bd && bd < today; };
       const isFuture = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= today; };
-      // v416: 実成約 = broad (status=成約) / 見込み = 検討中等
-      const _is実成約DR = (d) => d.status === '成約';
+      // v427: 実成約 = 治療カテゴリ別 (BFは bf_status=成約 のみ)
+      const _is実成約DR = (d) => {
+        if (treatment === 'BF') {
+          const bf = (getBFInfo(d.name, d.applyDate) || {}).bf_status || '';
+          return bf === '成約';
+        }
+        return d.status === '成約';
+      };
       const _is見込みDR = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
       const total = filtered.length;
       const visited = filtered.filter(d => isVisitedStatus(_effStDR(d))).length;
@@ -11165,8 +11193,8 @@ function drawKaiinRows(treatment, rows, container) {
         if (isVisitedStatus(s)) return false;
         return isFuture(d);
       }).length;
-      // v426: 実成約金額 = status='成約' の人の売上合計のみ
-      const totalAmt = filtered.reduce((s, d) => d.status === '成約' ? s + _amtDR(d) : s, 0);
+      // v427: 実成約金額 = _is実成約DR (治療カテゴリ別) の人の売上合計のみ
+      const totalAmt = filtered.reduce((s, d) => _is実成約DR(d) ? s + _amtDR(d) : s, 0);
       const pastBookings = filtered.filter(isPast);
       const pastVisited = pastBookings.filter(d => isVisitedStatus(_effStDR(d))).length;
       const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
