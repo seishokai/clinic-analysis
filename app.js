@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v427';
+const APP_VERSION = 'v428';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -7378,8 +7378,12 @@ function renderBookings() {
     return d.status === '成約';
   };
   const contracted = active.filter(_is実成約Bk).length;
-  // v416: 見込み = 来院済だがまだ成約していない (検討中/後追いLINE済み/予約変更/予約連絡待ち)
-  const prospective = active.filter(d => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '')).length;
+  // v428: 見込み = 売上金額が入力されているが、まだ実成約ではない人
+  const _amtBk = (d) => {
+    const ex = _bkExtra[d.name + '|' + d.applyDate] || {};
+    return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
+  };
+  const prospective = active.filter(d => !_is実成約Bk(d) && _amtBk(d) > 0).length;
   // 正式キャンセル件数
   const formalCancelled = active.filter(d => _effSt(d) === 'キャンセル').length;
   // 未来店 = 過去予約 で 来院せず 正式キャンセルでもない
@@ -7432,7 +7436,7 @@ function renderBookings() {
     <div class="stat-card" title="進行中 = 未来予約で 確認済/後追いLINE済み/予約変更等 (連絡済で来院待ち)"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
     <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店(来院せず・連絡途絶・予約日経過)"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
     <div class="stat-card ${visited>0?'is-info':''}" title="来院済 = 来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
-    <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 来院済だがまだ成約していない (検討中 / 後追いLINE済み / 予約変更 / 予約連絡待ち)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">検討中等<br>(あと一押し)</span></div>
+    <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
     <div class="stat-card ${contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
     <div class="stat-card" title="実成約金額の合計 (税抜)"><span class="stat-label">実成約金額</span><span class="stat-num">¥${fmt(totalAmount)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
   `;
@@ -9890,7 +9894,6 @@ async function renderKaiinAll(containerId) {
   // v427: 「実成約」を治療カテゴリ別に厳密化
   //   - BF の人: bf_status='成約' のみ (印象前の純粋成約のみ。治療進行中は除外)
   //   - 矯正/インプラント/その他: d.status='成約'
-  //   → BFタブの「ステータス内訳 成約 N」と「実成約カード N」が一致する
   const _is実成約 = (d) => {
     const t = getTreatmentCategory(d);
     if (t === 'BF') {
@@ -9899,8 +9902,9 @@ async function renderKaiinAll(containerId) {
     }
     return d.status === '成約';
   };
-  // 「見込み」は来院済だがまだ成約していない (検討中/後追いLINE済み/予約変更/予約連絡待ち)
-  const _is見込み = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
+  // v428: 「見込み」= 売上金額が入力されているが、まだ実成約ではない人
+  // (BF治療進行中・ローン審査中・印象待ち・セット待ち 等で金額が見えている人)
+  const _is見込み = (d) => !_is実成約(d) && _amt(d) > 0;
   const byCat = {};
   const byFac = {};
   allRows.forEach(d => {
@@ -10007,7 +10011,7 @@ async function renderKaiinAll(containerId) {
       <div class="stat-card" title="進行中 = 未来予約で 確認済/連絡待ち/予約変更等"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
       <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
       <div class="stat-card ${visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
-      <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 来院済だがまだ成約していない (検討中 / 後追いLINE済み / 予約変更 / 予約連絡待ち)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">検討中等<br>(あと一押し)</span></div>
+      <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
       <div class="stat-card ${contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%（${contracted}/${visited}）</span></div>
       <div class="stat-card" title="実成約金額の合計 (税抜)"><span class="stat-label">実成約金額</span><span class="stat-num">¥${fmt(totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
     </div>
@@ -10722,7 +10726,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
     }
     return d.status === '成約';
   };
-  const _is見込み = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
+  // v428: 見込み = 売上金額が入力されているが、まだ実成約ではない人
+  const _is見込み = (d) => !_is実成約(d) && _amtSL(d) > 0;
   // v417: 予約管理と数字を一致させるため _effSt (BF aware) で判定
   const _effSt2 = (d) => {
     if (typeof isBFBooking === 'function' && isBFBooking(d)) {
@@ -10832,7 +10837,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       <div class="stat-card" title="進行中 = 未来予約で 確認済/連絡待ち/予約変更等"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num kaiin-sum-progress" style="color:#7c3aed">${sum.inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
       <div class="stat-card ${sum.cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num kaiin-sum-cancelled">${sum.cancelled}</span><span class="stat-yoy kaiin-sum-cancelled-detail" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${sum.formalCancelled}+未来店${sum.noShow}</span></div>
       <div class="stat-card ${sum.visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 治療段階"><span class="stat-label">来院済</span><span class="stat-num kaiin-sum-visited">${sum.visited}</span><span class="stat-yoy kaiin-sum-visited-rate" style="color:var(--text-sub);font-size:11px">来院率 ${sum.visitRate}%（${sum.pastVisited}/${sum.pastBookings.length}）</span></div>
-      <div class="stat-card ${sum.prospective>0?'is-warning':''}" title="見込み = 来院済だがまだ成約していない (検討中 / 後追いLINE済み / 予約変更 / 予約連絡待ち)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num kaiin-sum-prospective" style="color:#d97706">${sum.prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">検討中等<br>(あと一押し)</span></div>
+      <div class="stat-card ${sum.prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num kaiin-sum-prospective" style="color:#d97706">${sum.prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
       <div class="stat-card ${sum.contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num kaiin-sum-contracted">${sum.contracted}</span><span class="stat-yoy kaiin-sum-contracted-rate" style="color:var(--text-sub);font-size:11px">成約率 ${sum.contractRate}%（${sum.contracted}/${sum.visited}）</span></div>
       <div class="stat-card" title="実成約金額の合計 (税抜)"><span class="stat-label">実成約金額</span><span class="stat-num kaiin-sum-amt">¥${fmt(sum.totalAmt)}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400">税抜合計</span></div>
     </div>
@@ -11176,7 +11181,8 @@ function drawKaiinRows(treatment, rows, container) {
         }
         return d.status === '成約';
       };
-      const _is見込みDR = (d) => ['検討中','後追いLINE済み','予約変更','予約連絡待ち'].includes(d.status || '');
+      // v428: 見込み = 売上金額が入力されているが、まだ実成約ではない人
+      const _is見込みDR = (d) => !_is実成約DR(d) && _amtDR(d) > 0;
       const total = filtered.length;
       const visited = filtered.filter(d => isVisitedStatus(_effStDR(d))).length;
       const contracted = filtered.filter(_is実成約DR).length;
