@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v425';
+const APP_VERSION = 'v426';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -7401,10 +7401,12 @@ function renderBookings() {
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt(d))).length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
-  // 成約金額集計（フィルター済みデータから）
+  // v426: 実成約金額 = status='成約' の人の売上合計のみ
+  // (検討中/来院済等で売上入力されている人は除外)
   const bkExtraStats = _bkExtra;
   let totalAmount = 0;
   active.forEach(d => {
+    if (d.status !== '成約') return; // 実成約のみ
     const key = d.name + '|' + d.applyDate;
     const extra = bkExtraStats[key] || {};
     const amt = Number(extra.contractAmount) || Number(d.contractAmount) || 0;
@@ -9947,7 +9949,8 @@ async function renderKaiinAll(containerId) {
     if (isVisitedStatus(s)) return false;
     return isFuture2(d);
   }).length;
-  const totalAmt = allRows.reduce((s, d) => s + _amt(d), 0);
+  // v426: 実成約金額 = status='成約' の人の売上合計のみ
+  const totalAmt = allRows.reduce((s, d) => d.status === '成約' ? s + _amt(d) : s, 0);
   const pastBookings = allRows.filter(isPast2);
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
   const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
@@ -10730,7 +10733,8 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       if (isVisitedStatus(s)) return false;
       return isFuture(d);
     }).length;
-    const totalAmt = rs.reduce((s, d) => s + _amtSL(d), 0);
+    // v426: 実成約金額 = status='成約' の人の売上合計のみ
+    const totalAmt = rs.reduce((s, d) => d.status === '成約' ? s + _amtSL(d) : s, 0);
     const pastBookings = rs.filter(d => isPast(d));
     const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
     const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
@@ -11161,7 +11165,8 @@ function drawKaiinRows(treatment, rows, container) {
         if (isVisitedStatus(s)) return false;
         return isFuture(d);
       }).length;
-      const totalAmt = filtered.reduce((s, d) => s + _amtDR(d), 0);
+      // v426: 実成約金額 = status='成約' の人の売上合計のみ
+      const totalAmt = filtered.reduce((s, d) => d.status === '成約' ? s + _amtDR(d) : s, 0);
       const pastBookings = filtered.filter(isPast);
       const pastVisited = pastBookings.filter(d => isVisitedStatus(_effStDR(d))).length;
       const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
