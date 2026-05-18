@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v418';
+const APP_VERSION = 'v419';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9979,6 +9979,7 @@ async function renderKaiinAll(containerId) {
       </select>
       <span class="kaiin-all-promo-slot" title="プロモ"></span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:4px">
+        <button id="kaiin-all-csv" class="filter-btn" title="現在の絞込結果をCSVダウンロード">📥 CSV</button>
         <button id="kaiin-all-filter-toggle" class="filter-btn ${state.filterOpen?'is-active':''}" title="他の絞込フィルタを表示/非表示">${state.filterOpen?'▲ 絞込':'▼ 絞込'}</button>
         <button id="kaiin-all-dashboard-toggle" class="filter-btn ${state.dashboardOpen?'is-active':''}" title="サマリー(統計+カード)を表示/非表示">${state.dashboardOpen?'▲ サマリー':'▼ サマリー'}</button>
       </span>
@@ -10105,19 +10106,24 @@ async function renderKaiinAll(containerId) {
                   const lbl = d.source.length > 14 ? d.source.slice(0,14) + '…' : d.source;
                   promoChip = `<span title="${isSelect?'セレクトタイプ予約 (変更不可)':'DXHUB予約 (自動取得・変更不可)'}" style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
                 }
-                // 状態 (編集可能なセレクト, 統一クラス .status-pill 使用)
-                // v360: BF特有ライフサイクル(CT/診断等)が設定されている場合のみ bf_status を優先表示。
-                // 標準ステータス(来院済等)が両方にあれば status を canonical として表示。
+                // v419: 来店管理一覧のステータス select を完全に BF/治療 aware に統一
+                // BF の人: bf_status を表示・編集 (BF全段階の選択肢)
+                // 非BFの人: d.status を表示・編集 (基本選択肢)
+                // → 治療(BF)タブで変更したステータスが一覧にも即反映される
                 const _bfInfo = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
-                const _BF_LIFECYCLE_ONLY = new Set(['CT/診断','P処置','C処置','ガイド印象','手術予定','治癒期間','印象','セット','完了','ローン審査中','ローン審査落','矯正決定(BF保留)','ラブリエ決定(BF保留)','インプラント決定(BF保留)','印象待ち(治療無)','印象待ち(治療有)','治療中','セット日確定待ち','セット待ち','セット完了','離脱']);
-                const st = (_bfInfo && _bfInfo.bf_status && _BF_LIFECYCLE_ONLY.has(_bfInfo.bf_status))
-                  ? _bfInfo.bf_status
+                const _isBF = (typeof isBFBooking === 'function') && isBFBooking(d);
+                const st = _isBF
+                  ? ((_bfInfo && _bfInfo.bf_status) || d.status || '')
                   : (d.status || '');
-                // v414: 除外 (重複・削除扱い) を追加
-                const stOptions = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル','除外'];
-                const stBadge = `<select class="kaiin-all-status-sel status-pill ${statusPillClass(st)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="font-size:10px;width:100%;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
+                // 選択肢を BF / 非BF で出し分け
+                const stOptions = _isBF
+                  ? BF_STATUSES.map(s => s.value)  // BF全段階 (除外含む)
+                  : ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル','除外'];
+                // 「次回予約連絡待ち」ラベル変換
+                const _stLabel = (s) => s === '予約連絡待ち' ? '次回予約連絡待ち' : statusPillLabel(s);
+                const stBadge = `<select class="kaiin-all-status-sel status-pill ${statusPillClass(st)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-is-bf="${_isBF?'1':'0'}" style="font-size:10px;width:100%;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
                   <option value="">未設定</option>
-                  ${stOptions.map(s => { const lbl = statusPillLabel(s); return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
+                  ${stOptions.map(s => `<option value="${s}" ${st===s?'selected':''}>${_stLabel(s)}</option>`).join('')}
                 </select>`;
                 // 来院日 (v376: 短縮形式 "M/D" は今年として扱う / v389: applyDate フォールバック時は淡色 + ✱印)
                 const bookDateISO = (bdYear && bdMonth && bdDay)
@@ -10290,6 +10296,58 @@ async function renderKaiinAll(containerId) {
     if (state.search) { searchEl.focus(); searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length); }
   }
 
+  // === v419: CSV ダウンロード (現在の allRows 絞込結果) ===
+  el.querySelector('#kaiin-all-csv')?.addEventListener('click', () => {
+    try {
+      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','売上','次回予定','メモ','電話','メール','ツール'];
+      const csvRows = [headers.join(',')];
+      const _csvEsc = (v) => {
+        const s = String(v == null ? '' : v);
+        if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+        return s;
+      };
+      allRows.forEach(d => {
+        const cat = getTreatmentCategory(d) || '';
+        const info = bfLifecycleCache[d.name + '|' + d.applyDate] || {};
+        const memo = d._memo || info.bf_memo || info.memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+        csvRows.push([
+          d.bookDate || '',
+          d.applyDate || '',
+          d.name || '',
+          cat,
+          normFac(d.facility) || '',
+          d.source || '',
+          d.status || '',
+          info.bf_status || '',
+          d.contractService || info.contract_service || '',
+          _amt(d) || 0,
+          info.bf_next_date || '',
+          (memo || '').replace(/\r?\n/g, ' '),
+          d.phone || '',
+          d.email || '',
+          d.tool || ''
+        ].map(_csvEsc).join(','));
+      });
+      // UTF-8 BOM 付き (Excelで文字化け防止)
+      const csv = '﻿' + csvRows.join('\r\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const today = new Date();
+      const ymd = `${today.getFullYear()}${String(today.getMonth()+1).padStart(2,'0')}${String(today.getDate()).padStart(2,'0')}`;
+      a.download = `来院管理_${ymd}_${allRows.length}件.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast(`✓ ${allRows.length}件 CSV出力`);
+    } catch (e) {
+      console.warn('CSV export failed', e);
+      showToast('CSV出力に失敗', true);
+    }
+  });
+
   // === リセット ===
   el.querySelector('#kaiin-all-reset')?.addEventListener('click', () => {
     _kaiinAllPeriodState.period = 'thisMonth';
@@ -10320,28 +10378,64 @@ async function renderKaiinAll(containerId) {
   });
 
   // === 編集: 状態 (DB upsert + bookingsData同期 + bf_status 同期) ===
-  // v385: ユーザーが明示的にドロップダウンから選んだ時は必ず反映する。
-  // BF意図保護はクロスタブ自動同期のためであり、ユーザーの直接編集には適用しない。
-  // (旧v361では shouldUpdate ガードで来院済選択が無視され、画面に反映されないバグ発生)
+  // v419: BFの人は bf_status を更新 (これが治療(BF)タブと完全同期)
+  //   - val を bf_status に保存
+  //   - BF_TO_STATUS マップで d.status も連動更新
+  // 非BFの人は従来通り d.status を更新 + STATUS_TO_BF で bf_status 連動
   el.querySelectorAll('.kaiin-all-status-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
       const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || null;
+      const isBF = sel.dataset.isBf === '1';
       try {
-        const payload = { name, apply_date: apply, status: val };
-        if (val && typeof STATUS_TO_BF !== 'undefined') {
-          // STATUS_TO_BF: 来院済→検討中, 成約→成約, キャンセル→キャンセル, 除外→null, 他→val そのまま
-          const targetBF = STATUS_TO_BF[val] !== undefined ? STATUS_TO_BF[val] : val;
-          // null の場合は bf_status を空にする (除外時)、それ以外は強制上書き
-          payload.bf_status = targetBF;
+        const payload = { name, apply_date: apply };
+        const key = name + '|' + apply;
+        if (isBF) {
+          // BF: bf_status を真として保存、d.status は BF_TO_STATUS マップで連動
+          payload.bf_status = val;
+          const mappedStatus = val ? (BF_TO_STATUS[val] !== undefined ? BF_TO_STATUS[val] : val) : null;
+          payload.status = mappedStatus;
           if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
-            const key = name + '|' + apply;
             if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
-            bfLifecycleCache[key].bf_status = targetBF;
+            bfLifecycleCache[key].bf_status = val;
           }
+          // bf_history に記録 (履歴トラッキング)
+          if (val && typeof sb !== 'undefined') {
+            const curBF = (bfLifecycleCache[key] || {}).bf_status;
+            if (curBF !== val) {
+              try {
+                await sb.from('bf_history').insert({
+                  booking_name: name, booking_apply_date: apply,
+                  from_status: curBF || null, to_status: val,
+                  changed_by: getLoggedUserName() + '(一覧編集)'
+                });
+              } catch(_){}
+            }
+          }
+          const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+          if (target) target.status = mappedStatus || '';
+        } else {
+          // 非BF: 従来通り d.status を保存、STATUS_TO_BF で bf_status 連動
+          payload.status = val;
+          if (val && typeof STATUS_TO_BF !== 'undefined') {
+            const targetBF = STATUS_TO_BF[val] !== undefined ? STATUS_TO_BF[val] : val;
+            payload.bf_status = targetBF;
+            if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
+              if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
+              bfLifecycleCache[key].bf_status = targetBF;
+            }
+          }
+          const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+          if (target) target.status = val || '';
         }
         await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
-        const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-        if (target) target.status = val || '';
+        // bk-extra にも反映 (予約一覧との整合)
+        try {
+          const bkEx = loadData('bk-extra', {});
+          if (!bkEx[key]) bkEx[key] = {};
+          bkEx[key].editedStatus = payload.status || '';
+          if (isBF) bkEx[key].editedBFStatus = val || '';
+          saveData('bk-extra', bkEx);
+        } catch(_){}
         sel.style.outline = '2px solid #16a34a';
         setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
         syncCrossTabRender();
