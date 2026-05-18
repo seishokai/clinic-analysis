@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v422';
+const APP_VERSION = 'v423';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10106,26 +10106,23 @@ async function renderKaiinAll(containerId) {
                   const lbl = d.source.length > 14 ? d.source.slice(0,14) + '…' : d.source;
                   promoChip = `<span title="${isSelect?'セレクトタイプ予約 (変更不可)':'DXHUB予約 (自動取得・変更不可)'}" style="display:inline-block;padding:3px 8px;background:${bgC};color:${fgC};border-radius:12px;font-size:10px;font-weight:600;border:1px solid ${bdC}">${escapeHtml(lbl)}</span>`;
                 }
-                // v420: 治療カテゴリ別 (BF/矯正/インプラント/...) で完全に治療タブと同じ仕様
-                // ・インプラント治療段階に進んだ人 → d.status を見る (drawKaiinRows と同じ)
-                // ・BF/矯正/その他 → bf_status を見る
-                // 選択肢は getStatusesForTreatment(治療カテゴリ) を使い、治療タブと完全一致
+                // v423 緊急ロールバック: v419/v420 の BF/治療別 select は撤回。
+                // 表示は治療進行を反映するが、編集は d.status のみ (bf_status は治療別タブで)
+                // 表示用 st は治療カテゴリを考慮 (BF/矯正等は bf_status 優先で見やすく表示)
                 const _bfInfo = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
                 const _treatment = (typeof getTreatmentCategory === 'function') ? getTreatmentCategory(d) : 'その他';
                 const _isImplant = _treatment === 'インプラント';
-                // ステータス取得 (治療タブ drawKaiinRows の getSt() と同じロジック)
-                const st = _isImplant
-                  ? (d.status || '')
-                  : ((_bfInfo && _bfInfo.bf_status) || '');
-                // 選択肢を治療カテゴリ別に
-                const _trStatuses = (typeof getStatusesForTreatment === 'function') ? getStatusesForTreatment(_treatment) : [];
-                const _trOptValues = _trStatuses.map(s => s.value);
-                // 除外がなければ追加
-                if (!_trOptValues.includes('除外')) _trOptValues.push('除外');
-                const _stLabel = (s) => s === '予約連絡待ち' ? '次回予約連絡待ち' : statusPillLabel(s);
-                const stBadge = `<select class="kaiin-all-status-sel status-pill ${statusPillClass(st)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-is-implant="${_isImplant?'1':'0'}" data-treatment="${escapeHtml(_treatment)}" style="font-size:10px;width:100%;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
+                // 表示用: BF lifecycle 段階が設定済みなら、それを「現在の状態」として表示
+                const _BF_LIFECYCLE_ONLY = new Set(['CT/診断','P処置','C処置','ガイド印象','手術予定','治癒期間','印象','セット','完了','ローン審査中','ローン審査落','矯正決定(BF保留)','ラブリエ決定(BF保留)','インプラント決定(BF保留)','印象待ち(治療無)','印象待ち(治療有)','治療中','セット日確定待ち','セット待ち','セット完了','離脱']);
+                const _bfSt = (_bfInfo && _bfInfo.bf_status) || '';
+                const st = (_bfSt && _BF_LIFECYCLE_ONLY.has(_bfSt))
+                  ? _bfSt
+                  : (d.status || '');
+                // 選択肢は基本のみ (BF全段階は治療別タブで)
+                const stOptions = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル','除外'];
+                const stBadge = `<select class="kaiin-all-status-sel status-pill ${statusPillClass(st)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" title="${_bfSt ? 'BF/治療進行: ' + _bfSt + ' (治療別タブで編集してください)' : ''}" style="font-size:10px;width:100%;background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
                   <option value="">未設定</option>
-                  ${_trOptValues.map(s => `<option value="${s}" ${st===s?'selected':''}>${_stLabel(s)}</option>`).join('')}
+                  ${stOptions.map(s => { const lbl = statusPillLabel(s); return `<option value="${s}" ${st===s?'selected':''}>${lbl}</option>`; }).join('')}
                 </select>`;
                 // 来院日 (v376: 短縮形式 "M/D" は今年として扱う / v389: applyDate フォールバック時は淡色 + ✱印)
                 const bookDateISO = (bdYear && bdMonth && bdDay)
@@ -10380,54 +10377,38 @@ async function renderKaiinAll(containerId) {
   });
 
   // === 編集: 状態 (DB upsert + bookingsData同期 + bf_status 同期) ===
-  // v420: 治療カテゴリ別 (drawKaiinRows と同じロジック)
-  //   - インプラント: d.status を更新 (BF lifecycle 経由しない)
-  //   - BF/矯正/その他: bf_status を更新 + BF_TO_STATUS で d.status 連動
-  // これで治療タブと一覧タブの編集が完全双方向同期
+  // v423 緊急ロールバック: v419/v420 で導入した BF/治療カテゴリ別の保存処理が
+  // 治療別タブで足立さんが入れたデータと競合してデータ消失している疑いがあるため、
+  // v418 以前のシンプルなロジックに戻す。
+  // 一覧タブからのステータス編集は status (d.status) のみ更新し、bf_status の
+  // 直接編集は治療別タブ (BF/矯正等) で行う運用に戻す。
   el.querySelectorAll('.kaiin-all-status-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
       const name = sel.dataset.name, apply = sel.dataset.apply, val = sel.value || null;
-      const isImplant = sel.dataset.isImplant === '1';
-      try {
-        const payload = { name, apply_date: apply };
-        const key = name + '|' + apply;
-        if (isImplant) {
-          // インプラント: d.status を保存
-          payload.status = val;
-          // BF lifecycle 連動は不要 (インプラントは BF tracking 対象外)
+      // 未設定への変更は誤操作防止のため確認
+      if (!val) {
+        if (!confirm(`${name} のステータスを「未設定」に戻しますか？\n(BFステータスや治療進行情報には影響しません)`)) {
+          // 元の値に戻す
           const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-          if (target) target.status = val || '';
-        } else {
-          // BF/矯正/その他: bf_status を真として保存
-          payload.bf_status = val;
-          const mappedStatus = val ? (BF_TO_STATUS[val] !== undefined ? BF_TO_STATUS[val] : val) : null;
-          payload.status = mappedStatus;
-          // キャッシュ更新
-          if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
-            const curBF = (bfLifecycleCache[key] || {}).bf_status;
-            if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
-            bfLifecycleCache[key].bf_status = val;
-            // bf_history に記録 (履歴トラッキング)
-            if (val && curBF !== val && typeof sb !== 'undefined') {
-              try {
-                await sb.from('bf_history').insert({
-                  booking_name: name, booking_apply_date: apply,
-                  from_status: curBF || null, to_status: val,
-                  changed_by: getLoggedUserName() + '(一覧編集)'
-                });
-              } catch(_){}
-            }
-          }
-          const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-          if (target) target.status = mappedStatus || '';
+          if (target && target.status) sel.value = target.status;
+          return;
         }
+      }
+      try {
+        const payload = { name, apply_date: apply, status: val };
+        // 一覧タブからの編集は d.status のみ更新 (bf_status には触らない)
+        // → 治療別タブでの足立さんの編集 (bf_status / 売上等) を上書きしない
+        // 旧 v418 以前は STATUS_TO_BF で bf_status も連動更新していたが、
+        // データ消失リスクが高いため一覧編集では連動させない
         await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
-        // bk-extra にも反映 (予約一覧との整合)
+        const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+        if (target) target.status = val || '';
+        // bk-extra にも反映
         try {
           const bkEx = loadData('bk-extra', {});
+          const key = name + '|' + apply;
           if (!bkEx[key]) bkEx[key] = {};
-          bkEx[key].editedStatus = payload.status || '';
-          if (!isImplant) bkEx[key].editedBFStatus = val || '';
+          bkEx[key].editedStatus = val || '';
           saveData('bk-extra', bkEx);
         } catch(_){}
         sel.style.outline = '2px solid #16a34a';
