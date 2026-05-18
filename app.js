@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v424';
+const APP_VERSION = 'v425';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9705,30 +9705,26 @@ function isBFBooking(d) {
 }
 
 // === 治療カテゴリー判定 (来院タブ用) ===
-// 優先順位: BFステータス(転向) > 成約施術 > 相談内容
+// v425: 「相談内容 (d.service)」ベースに厳密化
+//   - 相談=BF相談 → BFタブ
+//   - 相談=矯正相談 → 矯正タブ
+//   - 相談=インプラント相談 → インプラントタブ
+//   - 等々
+// 旧ロジックは bf_status (BF lifecycle) や contractService も見ていたため、
+// 矯正相談で来院した人がBF成約するとBFタブに表示され、ユーザーから
+// 「BFタブにBF相談と矯正相談が混在する」と混乱を招いていた
 function getTreatmentCategory(d) {
   if (!d) return 'その他';
-  const info = getBFInfo(d.name, d.applyDate) || {};
-  const bfSt = info.bf_status || '';
-  // BF→他治療へ確定したケース
-  if (bfSt === '矯正決定(BF保留)') return '矯正';
-  if (bfSt === 'ラブリエ決定(BF保留)') return 'ラブリエ';
-  if (bfSt === 'インプラント決定(BF保留)') return 'インプラント';
-  // BF系ステータスが設定されているならBF
-  if (bfSt && !['キャンセル', '離脱'].includes(bfSt)) return 'BF';
-  const cs = (d.contractService || '').toLowerCase();
   const sv = (d.service || '').toLowerCase();
-  const both = cs + ' ' + sv;
-  // 成約→相談の順で判定 (より確定度の高い方優先)
-  if (/bf|ブラック/i.test(both)) return 'BF';
-  if (/矯正|インビザ|ワイヤー|ﾋﾟｰｽ|マウスピース/i.test(both)) return '矯正';
-  if (/インプラント|ｲﾝﾌﾟﾗﾝﾄ/i.test(both)) return 'インプラント';
-  if (/ラブリエ|ﾗﾌﾞﾘｴ/i.test(both)) return 'ラブリエ';
-  if (/セラミック|補綴|クラウン|ベニア/i.test(both)) return '自費補綴';
-  if (/根治|根管|endo/i.test(both)) return '自費根治';
-  if (/ホワイトニング|ホワイト/i.test(both)) return 'ホワイトニング';
-  if (/リップ/i.test(both)) return 'リップアート';
-  if (/ジュエリー/i.test(both)) return 'ティースジュエリー';
+  if (/bf|ブラック|ラミネート/i.test(sv)) return 'BF';
+  if (/矯正|インビザ|ワイヤー|ﾋﾟｰｽ|マウスピース/i.test(sv)) return '矯正';
+  if (/インプラント|ｲﾝﾌﾟﾗﾝﾄ/i.test(sv)) return 'インプラント';
+  if (/ラブリエ|ﾗﾌﾞﾘｴ/i.test(sv)) return 'ラブリエ';
+  if (/セラミック|補綴|クラウン|ベニア/i.test(sv)) return '自費補綴';
+  if (/根治|根管|endo/i.test(sv)) return '自費根治';
+  if (/ホワイトニング|ホワイト/i.test(sv)) return 'ホワイトニング';
+  if (/リップ/i.test(sv)) return 'リップアート';
+  if (/ジュエリー/i.test(sv)) return 'ティースジュエリー';
   return 'その他';
 }
 
