@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v439';
+const APP_VERSION = 'v440';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12912,9 +12912,10 @@ function _followupMemoDate(d = new Date()) {
 }
 async function appendFollowupMemo(name, apply, flowStatus, options = {}) {
   const label = FOLLOWUP_MEMO_LABELS[flowStatus];
-  if (!label || !name || !apply) return false;
+  // options.line でカスタムのメモ行を指定可能 (例: 「🔁 6/3 再予約」)
+  const line = options.line || (label ? `${_followupMemoDate()} ${label}` : '');
+  if (!line || !name || !apply) return false;
   const key = name + '|' + apply;
-  const line = `${_followupMemoDate()} ${label}`;
   const memos = (typeof loadData === 'function') ? loadData('bk-memos', {}) : {};
   const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
   const info = (typeof getBFInfo === 'function') ? getBFInfo(name, apply) : null;
@@ -13405,9 +13406,57 @@ function renderFollowup() {
       }, 100);
     } catch(e) { console.warn('navigate to booking failed', e); }
   };
+  // 「📅再予約」: 再予約日を入力 → メモに「🔁 M/D 再予約」追記 + 予約日を更新して予約管理に復活
+  const rebookWithDate = async (name, apply) => {
+    const d = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+    if (!d) { showToast('対象の予約が見つかりません', true); return; }
+    const newDate = await _promptNewBookDate(d); // "YYYY-MM-DD HH:MM" or null
+    if (!newDate) return;
+    try {
+      const key = name + '|' + apply;
+      const md = (() => {
+        const m = String(newDate).match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
+        return m ? `${parseInt(m[2], 10)}/${parseInt(m[3], 10)}` : newDate;
+      })();
+      // 予約管理の表示判定 _effSt に合わせ、治療タイプに応じた正しいフィールドを「予約変更」にする
+      const isBF = (typeof isBFBooking === 'function') && isBFBooking(d);
+      if (isBF) {
+        // BF: 正データは bf_status。予約日(book_date)は booking_status に保存。
+        await safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: apply, book_date: newDate }, options:{ onConflict:'name,apply_date' } });
+        await saveBFLifecycleField(name, apply, 'bf_status', '予約変更');
+        d.bookDate = newDate;
+      } else {
+        // 矯正/インプラント/その他: 正データは d.status
+        await safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: apply, book_date: newDate, status: '予約変更' }, options:{ onConflict:'name,apply_date' } });
+        d.bookDate = newDate;
+        d.status = '予約変更';
+      }
+      // bk-extra (予約タブの編集履歴) にも反映
+      try {
+        const bkEx = loadData('bk-extra', {});
+        if (!bkEx[key]) bkEx[key] = {};
+        bkEx[key].editedBookDate = newDate;
+        if (!isBF) bkEx[key].editedStatus = '予約変更';
+        saveData('bk-extra', bkEx);
+      } catch(_){}
+      // メモに「🔁 M/D 再予約」を追記
+      await appendFollowupMemo(name, apply, null, { line: `🔁 ${md} 再予約`, awaitSave: false });
+      // 追いかけステータス = 再予約獲得 (成果カウント)
+      const meta = loadFollowupMeta();
+      meta[key] = stampMeta(meta[key], '再予約獲得');
+      saveFollowupMeta(meta);
+      showToast(`📅 ${name} を再予約 (${md}) にしました（予約管理に反映・メモ追記）`);
+      renderFollowup();
+      if (typeof syncCrossTabRender === 'function') syncCrossTabRender('followup');
+    } catch (e) {
+      console.warn('rebookWithDate failed', e);
+      showToast('再予約の保存に失敗', true);
+    }
+  };
   el._followupHandlers = {
     updateSelection: updateFollowupSelectionUI,
     setFollowupFlow,
+    rebookWithDate,
     quickStatusFixNoToast,
     goBookingRow,
     bulkFlow: async (flow) => {
@@ -13456,7 +13505,12 @@ function renderFollowup() {
       }
       const flowBtn = ev.target.closest('.followup-flow-btn');
       if (flowBtn && el.contains(flowBtn)) {
-        h.setFollowupFlow?.(flowBtn.dataset.name, flowBtn.dataset.apply, flowBtn.dataset.flow);
+        // 「再予約」は日付入力 → メモ追記 + 予約日更新で予約管理に復活
+        if (flowBtn.dataset.flow === '再予約獲得') {
+          h.rebookWithDate?.(flowBtn.dataset.name, flowBtn.dataset.apply);
+        } else {
+          h.setFollowupFlow?.(flowBtn.dataset.name, flowBtn.dataset.apply, flowBtn.dataset.flow);
+        }
         return;
       }
       const bulkBtn = ev.target.closest('.followup-bulk-flow');
