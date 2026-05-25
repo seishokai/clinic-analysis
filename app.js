@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v434';
+const APP_VERSION = 'v435';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1228,7 +1228,7 @@ const SMS_TEMPLATES_DEFAULT = [
   {
     id: 'no-show',
     icon: '⚠️',
-    label: '無断キャンセル',
+    label: '来院確認',
     desc: '来院確認連絡',
     body: '{name}様\n\n清翔会です。\n本日 {time} のご予約でしたが、まだご来院がないようでしたので確認のご連絡です。\n\nご都合がつかれましたらこのままご返信ください。'
   },
@@ -7376,7 +7376,7 @@ function renderBookings() {
   // Stats（除外は統計から除く）
   // v285: 数の整合性を保つ
   //   過去予約(予約日<今日) で 来院していない人 → 全部キャンセルとしてカウント
-  //   ① 正式キャンセル: status=キャンセル
+  //   ① キャンセル済: status=キャンセル
   //   ② 未来店(過去要対応): status=未対応 で 予約日<今日 → 来なかった
   //   ③ 未来店(過去進行中): status=確認済/連絡待ち/予約変更等 で 予約日<今日 → 来なかった
   //   進行中 = 未来予約(予約日>=今日) で 確認済/連絡待ち等
@@ -7406,16 +7406,16 @@ function renderBookings() {
     return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
   };
   const prospective = active.filter(d => !_is実成約Bk(d) && _amtBk(d) > 0).length;
-  // 正式キャンセル件数
+  // キャンセル済件数
   const formalCancelled = active.filter(d => _effSt(d) === 'キャンセル').length;
-  // 未来店 = 過去予約 で 来院せず 正式キャンセルでもない
+  // 未来店 = 過去予約 で 来院せず キャンセル済でもない
   const noShow = active.filter(d => {
     const eff = _effSt(d);
     if (eff === 'キャンセル') return false;
     if (isVisitedStatus(eff)) return false;
     return _isPastBooking(d);
   }).length;
-  // キャンセル(合計) = 正式キャンセル + 未来店
+  // キャンセル(合計) = キャンセル済 + 未来店
   const cancelled = formalCancelled + noShow;
   // 要対応 = 未来店のうち 未対応状態 (緊急度高)
   const overdueCountStat = active.filter(d => _isUnhandled(d) && _isPastBooking(d)).length;
@@ -7455,7 +7455,7 @@ function renderBookings() {
     <div class="stat-card ${overdueCount>0?'is-warning':''}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数 (キャンセル内の未来店に含まれます)"><span class="stat-label">⚠ 要対応</span><span class="stat-num">${overdueCount}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
     <div class="stat-card" title="未来予約 = 未対応のまま予約日がまだ未来。新規予約で未連絡な状態"><span class="stat-label">未来予約</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">未対応で予約日<br>がまだ未来</span></div>
     <div class="stat-card" title="進行中 = 未来予約で 確認済/後追いLINE済み/予約変更等 (連絡済で来院待ち)"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
-    <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店(来院せず・連絡途絶・予約日経過)"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
+    <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = キャンセル済 + 未来店(来院せず・連絡途絶・予約日経過)"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
     <div class="stat-card ${visited>0?'is-info':''}" title="来院済 = 来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階 (実際に来店した件数)"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
     <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
     <div class="stat-card ${contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${visited > 0 ? Math.round(contracted/visited*100) : 0}%（${contracted}/${visited}）</span></div>
@@ -10029,7 +10029,7 @@ async function renderKaiinAll(containerId) {
       <div class="stat-card ${overdue>0?'is-warning':''}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数"><span class="stat-label">⚠ 要対応</span><span class="stat-num">${overdue}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
       <div class="stat-card" title="未来予約 = 未対応のまま予約日がまだ未来"><span class="stat-label">未来予約</span><span class="stat-num">${pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">未対応で予約日<br>がまだ未来</span></div>
       <div class="stat-card" title="進行中 = 未来予約で 確認済/連絡待ち/予約変更等"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num" style="color:#7c3aed">${inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
-      <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
+      <div class="stat-card ${cancelled>0?'is-danger':''}" title="キャンセル合計 = キャンセル済 + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num">${cancelled}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${formalCancelled}+未来店${noShow}</span></div>
       <div class="stat-card ${visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 次回予約連絡待ち + 治療段階"><span class="stat-label">来院済</span><span class="stat-num">${visited}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">来院率 ${visitRate}%（${pastVisited}/${pastBookings.length}）</span></div>
       <div class="stat-card ${prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num" style="color:#d97706">${prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
       <div class="stat-card ${contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num">${contracted}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:11px">成約率 ${contractRate}%（${contracted}/${visited}）</span></div>
@@ -10885,7 +10885,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       <div class="stat-card ${sum.overdue>0?'is-warning':''}" title="⚠ 未対応のまま予約日を過ぎた緊急対応必要件数"><span class="stat-label">⚠ 要対応</span><span class="stat-num kaiin-sum-overdue">${sum.overdue}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">⚠ 急ぎ電話<br>(キャンセル内数)</span></div>
       <div class="stat-card" title="未来予約 = 未対応のまま予約日がまだ未来"><span class="stat-label">未来予約</span><span class="stat-num kaiin-sum-pending">${sum.pending}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">未対応で予約日<br>がまだ未来</span></div>
       <div class="stat-card" title="進行中 = 未来予約で 確認済/連絡待ち/予約変更等"><span class="stat-label" style="color:#7c3aed">進行中</span><span class="stat-num kaiin-sum-progress" style="color:#7c3aed">${sum.inProgress}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">確認済/連絡済<br>(未来予約)</span></div>
-      <div class="stat-card ${sum.cancelled>0?'is-danger':''}" title="キャンセル合計 = 正式キャンセル + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num kaiin-sum-cancelled">${sum.cancelled}</span><span class="stat-yoy kaiin-sum-cancelled-detail" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${sum.formalCancelled}+未来店${sum.noShow}</span></div>
+      <div class="stat-card ${sum.cancelled>0?'is-danger':''}" title="キャンセル合計 = キャンセル済 + 未来店"><span class="stat-label">キャンセル</span><span class="stat-num kaiin-sum-cancelled">${sum.cancelled}</span><span class="stat-yoy kaiin-sum-cancelled-detail" style="color:var(--text-sub);font-size:10px;font-weight:600;line-height:1.3">取消${sum.formalCancelled}+未来店${sum.noShow}</span></div>
       <div class="stat-card ${sum.visited>0?'is-info':''}" title="来院済 + 検討中 + 成約 + 治療段階"><span class="stat-label">来院済</span><span class="stat-num kaiin-sum-visited">${sum.visited}</span><span class="stat-yoy kaiin-sum-visited-rate" style="color:var(--text-sub);font-size:11px">来院率 ${sum.visitRate}%（${sum.pastVisited}/${sum.pastBookings.length}）</span></div>
       <div class="stat-card ${sum.prospective>0?'is-warning':''}" title="見込み = 売上金額が入力されているが、まだ実成約ではない人 (BF治療進行中・印象待ち・セット待ち 等)"><span class="stat-label" style="color:#d97706">見込み</span><span class="stat-num kaiin-sum-prospective" style="color:#d97706">${sum.prospective}</span><span class="stat-yoy" style="color:var(--text-sub);font-size:10px;font-weight:400;line-height:1.3">金額入力済<br>(成約一歩前)</span></div>
       <div class="stat-card ${sum.contracted>0?'is-success':''}" title="実成約 = 累計成約 (status=成約 / BF治療進行中の人も契約済みとして含む)"><span class="stat-label">実成約</span><span class="stat-num kaiin-sum-contracted">${sum.contracted}</span><span class="stat-yoy kaiin-sum-contracted-rate" style="color:var(--text-sub);font-size:11px">成約率 ${sum.contractRate}%（${sum.contracted}/${sum.visited}）</span></div>
@@ -12737,7 +12737,7 @@ let _promoTabState = {
 };
 
 // === v393: 追いかけタブ ===
-// キャンセル/無断キャンセル/検討中で長期動きなし の患者を再アプローチ
+// キャンセル/来院結果未入力/検討中で長期動きなし の患者を再アプローチ
 const FOLLOWUP_META_LS_KEY = 'followup-meta';
 const FOLLOWUP_META_SHARED_KEY = 'followup_tracking';
 const FOLLOWUP_FLOW_STATUSES = [
@@ -12859,17 +12859,17 @@ function renderFollowup() {
         reason = 'キャンセル(メモあり)';
       } else {
         category = 'cancelled';
-        reason = '正式キャンセル';
+        reason = 'キャンセル済';
       }
     } else if (status !== 'キャンセル' && (typeof isVisitedStatus === 'function' ? !isVisitedStatus(status) : !['来院済','成約','検討中'].includes(status)) && status !== '除外' && isPastBd) {
-      // 過去予約で来院もキャンセルもしてない
-      // v399: メモがあれば「状態確認必要」、なければ純粋な無断キャンセル
+      // 過去予約で来院結果もキャンセルも入力されていない
+      // v399/v435: 患者側の未連絡とは限らないため「来院結果未入力」として扱う
       if (hasMemo) {
         category = 'review';
         reason = `${status||'未対応'}(メモあり)`;
       } else {
         category = 'noshow';
-        reason = '無断キャンセル';
+        reason = '来院結果未入力';
       }
     } else if (status === '検討中') {
       // 検討中で 2週間以上動きなし
@@ -12965,7 +12965,7 @@ function renderFollowup() {
       <span style="color:var(--border)">|</span>
       <span><span style="color:var(--text-sub)">再予約 (成果)</span> <strong style="color:#059669;font-size:13px">${totalRebooked}</strong></span>
       <span style="color:var(--border)">|</span>
-      <span style="color:var(--text-muted)">内訳: キャンセル ${byReason.cancelled} / 無断 ${byReason.noshow} / 確認 ${byReason.review} / 検討 ${byReason.considering}</span>
+      <span style="color:var(--text-muted)">内訳: キャンセル ${byReason.cancelled} / 未入力 ${byReason.noshow} / 確認 ${byReason.review} / 検討 ${byReason.considering}</span>
     </div>
     <!-- 追いかけフロートグル -->
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
