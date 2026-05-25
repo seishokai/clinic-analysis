@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v433';
+const APP_VERSION = 'v434';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3695,13 +3695,13 @@ function renderHomeDashboard() {
   el.querySelectorAll('.home-card, .home-alert').forEach(c => {
     c.addEventListener('click', () => {
       const action = c.dataset.action;
-      // v401: 状況確認カード → 追いかけタブの「状態確認必要」へジャンプ
+      // v401/v434: 状況確認カード → 追いかけタブの「未対応」へジャンプ
       if (action === 'status-review') {
         try {
           switchView('followup');
           setTimeout(() => {
             if (typeof _followupState !== 'undefined') {
-              _followupState.category = 'review';
+              _followupState.category = 'todo';
               if (typeof renderFollowup === 'function') renderFollowup();
             }
           }, 100);
@@ -5260,6 +5260,7 @@ function switchView(view) {
   }
   // v393: 追いかけタブ切替時に renderFollowup
   if (view === 'followup') {
+    if (typeof syncSharedFollowupMeta === 'function') syncSharedFollowupMeta();
     setTimeout(() => { if (typeof renderFollowup === 'function') renderFollowup(); }, 50);
   }
   // 管理タブ切替時: 権限管理を自動で表示
@@ -12737,8 +12738,61 @@ let _promoTabState = {
 
 // === v393: 追いかけタブ ===
 // キャンセル/無断キャンセル/検討中で長期動きなし の患者を再アプローチ
+const FOLLOWUP_META_LS_KEY = 'followup-meta';
+const FOLLOWUP_META_SHARED_KEY = 'followup_tracking';
+const FOLLOWUP_FLOW_STATUSES = [
+  '未対応',
+  '架電予定',
+  '架電済・不通',
+  '架電済・留守電',
+  'SMS送信済',
+  '接触済・検討中',
+  '接触済・予約案内済',
+  '再予約獲得',
+  '対応終了'
+];
+const FOLLOWUP_STATUS_STYLE = {
+  '未対応': { bg:'#f3f4f6', fg:'#4b5563', bd:'#d1d5db' },
+  '架電予定': { bg:'#fef3c7', fg:'#92400e', bd:'#fde68a' },
+  '架電済・不通': { bg:'#fee2e2', fg:'#b91c1c', bd:'#fecaca' },
+  '架電済・留守電': { bg:'#fff7ed', fg:'#c2410c', bd:'#fed7aa' },
+  'SMS送信済': { bg:'#ede9fe', fg:'#6d28d9', bd:'#c4b5fd' },
+  '接触済・検討中': { bg:'#e0f2fe', fg:'#0369a1', bd:'#bae6fd' },
+  '接触済・予約案内済': { bg:'#dbeafe', fg:'#1d4ed8', bd:'#bfdbfe' },
+  '再予約獲得': { bg:'#dcfce7', fg:'#15803d', bd:'#86efac' },
+  '対応終了': { bg:'#f3f4f6', fg:'#6b7280', bd:'#d1d5db' },
+  '除外': { bg:'#f3f4f6', fg:'#6b7280', bd:'#d1d5db' }
+};
+function loadFollowupMeta() {
+  return (typeof loadData === 'function') ? loadData(FOLLOWUP_META_LS_KEY, {}) : {};
+}
+function saveFollowupMeta(meta) {
+  try { if (typeof saveData === 'function') saveData(FOLLOWUP_META_LS_KEY, meta || {}); } catch(_){}
+  if (typeof loadSharedSetting === 'function' && typeof saveSharedSetting === 'function') {
+    const snapshot = { ...(meta || {}) };
+    loadSharedSetting(FOLLOWUP_META_SHARED_KEY, {}).then(remote => {
+      const merged = { ...((remote && typeof remote === 'object') ? remote : {}), ...snapshot };
+      return saveSharedSetting(FOLLOWUP_META_SHARED_KEY, merged);
+    }).catch(() => {});
+  }
+}
+async function syncSharedFollowupMeta() {
+  try {
+    if (typeof loadSharedSetting !== 'function') return;
+    const remote = await loadSharedSetting(FOLLOWUP_META_SHARED_KEY, null);
+    if (remote && typeof remote === 'object' && !Array.isArray(remote)) {
+      try { localStorage.setItem(FOLLOWUP_META_LS_KEY, JSON.stringify(remote)); } catch(_){}
+      if (currentView === 'followup' && typeof renderFollowup === 'function') renderFollowup();
+    }
+  } catch(_){}
+}
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', () => setTimeout(syncSharedFollowupMeta, 1200));
+} else {
+  setTimeout(syncSharedFollowupMeta, 1200);
+}
 let _followupState = {
-  category: 'cancelled',  // 'cancelled' | 'noshow' | 'considering' | 'review' | 'all'
+  category: 'todo',  // 'todo' | 'calling' | 'sms' | 'connected' | 'rebooked' | 'closed' | 'all'
   search: '',
   hideWithRebooking: false,  // 再予約済を非表示
   selected: new Set(),  // v402: 一括編集用の選択 (name|applyDate)
@@ -12750,6 +12804,22 @@ function renderFollowup() {
   const data = (typeof getFilteredBookingsData === 'function' ? getFilteredBookingsData() : (bookingsData || []));
   const today = new Date(); today.setHours(0,0,0,0);
   const todayMs = today.getTime();
+  const followMeta = loadFollowupMeta();
+  const followKeyOf = (d) => (d.name || '') + '|' + (d.applyDate || '');
+  const getFlowStatus = (d, rebooking) => {
+    const meta = followMeta[followKeyOf(d)] || {};
+    if (rebooking) return '再予約獲得';
+    return meta.status || '未対応';
+  };
+  const flowStyle = (status) => FOLLOWUP_STATUS_STYLE[status] || FOLLOWUP_STATUS_STYLE['未対応'];
+  const flowGroup = (status) => {
+    if (status === '再予約獲得') return 'rebooked';
+    if (status === '対応終了' || status === '除外') return 'closed';
+    if (status === 'SMS送信済') return 'sms';
+    if (status === '接触済・検討中' || status === '接触済・予約案内済') return 'connected';
+    if (status === '架電予定' || status === '架電済・不通' || status === '架電済・留守電') return 'calling';
+    return 'todo';
+  };
 
   // SMS履歴をマップ化
   const smsHist = (typeof loadData === 'function') ? loadData('sms-history', []) : [];
@@ -12829,9 +12899,12 @@ function renderFollowup() {
     // SMS履歴
     const phoneKey = String(d.phone || '').replace(/[^0-9+]/g,'');
     const sms = smsByPhone[phoneKey] || [];
+    const flowStatus = getFlowStatus(d, rebooking);
 
     candidates.push({
       d, category, reason,
+      flowStatus,
+      flowGroup: flowGroup(flowStatus),
       rebooking,
       sms,
       lastSms: sms.length ? sms[sms.length-1] : null,
@@ -12839,17 +12912,22 @@ function renderFollowup() {
   });
 
   // フィルタ
-  const cat = _followupState.category;
+  const validFlowCats = new Set(['todo','calling','sms','connected','rebooked','closed','all']);
+  const cat = validFlowCats.has(_followupState.category) ? _followupState.category : 'todo';
+  if (cat !== _followupState.category) _followupState.category = cat;
   let filtered = candidates;
-  if (cat !== 'all') filtered = filtered.filter(c => c.category === cat);
-  if (_followupState.hideWithRebooking) filtered = filtered.filter(c => !c.rebooking);
+  if (cat !== 'all') filtered = filtered.filter(c => c.flowGroup === cat);
+  if (_followupState.hideWithRebooking) filtered = filtered.filter(c => c.flowStatus !== '再予約獲得');
   if (_followupState.search) {
     const s = _followupState.search.toLowerCase();
     filtered = filtered.filter(c => (c.d.name || '').toLowerCase().includes(s));
   }
 
-  // 並べ替え: 再予約あり優先 (成果) → SMS済み → 未送信
+  // 並べ替え: 未対応優先 → 再予約あり → SMS済み → 予約日新しい順
   filtered.sort((a, b) => {
+    const order = { 'todo': 0, 'calling': 1, 'sms': 2, 'connected': 3, 'rebooked': 4, 'closed': 5 };
+    const og = (order[a.flowGroup] ?? 9) - (order[b.flowGroup] ?? 9);
+    if (og) return og;
     if (!!a.rebooking !== !!b.rebooking) return a.rebooking ? -1 : 1;
     if (!!a.lastSms !== !!b.lastSms) return a.lastSms ? -1 : 1;
     const ad = (typeof parseDate === 'function') ? (parseDate(a.d.bookDate)?.getTime() || 0) : 0;
@@ -12858,12 +12936,12 @@ function renderFollowup() {
   });
 
   // 集計
-  // v399: review カテゴリ追加 (メモあり 過去予約 + 未対応/キャンセル → 状態確認必要)
-  const byCat = { cancelled: 0, noshow: 0, considering: 0, review: 0 };
-  candidates.forEach(c => byCat[c.category]++);
+  const byFlow = { todo: 0, calling: 0, sms: 0, connected: 0, rebooked: 0, closed: 0 };
+  candidates.forEach(c => { byFlow[c.flowGroup] = (byFlow[c.flowGroup] || 0) + 1; });
+  const byReason = { cancelled: 0, noshow: 0, considering: 0, review: 0 };
+  candidates.forEach(c => byReason[c.category]++);
   const totalSent = candidates.filter(c => c.lastSms).length;
-  const totalRebooked = candidates.filter(c => c.rebooking).length;
-  const conversionRate = totalSent > 0 ? Math.round(totalRebooked / totalSent * 100) : 0;
+  const totalRebooked = candidates.filter(c => c.flowStatus === '再予約獲得').length;
 
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
@@ -12879,29 +12957,39 @@ function renderFollowup() {
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;font-size:11px">
       <span><span style="color:var(--text-sub)">対象</span> <strong style="font-size:13px">${candidates.length}</strong></span>
       <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">未対応</span> <strong style="color:#b45309;font-size:13px">${byFlow.todo}</strong></span>
+      <span><span style="color:var(--text-sub)">架電系</span> <strong style="color:#c2410c;font-size:13px">${byFlow.calling}</strong></span>
+      <span><span style="color:var(--text-sub)">接触済</span> <strong style="color:#0369a1;font-size:13px">${byFlow.connected}</strong></span>
+      <span style="color:var(--border)">|</span>
       <span><span style="color:var(--text-sub)">SMS送信済</span> <strong style="color:#7c3aed;font-size:13px">${totalSent}</strong></span>
       <span style="color:var(--border)">|</span>
-      <span><span style="color:var(--text-sub)">再予約 (成果)</span> <strong style="color:#059669;font-size:13px">${totalRebooked}</strong> <span style="color:var(--text-sub)">/ ${totalSent} 中 = ${conversionRate}%</span></span>
+      <span><span style="color:var(--text-sub)">再予約 (成果)</span> <strong style="color:#059669;font-size:13px">${totalRebooked}</strong></span>
+      <span style="color:var(--border)">|</span>
+      <span style="color:var(--text-muted)">内訳: キャンセル ${byReason.cancelled} / 無断 ${byReason.noshow} / 確認 ${byReason.review} / 検討 ${byReason.considering}</span>
     </div>
-    <!-- カテゴリトグル -->
+    <!-- 追いかけフロートグル -->
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
-      <span style="font-size:11px;color:var(--text-sub)">対象:</span>
+      <span style="font-size:11px;color:var(--text-sub)">追いかけ:</span>
       ${[
+        { key: 'todo', label: '未対応', count: byFlow.todo, color: '#b45309' },
+        { key: 'calling', label: '架電・不通', count: byFlow.calling, color: '#c2410c' },
+        { key: 'sms', label: 'SMS済', count: byFlow.sms, color: '#7c3aed' },
+        { key: 'connected', label: '接触済', count: byFlow.connected, color: '#0369a1' },
+        { key: 'rebooked', label: '再予約獲得', count: byFlow.rebooked, color: '#059669' },
+        { key: 'closed', label: '終了/除外', count: byFlow.closed, color: '#6b7280' },
         { key: 'all', label: '全て', count: candidates.length, color: '#6b7280' },
-        { key: 'review', label: '🤝 状態確認必要', count: byCat.review, color: '#0284c7' },
-        { key: 'cancelled', label: '💔 キャンセル', count: byCat.cancelled, color: '#dc2626' },
-        { key: 'noshow', label: '⚠️ 無断キャンセル', count: byCat.noshow, color: '#b45309' },
-        { key: 'considering', label: '🤔 検討中(2週間+)', count: byCat.considering, color: '#7c3aed' },
       ].map(b => `<button class="followup-cat-btn filter-btn ${cat===b.key?'is-active':''}" data-cat="${b.key}" style="${cat===b.key?`background:${b.color};color:#fff;font-weight:700`:''}">${b.label} <span style="font-size:10px;opacity:.8">${b.count}</span></button>`).join('')}
     </div>
-    ${cat==='review' ? '<div style="font-size:11px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:6px 10px;margin-bottom:6px">💡 過去の予約日 + メモあり + 未対応/キャンセル の方達。実際は来院済の可能性が高いので「✅ 来院済にする」で1タップ修正できます。</div>' : ''}
+    <div style="font-size:11px;color:#374151;background:#f9fafb;border:1px solid var(--border);border-radius:6px;padding:6px 10px;margin-bottom:6px">追いかけは「予約ステータス」と別管理です。架電・SMS・接触・再予約の進捗だけをここで更新します。</div>
     <!-- v402/v431: 一括アクションバー (選択更新は再描画せずDOMだけ更新) -->
     <div id="followup-bulk-bar" style="position:sticky;top:0;z-index:50;display:${_followupState.selected.size > 0 ? 'flex' : 'none'};gap:8px;align-items:center;background:linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%);color:#fff;padding:8px 12px;border-radius:8px;margin-bottom:6px;box-shadow:0 4px 12px rgba(124,58,237,.3)">
       <span id="followup-selected-count" style="font-size:13px;font-weight:700">✓ ${_followupState.selected.size}件 選択中</span>
       <span style="flex:1"></span>
-      <button id="followup-bulk-visited" class="filter-btn" style="background:#fff;color:#15803d;border:1px solid #dcfce7;font-weight:700;padding:6px 14px">✅ 一括 来院済にする</button>
-      <button id="followup-bulk-cancel" class="filter-btn" style="background:#fff;color:#b91c1c;border:1px solid #fecaca;font-weight:700;padding:6px 14px">❌ 一括 キャンセル</button>
-      <button id="followup-bulk-delete" class="filter-btn" style="background:#fff;color:#6b7280;border:1px solid #d1d5db;font-weight:700;padding:6px 14px">🗑 一括 削除</button>
+      <button class="followup-bulk-flow filter-btn" data-flow="架電済・不通" style="background:#fff;color:#b91c1c;border:1px solid #fecaca;font-weight:700;padding:6px 12px">📞 一括 不通</button>
+      <button class="followup-bulk-flow filter-btn" data-flow="SMS送信済" style="background:#fff;color:#6d28d9;border:1px solid #ddd6fe;font-weight:700;padding:6px 12px">📱 一括 SMS済</button>
+      <button class="followup-bulk-flow filter-btn" data-flow="再予約獲得" style="background:#fff;color:#15803d;border:1px solid #dcfce7;font-weight:700;padding:6px 12px">📅 一括 再予約</button>
+      <button class="followup-bulk-flow filter-btn" data-flow="対応終了" style="background:#fff;color:#6b7280;border:1px solid #d1d5db;font-weight:700;padding:6px 12px">⏸ 一括 終了</button>
+      <button id="followup-bulk-delete" class="filter-btn" style="background:#fff;color:#6b7280;border:1px solid #d1d5db;font-weight:700;padding:6px 12px">🗑 一括 除外</button>
       <button id="followup-bulk-clear" class="filter-btn" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 12px" title="選択解除">✕ 解除</button>
     </div>
     <div class="card" style="padding:6px">
@@ -12910,14 +12998,15 @@ function renderFollowup() {
           <thead><tr>
             <th style="width:36px;text-align:center"><input type="checkbox" id="followup-select-all" title="表示中を全選択" style="width:14px;height:14px;cursor:pointer"></th>
             <th style="text-align:left;width:130px">名前</th>
-            <th style="width:90px">状況</th>
+            <th style="width:92px">対象理由</th>
+            <th style="width:130px">追いかけ</th>
             <th style="width:70px">予約日</th>
             <th style="width:70px">医院</th>
             <th style="text-align:left;width:160px">連絡先</th>
             <th style="width:100px">SMS履歴</th>
             <th style="width:120px">再予約</th>
             <th style="text-align:left">メモ</th>
-            <th style="width:130px;text-align:center">クイック修正</th>
+            <th style="width:240px;text-align:center">追いかけ操作</th>
           </tr></thead>
           <tbody>
             ${filtered.map(c => {
@@ -12929,22 +13018,16 @@ function renderFollowup() {
               const fmtMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${parseInt(m[2])}/${parseInt(m[3])}` : '-'; };
               const fac = typeof normFac === 'function' ? (normFac(d.facility) || '-') : (d.facility || '-');
               const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
-              // 状況バッジ
+              // 対象理由バッジ
               const catColor = c.category === 'cancelled' ? { bg: '#fee2e2', fg: '#b91c1c' }
                             : c.category === 'noshow' ? { bg: '#fed7aa', fg: '#9a3412' }
                             : c.category === 'review' ? { bg: '#dbeafe', fg: '#0369a1' }
                             : { bg: '#ede9fe', fg: '#7c3aed' };
-              // v403: 状況セルを編集可能ドロップダウンに
-              const curStatus = d.status || '';
-              const statusOpts = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル'];
-              const statusSelHtml = `<select class="followup-status-sel" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="font-size:10px;padding:3px 4px;border:1px solid ${catColor.fg}55;border-radius:8px;background:${catColor.bg};color:${catColor.fg};font-weight:600;cursor:pointer;width:100%;min-width:90px">
-                <option value="" ${!curStatus?'selected':''}>未設定</option>
-                ${statusOpts.map(s => `<option value="${escapeHtml(s)}" ${curStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+              const reasonBadge = `<span style="display:inline-block;padding:3px 7px;border-radius:10px;background:${catColor.bg};color:${catColor.fg};border:1px solid ${catColor.fg}33;font-size:10px;font-weight:700">${escapeHtml(c.reason)}</span>`;
+              const fs = flowStyle(c.flowStatus);
+              const flowSelHtml = `<select class="followup-flow-sel" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="font-size:10px;padding:3px 4px;border:1px solid ${fs.bd};border-radius:8px;background:${fs.bg};color:${fs.fg};font-weight:700;cursor:pointer;width:100%;min-width:120px">
+                ${FOLLOWUP_FLOW_STATUSES.map(s => `<option value="${escapeHtml(s)}" ${c.flowStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
               </select>`;
-              // 補助情報 (メモあり / N日経過 等)
-              const reasonHint = c.reason !== curStatus && c.reason !== (curStatus + '(メモあり)')
-                ? `<div style="font-size:9px;color:var(--text-muted);margin-top:2px;text-align:center">${escapeHtml(c.reason.replace(curStatus, '').replace(/[()（）]/g,'').trim() || c.reason)}</div>`
-                : '';
               // SMS 履歴サマリー
               const smsCell = c.lastSms
                 ? `<span title="${escapeHtml(c.sms.length + '回送信。最終: ' + new Date(c.lastSms.sentAt).toLocaleDateString())}" style="display:inline-block;padding:2px 7px;background:#ede9fe;color:#7c3aed;border-radius:10px;font-size:10px;font-weight:600;border:1px solid #c4b5fd">📱 ${c.sms.length}回</span><div style="font-size:9px;color:var(--text-muted);margin-top:1px">最終: ${escapeHtml(new Date(c.lastSms.sentAt).toLocaleDateString().slice(5))}</div>`
@@ -12953,10 +13036,14 @@ function renderFollowup() {
               const rebookCell = c.rebooking
                 ? `<span style="display:inline-block;padding:2px 7px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:700;border:1px solid #86efac" title="再予約日: ${escapeHtml(c.rebooking.applyDate||'')} / ステータス: ${escapeHtml(c.rebooking.status||'')}">✅ 再予約 ${escapeHtml(fmtMD(c.rebooking.applyDate))}</span>`
                 : '<span style="color:var(--text-muted);font-size:10px">なし</span>';
-              // v399: クイック修正ボタン (来院済 / キャンセル)
+              // v434: 追いかけ操作ボタン (予約本体のステータスは触らない)
               const quickFix = `
-                <button class="followup-quick-visited filter-btn" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="状態を「来院済」に変更" style="font-size:10px;padding:3px 6px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;margin-right:2px">✅来院</button>
-                <button class="followup-quick-cancel filter-btn" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="状態を「キャンセル」に変更" style="font-size:10px;padding:3px 6px;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;font-weight:700">❌取消</button>
+                <button class="followup-flow-btn filter-btn" data-flow="架電済・不通" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="架電したがつながらなかった" style="font-size:10px;padding:3px 6px;background:#fee2e2;color:#b91c1c;border:1px solid #fecaca;font-weight:700;margin-right:2px">📞不通</button>
+                <button class="followup-flow-btn filter-btn" data-flow="架電済・留守電" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="留守電対応" style="font-size:10px;padding:3px 6px;background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;font-weight:700;margin-right:2px">留守電</button>
+                <button class="followup-flow-btn filter-btn" data-flow="SMS送信済" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="SMS送信済みにする" style="font-size:10px;padding:3px 6px;background:#ede9fe;color:#6d28d9;border:1px solid #c4b5fd;font-weight:700;margin-right:2px">📱SMS</button>
+                <button class="followup-flow-btn filter-btn" data-flow="接触済・予約案内済" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="本人とつながり予約案内済みにする" style="font-size:10px;padding:3px 6px;background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe;font-weight:700;margin-right:2px">🙋接触</button>
+                <button class="followup-flow-btn filter-btn" data-flow="再予約獲得" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="再予約につながった" style="font-size:10px;padding:3px 6px;background:#dcfce7;color:#15803d;border:1px solid #86efac;font-weight:700;margin-right:2px">📅再予約</button>
+                <button class="followup-flow-btn filter-btn" data-flow="対応終了" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" title="これ以上追いかけない" style="font-size:10px;padding:3px 6px;background:#f3f4f6;color:#6b7280;border:1px solid #d1d5db;font-weight:700">終了</button>
               `;
               const rowKey = (d.name || '') + '|' + (d.applyDate || '');
               const isSelected = _followupState.selected.has(rowKey);
@@ -12964,7 +13051,8 @@ function renderFollowup() {
               return `<tr class="followup-row" data-key="${escapeHtml(rowKey)}" data-base-bg="${baseRowBg}" style="background:${isSelected?'#ede9fe':baseRowBg}">
                 <td style="text-align:center"><input type="checkbox" class="followup-row-check" data-key="${escapeHtml(rowKey)}" ${isSelected?'checked':''} style="width:14px;height:14px;cursor:pointer;accent-color:#7c3aed"></td>
                 <td style="font-weight:600"><a href="#" class="followup-name-link" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="color:#1d4ed8;text-decoration:none;display:inline-flex;align-items:center;gap:2px" title="予約一覧で詳細を見る">${escapeHtml(d.name||'')} <span style="font-size:9px;opacity:.6">↗</span></a></td>
-                <td>${statusSelHtml}${reasonHint}</td>
+                <td style="text-align:center">${reasonBadge}</td>
+                <td>${flowSelHtml}</td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fmtMD(d.bookDate))}</td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fac)}</td>
                 <td>${phone && phoneDigits ? `<span style="display:inline-flex;align-items:stretch;gap:0;border-radius:6px;overflow:hidden;border:1px solid #86efac;line-height:1"><a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#dcfce7;color:#15803d;font-weight:700;text-decoration:none;font-size:11px">📞 ${escapeHtml(phone)}</a><button type="button" class="followup-sms-btn" data-name="${escapeHtml(d.name||'')}" data-phone="${escapeHtml(d.phone||'')}" data-bookdate="${escapeHtml(d.bookDate||'')}" data-facility="${escapeHtml(d.facility||'')}" title="SMSを送る" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;background:#ede9fe;color:#7c3aed;border:none;border-left:1px solid #c4b5fd;font-weight:700;font-size:13px;cursor:pointer">📱</button></span>` : '<span style="color:var(--text-muted)">-</span>'}</td>
@@ -12973,7 +13061,7 @@ function renderFollowup() {
                 <td style="font-size:10px;color:var(--text-sub);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(memo||'')}">${escapeHtml((typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo.slice(0, 60)) || '-')}</td>
                 <td style="text-align:center;white-space:nowrap">${quickFix}</td>
               </tr>`;
-            }).join('') || '<tr><td colspan="10" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
+            }).join('') || '<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
           </tbody>
         </table>
       </div>
@@ -13054,52 +13142,35 @@ function renderFollowup() {
     if (target) target.status = newStatus;
   };
 
-  // v399: クイック修正 (来院済 / キャンセル に1タップで変更)
-  const _quickStatusFix = async (name, apply, newStatus) => {
+  // v434: 追いかけ専用ステータス (予約本体 status は触らない)
+  const _setFollowupFlow = (name, apply, flowStatus, silent = false) => {
     try {
-      const payload = { name, apply_date: apply, status: newStatus };
-      // BFステータスも同期 (STATUS_TO_BFマップ経由)
-      if (typeof STATUS_TO_BF !== 'undefined') {
-        const targetBF = STATUS_TO_BF[newStatus] !== undefined ? STATUS_TO_BF[newStatus] : newStatus;
-        payload.bf_status = targetBF;
-        if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
-          const key = name + '|' + apply;
-          if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
-          bfLifecycleCache[key].bf_status = targetBF;
-        }
+      const key = name + '|' + apply;
+      const meta = loadFollowupMeta();
+      if (!flowStatus || flowStatus === '未対応') {
+        delete meta[key];
+      } else {
+        meta[key] = {
+          ...(meta[key] || {}),
+          status: flowStatus,
+          updatedAt: new Date().toISOString(),
+          updatedBy: sessionStorage.getItem('currentRole') || sessionStorage.getItem('role') || userRole || ''
+        };
       }
-      await safeSave({ type:'upsert', table:'booking_status', payload, options:{ onConflict:'name,apply_date' } });
-      const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-      if (target) target.status = newStatus;
-      showToast(`✓ ${name} を「${newStatus}」に変更しました`);
+      saveFollowupMeta(meta);
+      if (!silent) showToast(`✓ ${name} を「${flowStatus || '未対応'}」にしました`);
       renderFollowup();
-      if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
     } catch(e) {
-      console.warn('quick fix failed', e);
-      showToast('状態変更に失敗', true);
+      console.warn('followup flow save failed', e);
+      if (!silent) showToast('追いかけ状態の保存に失敗', true);
     }
   };
-  el.querySelectorAll('.followup-quick-visited').forEach(btn => {
-    btn.addEventListener('click', () => _quickStatusFix(btn.dataset.name, btn.dataset.apply, '来院済'));
+  el.querySelectorAll('.followup-flow-btn').forEach(btn => {
+    btn.addEventListener('click', () => _setFollowupFlow(btn.dataset.name, btn.dataset.apply, btn.dataset.flow));
   });
-  // v403: 状況プルダウンで任意ステータスに変更
-  el.querySelectorAll('.followup-status-sel').forEach(sel => {
+  el.querySelectorAll('.followup-flow-sel').forEach(sel => {
     sel.addEventListener('change', () => {
-      const name = sel.dataset.name;
-      const apply = sel.dataset.apply;
-      const newStatus = sel.value || '';
-      if (!newStatus) {
-        // 空 = 未設定。bookingsData.status を空に
-        _quickStatusFix(name, apply, '');
-        return;
-      }
-      _quickStatusFix(name, apply, newStatus);
-    });
-  });
-  el.querySelectorAll('.followup-quick-cancel').forEach(btn => {
-    btn.addEventListener('click', () => {
-      if (!confirm(`${btn.dataset.name} さんを「キャンセル」状態にしますか?`)) return;
-      _quickStatusFix(btn.dataset.name, btn.dataset.apply, 'キャンセル');
+      _setFollowupFlow(sel.dataset.name, sel.dataset.apply, sel.value || '未対応');
     });
   });
 
@@ -13128,31 +13199,32 @@ function renderFollowup() {
     }
     updateFollowupSelectionUI();
   });
-  // 一括: 来院済
-  el.querySelector('#followup-bulk-visited')?.addEventListener('click', async () => {
-    const keys = [..._followupState.selected];
-    if (!confirm(`選択中の ${keys.length}件 を全て「来院済」に変更しますか?`)) return;
-    for (const k of keys) {
-      const [name, apply] = k.split('|');
-      try { await _quickStatusFixNoToast(name, apply, '来院済'); } catch(_){}
-    }
-    _followupState.selected.clear();
-    showToast(`✓ ${keys.length}件 を「来院済」に変更しました`);
-    renderFollowup();
-    if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
-  });
-  // 一括: キャンセル
-  el.querySelector('#followup-bulk-cancel')?.addEventListener('click', async () => {
-    const keys = [..._followupState.selected];
-    if (!confirm(`選択中の ${keys.length}件 を全て「キャンセル」に変更しますか?\n(取り消せません)`)) return;
-    for (const k of keys) {
-      const [name, apply] = k.split('|');
-      try { await _quickStatusFixNoToast(name, apply, 'キャンセル'); } catch(_){}
-    }
-    _followupState.selected.clear();
-    showToast(`✓ ${keys.length}件 を「キャンセル」に変更しました`);
-    renderFollowup();
-    if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+  // 一括: 追いかけフロー更新
+  el.querySelectorAll('.followup-bulk-flow').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const keys = [..._followupState.selected];
+      const flow = btn.dataset.flow || '未対応';
+      if (!keys.length) return;
+      if (!confirm(`選択中の ${keys.length}件 を「${flow}」に変更しますか?`)) return;
+      const meta = loadFollowupMeta();
+      keys.forEach(k => {
+        const [name, apply] = k.split('|');
+        if (!flow || flow === '未対応') {
+          delete meta[k];
+        } else {
+          meta[k] = {
+            ...(meta[k] || {}),
+            status: flow,
+            updatedAt: new Date().toISOString(),
+            updatedBy: sessionStorage.getItem('currentRole') || sessionStorage.getItem('role') || userRole || ''
+          };
+        }
+      });
+      saveFollowupMeta(meta);
+      _followupState.selected.clear();
+      showToast(`✓ ${keys.length}件 を「${flow}」にしました`);
+      renderFollowup();
+    });
   });
   // 一括: 削除(除外)
   el.querySelector('#followup-bulk-delete')?.addEventListener('click', async () => {
