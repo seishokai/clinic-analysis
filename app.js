@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v438';
+const APP_VERSION = 'v439';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -247,21 +247,23 @@ function syncCrossTabRender(skipSelf) {
     const skip = _syncCrossTabSkip;
     _syncCrossTabSkip = null;
     try {
-      // 予約タブ - bk-table が DOM にあれば再描画
-      if (skip !== 'bookings' && typeof renderBookings === 'function' && document.getElementById('bk-tbody')) {
+      const activeBookingSub = document.querySelector('#bk-sub-nav .sub-nav-btn.active')?.dataset.sub || 'bk-phone';
+      const activeKaiinSub = document.querySelector('#kaiin-sub-nav .sub-nav-btn.active')?.dataset.sub || 'kaiin-all';
+      // 予約タブ - 表示中のサブタブだけ再描画
+      if (currentView === 'bookings' && activeBookingSub === 'bk-list' && skip !== 'bookings' && typeof renderBookings === 'function' && document.getElementById('bk-tbody')) {
         renderBookings();
       }
       // 電話前確認 - phone-check-content が DOM にあれば再描画
-      if (skip !== 'phone' && typeof renderPhoneCheck === 'function' && document.getElementById('phone-check-content')) {
+      if (currentView === 'bookings' && activeBookingSub === 'bk-phone' && skip !== 'phone' && typeof renderPhoneCheck === 'function' && document.getElementById('phone-check-content')) {
         renderPhoneCheck();
       }
       // BF進捗 (lifecycle) が表示中なら再描画
       const lc = document.getElementById('bf-lifecycle');
-      if (lc && !lc.hidden && typeof updateBFFunnelAndTable === 'function' && typeof getBFRows === 'function') {
+      if (currentView === 'kaiin' && lc && !lc.hidden && typeof updateBFFunnelAndTable === 'function' && typeof getBFRows === 'function') {
         updateBFFunnelAndTable(getBFRows());
       }
       // 来院タブの各治療サブタブ - 表示中の sub-kaiin-* があれば renderKaiinTab 再実行
-      if (skip !== 'kaiin-tab') {
+      if (currentView === 'kaiin' && activeKaiinSub !== 'kaiin-all' && skip !== 'kaiin-tab') {
         const treatmentMap = { 'sub-kaiin-bf':'BF', 'sub-kaiin-kyosei':'矯正', 'sub-kaiin-implant':'インプラント', 'sub-kaiin-labrie':'ラブリエ', 'sub-kaiin-hotetsu':'自費補綴', 'sub-kaiin-konchi':'自費根治', 'sub-kaiin-whitening':'ホワイトニング', 'sub-kaiin-lipart':'リップアート', 'sub-kaiin-jewelry':'ティースジュエリー', 'sub-kaiin-other':'その他' };
         Object.keys(treatmentMap).forEach(subId => {
           const sub = document.getElementById(subId);
@@ -274,7 +276,7 @@ function syncCrossTabRender(skipSelf) {
         });
       }
       // 一覧タブ - sub-kaiin-list が表示中なら renderKaiinAll 再実行
-      if (skip !== 'kaiin-all') {
+      if (currentView === 'kaiin' && activeKaiinSub === 'kaiin-all' && skip !== 'kaiin-all') {
         const listSub = document.getElementById('sub-kaiin-list');
         if (listSub && !listSub.hidden && document.getElementById('kaiin-all-content') && typeof renderKaiinAll === 'function') {
           try { renderKaiinAll('kaiin-all-content'); } catch(_){}
@@ -913,7 +915,79 @@ let reviewsFacility = '全体';
 
 // === Storage helpers ===
 function loadData(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; } }
-function saveData(key, data) { localStorage.setItem(key, JSON.stringify(data)); }
+function saveData(key, data) {
+  localStorage.setItem(key, JSON.stringify(data));
+  if (key === 'bk-memos') invalidateMemoIndex();
+}
+
+// 速度対策: 行ごとのメモ全探索/日付parseを避けるための軽量キャッシュ
+let _memoIndexCache = null;
+function invalidateMemoIndex() { _memoIndexCache = null; }
+try {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'bk-memos') invalidateMemoIndex();
+  });
+} catch(_) {}
+function _putMemoIndex(byName, byKey, name, apply, memo) {
+  const text = String(memo || '').trim();
+  if (!text || !name) return;
+  const nk = (typeof normName === 'function') ? normName(name) : String(name).trim().toLowerCase();
+  const exactKey = apply ? `${name}|${apply}` : '';
+  if (exactKey && !byKey.has(exactKey)) byKey.set(exactKey, text);
+  if (nk && !byName.has(nk)) byName.set(nk, text);
+}
+function getMemoIndexes() {
+  if (_memoIndexCache) return _memoIndexCache;
+  const byName = new Map();
+  const byKey = new Map();
+  try {
+    if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
+      Object.keys(bfLifecycleCache).forEach(k => {
+        const info = bfLifecycleCache[k];
+        if (!info) return;
+        _putMemoIndex(byName, byKey, info.name, info.apply_date || k.split('|')[1], info.bf_memo || info.memo || '');
+      });
+    }
+  } catch(_) {}
+  try {
+    const memos = loadData('bk-memos', {});
+    Object.keys(memos || {}).forEach(k => {
+      const parts = k.split('|');
+      _putMemoIndex(byName, byKey, parts[0], parts[1], memos[k]);
+    });
+  } catch(_) {}
+  try {
+    (bookingsData || []).forEach(b => _putMemoIndex(byName, byKey, b.name, b.applyDate, b._memo || ''));
+  } catch(_) {}
+  _memoIndexCache = { byName, byKey };
+  return _memoIndexCache;
+}
+function findMemoForBooking(name, apply) {
+  if (!name) return '';
+  const idx = getMemoIndexes();
+  const exact = apply ? idx.byKey.get(`${name}|${apply}`) : '';
+  if (exact) return exact;
+  const nk = (typeof normName === 'function') ? normName(name) : String(name).trim().toLowerCase();
+  return idx.byName.get(nk) || '';
+}
+function _cachedDateMs(row, field, parser) {
+  if (!row) return 0;
+  const raw = row[field] || '';
+  const rawKey = `__${field}Raw`;
+  const msKey = `__${field}Ms`;
+  if (row[rawKey] === raw && typeof row[msKey] === 'number') return row[msKey];
+  const fn = parser || (typeof parseDate === 'function' ? parseDate : null);
+  const dt = fn ? fn(raw) : null;
+  const ms = dt && !isNaN(dt.getTime()) ? dt.getTime() : 0;
+  row[rawKey] = raw;
+  row[msKey] = ms;
+  return ms;
+}
+function bookingApplyMs(row) { return _cachedDateMs(row, 'applyDate'); }
+function bookingBookMs(row) {
+  const book = _cachedDateMs(row, 'bookDate');
+  return book || bookingApplyMs(row);
+}
 
 // === Init ===
 document.addEventListener('DOMContentLoaded', () => {
@@ -3360,7 +3434,7 @@ function renderHomeDashboard() {
     // 未対応 or キャンセル or 空
     if (!(status === '' || status === '未対応' || status === 'キャンセル')) return false;
     // メモあり判定
-    const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+    const memo = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
     return !!memo;
   }).length;
 
@@ -4094,10 +4168,29 @@ function renderPhoneCheck() {
   };
   const facSet = new Set(_phoneCheckState.facilities || []);
 
+  const _toDateTime = (d, field) => {
+    const raw = d && d[field] ? d[field] : '';
+    const rawKey = `__phone_${field}_raw`;
+    const msKey = `__phone_${field}_ms`;
+    if (d && d[rawKey] === raw && typeof d[msKey] === 'number') return d[msKey];
+    const dt = _parseDateLoose(raw);
+    let ms = 0;
+    if (dt) {
+      const tm = String(raw).match(/(\d{1,2}):(\d{2})/);
+      if (tm) dt.setHours(parseInt(tm[1], 10), parseInt(tm[2], 10));
+      ms = dt.getTime();
+    }
+    if (d) {
+      d[rawKey] = raw;
+      d[msKey] = ms;
+    }
+    return ms;
+  };
+
   let rows = data.filter(d => {
     if (d.status === '除外' || d.status === 'キャンセル') return false;
-    const bd = _parseDateLoose(d.bookDate);  // Bug fix: 短縮形式対応
-    if (!isInPeriod(bd)) return false;
+    const bdMs = _toDateTime(d, 'bookDate');  // Bug fix: 短縮形式対応
+    if (!bdMs || !isInPeriod(new Date(bdMs))) return false;
     // 医院フィルタ (空配列なら全医院)
     if (facSet.size > 0 && !facSet.has(normFac(d.facility))) return false;
     // v294: showCalled=false の時は完了系 (確認OK/来院済/成約) を除外
@@ -4119,34 +4212,28 @@ function renderPhoneCheck() {
 
   // v273: 登録日時 (applyDate) の降順 / 同登録日なら予約日時 (bookDate) 昇順
   // (Bug fix: 文字列比較だと "5/30" < "5/7" になるため Date オブジェクトで比較、短縮形式対応)
-  const _toDateTime = (s) => {
-    const d = _parseDateLoose(s);
-    if (!d) return 0;
-    const tm = String(s).match(/(\d{1,2}):(\d{2})/);
-    if (tm) d.setHours(parseInt(tm[1], 10), parseInt(tm[2], 10));
-    return d.getTime();
-  };
   rows.sort((a,b) => {
-    const adA = _toDateTime(a.applyDate);
-    const adB = _toDateTime(b.applyDate);
+    const adA = _toDateTime(a, 'applyDate');
+    const adB = _toDateTime(b, 'applyDate');
     if (adA !== adB) return adB - adA; // applyDate DESC
-    return _toDateTime(a.bookDate) - _toDateTime(b.bookDate); // bookDate ASC
+    return _toDateTime(a, 'bookDate') - _toDateTime(b, 'bookDate'); // bookDate ASC
   });
 
   // 医院リスト作成
   const allFacs = [...new Set(data.map(d => normFac(d.facility)).filter(f => f && f !== '-'))].sort();
   // v294: 新しいステータス体系 (1〜3コール×留守電有無 + 確認OK + 予約日変更 + キャンセル)
   const _isCalledStat = (s) => s && /^[1-3]コール留守電(有|無)$/.test(s);
-  const stats = {
-    total: rows.length,
-    pending: rows.filter(d => !d.status || d.status === '未対応').length,
-    called: rows.filter(d => _isCalledStat(d.status)).length,
-    confirmed: rows.filter(d => d.status === '確認OK' || d.status === '確認済').length,
-    rescheduled: rows.filter(d => d.status === '予約日変更').length,
-    // 旧互換 (留守電/折り返し も残データ用)
-    rusu: rows.filter(d => d.status === '留守電' || _isCalledStat(d.status)).length,
-    cb:   rows.filter(d => d.status === '折り返し').length,
-  };
+  const stats = { total: rows.length, pending: 0, called: 0, confirmed: 0, rescheduled: 0, rusu: 0, cb: 0 };
+  rows.forEach(d => {
+    const s = d.status || '';
+    const called = _isCalledStat(s);
+    if (!s || s === '未対応') stats.pending++;
+    if (called) stats.called++;
+    if (s === '確認OK' || s === '確認済') stats.confirmed++;
+    if (s === '予約日変更') stats.rescheduled++;
+    if (s === '留守電' || called) stats.rusu++;
+    if (s === '折り返し') stats.cb++;
+  });
 
   const canViewPII = !_isPII_MaskNeeded();
   const memos = loadData('bk-memos', {});
@@ -4164,36 +4251,27 @@ function renderPhoneCheck() {
     if (_phoneCallStatesRe.test(status)) return true;  // 1〜3コール留守電 (電話前確認タブ専用)
     return false;
   };
-  // 今月荷電した患者リスト
-  const _calledThisMonth = (bookingsData || []).filter(d => {
+  // 今月荷電した患者リスト + 参考ステータスを1回の走査で集計
+  const _calledThisMonth = [];
+  const _calledStats = { confirmed: 0, called: 0 };
+  const _otherStatusCounts = { rescheduled: 0, cancelled: 0, confirmed_generic: 0 };
+  (bookingsData || []).forEach(d => {
     const u = d.updatedAt || d.updated_at;
-    if (!u) return false;
-    if (!String(u).startsWith(_curYM)) return false;
-    return _isPhoneAction(d.status || '');
-  }).sort((a, b) => {
+    if (!u || !String(u).startsWith(_curYM)) return;
+    const s = d.status || '';
+    if (_isPhoneAction(s)) {
+      _calledThisMonth.push(d);
+      if (s === '確認OK') _calledStats.confirmed++;
+      else if (_phoneCallStatesRe.test(s)) _calledStats.called++;
+    } else if (s === '予約日変更') _otherStatusCounts.rescheduled++;
+    else if (s === 'キャンセル') _otherStatusCounts.cancelled++;
+    else if (s === '確認済') _otherStatusCounts.confirmed_generic++;
+  });
+  _calledThisMonth.sort((a, b) => {
     const ua = a.updatedAt || a.updated_at || '';
     const ub = b.updatedAt || b.updated_at || '';
     return ub.localeCompare(ua);
   });
-  const _calledStats = { confirmed: 0, called: 0 };
-  _calledThisMonth.forEach(d => {
-    const s = d.status || '';
-    if (s === '確認OK') _calledStats.confirmed++;
-    else if (_phoneCallStatesRe.test(s)) _calledStats.called++;
-  });
-  // 参考: 他経路もあるステータス
-  const _otherStatusCounts = (() => {
-    const c = { rescheduled: 0, cancelled: 0, confirmed_generic: 0 };
-    (bookingsData || []).forEach(d => {
-      const u = d.updatedAt || d.updated_at;
-      if (!u || !String(u).startsWith(_curYM)) return;
-      const s = d.status || '';
-      if (s === '予約日変更') c.rescheduled++;
-      else if (s === 'キャンセル') c.cancelled++;
-      else if (s === '確認済') c.confirmed_generic++;
-    });
-    return c;
-  })();
   // 月初〜今日の日数で 1日平均
   const _dayOfMonth = Math.max(1, now.getDate());
   const _avgPerDay = Math.round(_calledThisMonth.length / _dayOfMonth);
@@ -4250,7 +4328,7 @@ function renderPhoneCheck() {
               const bdMatch = String(d.bookDate || '').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
               const bookLabel = bdMatch ? `${parseInt(bdMatch[2])}/${parseInt(bdMatch[3])}` : '-';
               const fac = typeof normFac === 'function' ? (normFac(d.facility) || '-') : (d.facility || '-');
-              const memoText = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+              const memoText = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
               return `<tr>
                 <td style="font-size:10px;color:var(--text-sub);font-variant-numeric:tabular-nums">${escapeHtml(dtLabel)}</td>
                 <td><a href="#" class="phonelog-name-link" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="color:#1d4ed8;text-decoration:none;font-weight:600;display:inline-flex;align-items:center;gap:2px" title="予約一覧で詳細を見る">${escapeHtml(d.name||'')} <span style="font-size:9px;opacity:.6">↗</span></a></td>
@@ -4493,21 +4571,25 @@ function renderPhoneCheck() {
   }
   // 一括処理ボタン
   el.querySelectorAll('.phone-bulk-btn').forEach(btn => {
-    btn.addEventListener('click', async () => {
+    btn.addEventListener('click', () => {
       const newStatus = btn.dataset.st;
       const keys = Array.from(_phoneSelected);
       if (keys.length === 0) return;
       btn.disabled = true; const orig = btn.textContent; btn.textContent = '処理中…';
       let ok = 0;
+      const saves = [];
       for (const key of keys) {
         const [name, apply] = key.split('|');
         try {
-          await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
           const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
           if (match) match.status = newStatus;
+          saves.push(safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } }));
           ok++;
         } catch(_){}
       }
+      Promise.all(saves).then(results => {
+        if (results.some(r => r && r.ok === false)) showToast('⚠ 一部保存を再送信キューに入れました', true);
+      });
       btn.textContent = orig;
       btn.disabled = false;
       _phoneSelected.clear();
@@ -5070,13 +5152,14 @@ function _bindPhoneCheckRowEvents(el) {
           const newDate = await _promptNewBookDate(dRow);
           if (!newDate) return;
           try {
-            await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } });
             dRow.status = newStatus; dRow.bookDate = newDate;
             _showBigToast(`📅 予約日を ${newDate} に変更しました`, '#7c3aed');
             // v297: 該当行だけ更新 (全テーブル再描画を回避)
             _updatePhoneRowInPlace(row, dRow);
             updateHeaderBadge();
-            if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+            safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } })
+              .then(res => { if (res && res.ok === false) showToast('⚠ 予約日変更の保存を再送信キューに入れました', true); });
+            if (typeof syncCrossTabRender === 'function') syncCrossTabRender('phone');
           } catch(e) { _showBigToast('保存エラー: ' + e.message, '#dc2626'); }
           return;
         }
@@ -5085,7 +5168,6 @@ function _bindPhoneCheckRowEvents(el) {
         btn.disabled = true; btn.textContent = '…';
         try {
           const payload = { name, apply_date: apply, status: newStatus };
-          await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
           const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
           if (match) match.status = newStatus;
           try {
@@ -5101,10 +5183,12 @@ function _bindPhoneCheckRowEvents(el) {
                            : newStatus === '未対応' ? '#6b7280'
                            : '#f59e0b';
           _showBigToast(`✓ ${name}: ${_phoneStatusLabel(newStatus)}`, toastColor);
+          safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } })
+            .then(res => { if (res && res.ok === false) showToast('⚠ 電話結果の保存を再送信キューに入れました', true); });
           // v297: 該当行だけ更新 (全テーブル再描画を回避してスクロール位置維持)
           if (match) _updatePhoneRowInPlace(row, match);
           updateHeaderBadge();
-          if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+          if (typeof syncCrossTabRender === 'function') syncCrossTabRender('phone');
         } catch(e) {
           _showBigToast('保存エラー: ' + e.message, '#dc2626');
           btn.disabled = false;
@@ -6816,8 +6900,15 @@ async function loadBookings() {
       const { data: dbStatuses } = await sb.from('booking_status').select('*');
       if (dbStatuses && dbStatuses.length) {
         const statusMap = {};
+        const statusByNormDate = new Map();
+        const memoByNormName = new Map();
         dbStatuses.forEach(s => {
-          statusMap[s.name + '|' + s.apply_date] = s;
+          const exactKey = s.name + '|' + s.apply_date;
+          statusMap[exactKey] = s;
+          const nn = normName(s.name);
+          const dateKey = normDateKey(s.apply_date);
+          if (nn && dateKey && !statusByNormDate.has(nn + '|' + dateKey)) statusByNormDate.set(nn + '|' + dateKey, s);
+          if (nn && (s.memo || s.bf_memo) && !memoByNormName.has(nn)) memoByNormName.set(nn, s);
           if (s.updated_at) setVersion('booking_status', s.name + '|' + s.apply_date, s.updated_at);
         });
         bookingsData.forEach(d => {
@@ -6827,7 +6918,7 @@ async function loadBookings() {
           if (!dbRow) {
             const nnTarget = normName(d.name);
             const dateKey = normDateKey(d.bookDate || d.applyDate);
-            const candidate = dbStatuses.find(s => normName(s.name) === nnTarget && normDateKey(s.apply_date) === dateKey);
+            const candidate = statusByNormDate.get(nnTarget + '|' + dateKey);
             if (candidate) dbRow = candidate;
           }
           if (dbRow) {
@@ -6848,8 +6939,7 @@ async function loadBookings() {
           // メモだけは名前だけのフォールバック: 同じ正規化名+医院 の booking_status 行からメモを取得
           if (!d._memo) {
             const nnTarget = normName(d.name);
-            const fTarget = normFac(d.facility);
-            const fallback = dbStatuses.find(s => normName(s.name) === nnTarget && (s.memo || s.bf_memo));
+            const fallback = memoByNormName.get(nnTarget);
             if (fallback) {
               d._memo = fallback.memo || fallback.bf_memo;
             }
@@ -6919,6 +7009,7 @@ async function loadBookings() {
 
     // BF相談のbf_status表示のためBFキャッシュもロード
     try { await loadBFLifecycleData(); } catch(_){}
+    try { invalidateMemoIndex(); } catch(_){}
 
     populateBookingFilters();
     renderBookings();
@@ -7278,8 +7369,8 @@ function renderBookings() {
       for (const sel of statusSet) {
         if (sel === '要対応') {
           if (!eff || eff === '未対応') {
-            const bd = parseDate(d.bookDate);
-            if (bd && bd < td) return true;
+            const bdMs = bookingBookMs(d);
+            if (bdMs && bdMs < td.getTime()) return true;
           }
         } else if (sel === '未対応') {
           if (!eff || eff === '未対応') return true;
@@ -7356,8 +7447,8 @@ function renderBookings() {
   if (window._bkProgressFilter) {
     const td2 = new Date(); td2.setHours(0,0,0,0);
     filtered = filtered.filter(d => {
-      const bd = parseDate(d.bookDate);
-      return bd && bd < td2;
+      const bdMs = bookingBookMs(d);
+      return bdMs && bdMs < td2.getTime();
     });
   }
   // 日付ピンポイントフィルター
@@ -7386,8 +7477,8 @@ function renderBookings() {
   const total = active.length;
   const todayForRate = new Date(); todayForRate.setHours(0,0,0,0);
   const _isUnhandled = (d) => { const e = _effSt(d); return !e || e === '未対応'; };
-  const _isPastBooking = (d) => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; };
-  const _isFutureBooking = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= todayForRate; };
+  const _isPastBooking = (d) => { const bdMs = bookingBookMs(d); return bdMs && bdMs < todayForRate.getTime(); };
+  const _isFutureBooking = (d) => { const bdMs = bookingBookMs(d); return !bdMs || bdMs >= todayForRate.getTime(); };
 
   const visited = active.filter(d => isVisitedStatus(_effSt(d))).length;
   // v427: 実成約 = 治療カテゴリ別 (BFは bf_status=成約 のみ, それ以外は d.status=成約)
@@ -7430,7 +7521,7 @@ function renderBookings() {
     return _isFutureBooking(d);
   }).length;
   // 来院率 = 予約日が昨日以前の人の中で来院済+成約の割合
-  const pastBookings = active.filter(d => { const bd = parseDate(d.bookDate); return bd && bd < todayForRate; });
+  const pastBookings = active.filter(d => { const bdMs = bookingBookMs(d); return bdMs && bdMs < todayForRate.getTime(); });
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt(d))).length;
   const visitRate = pastBookings.length > 0 ? Math.round(pastVisited / pastBookings.length * 100) : 0;
 
@@ -7465,7 +7556,10 @@ function renderBookings() {
 
   // メモデータを付与
   const memoData = loadData('bk-memos', {});
-  filtered.forEach(d => { const key = d.name+'|'+d.applyDate; d._memo = memoData[key] || ''; });
+  filtered.forEach(d => {
+    const key = d.name+'|'+d.applyDate;
+    if (Object.prototype.hasOwnProperty.call(memoData, key)) d._memo = memoData[key] || '';
+  });
 
   // v283: 「いつのデータか」を分かりやすく表示 (基準セレクター対応)
   const _now = new Date();
@@ -7526,11 +7620,10 @@ function renderBookings() {
     return i < 0 ? 999 : i;
   };
   const _bkApplyKey = (d) => {
-    const p = parseDate(d.applyDate); return (p && !isNaN(p)) ? p.getTime() : 0;
+    return bookingApplyMs(d);
   };
   const _bkBookKey = (d) => {
-    const p = parseDate(d.bookDate); if (p && !isNaN(p)) return p.getTime();
-    const pa = parseDate(d.applyDate); return (pa && !isNaN(pa)) ? pa.getTime() : 0;
+    return bookingBookMs(d);
   };
   const _bkSortFn = (a, b) => {
     if (_bkSortBy === 'apply-asc')  return _bkApplyKey(a) - _bkApplyKey(b);
@@ -7604,8 +7697,8 @@ function renderBookings() {
     if (d.status && d.status !== '未対応') return false;
     if (!d.bookDate) return false;
     // #12 parseDate 統一 (タイムゾーン差回避)
-    const bd = parseDate(d.bookDate);
-    return bd ? bd < today : false;
+    const bdMs = bookingBookMs(d);
+    return bdMs ? bdMs < today.getTime() : false;
   };
 
   const isAdmin = canEditContent();
@@ -7618,6 +7711,7 @@ function renderBookings() {
   });
   tbody.innerHTML = sorted.slice(0, displayLimit).map((d, idx) => {
     const overdue = isOverdue(d);
+    const rowMemo = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
     const dupKey = normName(d.name) + '|' + normFac(d.facility);
     const isDup = dupCounts[dupKey] > 1;
     const pinned = isPinned(d);
@@ -7692,13 +7786,13 @@ function renderBookings() {
         <input type="date" class="bk-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(iso)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
       </span>`;
     })()}</td>
-    <td class="bk-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${esc(d._memo||findAnyMemo(d.name)||'')}" style="${(() => {
-      const memo = d._memo || findAnyMemo(d.name);
+    <td class="bk-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="${esc(rowMemo)}" style="${(() => {
+      const memo = rowMemo;
       // 次回予定 (黄色) とのカブり解消で淡い青系に変更
       const hasMemo = !!memo;
       return `font-size:11px;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer;text-align:left;padding:4px 8px;background:${hasMemo?'#eff6ff':'transparent'};border:1px ${hasMemo?'solid #bfdbfe':'dashed #e5e7eb'};border-radius:4px;color:${hasMemo?'#1e40af':'#bbb'};font-weight:${hasMemo?500:400}`;
     })()}">${(() => {
-      const memo = d._memo || findAnyMemo(d.name);
+      const memo = rowMemo;
       if (!isAdmin) return memo ? esc(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo) : '-';
       if (memo) return esc(typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo);
       return '＋ メモ';
@@ -8788,7 +8882,7 @@ function searchPatients() {
   const sorted = [...results].sort((a, b) => (b.applyDate || '').localeCompare(a.applyDate || ''));
   document.getElementById('ps-tbody').innerHTML = sorted.slice(0, 100).map(d => {
     const cur = d.status || '';
-    const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+    const memo = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
     const memoShort = memo ? (typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 30) : memo.slice(0, 30)) : '';
     const memoStyle = memo
       ? 'background:#fff8e1;border:1px dashed #f9a825;color:#92400e'
@@ -9650,31 +9744,9 @@ function normDateKey(s) {
   if (m2) { const y = new Date().getFullYear(); return `${y}-${String(m2[1]).padStart(2,'0')}-${String(m2[2]).padStart(2,'0')}`; }
   return s2;
 }
-// 同一正規化名の患者のメモをどこからでも探す (bfLifecycleCache/bk-memos/bookingsData全走査)
+// 同一正規化名の患者のメモをどこからでも探す (索引化済み)
 function findAnyMemo(name) {
-  if (!name) return '';
-  const nn = normName(name);
-  // BF lifecycle cache (bf_memo or memo)
-  for (const k in bfLifecycleCache) {
-    const info = bfLifecycleCache[k];
-    if (!info) continue;
-    if (normName(info.name) === nn) {
-      const m = info.bf_memo || info.memo || '';
-      if (m) return m;
-    }
-  }
-  // localStorage bk-memos
-  try {
-    const memos = loadData('bk-memos', {});
-    for (const k in memos) {
-      if (normName(k.split('|')[0]) === nn && memos[k]) return memos[k];
-    }
-  } catch(_){}
-  // bookingsData 他の行
-  for (const b of (bookingsData || [])) {
-    if (normName(b.name) === nn && b._memo) return b._memo;
-  }
-  return '';
+  return findMemoForBooking(name, '');
 }
 
 // BF用: 同一人物を名前正規化でグルーピング (同じ facility かつ同日)
@@ -9834,6 +9906,7 @@ let _kaiinAllPeriodState = {
   // v416: 売上関連 (sortBy: '' | 'sales-desc' | 'sales-asc' | 'book-desc' | 'book-asc')
   hasSalesOnly: false,
   sortBy: '',
+  displayLimit: 300,
   dashboardOpen: (() => { try { return sessionStorage.getItem('kaiin-all-dashboard') === '1'; } catch(_) { return false; } })(),
   filterOpen: (() => { try { return sessionStorage.getItem('kaiin-all-filter') === '1'; } catch(_) { return false; } })(),
 };
@@ -9846,8 +9919,8 @@ async function renderKaiinAll(containerId) {
   // 全治療タイプの来院対象行を集計
   let baseRows = (bookingsData || []).filter(d => {
     if (d.status === '除外') return false;
-    const bd = parseDate(d.bookDate);
-    if (bd && bd > todayEnd) return false;
+    const bdMs = bookingBookMs(d);
+    if (bdMs && bdMs > todayEnd.getTime()) return false;
     if (_hasPromoRestriction() && !_matchesAllowedPromo(d.source)) return false;
     return true;
   });
@@ -9968,8 +10041,8 @@ async function renderKaiinAll(containerId) {
   };
   const _today2 = new Date(); _today2.setHours(0,0,0,0);
   const isUnhandled2 = (d) => { const e = _effSt2(d); return !e || e === '未対応'; };
-  const isPast2 = (d) => { const bd = parseDate(d.bookDate); return bd && bd < _today2; };
-  const isFuture2 = (d) => { const bd = parseDate(d.bookDate); return !bd || bd >= _today2; };
+  const isPast2 = (d) => { const bdMs = bookingBookMs(d); return bdMs && bdMs < _today2.getTime(); };
+  const isFuture2 = (d) => { const bdMs = bookingBookMs(d); return !bdMs || bdMs >= _today2.getTime(); };
   const totalCount = allRows.length;
   const visited = allRows.filter(d => isVisitedStatus(_effSt2(d))).length;
   // v416: 実成約 = 累計 (status=成約、BF治療進行中も含む) ← broad 維持
@@ -9995,6 +10068,21 @@ async function renderKaiinAll(containerId) {
   const pastVisited = pastBookings.filter(d => isVisitedStatus(_effSt2(d))).length;
   const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
   const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
+  const sortMode = state.sortBy || '';
+  const sortedRows = allRows.slice().sort((a,b) => {
+    if (sortMode === 'sales-desc' || sortMode === 'sales-asc') {
+      const av = _amt(a);
+      const bv = _amt(b);
+      if (av !== bv) return sortMode === 'sales-desc' ? bv - av : av - bv;
+      return bookingBookMs(b) - bookingBookMs(a);
+    }
+    if (sortMode === 'name') return (a.name || '').localeCompare(b.name || '', 'ja');
+    const ad = bookingBookMs(a);
+    const bd = bookingBookMs(b);
+    return sortMode === 'book-asc' ? ad - bd : bd - ad;
+  });
+  const displayLimit = state.displayLimit || 300;
+  const visibleRows = sortedRows.slice(0, displayLimit);
 
   // 期間ラベル
   const basisLabel = basis === 'apply' ? '登録日基準' : '来院日基準';
@@ -10082,27 +10170,7 @@ async function renderKaiinAll(containerId) {
             <th style="text-align:left">メモ</th>
           </tr></thead>
           <tbody>
-            ${allRows
-              .slice()
-              .sort((a,b) => {
-                // v416: ソートモード切替 ('' = 来院日新→古 / book-asc / sales-desc / sales-asc / name)
-                const sortMode = state.sortBy || '';
-                if (sortMode === 'sales-desc' || sortMode === 'sales-asc') {
-                  const av = _amt(a);
-                  const bv = _amt(b);
-                  if (av !== bv) return sortMode === 'sales-desc' ? bv - av : av - bv;
-                  // 同額なら来院日 新→古
-                  const ad2 = parseDate(a.bookDate)?.getTime() || 0;
-                  const bd2 = parseDate(b.bookDate)?.getTime() || 0;
-                  return bd2 - ad2;
-                }
-                if (sortMode === 'name') {
-                  return (a.name || '').localeCompare(b.name || '', 'ja');
-                }
-                const ad = parseDate(a.bookDate)?.getTime() || 0;
-                const bd = parseDate(b.bookDate)?.getTime() || 0;
-                return sortMode === 'book-asc' ? ad - bd : bd - ad;
-              })
+            ${visibleRows
               .map(d => {
                 const cat = getTreatmentCategory(d) || '-';
                 const fac = normFac(d.facility) || '-';
@@ -10186,7 +10254,7 @@ async function renderKaiinAll(containerId) {
                   ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
                   : 'background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e';
                 const nextChip = `<button type="button" class="kaiin-all-next-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${escapeHtml(nextDate)}" style="font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;${nextDateStyle}">${nextMMDD || '年/月/日'}</button><input type="date" class="kaiin-all-next-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(nextDate)}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">`;
-                const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+                const memo = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
                 // BFタブと同じ「+ メモ」プレースホルダースタイル
                 const memoStyle = memo
                   ? 'background:#fff8e1;border:1px dashed #f9a825'
@@ -10225,6 +10293,7 @@ async function renderKaiinAll(containerId) {
                   <td class="kaiin-all-memo-cell" data-label="メモ" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;${memoStyle}" title="${escapeHtml(memo)}">${memoInner}</td>
                 </tr>`;
               }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
+            ${sortedRows.length > displayLimit ? `<tr><td colspan="10" style="text-align:center;padding:10px"><button type="button" id="kaiin-all-more" class="filter-btn" style="font-size:12px;padding:6px 16px">さらに300件表示（全${sortedRows.length}件中${displayLimit}件）</button></td></tr>` : ''}
           </tbody>
         </table>
       </div>
@@ -10235,6 +10304,7 @@ async function renderKaiinAll(containerId) {
     btn.addEventListener('click', () => {
       _kaiinAllPeriodState.period = btn.dataset.period;
       _kaiinAllPeriodState.month = '';
+      _kaiinAllPeriodState.displayLimit = 300;
       renderKaiinAll(containerId);
     });
   });
@@ -10242,31 +10312,41 @@ async function renderKaiinAll(containerId) {
   el.querySelector('#kaiin-all-period-quick')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.period = e.target.value;
     _kaiinAllPeriodState.month = '';
+    _kaiinAllPeriodState.displayLimit = 300;
     renderKaiinAll(containerId);
   });
   el.querySelector('#kaiin-all-month')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.month = e.target.value;
     if (e.target.value) _kaiinAllPeriodState.period = '';
+    _kaiinAllPeriodState.displayLimit = 300;
     renderKaiinAll(containerId);
   });
   el.querySelector('#kaiin-all-basis')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.basis = e.target.value;
+    _kaiinAllPeriodState.displayLimit = 300;
     renderKaiinAll(containerId);
   });
 
   // === 今日来院トグル ===
   el.querySelector('#kaiin-all-today')?.addEventListener('click', () => {
     _kaiinAllPeriodState.todayOnly = !_kaiinAllPeriodState.todayOnly;
+    _kaiinAllPeriodState.displayLimit = 300;
     renderKaiinAll(containerId);
   });
 
   // === v416: 売上ありフィルタ + 売上順ソート ===
   el.querySelector('#kaiin-all-has-sales')?.addEventListener('click', () => {
     _kaiinAllPeriodState.hasSalesOnly = !_kaiinAllPeriodState.hasSalesOnly;
+    _kaiinAllPeriodState.displayLimit = 300;
     renderKaiinAll(containerId);
   });
   el.querySelector('#kaiin-all-sort')?.addEventListener('change', (e) => {
     _kaiinAllPeriodState.sortBy = e.target.value || '';
+    _kaiinAllPeriodState.displayLimit = 300;
+    renderKaiinAll(containerId);
+  });
+  el.querySelector('#kaiin-all-more')?.addEventListener('click', () => {
+    _kaiinAllPeriodState.displayLimit = (_kaiinAllPeriodState.displayLimit || 300) + 300;
     renderKaiinAll(containerId);
   });
 
@@ -10274,6 +10354,7 @@ async function renderKaiinAll(containerId) {
   el.querySelectorAll('.kaiin-all-view-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       _kaiinAllPeriodState.viewMode = btn.dataset.view;
+      _kaiinAllPeriodState.displayLimit = 300;
       renderKaiinAll(containerId);
     });
   });
@@ -10292,7 +10373,10 @@ async function renderKaiinAll(containerId) {
   });
 
   // === マルチセレクトフィルター初期化 (baseRows から選択肢を抽出) ===
-  const triggerRedraw = () => renderKaiinAll(containerId);
+  const triggerRedraw = () => {
+    _kaiinAllPeriodState.displayLimit = 300;
+    renderKaiinAll(containerId);
+  };
   const toolOpts = ['DXHUB','セレクト','手動'];
   const facilityOpts = [...new Set(baseRows.map(d => normFac(d.facility)).filter(Boolean))].sort();
   const promoCounts = {};
@@ -10331,6 +10415,7 @@ async function renderKaiinAll(containerId) {
       clearTimeout(_t);
       _t = setTimeout(() => {
         _kaiinAllPeriodState.search = e.target.value;
+        _kaiinAllPeriodState.displayLimit = 300;
         renderKaiinAll(containerId);
       }, 250);
     });
@@ -10350,7 +10435,7 @@ async function renderKaiinAll(containerId) {
       allRows.forEach(d => {
         const cat = getTreatmentCategory(d) || '';
         const info = bfLifecycleCache[d.name + '|' + d.applyDate] || {};
-        const memo = d._memo || info.bf_memo || info.memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+        const memo = d._memo || info.bf_memo || info.memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
         csvRows.push([
           d.bookDate || '',
           d.applyDate || '',
@@ -10405,6 +10490,7 @@ async function renderKaiinAll(containerId) {
     // v416: 売上関連もリセット
     _kaiinAllPeriodState.hasSalesOnly = false;
     _kaiinAllPeriodState.sortBy = '';
+    _kaiinAllPeriodState.displayLimit = 300;
     renderKaiinAll(containerId);
   });
 
@@ -11043,7 +11129,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       const csvRows = [headers.join(',')];
       filtered.forEach(d => {
         const info = bfLifecycleCache[d.name + '|' + d.applyDate] || {};
-        const memo = d._memo || info.bf_memo || info.memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+        const memo = d._memo || info.bf_memo || info.memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
         csvRows.push([
           d.bookDate || '',
           d.applyDate || '',
@@ -11284,7 +11370,7 @@ function drawKaiinRows(treatment, rows, container) {
     // インプラントは予約タブと完全統合: d.status を使用 (既存ステータスを維持)
     const st = (treatment === 'インプラント') ? (d.status || '') : (info.bf_status || '');
     const stColor = statuses.find(s => s.value === st)?.color || '';
-    const memo = d._memo || findAnyMemo(d.name);
+    const memo = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '');
     // プロモ表示: 統一スタイル (バッジ風) + 手動はクリックで編集
     let promoBadge = '';
     if (d.tool === '手動') {
@@ -12777,15 +12863,27 @@ const FOLLOWUP_MEMO_LABELS = {
 function loadFollowupMeta() {
   return (typeof loadData === 'function') ? loadData(FOLLOWUP_META_LS_KEY, {}) : {};
 }
+let _followupMetaSyncTimer = null;
+let _followupMetaPending = null;
+function flushFollowupMetaSync() {
+  if (!_followupMetaPending) return Promise.resolve(false);
+  const snapshot = { ..._followupMetaPending };
+  _followupMetaPending = null;
+  if (_followupMetaSyncTimer) {
+    clearTimeout(_followupMetaSyncTimer);
+    _followupMetaSyncTimer = null;
+  }
+  if (typeof loadSharedSetting !== 'function' || typeof saveSharedSetting !== 'function') return Promise.resolve(false);
+  return loadSharedSetting(FOLLOWUP_META_SHARED_KEY, {}).then(remote => {
+    const merged = { ...((remote && typeof remote === 'object') ? remote : {}), ...snapshot };
+    return saveSharedSetting(FOLLOWUP_META_SHARED_KEY, merged);
+  }).catch(() => false);
+}
 function saveFollowupMeta(meta) {
   try { if (typeof saveData === 'function') saveData(FOLLOWUP_META_LS_KEY, meta || {}); } catch(_){}
-  if (typeof loadSharedSetting === 'function' && typeof saveSharedSetting === 'function') {
-    const snapshot = { ...(meta || {}) };
-    loadSharedSetting(FOLLOWUP_META_SHARED_KEY, {}).then(remote => {
-      const merged = { ...((remote && typeof remote === 'object') ? remote : {}), ...snapshot };
-      return saveSharedSetting(FOLLOWUP_META_SHARED_KEY, merged);
-    }).catch(() => {});
-  }
+  _followupMetaPending = { ...(meta || {}) };
+  if (_followupMetaSyncTimer) clearTimeout(_followupMetaSyncTimer);
+  _followupMetaSyncTimer = setTimeout(() => { flushFollowupMetaSync(); }, 250);
 }
 async function syncSharedFollowupMeta() {
   try {
@@ -12812,7 +12910,7 @@ function _followupPatientKey(d) {
 function _followupMemoDate(d = new Date()) {
   return `${d.getMonth() + 1}/${d.getDate()}`;
 }
-async function appendFollowupMemo(name, apply, flowStatus) {
+async function appendFollowupMemo(name, apply, flowStatus, options = {}) {
   const label = FOLLOWUP_MEMO_LABELS[flowStatus];
   if (!label || !name || !apply) return false;
   const key = name + '|' + apply;
@@ -12833,19 +12931,73 @@ async function appendFollowupMemo(name, apply, flowStatus) {
     bfLifecycleCache[key].bf_memo = next;
   }
   if (typeof safeSave === 'function') {
-    await safeSave({
+    const savePromise = safeSave({
       type: 'upsert',
       table: 'booking_status',
       payload: { name, apply_date: apply, memo: next, bf_memo: next },
       options: { onConflict: 'name,apply_date' }
     });
+    if (options.awaitSave === false) {
+      savePromise.catch(e => console.warn('followup memo background save failed', e));
+    } else {
+      await savePromise;
+    }
   }
   return !already;
 }
+async function appendFollowupMemosBulk(keys, flowStatus, options = {}) {
+  const label = FOLLOWUP_MEMO_LABELS[flowStatus];
+  if (!label || !Array.isArray(keys) || !keys.length) return 0;
+  const line = `${_followupMemoDate()} ${label}`;
+  const memos = (typeof loadData === 'function') ? loadData('bk-memos', {}) : {};
+  const bookingMap = new Map((bookingsData || []).map(b => [`${b.name}|${b.applyDate}`, b]));
+  let added = 0;
+  const saveOps = [];
+  keys.forEach(k => {
+    const [name, apply] = String(k).split('|');
+    if (!name || !apply) return;
+    const target = bookingMap.get(k);
+    const info = (typeof getBFInfo === 'function') ? getBFInfo(name, apply) : null;
+    const current = (memos[k] || target?._memo || info?.memo || info?.bf_memo || '').trim();
+    const already = current.split(/\r?\n/).map(s => s.trim()).includes(line);
+    const next = already ? current : (current ? current + '\n' + line : line);
+    memos[k] = next;
+    if (!already) added++;
+    if (target) target._memo = next;
+    if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
+      if (!bfLifecycleCache[k]) bfLifecycleCache[k] = { name, apply_date: apply };
+      bfLifecycleCache[k].memo = next;
+      bfLifecycleCache[k].bf_memo = next;
+    }
+    if (typeof safeSave === 'function') {
+      saveOps.push(safeSave({
+        type: 'upsert',
+        table: 'booking_status',
+        payload: { name, apply_date: apply, memo: next, bf_memo: next },
+        options: { onConflict: 'name,apply_date' }
+      }));
+    }
+  });
+  if (typeof saveData === 'function') saveData('bk-memos', memos);
+  if (options.awaitSave === false) {
+    Promise.all(saveOps).catch(e => console.warn('followup memo bulk background save failed', e));
+  } else {
+    await Promise.all(saveOps);
+  }
+  return added;
+}
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', () => setTimeout(syncSharedFollowupMeta, 1200));
+  document.addEventListener('DOMContentLoaded', () => {
+    setTimeout(syncSharedFollowupMeta, 1200);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushFollowupMetaSync();
+    });
+  });
 } else {
   setTimeout(syncSharedFollowupMeta, 1200);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushFollowupMetaSync();
+  });
 }
 let _followupState = {
   category: 'todo',  // 'todo'(キャンセル済) | 'unentered' | 'review' | 'calling' | 'sms' | 'connected' | 'rebooked' | 'closed' | 'all'
@@ -12862,6 +13014,7 @@ function renderFollowup() {
   const todayMs = today.getTime();
   const followMeta = loadFollowupMeta();
   const followKeyOf = (d) => (d.name || '') + '|' + (d.applyDate || '');
+  const memoFor = (d) => (d && d._memo) || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
   const getFlowStatus = (d, rebooking) => {
     const meta = followMeta[followKeyOf(d)] || {};
     if (rebooking) return '再予約獲得';
@@ -12894,6 +13047,8 @@ function renderFollowup() {
   const bookingsByPatientKey = {};
   const bookingsByNameKey = {};
   data.forEach(d => {
+    d.__followApplyMs = bookingApplyMs(d);
+    d.__followBookMs = bookingBookMs(d);
     const nameKey = _followupNameKey(d);
     if (!nameKey) return;
     if (!bookingsByNameKey[nameKey]) bookingsByNameKey[nameKey] = [];
@@ -12902,15 +13057,17 @@ function renderFollowup() {
     if (!bookingsByPatientKey[patientKey]) bookingsByPatientKey[patientKey] = [];
     bookingsByPatientKey[patientKey].push(d);
   });
+  Object.values(bookingsByNameKey).forEach(list => list.sort((a, b) => (a.__followApplyMs || 0) - (b.__followApplyMs || 0)));
+  Object.values(bookingsByPatientKey).forEach(list => list.sort((a, b) => (a.__followApplyMs || 0) - (b.__followApplyMs || 0)));
 
   // 候補を集計
   const candidates = [];
   data.forEach(d => {
     const status = d.status || '';
-    const bd = (typeof parseDate === 'function') ? parseDate(d.bookDate) : null;
-    const isPastBd = bd && bd.getTime() < todayMs;
+    const bdMs = d.__followBookMs || 0;
+    const isPastBd = bdMs && bdMs < todayMs;
     // v399: メモの有無を先に判定 (状態の取りこぼし検出に使う)
-    const memoCheck = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+    const memoCheck = memoFor(d);
     const hasMemo = !!memoCheck;
     let category = null;
     let reason = '';
@@ -12935,7 +13092,7 @@ function renderFollowup() {
       }
     } else if (status === '検討中') {
       // 検討中で 2週間以上動きなし
-      const lastEdit = bd ? bd.getTime() : 0;
+      const lastEdit = bdMs;
       const daysSince = lastEdit ? Math.floor((todayMs - lastEdit) / 86400000) : 999;
       if (daysSince > 14) {
         category = 'considering';
@@ -12945,30 +13102,22 @@ function renderFollowup() {
     if (!category) return;
 
     // 同一患者の他の予約で applyDate がより新しく、予約日が別日のもの (再予約検出)
-    const myApply = (typeof parseDate === 'function') ? parseDate(d.applyDate) : null;
-    const myApplyMs = myApply ? myApply.getTime() : 0;
-    const myBook = (typeof parseDate === 'function') ? parseDate(d.bookDate) : null;
-    const myBookMs = myBook ? myBook.getTime() : 0;
+    const myApplyMs = d.__followApplyMs || 0;
+    const myBookMs = d.__followBookMs || 0;
     const samePatient = _followupPhoneKey(d)
       ? (bookingsByPatientKey[_followupPatientKey(d)] || [])
       : (bookingsByNameKey[_followupNameKey(d)] || []);
-    const rebooking = samePatient.filter(b => {
+    const rebooking = samePatient.find(b => {
       if (b === d) return false;
-      const ba = (typeof parseDate === 'function') ? parseDate(b.applyDate) : null;
-      const baMs = ba ? ba.getTime() : 0;
-      const bb = (typeof parseDate === 'function') ? parseDate(b.bookDate) : null;
-      const bbMs = bb ? bb.getTime() : 0;
+      const baMs = b.__followApplyMs || 0;
+      const bbMs = b.__followBookMs || 0;
       // 自分より後に申し込まれていて、キャンセル以外
       if (baMs <= myApplyMs) return false;
       if (!bbMs) return false;
       if (myBookMs && bbMs === myBookMs) return false;
       if (b.status === 'キャンセル' || b.status === '除外') return false;
       return true;
-    }).sort((a, b) => {
-      const aa = (typeof parseDate === 'function') ? (parseDate(a.applyDate)?.getTime() || 0) : 0;
-      const ba = (typeof parseDate === 'function') ? (parseDate(b.applyDate)?.getTime() || 0) : 0;
-      return aa - ba;
-    })[0] || null;
+    }) || null;
 
     // SMS履歴
     const phoneKey = String(d.phone || '').replace(/[^0-9+]/g,'');
@@ -13004,8 +13153,8 @@ function renderFollowup() {
     if (og) return og;
     if (!!a.rebooking !== !!b.rebooking) return a.rebooking ? -1 : 1;
     if (!!a.lastSms !== !!b.lastSms) return a.lastSms ? -1 : 1;
-    const ad = (typeof parseDate === 'function') ? (parseDate(a.d.bookDate)?.getTime() || 0) : 0;
-    const bd = (typeof parseDate === 'function') ? (parseDate(b.d.bookDate)?.getTime() || 0) : 0;
+    const ad = a.d.__followBookMs || 0;
+    const bd = b.d.__followBookMs || 0;
     return bd - ad;
   });
 
@@ -13016,6 +13165,9 @@ function renderFollowup() {
   candidates.forEach(c => byReason[c.category]++);
   const totalSent = candidates.filter(c => c.lastSms).length;
   const totalRebooked = candidates.filter(c => c.flowStatus === '再予約獲得').length;
+  const displayLimit = _followupState.displayLimit || 300;
+  const visibleRows = filtered.slice(0, displayLimit);
+  _followupState.visibleKeys = visibleRows.map(c => (c.d.name || '') + '|' + (c.d.applyDate || ''));
 
   el.innerHTML = `
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
@@ -13087,7 +13239,7 @@ function renderFollowup() {
             <th style="width:240px;text-align:center">追いかけ操作</th>
           </tr></thead>
           <tbody>
-            ${filtered.map(c => {
+            ${visibleRows.map(c => {
               const d = c.d;
               const phone = (typeof maskPhone === 'function' && typeof _isPII_MaskNeeded === 'function')
                 ? (_isPII_MaskNeeded() ? maskPhone(d.phone) : (d.phone ? (typeof _normalizePhoneForDisplay === 'function' ? _normalizePhoneForDisplay(d.phone) : d.phone) : ''))
@@ -13099,7 +13251,7 @@ function renderFollowup() {
                 return fmtMD(s);
               };
               const fac = typeof normFac === 'function' ? (normFac(d.facility) || '-') : (d.facility || '-');
-              const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
+              const memo = memoFor(d);
               // 対象理由バッジ
               const catColor = c.category === 'cancelled' ? { bg: '#fee2e2', fg: '#b91c1c' }
                             : c.category === 'noshow' ? { bg: '#fed7aa', fg: '#9a3412' }
@@ -13151,6 +13303,7 @@ function renderFollowup() {
                 <td style="text-align:center;white-space:nowrap">${quickFix}</td>
               </tr>`;
             }).join('') || '<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
+            ${filtered.length > displayLimit ? `<tr><td colspan="11" style="text-align:center;padding:10px"><button type="button" id="followup-more-btn" class="filter-btn" style="font-size:12px;padding:6px 16px">さらに300件表示（全${filtered.length}件中${displayLimit}件）</button></td></tr>` : ''}
           </tbody>
         </table>
       </div>
@@ -13181,41 +13334,14 @@ function renderFollowup() {
     }
   };
 
-  // === イベント結合 ===
-  el.querySelectorAll('.followup-cat-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
-      _followupState.category = btn.dataset.cat;
-      renderFollowup();
-    });
+  // === イベント結合: コンテナ委譲で再描画ごとの大量addEventListenerを避ける ===
+  const stampMeta = (prev, flowStatus) => ({
+    ...(prev || {}),
+    status: flowStatus || '未対応',
+    updatedAt: new Date().toISOString(),
+    updatedBy: sessionStorage.getItem('currentRole') || sessionStorage.getItem('role') || userRole || ''
   });
-  const searchEl = el.querySelector('#followup-search');
-  if (searchEl) {
-    let _t;
-    searchEl.addEventListener('input', () => {
-      clearTimeout(_t);
-      _t = setTimeout(() => {
-        _followupState.search = searchEl.value;
-        renderFollowup();
-      }, 250);
-    });
-    if (_followupState.search) { searchEl.focus(); searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length); }
-  }
-  el.querySelector('#followup-hide-rebooked')?.addEventListener('change', (e) => {
-    _followupState.hideWithRebooking = e.target.checked;
-    renderFollowup();
-  });
-  el.querySelectorAll('.followup-sms-btn').forEach(btn => {
-    btn.addEventListener('click', (ev) => {
-      ev.stopPropagation();
-      ev.preventDefault();
-      if (typeof openSmsModal === 'function') {
-        openSmsModal(btn.dataset.name, btn.dataset.phone, btn.dataset.bookdate, btn.dataset.facility);
-      }
-    });
-  });
-
-  // v402: 一括処理用 (toast 表示無し、再描画もしない)
-  const _quickStatusFixNoToast = async (name, apply, newStatus) => {
+  const quickStatusFixNoToast = (name, apply, newStatus) => {
     const payload = { name, apply_date: apply, status: newStatus };
     if (typeof STATUS_TO_BF !== 'undefined') {
       const targetBF = STATUS_TO_BF[newStatus] !== undefined ? STATUS_TO_BF[newStatus] : newStatus;
@@ -13226,28 +13352,20 @@ function renderFollowup() {
         bfLifecycleCache[key].bf_status = targetBF;
       }
     }
-    await safeSave({ type:'upsert', table:'booking_status', payload, options:{ onConflict:'name,apply_date' } });
     const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
     if (target) target.status = newStatus;
+    if (typeof safeSave === 'function') {
+      safeSave({ type:'upsert', table:'booking_status', payload, options:{ onConflict:'name,apply_date' } })
+        .then(res => { if (res && res.ok === false) showToast('⚠ 除外の保存を再送信キューに入れました', true); });
+    }
   };
-
-  // v434: 追いかけ専用ステータス (予約本体 status は触らない)
-  const _setFollowupFlow = async (name, apply, flowStatus, silent = false) => {
+  const setFollowupFlow = async (name, apply, flowStatus, silent = false) => {
     try {
       const key = name + '|' + apply;
       const meta = loadFollowupMeta();
-      if (!flowStatus || flowStatus === '未対応') {
-        delete meta[key];
-      } else {
-        meta[key] = {
-          ...(meta[key] || {}),
-          status: flowStatus,
-          updatedAt: new Date().toISOString(),
-          updatedBy: sessionStorage.getItem('currentRole') || sessionStorage.getItem('role') || userRole || ''
-        };
-      }
+      meta[key] = stampMeta(meta[key], flowStatus || '未対応');
       saveFollowupMeta(meta);
-      const memoAdded = await appendFollowupMemo(name, apply, flowStatus);
+      const memoAdded = await appendFollowupMemo(name, apply, flowStatus, { awaitSave: false });
       if (!silent) showToast(`✓ ${name} を「${flowStatus || '未対応'}」にしました${memoAdded ? '（メモ追記）' : ''}`);
       renderFollowup();
     } catch(e) {
@@ -13255,134 +13373,160 @@ function renderFollowup() {
       if (!silent) showToast('追いかけ状態の保存に失敗', true);
     }
   };
-  el.querySelectorAll('.followup-flow-btn').forEach(btn => {
-    btn.addEventListener('click', () => _setFollowupFlow(btn.dataset.name, btn.dataset.apply, btn.dataset.flow));
-  });
-  el.querySelectorAll('.followup-flow-sel').forEach(sel => {
-    sel.addEventListener('change', () => {
-      _setFollowupFlow(sel.dataset.name, sel.dataset.apply, sel.value || '未対応');
-    });
-  });
-
-  // v402: 行チェックボックス
-  el.querySelectorAll('.followup-row-check').forEach(cb => {
-    cb.addEventListener('change', () => {
-      const k = cb.dataset.key;
-      if (cb.checked) _followupState.selected.add(k);
-      else _followupState.selected.delete(k);
-      updateFollowupSelectionUI();
-    });
-  });
-  // 全選択チェックボックス (表示中行のみ)
-  el.querySelector('#followup-select-all')?.addEventListener('change', (e) => {
-    const checked = e.target.checked;
-    if (checked) {
-      filtered.forEach(c => {
-        const k = (c.d.name || '') + '|' + (c.d.applyDate || '');
-        _followupState.selected.add(k);
-      });
-    } else {
-      filtered.forEach(c => {
-        const k = (c.d.name || '') + '|' + (c.d.applyDate || '');
-        _followupState.selected.delete(k);
-      });
-    }
-    updateFollowupSelectionUI();
-  });
-  // 一括: 追いかけフロー更新
-  el.querySelectorAll('.followup-bulk-flow').forEach(btn => {
-    btn.addEventListener('click', async () => {
+  const goBookingRow = (name, apply) => {
+    if (!name) return;
+    try {
+      switchView('bookings');
+      setTimeout(() => {
+        switchBookingSub('bk-list');
+        setTimeout(() => {
+          const searchInput = document.getElementById('bk-search');
+          if (searchInput) {
+            searchInput.value = name;
+            searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+            searchInput.focus();
+            searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+          setTimeout(() => {
+            const tbody = document.getElementById('bk-tbody');
+            if (!tbody) return;
+            const rows = tbody.querySelectorAll('tr');
+            for (const row of rows) {
+              if (row.dataset?.bkName === name && row.dataset?.bkApply === apply) {
+                row.style.background = '#fef3c7';
+                row.style.transition = 'background .8s';
+                row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                setTimeout(() => { row.style.background = ''; }, 3000);
+                break;
+              }
+            }
+          }, 600);
+        }, 150);
+      }, 100);
+    } catch(e) { console.warn('navigate to booking failed', e); }
+  };
+  el._followupHandlers = {
+    updateSelection: updateFollowupSelectionUI,
+    setFollowupFlow,
+    quickStatusFixNoToast,
+    goBookingRow,
+    bulkFlow: async (flow) => {
       const keys = [..._followupState.selected];
-      const flow = btn.dataset.flow || '未対応';
       if (!keys.length) return;
       if (!confirm(`選択中の ${keys.length}件 を「${flow}」に変更しますか?`)) return;
       const meta = loadFollowupMeta();
+      keys.forEach(k => { meta[k] = stampMeta(meta[k], flow || '未対応'); });
+      saveFollowupMeta(meta);
+      const added = await appendFollowupMemosBulk(keys, flow, { awaitSave: false });
+      _followupState.selected.clear();
+      showToast(`✓ ${keys.length}件 を「${flow}」にしました${added ? '（メモ追記）' : ''}`);
+      renderFollowup();
+    },
+    bulkDelete: async () => {
+      const keys = [..._followupState.selected];
+      if (!keys.length) return;
+      if (!confirm(`選択中の ${keys.length}件 を一覧から削除しますか?\n\n実際には「除外」ステータスに変更します。データ自体は残り、予約一覧の「除外も表示」で確認できます。`)) return;
       keys.forEach(k => {
         const [name, apply] = k.split('|');
-        if (!flow || flow === '未対応') {
-          delete meta[k];
-        } else {
-          meta[k] = {
-            ...(meta[k] || {}),
-            status: flow,
-            updatedAt: new Date().toISOString(),
-            updatedBy: sessionStorage.getItem('currentRole') || sessionStorage.getItem('role') || userRole || ''
-          };
-        }
+        quickStatusFixNoToast(name, apply, '除外');
       });
-      saveFollowupMeta(meta);
-      for (const k of keys) {
-        const [name, apply] = k.split('|');
-        try { await appendFollowupMemo(name, apply, flow); } catch(_){}
-      }
       _followupState.selected.clear();
-      showToast(`✓ ${keys.length}件 を「${flow}」にしました（メモ追記）`);
+      showToast(`✓ ${keys.length}件 を削除(除外)しました`);
       renderFollowup();
-    });
-  });
-  // 一括: 削除(除外)
-  el.querySelector('#followup-bulk-delete')?.addEventListener('click', async () => {
-    const keys = [..._followupState.selected];
-    if (!confirm(`選択中の ${keys.length}件 を一覧から削除しますか?\n\n実際には「除外」ステータスに変更します。データ自体は残り、予約一覧の「除外も表示」で確認できます。`)) return;
-    for (const k of keys) {
-      const [name, apply] = k.split('|');
-      try { await _quickStatusFixNoToast(name, apply, '除外'); } catch(_){}
+      if (typeof syncCrossTabRender === 'function') syncCrossTabRender('followup');
     }
-    _followupState.selected.clear();
-    showToast(`✓ ${keys.length}件 を削除(除外)しました`);
-    renderFollowup();
-    if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
-  });
-  // 選択解除
-  el.querySelector('#followup-bulk-clear')?.addEventListener('click', () => {
-    _followupState.selected.clear();
-    updateFollowupSelectionUI();
-  });
-
-  // v400: 名前クリック → 予約一覧 + その人で検索フィルタ
-  el.querySelectorAll('.followup-name-link').forEach(link => {
-    link.addEventListener('click', (ev) => {
-      ev.preventDefault();
-      const name = link.dataset.name;
-      const apply = link.dataset.apply;
-      if (!name) return;
-      // 予約タブへ → 予約一覧サブタブ → 名前検索ボックスに入れる → render
-      try {
-        switchView('bookings');
-        setTimeout(() => {
-          switchBookingSub('bk-list');
-          setTimeout(() => {
-            const searchInput = document.getElementById('bk-search');
-            if (searchInput) {
-              searchInput.value = name;
-              searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-              // フォーカス + スクロール
-              searchInput.focus();
-              searchInput.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-            // 対象行をハイライト + スクロール (該当行が見えるように)
-            setTimeout(() => {
-              const tbody = document.getElementById('bk-tbody');
-              if (!tbody) return;
-              const rows = tbody.querySelectorAll('tr');
-              for (const row of rows) {
-                const nameCell = row.querySelector('td[data-name]') || row;
-                const nm = nameCell.dataset?.name;
-                const ap = nameCell.dataset?.apply;
-                if (nm === name && ap === apply) {
-                  row.style.background = '#fef3c7';
-                  row.style.transition = 'background .8s';
-                  row.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                  setTimeout(() => { row.style.background = ''; }, 3000);
-                  break;
-                }
-              }
-            }, 600);
-          }, 150);
-        }, 100);
-      } catch(e) { console.warn('navigate to booking failed', e); }
+  };
+  if (!el._followupDelegated) {
+    el._followupDelegated = true;
+    el.addEventListener('click', (ev) => {
+      const h = el._followupHandlers || {};
+      const catBtn = ev.target.closest('.followup-cat-btn');
+      if (catBtn && el.contains(catBtn)) {
+        _followupState.category = catBtn.dataset.cat;
+        _followupState.displayLimit = 300;
+        renderFollowup();
+        return;
+      }
+      const smsBtn = ev.target.closest('.followup-sms-btn');
+      if (smsBtn && el.contains(smsBtn)) {
+        ev.stopPropagation();
+        ev.preventDefault();
+        if (typeof openSmsModal === 'function') openSmsModal(smsBtn.dataset.name, smsBtn.dataset.phone, smsBtn.dataset.bookdate, smsBtn.dataset.facility);
+        return;
+      }
+      const flowBtn = ev.target.closest('.followup-flow-btn');
+      if (flowBtn && el.contains(flowBtn)) {
+        h.setFollowupFlow?.(flowBtn.dataset.name, flowBtn.dataset.apply, flowBtn.dataset.flow);
+        return;
+      }
+      const bulkBtn = ev.target.closest('.followup-bulk-flow');
+      if (bulkBtn && el.contains(bulkBtn)) {
+        h.bulkFlow?.(bulkBtn.dataset.flow || '未対応');
+        return;
+      }
+      if (ev.target.closest('#followup-bulk-delete')) {
+        h.bulkDelete?.();
+        return;
+      }
+      if (ev.target.closest('#followup-bulk-clear')) {
+        _followupState.selected.clear();
+        h.updateSelection?.();
+        return;
+      }
+      if (ev.target.closest('#followup-more-btn')) {
+        _followupState.displayLimit = (_followupState.displayLimit || 300) + 300;
+        renderFollowup();
+        return;
+      }
+      const nameLink = ev.target.closest('.followup-name-link');
+      if (nameLink && el.contains(nameLink)) {
+        ev.preventDefault();
+        h.goBookingRow?.(nameLink.dataset.name, nameLink.dataset.apply);
+      }
     });
-  });
+    el.addEventListener('change', (ev) => {
+      const h = el._followupHandlers || {};
+      const sel = ev.target.closest('.followup-flow-sel');
+      if (sel && el.contains(sel)) {
+        h.setFollowupFlow?.(sel.dataset.name, sel.dataset.apply, sel.value || '未対応');
+        return;
+      }
+      const cb = ev.target.closest('.followup-row-check');
+      if (cb && el.contains(cb)) {
+        const k = cb.dataset.key;
+        if (cb.checked) _followupState.selected.add(k);
+        else _followupState.selected.delete(k);
+        h.updateSelection?.();
+        return;
+      }
+      if (ev.target.id === 'followup-select-all') {
+        const keys = _followupState.visibleKeys || [];
+        if (ev.target.checked) keys.forEach(k => _followupState.selected.add(k));
+        else keys.forEach(k => _followupState.selected.delete(k));
+        h.updateSelection?.();
+        return;
+      }
+      if (ev.target.id === 'followup-hide-rebooked') {
+        _followupState.hideWithRebooking = ev.target.checked;
+        _followupState.displayLimit = 300;
+        renderFollowup();
+      }
+    });
+    el.addEventListener('input', (ev) => {
+      if (ev.target.id !== 'followup-search') return;
+      clearTimeout(el._followupSearchTimer);
+      el._followupSearchTimer = setTimeout(() => {
+        _followupState.search = ev.target.value;
+        _followupState.displayLimit = 300;
+        renderFollowup();
+      }, 250);
+    });
+  }
+  const searchEl = el.querySelector('#followup-search');
+  if (searchEl && _followupState.search) {
+    searchEl.focus();
+    searchEl.setSelectionRange(searchEl.value.length, searchEl.value.length);
+  }
 }
 
 function renderPromo() {
@@ -13570,7 +13714,7 @@ function renderPromo() {
     });
   });
   el.querySelectorAll('.promo-paid-chk').forEach(cb => {
-    cb.addEventListener('change', async () => {
+    cb.addEventListener('change', () => {
       const name = cb.dataset.name, apply = cb.dataset.apply, paid = cb.checked;
       try {
         // v386: paid を Boolean で統一して保存 (#8)
@@ -13582,14 +13726,16 @@ function renderPromo() {
         saveData('bk-extra', bkEx);
         const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
         if (target) target.incentivePaid = paidBool;
-        await safeSave({
+        safeSave({
           type: 'upsert',
           table: 'booking_status',
           payload: { name, apply_date: apply, incentive_paid: paidBool },
           options: { onConflict: 'name,apply_date' }
+        }).then(res => {
+          if (res && res.ok === false) showToast('⚠ 支給状況の保存を再送信キューに入れました', true);
         });
-        renderPromo();
-        if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+        if (_promoTabState.hidePaid || _promoTabState.showPaidOnly || _promoTabState.showUnpaidOnly) renderPromo();
+        if (typeof syncCrossTabRender === 'function') syncCrossTabRender('promo');
       } catch (e) {
         console.warn('incentive paid save failed', e);
         showToast('支給状況の保存に失敗', true);
