@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v430';
+const APP_VERSION = 'v431';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12874,16 +12874,14 @@ function renderFollowup() {
       ].map(b => `<button class="followup-cat-btn filter-btn ${cat===b.key?'is-active':''}" data-cat="${b.key}" style="${cat===b.key?`background:${b.color};color:#fff;font-weight:700`:''}">${b.label} <span style="font-size:10px;opacity:.8">${b.count}</span></button>`).join('')}
     </div>
     ${cat==='review' ? '<div style="font-size:11px;color:#0369a1;background:#f0f9ff;border:1px solid #bae6fd;border-radius:6px;padding:6px 10px;margin-bottom:6px">💡 過去の予約日 + メモあり + 未対応/キャンセル の方達。実際は来院済の可能性が高いので「✅ 来院済にする」で1タップ修正できます。</div>' : ''}
-    <!-- v402: 一括アクションバー (選択がある時だけ表示) -->
-    ${_followupState.selected.size > 0 ? `
-    <div id="followup-bulk-bar" style="position:sticky;top:0;z-index:50;display:flex;gap:8px;align-items:center;background:linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%);color:#fff;padding:8px 12px;border-radius:8px;margin-bottom:6px;box-shadow:0 4px 12px rgba(124,58,237,.3)">
-      <span style="font-size:13px;font-weight:700">✓ ${_followupState.selected.size}件 選択中</span>
+    <!-- v402/v431: 一括アクションバー (選択更新は再描画せずDOMだけ更新) -->
+    <div id="followup-bulk-bar" style="position:sticky;top:0;z-index:50;display:${_followupState.selected.size > 0 ? 'flex' : 'none'};gap:8px;align-items:center;background:linear-gradient(135deg,#7c3aed 0%,#5b21b6 100%);color:#fff;padding:8px 12px;border-radius:8px;margin-bottom:6px;box-shadow:0 4px 12px rgba(124,58,237,.3)">
+      <span id="followup-selected-count" style="font-size:13px;font-weight:700">✓ ${_followupState.selected.size}件 選択中</span>
       <span style="flex:1"></span>
       <button id="followup-bulk-visited" class="filter-btn" style="background:#fff;color:#15803d;border:1px solid #dcfce7;font-weight:700;padding:6px 14px">✅ 一括 来院済にする</button>
       <button id="followup-bulk-cancel" class="filter-btn" style="background:#fff;color:#b91c1c;border:1px solid #fecaca;font-weight:700;padding:6px 14px">❌ 一括 キャンセル</button>
       <button id="followup-bulk-clear" class="filter-btn" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 12px" title="選択解除">✕ 解除</button>
     </div>
-    ` : ''}
     <div class="card" style="padding:6px">
       <div class="data-table-wrap" style="max-height:calc(100vh - 200px);overflow-y:auto">
         <table class="data-table compact" style="width:100%;font-size:12px">
@@ -12940,7 +12938,8 @@ function renderFollowup() {
               `;
               const rowKey = (d.name || '') + '|' + (d.applyDate || '');
               const isSelected = _followupState.selected.has(rowKey);
-              return `<tr style="background:${isSelected?'#ede9fe':c.rebooking?'#f0fdf4':c.category==='review'?'#f0f9ff':''}">
+              const baseRowBg = c.rebooking ? '#f0fdf4' : c.category === 'review' ? '#f0f9ff' : '';
+              return `<tr class="followup-row" data-key="${escapeHtml(rowKey)}" data-base-bg="${baseRowBg}" style="background:${isSelected?'#ede9fe':baseRowBg}">
                 <td style="text-align:center"><input type="checkbox" class="followup-row-check" data-key="${escapeHtml(rowKey)}" ${isSelected?'checked':''} style="width:14px;height:14px;cursor:pointer;accent-color:#7c3aed"></td>
                 <td style="font-weight:600"><a href="#" class="followup-name-link" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="color:#1d4ed8;text-decoration:none;display:inline-flex;align-items:center;gap:2px" title="予約一覧で詳細を見る">${escapeHtml(d.name||'')} <span style="font-size:9px;opacity:.6">↗</span></a></td>
                 <td>${statusSelHtml}${reasonHint}</td>
@@ -12958,6 +12957,30 @@ function renderFollowup() {
       </div>
     </div>
   `;
+
+  const updateFollowupSelectionUI = () => {
+    const selectedCount = _followupState.selected.size;
+    const bar = el.querySelector('#followup-bulk-bar');
+    if (bar) bar.style.display = selectedCount > 0 ? 'flex' : 'none';
+    const countEl = el.querySelector('#followup-selected-count');
+    if (countEl) countEl.textContent = `✓ ${selectedCount}件 選択中`;
+
+    const checks = Array.from(el.querySelectorAll('.followup-row-check'));
+    let visibleSelected = 0;
+    checks.forEach(cb => {
+      const selected = _followupState.selected.has(cb.dataset.key);
+      cb.checked = selected;
+      if (selected) visibleSelected++;
+      const row = cb.closest('.followup-row');
+      if (row) row.style.background = selected ? '#ede9fe' : (row.dataset.baseBg || '');
+    });
+
+    const selectAll = el.querySelector('#followup-select-all');
+    if (selectAll) {
+      selectAll.checked = checks.length > 0 && visibleSelected === checks.length;
+      selectAll.indeterminate = visibleSelected > 0 && visibleSelected < checks.length;
+    }
+  };
 
   // === イベント結合 ===
   el.querySelectorAll('.followup-cat-btn').forEach(btn => {
@@ -13064,7 +13087,7 @@ function renderFollowup() {
       const k = cb.dataset.key;
       if (cb.checked) _followupState.selected.add(k);
       else _followupState.selected.delete(k);
-      renderFollowup();
+      updateFollowupSelectionUI();
     });
   });
   // 全選択チェックボックス (表示中行のみ)
@@ -13081,7 +13104,7 @@ function renderFollowup() {
         _followupState.selected.delete(k);
       });
     }
-    renderFollowup();
+    updateFollowupSelectionUI();
   });
   // 一括: 来院済
   el.querySelector('#followup-bulk-visited')?.addEventListener('click', async () => {
@@ -13112,7 +13135,7 @@ function renderFollowup() {
   // 選択解除
   el.querySelector('#followup-bulk-clear')?.addEventListener('click', () => {
     _followupState.selected.clear();
-    renderFollowup();
+    updateFollowupSelectionUI();
   });
 
   // v400: 名前クリック → 予約一覧 + その人で検索フィルタ
