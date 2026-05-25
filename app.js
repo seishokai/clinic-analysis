@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v435';
+const APP_VERSION = 'v436';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12763,6 +12763,17 @@ const FOLLOWUP_STATUS_STYLE = {
   '対応終了': { bg:'#f3f4f6', fg:'#6b7280', bd:'#d1d5db' },
   '除外': { bg:'#f3f4f6', fg:'#6b7280', bd:'#d1d5db' }
 };
+const FOLLOWUP_MEMO_LABELS = {
+  '架電予定': '架電予定',
+  '架電済・不通': '架電・不通',
+  '架電済・留守電': '架電・留守電',
+  'SMS送信済': 'SMS送信',
+  '接触済・検討中': '接触・検討中',
+  '接触済・予約案内済': '接触・予約案内済',
+  '再予約獲得': '再予約獲得',
+  '対応終了': '追いかけ終了',
+  '除外': '追いかけ除外'
+};
 function loadFollowupMeta() {
   return (typeof loadData === 'function') ? loadData(FOLLOWUP_META_LS_KEY, {}) : {};
 }
@@ -12785,6 +12796,51 @@ async function syncSharedFollowupMeta() {
       if (currentView === 'followup' && typeof renderFollowup === 'function') renderFollowup();
     }
   } catch(_){}
+}
+function _followupNameKey(d) {
+  const n = d && d.name != null ? d.name : '';
+  return typeof normName === 'function' ? normName(n) : String(n).trim();
+}
+function _followupPhoneKey(d) {
+  return String((d && d.phone) || '').replace(/\D/g, '');
+}
+function _followupPatientKey(d) {
+  const name = _followupNameKey(d);
+  const phone = _followupPhoneKey(d);
+  return phone ? `${name}|${phone}` : name;
+}
+function _followupMemoDate(d = new Date()) {
+  return `${d.getMonth() + 1}/${d.getDate()}`;
+}
+async function appendFollowupMemo(name, apply, flowStatus) {
+  const label = FOLLOWUP_MEMO_LABELS[flowStatus];
+  if (!label || !name || !apply) return false;
+  const key = name + '|' + apply;
+  const line = `${_followupMemoDate()} ${label}`;
+  const memos = (typeof loadData === 'function') ? loadData('bk-memos', {}) : {};
+  const target = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+  const info = (typeof getBFInfo === 'function') ? getBFInfo(name, apply) : null;
+  const current = (memos[key] || target?._memo || info?.memo || info?.bf_memo || '').trim();
+  const already = current.split(/\r?\n/).map(s => s.trim()).includes(line);
+  const next = already ? current : (current ? current + '\n' + line : line);
+
+  memos[key] = next;
+  if (typeof saveData === 'function') saveData('bk-memos', memos);
+  if (target) target._memo = next;
+  if (typeof bfLifecycleCache === 'object' && bfLifecycleCache) {
+    if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
+    bfLifecycleCache[key].memo = next;
+    bfLifecycleCache[key].bf_memo = next;
+  }
+  if (typeof safeSave === 'function') {
+    await safeSave({
+      type: 'upsert',
+      table: 'booking_status',
+      payload: { name, apply_date: apply, memo: next, bf_memo: next },
+      options: { onConflict: 'name,apply_date' }
+    });
+  }
+  return !already;
 }
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => setTimeout(syncSharedFollowupMeta, 1200));
@@ -12831,14 +12887,18 @@ function renderFollowup() {
     smsByPhone[k].push(h);
   });
 
-  // 各患者の最新の予約 (再予約検出のため)
-  // 同じ name + phone でグルーピング → 最新の applyDate を見る
-  const bookingsByKey = {};
+  // 各患者の予約 (再予約検出のため)
+  // 電話番号がある場合は name + phone、ない場合のみ name でグルーピングする
+  const bookingsByPatientKey = {};
+  const bookingsByNameKey = {};
   data.forEach(d => {
-    const k = String(d.name || '').trim();
-    if (!k) return;
-    if (!bookingsByKey[k]) bookingsByKey[k] = [];
-    bookingsByKey[k].push(d);
+    const nameKey = _followupNameKey(d);
+    if (!nameKey) return;
+    if (!bookingsByNameKey[nameKey]) bookingsByNameKey[nameKey] = [];
+    bookingsByNameKey[nameKey].push(d);
+    const patientKey = _followupPatientKey(d);
+    if (!bookingsByPatientKey[patientKey]) bookingsByPatientKey[patientKey] = [];
+    bookingsByPatientKey[patientKey].push(d);
   });
 
   // 候補を集計
@@ -12882,19 +12942,31 @@ function renderFollowup() {
     }
     if (!category) return;
 
-    // 同名の他の予約で applyDate がより新しいもの (再予約検出)
+    // 同一患者の他の予約で applyDate がより新しく、予約日が別日のもの (再予約検出)
     const myApply = (typeof parseDate === 'function') ? parseDate(d.applyDate) : null;
     const myApplyMs = myApply ? myApply.getTime() : 0;
-    const sameName = bookingsByKey[String(d.name || '').trim()] || [];
-    const rebooking = sameName.find(b => {
+    const myBook = (typeof parseDate === 'function') ? parseDate(d.bookDate) : null;
+    const myBookMs = myBook ? myBook.getTime() : 0;
+    const samePatient = _followupPhoneKey(d)
+      ? (bookingsByPatientKey[_followupPatientKey(d)] || [])
+      : (bookingsByNameKey[_followupNameKey(d)] || []);
+    const rebooking = samePatient.filter(b => {
       if (b === d) return false;
       const ba = (typeof parseDate === 'function') ? parseDate(b.applyDate) : null;
       const baMs = ba ? ba.getTime() : 0;
+      const bb = (typeof parseDate === 'function') ? parseDate(b.bookDate) : null;
+      const bbMs = bb ? bb.getTime() : 0;
       // 自分より後に申し込まれていて、キャンセル以外
       if (baMs <= myApplyMs) return false;
+      if (!bbMs) return false;
+      if (myBookMs && bbMs === myBookMs) return false;
       if (b.status === 'キャンセル' || b.status === '除外') return false;
       return true;
-    });
+    }).sort((a, b) => {
+      const aa = (typeof parseDate === 'function') ? (parseDate(a.applyDate)?.getTime() || 0) : 0;
+      const ba = (typeof parseDate === 'function') ? (parseDate(b.applyDate)?.getTime() || 0) : 0;
+      return aa - ba;
+    })[0] || null;
 
     // SMS履歴
     const phoneKey = String(d.phone || '').replace(/[^0-9+]/g,'');
@@ -13016,6 +13088,10 @@ function renderFollowup() {
                 : (d.phone || '');
               const phoneDigits = String(phone).replace(/[^0-9]/g, '');
               const fmtMD = (s) => { const m = String(s||'').match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/); return m ? `${parseInt(m[2])}/${parseInt(m[3])}` : '-'; };
+              const fmtRebookDate = (s) => {
+                if (typeof fmtBookDate === 'function') return fmtBookDate(String(s || ''));
+                return fmtMD(s);
+              };
               const fac = typeof normFac === 'function' ? (normFac(d.facility) || '-') : (d.facility || '-');
               const memo = d._memo || (typeof findAnyMemo === 'function' ? findAnyMemo(d.name) : '') || '';
               // 対象理由バッジ
@@ -13034,7 +13110,7 @@ function renderFollowup() {
                 : '<span style="color:var(--text-muted);font-size:10px">未送信</span>';
               // 再予約セル
               const rebookCell = c.rebooking
-                ? `<span style="display:inline-block;padding:2px 7px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:700;border:1px solid #86efac" title="再予約日: ${escapeHtml(c.rebooking.applyDate||'')} / ステータス: ${escapeHtml(c.rebooking.status||'')}">✅ 再予約 ${escapeHtml(fmtMD(c.rebooking.applyDate))}</span>`
+                ? `<span style="display:inline-block;padding:2px 7px;background:#dcfce7;color:#15803d;border-radius:10px;font-size:10px;font-weight:700;border:1px solid #86efac" title="再予約日: ${escapeHtml(c.rebooking.bookDate||'')} / 申込日: ${escapeHtml(c.rebooking.applyDate||'')} / ステータス: ${escapeHtml(c.rebooking.status||'')}">✅ 再予約 ${escapeHtml(fmtRebookDate(c.rebooking.bookDate))}</span>`
                 : '<span style="color:var(--text-muted);font-size:10px">なし</span>';
               // v434: 追いかけ操作ボタン (予約本体のステータスは触らない)
               const quickFix = `
@@ -13143,7 +13219,7 @@ function renderFollowup() {
   };
 
   // v434: 追いかけ専用ステータス (予約本体 status は触らない)
-  const _setFollowupFlow = (name, apply, flowStatus, silent = false) => {
+  const _setFollowupFlow = async (name, apply, flowStatus, silent = false) => {
     try {
       const key = name + '|' + apply;
       const meta = loadFollowupMeta();
@@ -13158,7 +13234,8 @@ function renderFollowup() {
         };
       }
       saveFollowupMeta(meta);
-      if (!silent) showToast(`✓ ${name} を「${flowStatus || '未対応'}」にしました`);
+      const memoAdded = await appendFollowupMemo(name, apply, flowStatus);
+      if (!silent) showToast(`✓ ${name} を「${flowStatus || '未対応'}」にしました${memoAdded ? '（メモ追記）' : ''}`);
       renderFollowup();
     } catch(e) {
       console.warn('followup flow save failed', e);
@@ -13201,7 +13278,7 @@ function renderFollowup() {
   });
   // 一括: 追いかけフロー更新
   el.querySelectorAll('.followup-bulk-flow').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const keys = [..._followupState.selected];
       const flow = btn.dataset.flow || '未対応';
       if (!keys.length) return;
@@ -13221,8 +13298,12 @@ function renderFollowup() {
         }
       });
       saveFollowupMeta(meta);
+      for (const k of keys) {
+        const [name, apply] = k.split('|');
+        try { await appendFollowupMemo(name, apply, flow); } catch(_){}
+      }
       _followupState.selected.clear();
-      showToast(`✓ ${keys.length}件 を「${flow}」にしました`);
+      showToast(`✓ ${keys.length}件 を「${flow}」にしました（メモ追記）`);
       renderFollowup();
     });
   });
