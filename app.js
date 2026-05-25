@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v431';
+const APP_VERSION = 'v432';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4382,18 +4382,43 @@ function renderPhoneCheck() {
         </table>
       </div>
     `}
-    ${_phoneSelected.size > 0 ? `
-      <!-- v273: 一括処理フローティングバー -->
-      <div id="phone-bulk-bar" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:30px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:500;display:flex;gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 32px)">
-        <span style="font-size:13px;font-weight:700;padding:0 8px;white-space:nowrap">${_phoneSelected.size}件 選択中</span>
+      <!-- v273/v431: 一括処理フローティングバー (選択更新は再描画せずDOMだけ更新) -->
+      <div id="phone-bulk-bar" style="position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:#1a1a1a;color:#fff;padding:10px 14px;border-radius:30px;box-shadow:0 8px 24px rgba(0,0,0,.3);z-index:500;display:${_phoneSelected.size > 0 ? 'flex' : 'none'};gap:6px;align-items:center;flex-wrap:wrap;max-width:calc(100vw - 32px)">
+        <span id="phone-selected-count" style="font-size:13px;font-weight:700;padding:0 8px;white-space:nowrap">${_phoneSelected.size}件 選択中</span>
         <button class="phone-bulk-btn" data-st="確認済"   style="padding:6px 12px;background:#dbeafe;color:#1d4ed8;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">✅ 確認済</button>
         <button class="phone-bulk-btn" data-st="留守電"   style="padding:6px 12px;background:#fef3c7;color:#92400e;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">🎤 留守電</button>
         <button class="phone-bulk-btn" data-st="折り返し" style="padding:6px 12px;background:#f5f3ff;color:#7c3aed;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↩ 折り返し</button>
         <button class="phone-bulk-btn" data-st="未対応"   style="padding:6px 12px;background:#f3f4f6;color:#6b7280;border:none;border-radius:20px;font-size:11px;font-weight:700;cursor:pointer;font-family:inherit">↻ 取消</button>
         <button id="phone-bulk-cancel" style="padding:6px 12px;background:transparent;color:#fff;border:1px solid #555;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">解除</button>
       </div>
-    ` : ''}
   `;
+
+  const updatePhoneSelectionUI = () => {
+    const selectedCount = _phoneSelected.size;
+    const bar = el.querySelector('#phone-bulk-bar');
+    if (bar) bar.style.display = selectedCount > 0 ? 'flex' : 'none';
+    const countEl = el.querySelector('#phone-selected-count');
+    if (countEl) countEl.textContent = `${selectedCount}件 選択中`;
+
+    const checks = Array.from(el.querySelectorAll('.phone-row-check'));
+    let visibleSelected = 0;
+    checks.forEach(cb => {
+      const selected = _phoneSelected.has(cb.dataset.key);
+      cb.checked = selected;
+      if (selected) visibleSelected++;
+      const tr = cb.closest('tr.phone-row');
+      if (tr) {
+        tr.classList.toggle('selected', selected);
+        tr.style.background = selected ? '#eff6ff' : '';
+      }
+    });
+
+    const selectAll = el.querySelector('#phone-select-all');
+    if (selectAll) {
+      selectAll.checked = checks.length > 0 && visibleSelected === checks.length;
+      selectAll.indeterminate = visibleSelected > 0 && visibleSelected < checks.length;
+    }
+  };
 
   // イベントバインド
   el.querySelectorAll('.phone-period-btn').forEach(btn => {
@@ -4447,11 +4472,7 @@ function renderPhoneCheck() {
       const key = cb.dataset.key;
       if (cb.checked) _phoneSelected.add(key);
       else _phoneSelected.delete(key);
-      // 行ハイライト即時反映 + 一括バー再描画
-      const tr = cb.closest('tr.phone-row');
-      if (tr) tr.style.background = cb.checked ? '#eff6ff' : '';
-      // バーの再描画は renderPhoneCheck で
-      renderPhoneCheck();
+      updatePhoneSelectionUI();
     });
   });
   // 全選択
@@ -4467,7 +4488,7 @@ function renderPhoneCheck() {
       } else {
         allKeys.forEach(k => _phoneSelected.delete(k));
       }
-      renderPhoneCheck();
+      updatePhoneSelectionUI();
     });
   }
   // 一括処理ボタン
@@ -4497,7 +4518,7 @@ function renderPhoneCheck() {
   });
   el.querySelector('#phone-bulk-cancel')?.addEventListener('click', () => {
     _phoneSelected.clear();
-    renderPhoneCheck();
+    updatePhoneSelectionUI();
   });
   // v273: 電話モード起動
   el.querySelector('#phone-call-mode-btn')?.addEventListener('click', () => enterCallMode(rows, canViewPII, memos));
@@ -13396,52 +13417,88 @@ function renderPromo() {
     });
   });
 
+  const updatePromoSelectionUI = () => {
+    el.querySelectorAll('.promo-detail-section').forEach(section => {
+      const checks = Array.from(section.querySelectorAll('.promo-row-select'));
+      let selectedCount = 0;
+      let selectedInc = 0;
+
+      checks.forEach(cb => {
+        const selected = _promoTabState.selected.has(cb.dataset.key);
+        cb.checked = selected;
+        if (selected) {
+          selectedCount++;
+          selectedInc += Number(cb.dataset.inc || 0);
+        }
+        const row = cb.closest('.promo-booking-row');
+        if (row) row.style.background = selected ? '#ede9fe' : (row.dataset.baseBg || '#fff');
+      });
+
+      const summary = section.querySelector('.promo-selected-summary');
+      if (summary) {
+        summary.textContent = `選択 ${selectedCount}件${selectedCount > 0 ? ` / ¥${fmt(selectedInc)}` : ''}`;
+        summary.style.color = selectedCount > 0 ? '#7c3aed' : 'var(--text-muted)';
+        summary.style.fontWeight = selectedCount > 0 ? '600' : '400';
+      }
+
+      const clearBtn = section.querySelector('.promo-clear-select');
+      if (clearBtn) clearBtn.disabled = selectedCount === 0;
+
+      const noticeBtn = section.querySelector('.promo-create-notice');
+      if (noticeBtn) {
+        noticeBtn.disabled = selectedCount === 0;
+        noticeBtn.style.background = selectedCount > 0 ? '#7c3aed' : '#e5e7eb';
+        noticeBtn.style.color = selectedCount > 0 ? '#fff' : 'var(--text-muted)';
+        noticeBtn.textContent = `📄 ${noticeBtn.dataset.targetLabel || ''} 通知書作成 (${selectedCount})`;
+      }
+
+      const enabledChecks = checks.filter(cb => !cb.disabled);
+      const selectedEnabled = enabledChecks.filter(cb => _promoTabState.selected.has(cb.dataset.key)).length;
+      const selectAll = section.querySelector('.promo-select-all');
+      if (selectAll) {
+        selectAll.checked = enabledChecks.length > 0 && selectedEnabled === enabledChecks.length;
+        selectAll.indeterminate = selectedEnabled > 0 && selectedEnabled < enabledChecks.length;
+      }
+    });
+  };
+
   // === v380: 行選択チェックボックス ===
   el.querySelectorAll('.promo-row-select').forEach(cb => {
     cb.addEventListener('change', () => {
       const key = cb.dataset.key;
       if (cb.checked) _promoTabState.selected.add(key);
       else _promoTabState.selected.delete(key);
-      renderPromo();
+      updatePromoSelectionUI();
     });
   });
   // 全選択 (テーブル先頭のチェックボックス)
   el.querySelectorAll('.promo-select-all').forEach(cb => {
     cb.addEventListener('change', () => {
-      const src = cb.dataset.source;
-      const promo = sortedPromos.find(p => p.source === src);
-      if (!promo) return;
-      promo.bookings.filter(b => b.status === '成約').forEach(d => {
-        const key = d.name + '|' + d.applyDate;
-        const ex = _bkEx[key] || {};
-        const noticeCreated = ex.paymentNoticeCreated === true || ex.paymentNoticeCreated === 'true';
-        if (noticeCreated) return; // 通知済はスキップ
-        if (cb.checked) _promoTabState.selected.add(key);
-        else _promoTabState.selected.delete(key);
+      const section = cb.closest('.promo-detail-section');
+      if (!section) return;
+      section.querySelectorAll('.promo-row-select:not(:disabled)').forEach(rowCb => {
+        if (cb.checked) _promoTabState.selected.add(rowCb.dataset.key);
+        else _promoTabState.selected.delete(rowCb.dataset.key);
       });
-      renderPromo();
+      updatePromoSelectionUI();
     });
   });
   // 未通知を全選択
   el.querySelectorAll('.promo-select-unpaid').forEach(btn => {
     btn.addEventListener('click', () => {
-      const src = btn.dataset.source;
-      const promo = sortedPromos.find(p => p.source === src);
-      if (!promo) return;
-      promo.bookings.filter(b => b.status === '成約').forEach(d => {
-        const key = d.name + '|' + d.applyDate;
-        const ex = _bkEx[key] || {};
-        const noticeCreated = ex.paymentNoticeCreated === true || ex.paymentNoticeCreated === 'true';
-        if (!noticeCreated) _promoTabState.selected.add(key);
+      const section = btn.closest('.promo-detail-section');
+      if (!section) return;
+      section.querySelectorAll('.promo-row-select:not(:disabled)').forEach(rowCb => {
+        _promoTabState.selected.add(rowCb.dataset.key);
       });
-      renderPromo();
+      updatePromoSelectionUI();
     });
   });
   // 選択解除
   el.querySelectorAll('.promo-clear-select').forEach(btn => {
     btn.addEventListener('click', () => {
       _promoTabState.selected.clear();
-      renderPromo();
+      updatePromoSelectionUI();
     });
   });
   // v382: フィルタトグル (インセ¥0非表示 / 支給済非表示)
@@ -13698,7 +13755,7 @@ function _renderPromoDetail(p, _bkEx) {
   const _targetMonthLabel = `${_now.getFullYear()}年${_now.getMonth()+1}月分`;
   // 表示中の全件分インセ合計
   const visibleInc = contracted.reduce((s, d) => s + _inc(d), 0);
-  return `<div style="padding:8px">
+  return `<div class="promo-detail-section" data-source="${escapeHtml(p.source)}" style="padding:8px">
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
       <span style="font-size:11px;font-weight:600;color:var(--text-sub)">📋 ${escapeHtml(p.source)} 未支給 ${contracted.length}件 / ¥${fmt(visibleInc)}${hiddenZero||hiddenPaid||hiddenNotice?` <span style="color:var(--text-muted);font-weight:400">(全${totalContracted}件中: ${hiddenZero?`インセ¥0=${hiddenZero} `:''}${hiddenPaid?`支給済=${hiddenPaid} `:''}${hiddenNotice?`通知済=${hiddenNotice} `:''}非表示)</span>`:''}</span>
       <span style="margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
@@ -13716,10 +13773,10 @@ function _renderPromoDetail(p, _bkEx) {
           <span>通知済</span>
         </label>
         <span style="width:1px;height:18px;background:var(--border)"></span>
-        <span style="font-size:11px;color:${selectedCount>0?'#7c3aed':'var(--text-muted)'};font-weight:${selectedCount>0?'600':'400'}">選択 ${selectedCount}件 ${selectedCount>0?`/ ¥${fmt(selectedInc)}`:''}</span>
+        <span class="promo-selected-summary" data-source="${escapeHtml(p.source)}" style="font-size:11px;color:${selectedCount>0?'#7c3aed':'var(--text-muted)'};font-weight:${selectedCount>0?'600':'400'}">選択 ${selectedCount}件 ${selectedCount>0?`/ ¥${fmt(selectedInc)}`:''}</span>
         <button class="promo-select-unpaid filter-btn" data-source="${escapeHtml(p.source)}" title="表示中の全件を選択">表示中を全選択</button>
         <button class="promo-clear-select filter-btn" data-source="${escapeHtml(p.source)}" title="選択クリア" ${selectedCount===0?'disabled':''}>選択解除</button>
-        <button class="promo-create-notice filter-btn" data-source="${escapeHtml(p.source)}" data-target-month="${_targetMonth}" style="background:${selectedCount>0?'#7c3aed':'#e5e7eb'};color:${selectedCount>0?'#fff':'var(--text-muted)'};font-weight:600" ${selectedCount===0?'disabled':''} title="${escapeHtml(_targetMonthLabel)}の通知書をまとめて発行 (確認ダイアログ後に確定)">📄 ${_targetMonthLabel} 通知書作成 (${selectedCount})</button>
+        <button class="promo-create-notice filter-btn" data-source="${escapeHtml(p.source)}" data-target-month="${_targetMonth}" data-target-label="${escapeHtml(_targetMonthLabel)}" style="background:${selectedCount>0?'#7c3aed':'#e5e7eb'};color:${selectedCount>0?'#fff':'var(--text-muted)'};font-weight:600" ${selectedCount===0?'disabled':''} title="${escapeHtml(_targetMonthLabel)}の通知書をまとめて発行 (確認ダイアログ後に確定)">📄 ${_targetMonthLabel} 通知書作成 (${selectedCount})</button>
       </span>
     </div>
     <table class="data-table compact" style="width:100%;font-size:11px;margin-bottom:10px">
@@ -13753,8 +13810,9 @@ function _renderPromoDetail(p, _bkEx) {
             : `<span style="color:var(--text-muted);font-size:10px">未作成</span>`;
           // 行背景: 選択中=#ede9fe / 支給済=#f0fdf4 / 通知済=#f0f9ff / 未=#fff
           const rowBg = selected ? '#ede9fe' : paid ? '#f0fdf4' : noticeCreated ? '#f0f9ff' : '#fff';
-          return `<tr style="background:${rowBg}">
-            <td style="text-align:center"><input type="checkbox" class="promo-row-select" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-key="${escapeHtml(d.name + '|' + d.applyDate)}" ${selected?'checked':''} ${noticeCreated?'disabled title="既に通知書作成済"':''} style="width:14px;height:14px;cursor:${noticeCreated?'not-allowed':'pointer'};accent-color:#7c3aed"></td>
+          const baseRowBg = paid ? '#f0fdf4' : noticeCreated ? '#f0f9ff' : '#fff';
+          return `<tr class="promo-booking-row" data-source="${escapeHtml(p.source)}" data-key="${escapeHtml(d.name + '|' + d.applyDate)}" data-inc="${inc}" data-base-bg="${baseRowBg}" style="background:${rowBg}">
+            <td style="text-align:center"><input type="checkbox" class="promo-row-select" data-source="${escapeHtml(p.source)}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-key="${escapeHtml(d.name + '|' + d.applyDate)}" data-inc="${inc}" ${selected?'checked':''} ${noticeCreated?'disabled title="既に通知書作成済"':''} style="width:14px;height:14px;cursor:${noticeCreated?'not-allowed':'pointer'};accent-color:#7c3aed"></td>
             <td style="text-align:center">${escapeHtml(fmtMD(d.applyDate))}</td>
             <td style="text-align:center">${escapeHtml(fmtMD(d.bookDate))}</td>
             <td style="text-align:left;font-weight:500">${escapeHtml(d.name||'')}</td>
@@ -17300,7 +17358,10 @@ function renderMonshinTable() {
     } else {
       rows.forEach(r => monshinSelectedIds.delete(r.id));
     }
-    renderMonshinTable();  // 全行のチェック状態を反映
+    tbody.querySelectorAll('.mq-row-checkbox').forEach(cb => {
+      cb.checked = monshinSelectedIds.has(Number(cb.dataset.id));
+    });
+    updateMonshinBulkDeleteButton();
   });
 
   updateMonshinBulkDeleteButton();
