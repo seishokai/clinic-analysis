@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v442';
+const APP_VERSION = 'v443';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13171,6 +13171,16 @@ function renderFollowup() {
   _followupState.visibleKeys = visibleRows.map(c => (c.d.name || '') + '|' + (c.d.applyDate || ''));
 
   el.innerHTML = `
+    <style>
+      /* v443: 追いかけ表を詰めて、追いかけ操作ボタンを横スクロールなしで操作できるように (#followup-content 限定) */
+      #followup-content .data-table.compact td,
+      #followup-content .data-table.compact th { padding: 2px 4px !important; font-size: 10px; line-height: 1.15; }
+      #followup-content .data-table.compact th { font-size: 10px; }
+      #followup-content .followup-flow-btn { padding: 2px 4px !important; font-size: 9px !important; margin-right: 1px !important; }
+      #followup-content .followup-flow-sel { font-size: 9px !important; padding: 2px 3px !important; min-width: 84px !important; }
+      #followup-content .data-table.compact a { font-size: 11px; }
+      #followup-content .data-table-wrap { max-height: calc(100vh - 180px); }
+    </style>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
       <strong style="font-size:14px;font-weight:700">🎯 追いかけ</strong>
       <span style="font-size:11px;color:var(--text-sub)">${filtered.length}件 / 全 ${candidates.length}件</span>
