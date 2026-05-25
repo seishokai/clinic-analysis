@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v441';
+const APP_VERSION = 'v442';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13275,14 +13275,18 @@ function renderFollowup() {
               const reasonBadge = `<span style="display:inline-block;padding:3px 7px;border-radius:10px;background:${catColor.bg};color:${catColor.fg};border:1px solid ${catColor.fg}33;font-size:10px;font-weight:700">${escapeHtml(c.reason)}</span>`;
               const fs = flowStyle(c.flowStatus);
               const defaultFlowLabel = c.category === 'cancelled'
-                ? 'キャンセル済'
+                ? '架電予定'
                 : c.category === 'noshow'
                   ? '結果未入力'
                   : (c.category === 'review' || c.category === 'considering')
                     ? '確認/検討'
                     : '未対応';
               const flowSelHtml = `<select class="followup-flow-sel" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="font-size:10px;padding:3px 4px;border:1px solid ${fs.bd};border-radius:8px;background:${fs.bg};color:${fs.fg};font-weight:700;cursor:pointer;width:100%;min-width:120px">
-                ${FOLLOWUP_FLOW_STATUSES.map(s => `<option value="${escapeHtml(s)}" ${c.flowStatus===s?'selected':''}>${escapeHtml(s === '未対応' ? defaultFlowLabel : s)}</option>`).join('')}
+                ${FOLLOWUP_FLOW_STATUSES.map(s => {
+                  // キャンセル済の既定表示を「架電予定」にしているため、未操作行では重複する架電予定オプションを隠す
+                  if (s === '架電予定' && defaultFlowLabel === '架電予定' && c.flowStatus === '未対応') return '';
+                  return `<option value="${escapeHtml(s)}" ${c.flowStatus===s?'selected':''}>${escapeHtml(s === '未対応' ? defaultFlowLabel : s)}</option>`;
+                }).join('')}
               </select>`;
               // SMS 履歴サマリー
               const smsCell = c.lastSms
