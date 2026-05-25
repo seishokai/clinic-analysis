@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v436';
+const APP_VERSION = 'v437';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12848,7 +12848,7 @@ if (document.readyState === 'loading') {
   setTimeout(syncSharedFollowupMeta, 1200);
 }
 let _followupState = {
-  category: 'todo',  // 'todo' | 'calling' | 'sms' | 'connected' | 'rebooked' | 'closed' | 'all'
+  category: 'todo',  // 'todo' | 'unentered' | 'calling' | 'sms' | 'connected' | 'rebooked' | 'closed' | 'all'
   search: '',
   hideWithRebooking: false,  // 再予約済を非表示
   selected: new Set(),  // v402: 一括編集用の選択 (name|applyDate)
@@ -12868,12 +12868,13 @@ function renderFollowup() {
     return meta.status || '未対応';
   };
   const flowStyle = (status) => FOLLOWUP_STATUS_STYLE[status] || FOLLOWUP_STATUS_STYLE['未対応'];
-  const flowGroup = (status) => {
+  const flowGroup = (status, category) => {
     if (status === '再予約獲得') return 'rebooked';
     if (status === '対応終了' || status === '除外') return 'closed';
     if (status === 'SMS送信済') return 'sms';
     if (status === '接触済・検討中' || status === '接触済・予約案内済') return 'connected';
     if (status === '架電予定' || status === '架電済・不通' || status === '架電済・留守電') return 'calling';
+    if (category === 'noshow') return 'unentered';
     return 'todo';
   };
 
@@ -12976,7 +12977,7 @@ function renderFollowup() {
     candidates.push({
       d, category, reason,
       flowStatus,
-      flowGroup: flowGroup(flowStatus),
+      flowGroup: flowGroup(flowStatus, category),
       rebooking,
       sms,
       lastSms: sms.length ? sms[sms.length-1] : null,
@@ -12984,7 +12985,7 @@ function renderFollowup() {
   });
 
   // フィルタ
-  const validFlowCats = new Set(['todo','calling','sms','connected','rebooked','closed','all']);
+  const validFlowCats = new Set(['todo','unentered','calling','sms','connected','rebooked','closed','all']);
   const cat = validFlowCats.has(_followupState.category) ? _followupState.category : 'todo';
   if (cat !== _followupState.category) _followupState.category = cat;
   let filtered = candidates;
@@ -12997,7 +12998,7 @@ function renderFollowup() {
 
   // 並べ替え: 未対応優先 → 再予約あり → SMS済み → 予約日新しい順
   filtered.sort((a, b) => {
-    const order = { 'todo': 0, 'calling': 1, 'sms': 2, 'connected': 3, 'rebooked': 4, 'closed': 5 };
+    const order = { 'todo': 0, 'unentered': 1, 'calling': 2, 'sms': 3, 'connected': 4, 'rebooked': 5, 'closed': 6 };
     const og = (order[a.flowGroup] ?? 9) - (order[b.flowGroup] ?? 9);
     if (og) return og;
     if (!!a.rebooking !== !!b.rebooking) return a.rebooking ? -1 : 1;
@@ -13008,7 +13009,7 @@ function renderFollowup() {
   });
 
   // 集計
-  const byFlow = { todo: 0, calling: 0, sms: 0, connected: 0, rebooked: 0, closed: 0 };
+  const byFlow = { todo: 0, unentered: 0, calling: 0, sms: 0, connected: 0, rebooked: 0, closed: 0 };
   candidates.forEach(c => { byFlow[c.flowGroup] = (byFlow[c.flowGroup] || 0) + 1; });
   const byReason = { cancelled: 0, noshow: 0, considering: 0, review: 0 };
   candidates.forEach(c => byReason[c.category]++);
@@ -13030,6 +13031,7 @@ function renderFollowup() {
       <span><span style="color:var(--text-sub)">対象</span> <strong style="font-size:13px">${candidates.length}</strong></span>
       <span style="color:var(--border)">|</span>
       <span><span style="color:var(--text-sub)">未対応</span> <strong style="color:#b45309;font-size:13px">${byFlow.todo}</strong></span>
+      <span><span style="color:var(--text-sub)">結果未入力</span> <strong style="color:#9a3412;font-size:13px">${byFlow.unentered}</strong></span>
       <span><span style="color:var(--text-sub)">架電系</span> <strong style="color:#c2410c;font-size:13px">${byFlow.calling}</strong></span>
       <span><span style="color:var(--text-sub)">接触済</span> <strong style="color:#0369a1;font-size:13px">${byFlow.connected}</strong></span>
       <span style="color:var(--border)">|</span>
@@ -13044,6 +13046,7 @@ function renderFollowup() {
       <span style="font-size:11px;color:var(--text-sub)">追いかけ:</span>
       ${[
         { key: 'todo', label: '未対応', count: byFlow.todo, color: '#b45309' },
+        { key: 'unentered', label: '結果未入力', count: byFlow.unentered, color: '#9a3412' },
         { key: 'calling', label: '架電・不通', count: byFlow.calling, color: '#c2410c' },
         { key: 'sms', label: 'SMS済', count: byFlow.sms, color: '#7c3aed' },
         { key: 'connected', label: '接触済', count: byFlow.connected, color: '#0369a1' },
