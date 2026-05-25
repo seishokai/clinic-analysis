@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v440';
+const APP_VERSION = 'v441';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13228,12 +13228,14 @@ function renderFollowup() {
         <table class="data-table compact" style="width:100%;font-size:12px">
           <thead><tr>
             <th style="width:36px;text-align:center"><input type="checkbox" id="followup-select-all" title="表示中を全選択" style="width:14px;height:14px;cursor:pointer"></th>
-            <th style="text-align:left;width:130px">名前</th>
-            <th style="width:92px">対象理由</th>
-            <th style="width:130px">追いかけ</th>
-            <th style="width:70px">予約日</th>
-            <th style="width:70px">医院</th>
-            <th style="text-align:left;width:160px">連絡先</th>
+            <th style="text-align:left;width:110px">名前</th>
+            <th style="width:84px">対象理由</th>
+            <th style="width:118px">追いかけ</th>
+            <th style="width:54px">予約日</th>
+            <th style="width:60px">医院</th>
+            <th style="width:96px">プロモ</th>
+            <th style="text-align:left;width:104px">施術</th>
+            <th style="text-align:left;width:148px">連絡先</th>
             <th style="width:100px">SMS履歴</th>
             <th style="width:120px">再予約</th>
             <th style="text-align:left">メモ</th>
@@ -13252,6 +13254,18 @@ function renderFollowup() {
                 return fmtMD(s);
               };
               const fac = typeof normFac === 'function' ? (normFac(d.facility) || '-') : (d.facility || '-');
+              // プロモ (流入元) セル
+              const promoTxt = String(d.source || '').trim();
+              const promoShort = promoTxt.length > 13 ? promoTxt.slice(0, 13) + '…' : promoTxt;
+              const promoCell = promoTxt
+                ? `<span title="${escapeHtml(promoTxt)}" style="display:inline-block;max-width:100%;padding:2px 6px;background:#e0f2fe;color:#0369a1;border-radius:8px;font-size:9px;font-weight:600;border:1px solid #bae6fd;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box">${escapeHtml(promoShort)}</span>`
+                : '<span style="color:var(--text-muted);font-size:10px">-</span>';
+              // 予約した施術セル
+              const svcTxt = String(d.service || '').trim();
+              const svcShort = svcTxt.length > 14 ? svcTxt.slice(0, 14) + '…' : svcTxt;
+              const svcCell = svcTxt
+                ? `<span title="${escapeHtml(svcTxt)}" style="display:inline-block;max-width:100%;font-size:10px;color:var(--text-sub);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;box-sizing:border-box">${escapeHtml(svcShort)}</span>`
+                : '<span style="color:var(--text-muted);font-size:10px">-</span>';
               const memo = memoFor(d);
               // 対象理由バッジ
               const catColor = c.category === 'cancelled' ? { bg: '#fee2e2', fg: '#b91c1c' }
@@ -13297,14 +13311,16 @@ function renderFollowup() {
                 <td>${flowSelHtml}</td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fmtMD(d.bookDate))}</td>
                 <td style="text-align:center;font-size:10px;color:var(--text-sub)">${escapeHtml(fac)}</td>
+                <td style="text-align:center;max-width:96px;overflow:hidden">${promoCell}</td>
+                <td style="text-align:left;max-width:104px;overflow:hidden">${svcCell}</td>
                 <td>${phone && phoneDigits ? `<span style="display:inline-flex;align-items:stretch;gap:0;border-radius:6px;overflow:hidden;border:1px solid #86efac;line-height:1"><a href="tel:${phoneDigits}" style="display:inline-flex;align-items:center;gap:4px;padding:4px 8px;background:#dcfce7;color:#15803d;font-weight:700;text-decoration:none;font-size:11px">📞 ${escapeHtml(phone)}</a><button type="button" class="followup-sms-btn" data-name="${escapeHtml(d.name||'')}" data-phone="${escapeHtml(d.phone||'')}" data-bookdate="${escapeHtml(d.bookDate||'')}" data-facility="${escapeHtml(d.facility||'')}" title="SMSを送る" style="display:inline-flex;align-items:center;justify-content:center;padding:4px 8px;background:#ede9fe;color:#7c3aed;border:none;border-left:1px solid #c4b5fd;font-weight:700;font-size:13px;cursor:pointer">📱</button></span>` : '<span style="color:var(--text-muted)">-</span>'}</td>
                 <td style="text-align:center">${smsCell}</td>
                 <td style="text-align:center">${rebookCell}</td>
                 <td style="font-size:10px;color:var(--text-sub);max-width:300px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(memo||'')}">${escapeHtml((typeof _flattenMemoForDisplay === 'function' ? _flattenMemoForDisplay(memo, 60) : memo.slice(0, 60)) || '-')}</td>
                 <td style="text-align:center;white-space:nowrap">${quickFix}</td>
               </tr>`;
-            }).join('') || '<tr><td colspan="11" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
-            ${filtered.length > displayLimit ? `<tr><td colspan="11" style="text-align:center;padding:10px"><button type="button" id="followup-more-btn" class="filter-btn" style="font-size:12px;padding:6px 16px">さらに300件表示（全${filtered.length}件中${displayLimit}件）</button></td></tr>` : ''}
+            }).join('') || '<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-sub)">該当がありません</td></tr>'}
+            ${filtered.length > displayLimit ? `<tr><td colspan="13" style="text-align:center;padding:10px"><button type="button" id="followup-more-btn" class="filter-btn" style="font-size:12px;padding:6px 16px">さらに300件表示（全${filtered.length}件中${displayLimit}件）</button></td></tr>` : ''}
           </tbody>
         </table>
       </div>
