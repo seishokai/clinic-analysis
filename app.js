@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v432';
+const APP_VERSION = 'v433';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12901,6 +12901,7 @@ function renderFollowup() {
       <span style="flex:1"></span>
       <button id="followup-bulk-visited" class="filter-btn" style="background:#fff;color:#15803d;border:1px solid #dcfce7;font-weight:700;padding:6px 14px">✅ 一括 来院済にする</button>
       <button id="followup-bulk-cancel" class="filter-btn" style="background:#fff;color:#b91c1c;border:1px solid #fecaca;font-weight:700;padding:6px 14px">❌ 一括 キャンセル</button>
+      <button id="followup-bulk-delete" class="filter-btn" style="background:#fff;color:#6b7280;border:1px solid #d1d5db;font-weight:700;padding:6px 14px">🗑 一括 削除</button>
       <button id="followup-bulk-clear" class="filter-btn" style="background:transparent;color:#fff;border:1px solid rgba(255,255,255,.4);padding:6px 12px" title="選択解除">✕ 解除</button>
     </div>
     <div class="card" style="padding:6px">
@@ -13150,6 +13151,19 @@ function renderFollowup() {
     }
     _followupState.selected.clear();
     showToast(`✓ ${keys.length}件 を「キャンセル」に変更しました`);
+    renderFollowup();
+    if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
+  });
+  // 一括: 削除(除外)
+  el.querySelector('#followup-bulk-delete')?.addEventListener('click', async () => {
+    const keys = [..._followupState.selected];
+    if (!confirm(`選択中の ${keys.length}件 を一覧から削除しますか?\n\n実際には「除外」ステータスに変更します。データ自体は残り、予約一覧の「除外も表示」で確認できます。`)) return;
+    for (const k of keys) {
+      const [name, apply] = k.split('|');
+      try { await _quickStatusFixNoToast(name, apply, '除外'); } catch(_){}
+    }
+    _followupState.selected.clear();
+    showToast(`✓ ${keys.length}件 を削除(除外)しました`);
     renderFollowup();
     if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
   });
