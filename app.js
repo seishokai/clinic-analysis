@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v437';
+const APP_VERSION = 'v438';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12848,7 +12848,7 @@ if (document.readyState === 'loading') {
   setTimeout(syncSharedFollowupMeta, 1200);
 }
 let _followupState = {
-  category: 'todo',  // 'todo' | 'unentered' | 'calling' | 'sms' | 'connected' | 'rebooked' | 'closed' | 'all'
+  category: 'todo',  // 'todo'(キャンセル済) | 'unentered' | 'review' | 'calling' | 'sms' | 'connected' | 'rebooked' | 'closed' | 'all'
   search: '',
   hideWithRebooking: false,  // 再予約済を非表示
   selected: new Set(),  // v402: 一括編集用の選択 (name|applyDate)
@@ -12875,6 +12875,7 @@ function renderFollowup() {
     if (status === '接触済・検討中' || status === '接触済・予約案内済') return 'connected';
     if (status === '架電予定' || status === '架電済・不通' || status === '架電済・留守電') return 'calling';
     if (category === 'noshow') return 'unentered';
+    if (category === 'review' || category === 'considering') return 'review';
     return 'todo';
   };
 
@@ -12985,7 +12986,7 @@ function renderFollowup() {
   });
 
   // フィルタ
-  const validFlowCats = new Set(['todo','unentered','calling','sms','connected','rebooked','closed','all']);
+  const validFlowCats = new Set(['todo','unentered','review','calling','sms','connected','rebooked','closed','all']);
   const cat = validFlowCats.has(_followupState.category) ? _followupState.category : 'todo';
   if (cat !== _followupState.category) _followupState.category = cat;
   let filtered = candidates;
@@ -12998,7 +12999,7 @@ function renderFollowup() {
 
   // 並べ替え: 未対応優先 → 再予約あり → SMS済み → 予約日新しい順
   filtered.sort((a, b) => {
-    const order = { 'todo': 0, 'unentered': 1, 'calling': 2, 'sms': 3, 'connected': 4, 'rebooked': 5, 'closed': 6 };
+    const order = { 'todo': 0, 'unentered': 1, 'review': 2, 'calling': 3, 'sms': 4, 'connected': 5, 'rebooked': 6, 'closed': 7 };
     const og = (order[a.flowGroup] ?? 9) - (order[b.flowGroup] ?? 9);
     if (og) return og;
     if (!!a.rebooking !== !!b.rebooking) return a.rebooking ? -1 : 1;
@@ -13009,7 +13010,7 @@ function renderFollowup() {
   });
 
   // 集計
-  const byFlow = { todo: 0, unentered: 0, calling: 0, sms: 0, connected: 0, rebooked: 0, closed: 0 };
+  const byFlow = { todo: 0, unentered: 0, review: 0, calling: 0, sms: 0, connected: 0, rebooked: 0, closed: 0 };
   candidates.forEach(c => { byFlow[c.flowGroup] = (byFlow[c.flowGroup] || 0) + 1; });
   const byReason = { cancelled: 0, noshow: 0, considering: 0, review: 0 };
   candidates.forEach(c => byReason[c.category]++);
@@ -13030,8 +13031,9 @@ function renderFollowup() {
     <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:#f9fafb;border:1px solid var(--border);border-radius:6px;font-size:11px">
       <span><span style="color:var(--text-sub)">対象</span> <strong style="font-size:13px">${candidates.length}</strong></span>
       <span style="color:var(--border)">|</span>
-      <span><span style="color:var(--text-sub)">未対応</span> <strong style="color:#b45309;font-size:13px">${byFlow.todo}</strong></span>
+      <span><span style="color:var(--text-sub)">キャンセル済</span> <strong style="color:#b45309;font-size:13px">${byFlow.todo}</strong></span>
       <span><span style="color:var(--text-sub)">結果未入力</span> <strong style="color:#9a3412;font-size:13px">${byFlow.unentered}</strong></span>
+      <span><span style="color:var(--text-sub)">確認/検討</span> <strong style="color:#0369a1;font-size:13px">${byFlow.review}</strong></span>
       <span><span style="color:var(--text-sub)">架電系</span> <strong style="color:#c2410c;font-size:13px">${byFlow.calling}</strong></span>
       <span><span style="color:var(--text-sub)">接触済</span> <strong style="color:#0369a1;font-size:13px">${byFlow.connected}</strong></span>
       <span style="color:var(--border)">|</span>
@@ -13045,8 +13047,9 @@ function renderFollowup() {
     <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:6px">
       <span style="font-size:11px;color:var(--text-sub)">追いかけ:</span>
       ${[
-        { key: 'todo', label: '未対応', count: byFlow.todo, color: '#b45309' },
+        { key: 'todo', label: 'キャンセル済', count: byFlow.todo, color: '#b45309' },
         { key: 'unentered', label: '結果未入力', count: byFlow.unentered, color: '#9a3412' },
+        { key: 'review', label: '確認/検討', count: byFlow.review, color: '#0369a1' },
         { key: 'calling', label: '架電・不通', count: byFlow.calling, color: '#c2410c' },
         { key: 'sms', label: 'SMS済', count: byFlow.sms, color: '#7c3aed' },
         { key: 'connected', label: '接触済', count: byFlow.connected, color: '#0369a1' },
@@ -13104,8 +13107,15 @@ function renderFollowup() {
                             : { bg: '#ede9fe', fg: '#7c3aed' };
               const reasonBadge = `<span style="display:inline-block;padding:3px 7px;border-radius:10px;background:${catColor.bg};color:${catColor.fg};border:1px solid ${catColor.fg}33;font-size:10px;font-weight:700">${escapeHtml(c.reason)}</span>`;
               const fs = flowStyle(c.flowStatus);
+              const defaultFlowLabel = c.category === 'cancelled'
+                ? 'キャンセル済'
+                : c.category === 'noshow'
+                  ? '結果未入力'
+                  : (c.category === 'review' || c.category === 'considering')
+                    ? '確認/検討'
+                    : '未対応';
               const flowSelHtml = `<select class="followup-flow-sel" data-name="${escapeHtml(d.name||'')}" data-apply="${escapeHtml(d.applyDate||'')}" style="font-size:10px;padding:3px 4px;border:1px solid ${fs.bd};border-radius:8px;background:${fs.bg};color:${fs.fg};font-weight:700;cursor:pointer;width:100%;min-width:120px">
-                ${FOLLOWUP_FLOW_STATUSES.map(s => `<option value="${escapeHtml(s)}" ${c.flowStatus===s?'selected':''}>${escapeHtml(s)}</option>`).join('')}
+                ${FOLLOWUP_FLOW_STATUSES.map(s => `<option value="${escapeHtml(s)}" ${c.flowStatus===s?'selected':''}>${escapeHtml(s === '未対応' ? defaultFlowLabel : s)}</option>`).join('')}
               </select>`;
               // SMS 履歴サマリー
               const smsCell = c.lastSms
