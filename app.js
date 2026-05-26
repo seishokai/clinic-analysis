@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v443';
+const APP_VERSION = 'v444';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10838,14 +10838,14 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   const statuses = getStatusesForTreatment(treatment);
   // カウント
   // v275: インプラントは d.status を使う (bf_status ではない)
-  // v424: 矯正/BF/その他 で bf_status が空なら d.status にフォールバック
+  // v443: 表示・フィルターと一致させる (BF/矯正/その他は bf_status のみ、d.status にフォールバックしない)
   const byStatus = {};
   statuses.forEach(s => byStatus[s.value] = 0);
   let noSt = 0;
   rows.forEach(d => {
     const st = (treatment === 'インプラント')
       ? (d.status || '')
-      : (((getBFInfo(d.name, d.applyDate) || {}).bf_status) || d.status || '');
+      : (((getBFInfo(d.name, d.applyDate) || {}).bf_status) || '');
     if (st && byStatus[st] !== undefined) byStatus[st]++;
     else noSt++;
   });
@@ -11229,12 +11229,13 @@ function drawKaiinRows(treatment, rows, container) {
   });
   // ステータスフィルター (multi-select)
   // v275: インプラントは d.status を使う (bf_status ではない)
-  // v424: 矯正/BF/その他 で bf_status が空なら d.status にフォールバック
-  //   → 予約タブで「成約」「来院済」になっている人が、治療タブで「未設定」と
-  //     表示されてしまう不整合を解消
+  // v443: 表示(ステータス列)と完全一致させる。BF/矯正/その他は bf_status のみで判定し、
+  //   d.status へはフォールバックしない。
+  //   → これをしないと、画面上は「未設定」と表示されている行 (bf_status 空) が、
+  //     d.status を持つため「未設定」フィルターで除外されてしまう不整合になる。
   const getSt = (d) => {
     if (treatment === 'インプラント') return d.status || '';
-    return (getBFInfo(d.name, d.applyDate)||{}).bf_status || d.status || '';
+    return (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
   };
   if (statusSet.size) {
     filtered = filtered.filter(d => {
@@ -11270,16 +11271,13 @@ function drawKaiinRows(treatment, rows, container) {
   container._lastFiltered = filtered;
   container.querySelector('.kaiin-count').textContent = filtered.length + '件';
   // サマリー数値もフィルター結果で更新
-  // v275: インプラントは d.status を使う
-  // v424: 矯正/BF/その他 で bf_status が空なら d.status にフォールバック
+  // v443: 表示・フィルターと同じ getSt で判定 (BF/矯正/その他は bf_status のみ)
   (function updateSummary(){
     const byStatusF = {};
     statuses.forEach(s => byStatusF[s.value] = 0);
     let unsetF = 0;
     filtered.forEach(d => {
-      const st = (treatment === 'インプラント')
-        ? (d.status || '')
-        : (((getBFInfo(d.name, d.applyDate) || {}).bf_status) || d.status || '');
+      const st = getSt(d);
       if (st && byStatusF[st] !== undefined) byStatusF[st]++; else unsetF++;
     });
     const elTotal = container.querySelector('.kaiin-count-total');
