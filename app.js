@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v444';
+const APP_VERSION = 'v445';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9973,8 +9973,15 @@ async function renderKaiinAll(containerId) {
   if (state.facility.size) allRows = allRows.filter(d => state.facility.has(normFac(d.facility)));
   if (state.promo.size) allRows = allRows.filter(d => state.promo.has(d.source));
   if (state.service.size) allRows = allRows.filter(d => state.service.has(normSvc(d.service)));
-  // v416: 成約フィルタは broad (d.status === '成約' = BF治療進行中も成約として扱う)
-  if (state.status.size) allRows = allRows.filter(d => state.status.has(d.status || '__未設定__'));
+  // v444: 表示(ステータス列)と一致する実効ステータス。インプラントは d.status、
+  //   それ以外(BF/矯正等)は bf_status 優先(空ならd.status)。
+  //   従来フィルターは d.status のみで判定していたため、画面表示と食い違っていた。
+  const _kaEffSt = (d) => (getTreatmentCategory(d) === 'インプラント')
+    ? (d.status || '')
+    : ((getBFInfo(d.name, d.applyDate) || {}).bf_status || d.status || '');
+  if (state.status.size) {
+    allRows = allRows.filter(d => state.status.has(_kaEffSt(d) || '__未設定__'));
+  }
   if (state.contract.size) allRows = allRows.filter(d => state.contract.has(d.contractService));
   // 治療タイプ別カウント
   // 金額は status 不問・bk-extra 優先で合算 (予約管理と同じ集計)
@@ -10384,11 +10391,15 @@ async function renderKaiinAll(containerId) {
   const promoOpts = Object.keys(promoCounts).sort((a,b) => promoCounts[b]-promoCounts[a]).map(p => ({ value: p, label: `${p} (${promoCounts[p]})` }));
   const serviceOpts = [...new Set(baseRows.map(d => normSvc(d.service)).filter(Boolean))].sort();
   const contractOpts = [...new Set(baseRows.map(d => d.contractService).filter(Boolean))].sort();
+  // v444: 表示中の実効ステータス(_kaEffSt)から動的生成。BF/矯正のライフサイクル段階も
+  //   選択肢に含め、フィルター・選択肢・表示を完全一致させる。
+  const _stdStOrder = ['未対応','予約連絡待ち','後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル'];
+  const _stPresent = new Set();
+  baseRows.forEach(d => _stPresent.add(_kaEffSt(d) || '__未設定__'));
   const statusOpts = [
-    '未対応',
-    { value: '予約連絡待ち', label: '次回予約連絡待ち' },
-    '後追いLINE済み','確認済','予約変更','検討中','来院済','成約','キャンセル',
-    { value: '__未設定__', label: '未設定' },
+    ..._stdStOrder.filter(s => _stPresent.has(s)).map(s => s === '予約連絡待ち' ? { value: s, label: '次回予約連絡待ち' } : s),
+    ...[..._stPresent].filter(s => s !== '__未設定__' && !_stdStOrder.includes(s)).sort(),
+    ...(_stPresent.has('__未設定__') ? [{ value: '__未設定__', label: '未設定' }] : []),
   ];
 
   const toolDD = createMultiSelectDropdown({ label: 'ツール', options: toolOpts, selected: state.tool, onChange: triggerRedraw });
