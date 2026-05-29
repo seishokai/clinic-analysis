@@ -300,6 +300,11 @@
   pwInput.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); pwSubmit.click(); } });
   try { if (sessionStorage.getItem(UNLOCK_KEY) === '1') unlock(); } catch(_){}
 
+  // 申請日は今日(JST)を自動入力 (タイムゾーン安全のためローカル時刻ベース)
+  function todayYMD() {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+  }
   function addRow(data) {
     data = data || {};
     rowCounter++;
@@ -307,7 +312,7 @@
     tr.dataset.rowNo = rowCounter;
     tr.innerHTML = `
       <td class="rowno">${rowCounter}</td>
-      <td><input type="date" class="cell-applied-date" value="${data.applied_date||''}"></td>
+      <td><input type="date" class="cell-applied-date" value="${data.applied_date || todayYMD()}"></td>
       <td><input type="text" class="cell-applicant" placeholder="(空の場合は上の申請者名を使用)" value="${(data.applicant_name||'').replace(/"/g,'&quot;')}"></td>
       <td><input type="text" class="cell-patient" placeholder="患者名" value="${(data.patient_name||'').replace(/"/g,'&quot;')}"></td>
       <td>
