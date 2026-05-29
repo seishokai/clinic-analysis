@@ -134,7 +134,8 @@
     <!-- ツールバー -->
     <div class="toolbar">
       <label>申請者名 <strong id="default-applicant-label">(未設定)</strong></label>
-      <input type="text" id="default-applicant" placeholder="例: 小池 隆史" style="min-width:140px">
+      <input type="text" id="default-applicant" list="applicant-suggest" placeholder="例: 小池 隆史 / または医院名" style="min-width:160px">
+      <datalist id="applicant-suggest"></datalist>
       <button class="btn" id="btn-add-row">＋ 行を追加</button>
       <button class="btn btn-danger" id="btn-clear-empty">空行をクリア</button>
       <div style="flex:1"></div>
@@ -234,6 +235,12 @@
 
   const CLINICS = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都','その他'];
 
+  // 申請者名入力(上部・各行)に医院名候補を出す (1医院まとめ申請で医院名を申請者として選びたいケース対応)
+  try {
+    const dl = document.getElementById('applicant-suggest');
+    if (dl) dl.innerHTML = CLINICS.map(c => `<option value="${c}"></option>`).join('');
+  } catch(_) {}
+
   const pwGate = document.getElementById('pw-gate');
   const pwInput = document.getElementById('pw-input');
   const pwSubmit = document.getElementById('pw-submit');
@@ -313,7 +320,7 @@
     tr.innerHTML = `
       <td class="rowno">${rowCounter}</td>
       <td><input type="date" class="cell-applied-date" value="${data.applied_date || todayYMD()}"></td>
-      <td><input type="text" class="cell-applicant" placeholder="(空の場合は上の申請者名を使用)" value="${(data.applicant_name||'').replace(/"/g,'&quot;')}"></td>
+      <td><input type="text" class="cell-applicant" list="applicant-suggest" placeholder="(空=上の申請者名を使用)" value="${(data.applicant_name||'').replace(/"/g,'&quot;')}"></td>
       <td><input type="text" class="cell-patient" placeholder="患者名" value="${(data.patient_name||'').replace(/"/g,'&quot;')}"></td>
       <td>
         <select class="cell-clinic">
