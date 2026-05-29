@@ -1,20 +1,21 @@
 -- ============================================================
--- pbm_list_by_applicant.sql
--- スタッフが pbm-apply.html から「過去の自分の申請」を一覧で見るための公開RPC
+-- pbm_list_by_applicant.sql  (旧名のまま、内容は v448 で「全員分」版に変更)
+-- スタッフが pbm-apply.html から PBM 申請の一覧を見るための公開RPC
 --
 -- 適用方法:
 --   Supabase Dashboard → SQL Editor で 1 回だけ実行
+--   (旧 list_pbm_applications_by_applicant を一緒に削除してから新規作成)
 --
 -- 仕組み:
---   既存の submit_pbm_application_public と同じく共通パスワード認証。
---   ログイン不要で、パスワード + 申請者名(自分が入力したもの)で
---   自分の過去申請を最大200件取得できる。
+--   共通パスワード認証。誰でも自分のと他人の申請を含む全件を確認できる
+--   (運用上「自分のだけ見たい」ではなく「全員の状況を共有したい」要件)
 -- ============================================================
 
-CREATE OR REPLACE FUNCTION public.list_pbm_applications_by_applicant(
-  p_password TEXT,
-  p_applicant_name TEXT
-)
+-- 旧: applicant_name で絞る版があれば削除 (掃除)
+DROP FUNCTION IF EXISTS public.list_pbm_applications_by_applicant(TEXT, TEXT);
+
+-- 新: 全件返却 (共通パスワードのみで認証)
+CREATE OR REPLACE FUNCTION public.list_pbm_applications_public(p_password TEXT)
 RETURNS TABLE (
   id INTEGER,
   applied_at TIMESTAMPTZ,
@@ -40,10 +41,6 @@ BEGIN
     RAISE EXCEPTION 'パスワードが違います';
   END IF;
 
-  IF p_applicant_name IS NULL OR TRIM(p_applicant_name) = '' THEN
-    RAISE EXCEPTION '申請者名は必須です';
-  END IF;
-
   RETURN QUERY
   SELECT
     a.id,
@@ -60,17 +57,16 @@ BEGIN
     a.rejection_reason,
     a.approved_at
   FROM public.pbm_applications a
-  WHERE TRIM(a.applicant_name) ILIKE TRIM(p_applicant_name)
   ORDER BY a.applied_at DESC
-  LIMIT 200;
+  LIMIT 500;
 END;
 $$;
 
--- 公開アクセス許可 (Supabase の anon ロールから呼べるようにする)
-GRANT EXECUTE ON FUNCTION public.list_pbm_applications_by_applicant(TEXT, TEXT)
+-- 公開アクセス許可 (anon と authenticated の両方から呼べる)
+GRANT EXECUTE ON FUNCTION public.list_pbm_applications_public(TEXT)
   TO anon, authenticated;
 
 -- ============================================================
 -- 動作確認 (コメント、必要なら実行)
 -- ============================================================
--- SELECT * FROM public.list_pbm_applications_by_applicant('Seishokai1', '小池 隆史');
+-- SELECT * FROM public.list_pbm_applications_public('Seishokai1');

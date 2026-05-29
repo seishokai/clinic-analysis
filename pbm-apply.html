@@ -188,13 +188,14 @@
       <span class="pill">合計還元 <strong id="sum-total">¥0</strong></span>
     </div>
 
-    <!-- サーバ上の自分の申請履歴 -->
+    <!-- サーバ上のPBM申請一覧 (全員分) -->
     <div class="history" id="server-history">
       <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-        <h2 style="margin:0">🌐 サーバ上の自分の申請履歴 (最大200件)</h2>
+        <h2 style="margin:0">🌐 PBM申請一覧 (全員分・最大500件)</h2>
+        <input type="text" id="server-history-search" placeholder="🔍 申請者/患者/医院/Dr で絞込" style="font-size:12px;padding:5px 10px;border:1px solid #d1d5db;border-radius:6px;min-width:220px">
         <button class="btn" id="btn-load-server-history">🔄 取得 / 更新</button>
       </div>
-      <div id="server-history-empty" style="font-size:12px;color:#888;padding:6px 0">上の「申請者名」を入れて「取得 / 更新」を押すと、過去の申請が全部出ます（承認状況も確認できます）</div>
+      <div id="server-history-empty" style="font-size:12px;color:#888;padding:6px 0">「取得 / 更新」を押すと、これまでの申請が全員分まとめて出ます（承認状況も確認できます）</div>
       <div id="server-history-list"></div>
     </div>
 
@@ -530,51 +531,68 @@
   successCloseBtn.addEventListener('click', hideSuccessModal);
   successModal.addEventListener('click', (e) => { if (e.target === successModal) hideSuccessModal(); });
 
-  // === サーバ上の自分の申請履歴 ===
+  // === サーバ上のPBM申請一覧 (全員分) ===
   const btnLoadServerHistory = document.getElementById('btn-load-server-history');
   const serverHistoryEmpty = document.getElementById('server-history-empty');
   const serverHistoryList = document.getElementById('server-history-list');
+  const serverHistorySearch = document.getElementById('server-history-search');
   const PBM_STATUS_STYLE = {
     pending:  { bg:'#fef3c7', fg:'#b45309', label:'⏳ 審査中' },
     approved: { bg:'#dbeafe', fg:'#1d4ed8', label:'✅ 承認済' },
     rejected: { bg:'#fee2e2', fg:'#b91c1c', label:'❌ 却下' },
     paid:     { bg:'#dcfce7', fg:'#15803d', label:'💰 支払済' }
   };
+  let _serverHistoryAll = [];
   btnLoadServerHistory.addEventListener('click', async () => {
-    const name = (defaultApplicant.value || '').trim();
-    if (!name) {
-      showToast('上の「申請者名」を入力してください', 'err');
-      defaultApplicant.focus();
-      return;
-    }
     btnLoadServerHistory.disabled = true;
     const orig = btnLoadServerHistory.textContent;
     btnLoadServerHistory.textContent = '取得中...';
     try {
-      const { data, error } = await sb.rpc('list_pbm_applications_by_applicant', {
-        p_password: SHARED_PW,
-        p_applicant_name: name
+      const { data, error } = await sb.rpc('list_pbm_applications_public', {
+        p_password: SHARED_PW
       });
       if (error) throw error;
-      renderServerHistory(data || [], name);
+      _serverHistoryAll = data || [];
+      renderServerHistory();
     } catch (e) {
-      console.error('サーバ履歴取得エラー:', e);
+      console.error('サーバ申請一覧取得エラー:', e);
       showToast('取得失敗: ' + (e.message || '通信エラー'), 'err');
     } finally {
       btnLoadServerHistory.disabled = false;
       btnLoadServerHistory.textContent = orig;
     }
   });
-  function renderServerHistory(list, name) {
+  if (serverHistorySearch) {
+    let _t;
+    serverHistorySearch.addEventListener('input', () => {
+      clearTimeout(_t);
+      _t = setTimeout(() => renderServerHistory(), 200);
+    });
+  }
+  function renderServerHistory() {
+    const all = _serverHistoryAll || [];
+    const q = (serverHistorySearch?.value || '').trim().toLowerCase();
+    const list = q
+      ? all.filter(r =>
+          (r.applicant_name || '').toLowerCase().includes(q) ||
+          (r.patient_name || '').toLowerCase().includes(q) ||
+          (r.clinic_name || '').toLowerCase().includes(q) ||
+          (r.doctor_name || '').toLowerCase().includes(q))
+      : all;
     if (!list.length) {
       serverHistoryEmpty.style.display = 'block';
-      serverHistoryEmpty.textContent = `「${name}」の申請はサーバ上に見つかりませんでした`;
+      serverHistoryEmpty.textContent = all.length
+        ? `「${q}」に一致する申請はありません (全${all.length}件中)`
+        : '「取得 / 更新」を押すと、これまでの申請が全員分まとめて出ます';
       serverHistoryList.innerHTML = '';
       return;
     }
     serverHistoryEmpty.style.display = 'none';
     const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
-    serverHistoryList.innerHTML = list.map(r => {
+    const header = q
+      ? `<div style="font-size:11px;color:#555;margin-bottom:6px">${list.length}件表示中 / 全 ${all.length}件</div>`
+      : `<div style="font-size:11px;color:#555;margin-bottom:6px">全 ${all.length}件</div>`;
+    serverHistoryList.innerHTML = header + list.map(r => {
       const st = PBM_STATUS_STYLE[r.status] || { bg:'#f3f4f6', fg:'#555', label: esc(r.status || '-') };
       const dt = r.applied_at ? new Date(r.applied_at).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
       const amt = r.settlement_amount ? ' ／ ¥' + Number(r.settlement_amount).toLocaleString() : '';
@@ -585,7 +603,7 @@
         : '';
       return `<div class="history-item">
         <div class="main">
-          <div class="name">${esc(r.patient_name)} ／ ${esc(r.clinic_name)}${dr}</div>
+          <div class="name"><span style="color:#6b7280;font-weight:500">[${esc(r.applicant_name||'?')}]</span> ${esc(r.patient_name)} ／ ${esc(r.clinic_name)}${dr}</div>
           <div class="meta">${dt}${cd}${amt} ／ #${r.id}</div>
           ${reason}
         </div>
