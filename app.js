@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v445';
+const APP_VERSION = 'v446';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9887,6 +9887,21 @@ function getStatusesForTreatment(treatment) {
   return TREATMENT_STATUSES[treatment] || TREATMENT_STATUSES['デフォルト'];
 }
 
+// v446: 治療系の実効ステータスを返す統一ヘルパー (表示・フィルター・集計で同じ値を使うため)
+//   インプラント   → d.status
+//   それ以外(BF/矯正等) → mode='strict' なら bf_status のみ (per-treatment view)
+//                       mode='fallback' なら bf_status||d.status (overview view)
+// 旧コードで treatment === 'インプラント' / isBFBooking など似た式が分散していたものを一本化。
+function getEffStatus(d, mode) {
+  if (!d) return '';
+  if (typeof getTreatmentCategory === 'function' && getTreatmentCategory(d) === 'インプラント') {
+    return d.status || '';
+  }
+  const bf = (typeof getBFInfo === 'function' ? (getBFInfo(d.name, d.applyDate) || {}).bf_status : '') || '';
+  if (bf) return bf;
+  return mode === 'strict' ? '' : (d.status || '');
+}
+
 // 来院タブ「一覧」レンダラー (全治療タイプまとめて表示)
 // v273: 来院一覧の期間フィルタ状態 (デフォルト今月、来院日基準)
 // v371: dashboardOpen / filterOpen の初期値を sessionStorage から復元 (ユーザーの選択を維持)
@@ -9973,12 +9988,8 @@ async function renderKaiinAll(containerId) {
   if (state.facility.size) allRows = allRows.filter(d => state.facility.has(normFac(d.facility)));
   if (state.promo.size) allRows = allRows.filter(d => state.promo.has(d.source));
   if (state.service.size) allRows = allRows.filter(d => state.service.has(normSvc(d.service)));
-  // v444: 表示(ステータス列)と一致する実効ステータス。インプラントは d.status、
-  //   それ以外(BF/矯正等)は bf_status 優先(空ならd.status)。
-  //   従来フィルターは d.status のみで判定していたため、画面表示と食い違っていた。
-  const _kaEffSt = (d) => (getTreatmentCategory(d) === 'インプラント')
-    ? (d.status || '')
-    : ((getBFInfo(d.name, d.applyDate) || {}).bf_status || d.status || '');
+  // v446: 概要タブは fallback (bf_status||d.status)。統一ヘルパー getEffStatus を使用。
+  const _kaEffSt = (d) => getEffStatus(d, 'fallback');
   if (state.status.size) {
     allRows = allRows.filter(d => state.status.has(_kaEffSt(d) || '__未設定__'));
   }
@@ -10228,8 +10239,8 @@ async function renderKaiinAll(containerId) {
                 const _treatment = (typeof getTreatmentCategory === 'function') ? getTreatmentCategory(d) : 'その他';
                 const _isImplant = _treatment === 'インプラント';
                 const _bfSt = (_bfInfo && _bfInfo.bf_status) || '';
-                // 表示用 st: インプラントは d.status、それ以外は bf_status 優先 (未設定なら d.status にフォールバック)
-                const st = _isImplant ? (d.status || '') : (_bfSt || d.status || '');
+                // v446: 表示も統一ヘルパー getEffStatus を使用 (フィルターと完全一致)
+                const st = getEffStatus(d, 'fallback');
                 // 選択肢は治療タブと同一定義 (getStatusesForTreatment)
                 const stStatuses = (typeof getStatusesForTreatment === 'function') ? getStatusesForTreatment(_treatment) : [];
                 const stColor = (stStatuses.find(s => s.value === st) || {}).color || '';
@@ -10848,15 +10859,12 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   if (!el) return;
   const statuses = getStatusesForTreatment(treatment);
   // カウント
-  // v275: インプラントは d.status を使う (bf_status ではない)
-  // v443: 表示・フィルターと一致させる (BF/矯正/その他は bf_status のみ、d.status にフォールバックしない)
+  // v446: 集計も表示・フィルターと同じ getEffStatus(strict) を使う
   const byStatus = {};
   statuses.forEach(s => byStatus[s.value] = 0);
   let noSt = 0;
   rows.forEach(d => {
-    const st = (treatment === 'インプラント')
-      ? (d.status || '')
-      : (((getBFInfo(d.name, d.applyDate) || {}).bf_status) || '');
+    const st = getEffStatus(d, 'strict');
     if (st && byStatus[st] !== undefined) byStatus[st]++;
     else noSt++;
   });
@@ -11238,16 +11246,10 @@ function drawKaiinRows(treatment, rows, container) {
     })();
     return consultSet.has(c);
   });
-  // ステータスフィルター (multi-select)
-  // v275: インプラントは d.status を使う (bf_status ではない)
-  // v443: 表示(ステータス列)と完全一致させる。BF/矯正/その他は bf_status のみで判定し、
-  //   d.status へはフォールバックしない。
-  //   → これをしないと、画面上は「未設定」と表示されている行 (bf_status 空) が、
-  //     d.status を持つため「未設定」フィルターで除外されてしまう不整合になる。
-  const getSt = (d) => {
-    if (treatment === 'インプラント') return d.status || '';
-    return (getBFInfo(d.name, d.applyDate)||{}).bf_status || '';
-  };
+  // ステータスフィルター (multi-select) - v446: 統一ヘルパー getEffStatus を使用
+  //   per-treatment view では 'strict' (bf_status のみ、空なら未設定)。
+  //   表示・フィルター・集計が同じ式を共有することで v443 で起きた不整合を構造的に防ぐ。
+  const getSt = (d) => getEffStatus(d, 'strict');
   if (statusSet.size) {
     filtered = filtered.filter(d => {
       const s = getSt(d);
@@ -11376,8 +11378,8 @@ function drawKaiinRows(treatment, rows, container) {
   })();
   container.querySelector('.kaiin-tbody').innerHTML = filtered.map(d => {
     const info = getBFInfo(d.name, d.applyDate) || {};
-    // インプラントは予約タブと完全統合: d.status を使用 (既存ステータスを維持)
-    const st = (treatment === 'インプラント') ? (d.status || '') : (info.bf_status || '');
+    // v446: 表示ステータスは統一ヘルパー (strict: bf_status のみ、空なら未設定)
+    const st = getEffStatus(d, 'strict');
     const stColor = statuses.find(s => s.value === st)?.color || '';
     const memo = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '');
     // プロモ表示: 統一スタイル (バッジ風) + 手動はクリックで編集
