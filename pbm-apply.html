@@ -134,8 +134,11 @@
     <!-- ツールバー -->
     <div class="toolbar">
       <label>申請者名 <strong id="default-applicant-label">(未設定)</strong></label>
-      <input type="text" id="default-applicant" list="applicant-suggest" placeholder="例: 小池 隆史 / または医院名" style="min-width:160px">
-      <datalist id="applicant-suggest"></datalist>
+      <input type="text" id="default-applicant" placeholder="例: 小池 隆史" style="min-width:140px">
+      <label>デフォルト医院名 <strong id="default-clinic-label">(未設定)</strong></label>
+      <select id="default-clinic" style="min-width:120px;padding:6px 10px;font-size:13px;border:1px solid #d1d5db;border-radius:6px">
+        <option value="">(未設定)</option>
+      </select>
       <button class="btn" id="btn-add-row">＋ 行を追加</button>
       <button class="btn btn-danger" id="btn-clear-empty">空行をクリア</button>
       <div style="flex:1"></div>
@@ -232,13 +235,16 @@
   const UNLOCK_KEY = 'pbm_pw_ok';
   const HIST_KEY = 'pbm_local_history';
   const APPLICANT_KEY = 'pbm_last_applicant';
+  const CLINIC_KEY = 'pbm_last_default_clinic';
 
   const CLINICS = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都','その他'];
 
-  // 申請者名入力(上部・各行)に医院名候補を出す (1医院まとめ申請で医院名を申請者として選びたいケース対応)
+  // デフォルト医院名 select に CLINICS を入れる (1医院まとめ申請で各行の医院名入力を省略可)
   try {
-    const dl = document.getElementById('applicant-suggest');
-    if (dl) dl.innerHTML = CLINICS.map(c => `<option value="${c}"></option>`).join('');
+    const dc = document.getElementById('default-clinic');
+    if (dc) {
+      dc.innerHTML = '<option value="">(未設定)</option>' + CLINICS.map(c => `<option value="${c}">${c}</option>`).join('');
+    }
   } catch(_) {}
 
   const pwGate = document.getElementById('pw-gate');
@@ -249,6 +255,8 @@
   const gridTbody = document.getElementById('grid-tbody');
   const defaultApplicant = document.getElementById('default-applicant');
   const defaultApplicantLabel = document.getElementById('default-applicant-label');
+  const defaultClinic = document.getElementById('default-clinic');
+  const defaultClinicLabel = document.getElementById('default-clinic-label');
   const btnAddRow = document.getElementById('btn-add-row');
   const btnClearEmpty = document.getElementById('btn-clear-empty');
   const btnSubmitAll = document.getElementById('btn-submit-all');
@@ -281,6 +289,9 @@
       const last = localStorage.getItem(APPLICANT_KEY);
       if (last && !defaultApplicant.value) defaultApplicant.value = last;
       defaultApplicantLabel.textContent = last || '(未設定)';
+      const lastClinic = localStorage.getItem(CLINIC_KEY);
+      if (lastClinic && !defaultClinic.value && CLINICS.includes(lastClinic)) defaultClinic.value = lastClinic;
+      defaultClinicLabel.textContent = defaultClinic.value || '(未設定)';
     } catch(_){}
     // 初期5行
     for (let i = 0; i < 5; i++) addRow();
@@ -291,6 +302,9 @@
   defaultApplicant.addEventListener('input', () => {
     defaultApplicantLabel.textContent = defaultApplicant.value.trim() || '(未設定)';
     // 送信時に空セルへ補完するだけ。ここでは行に書き込まない。
+  });
+  defaultClinic.addEventListener('change', () => {
+    defaultClinicLabel.textContent = defaultClinic.value || '(未設定)';
   });
 
   pwSubmit.addEventListener('click', () => {
@@ -320,11 +334,11 @@
     tr.innerHTML = `
       <td class="rowno">${rowCounter}</td>
       <td><input type="date" class="cell-applied-date" value="${data.applied_date || todayYMD()}"></td>
-      <td><input type="text" class="cell-applicant" list="applicant-suggest" placeholder="(空=上の申請者名を使用)" value="${(data.applicant_name||'').replace(/"/g,'&quot;')}"></td>
+      <td><input type="text" class="cell-applicant" placeholder="(空=上の申請者名を使用)" value="${(data.applicant_name||'').replace(/"/g,'&quot;')}"></td>
       <td><input type="text" class="cell-patient" placeholder="患者名" value="${(data.patient_name||'').replace(/"/g,'&quot;')}"></td>
       <td>
         <select class="cell-clinic">
-          <option value="">選択</option>
+          <option value="">(空=上の医院名)</option>
           ${CLINICS.map(c => `<option ${data.clinic_name===c?'selected':''}>${c}</option>`).join('')}
         </select>
       </td>
@@ -413,7 +427,7 @@
           // 行の申請者名が空なら上部「申請者名」フィールドで補完
           applicant_name: rowApplicant || defaultName,
           patient_name: tr.querySelector('.cell-patient').value.trim(),
-          clinic_name: tr.querySelector('.cell-clinic').value.trim(),
+          clinic_name: (tr.querySelector('.cell-clinic').value.trim() || defaultClinic.value.trim()),
           contract_date: tr.querySelector('.cell-contract-date').value || null,
           settlement_amount: Number(tr.querySelector('.cell-amount').value) || null,
           payment_due_date: tr.querySelector('.cell-payment-date').value || null,
@@ -491,6 +505,7 @@
     if (okCount > 0) {
       // 申請者名を保存
       try { localStorage.setItem(APPLICANT_KEY, defaultApplicant.value.trim()); } catch(_){}
+      try { localStorage.setItem(CLINIC_KEY, defaultClinic.value); } catch(_){}
       // 成功した行をグリッドから削除
       Array.from(gridTbody.querySelectorAll('tr')).forEach(tr => {
         if (tr.querySelector('.cell-patient').value.trim()) tr.remove();
