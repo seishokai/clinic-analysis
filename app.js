@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v446';
+const APP_VERSION = 'v447';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2190,6 +2190,7 @@ function setupEventListeners() {
       if (sub === 'recordings') renderRecordings();
       if (sub === 'adm-history') { renderChangeLog(); renderBackupsList(); }
       if (sub === 'adm-sms') { if (typeof renderSmsTemplatesAdmin === 'function') renderSmsTemplatesAdmin(); }
+      if (sub === 'adm-pbm') { if (typeof renderPBMApplications === 'function') renderPBMApplications(); }
       if (sub === 'para-manage') { if (typeof renderPara === 'function') renderPara(); }
       if (sub === 'adm-auth-migration') { if (typeof renderAuthMigration === 'function') renderAuthMigration(); }
       // 来院タブのサブ
@@ -16278,6 +16279,188 @@ function _composePromoList(activePatterns, checkedValues) {
     if (!covered) result.add(v);
   });
   return [...result];
+}
+
+// ============================================================
+// v447: 管理タブ → 📝 PBM申請
+// pbm_applications を一覧表示し、承認/却下/支払済の管理を行う
+// (スタッフは pbm-apply.html で公開RPC経由で申請。ここはadmin専用)
+// ============================================================
+const PBM_STATUS_LABEL = { pending:'⏳審査中', approved:'✅承認', rejected:'❌却下', paid:'💰支払済' };
+const PBM_STATUS_COLOR = {
+  pending:  { bg:'#fef3c7', fg:'#b45309', bd:'#fde68a' },
+  approved: { bg:'#dbeafe', fg:'#1d4ed8', bd:'#bfdbfe' },
+  rejected: { bg:'#fee2e2', fg:'#b91c1c', bd:'#fecaca' },
+  paid:     { bg:'#dcfce7', fg:'#15803d', bd:'#86efac' }
+};
+let _pbmAdmState = { statusFilter: 'pending', search: '' };
+
+async function renderPBMApplications() {
+  const el = document.getElementById('adm-pbm-content');
+  if (!el) return;
+  el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div>';
+  try {
+    const { data, error } = await sb
+      .from('pbm_applications')
+      .select('*')
+      .order('applied_at', { ascending: false })
+      .limit(500);
+    if (error) throw error;
+    el._pbmAll = data || [];
+    _drawPBMTable(el);
+  } catch (e) {
+    el.innerHTML = `<div style="padding:20px;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:8px">読み込み失敗: ${escapeHtml(e.message || String(e))}</div>`;
+  }
+}
+
+function _drawPBMTable(el) {
+  const all = el._pbmAll || [];
+  // ステータス別件数
+  const counts = { pending:0, approved:0, rejected:0, paid:0 };
+  all.forEach(r => { if (counts[r.status] !== undefined) counts[r.status]++; });
+  const total = all.length;
+  // 絞込
+  let filtered = all;
+  if (_pbmAdmState.statusFilter !== 'all') filtered = filtered.filter(r => r.status === _pbmAdmState.statusFilter);
+  if (_pbmAdmState.search) {
+    const s = _pbmAdmState.search.toLowerCase();
+    filtered = filtered.filter(r =>
+      (r.applicant_name || '').toLowerCase().includes(s) ||
+      (r.patient_name || '').toLowerCase().includes(s) ||
+      (r.clinic_name || '').toLowerCase().includes(s) ||
+      (r.doctor_name || '').toLowerCase().includes(s)
+    );
+  }
+  // 合計金額
+  const totalAmt = filtered.reduce((s, r) => s + (Number(r.settlement_amount) || 0), 0);
+  const totalClinicReward = filtered.reduce((s, r) => s + (Number(r.clinic_reward) || 0), 0);
+  const totalDoctorReward = filtered.reduce((s, r) => s + (Number(r.doctor_reward) || 0), 0);
+  // チップ
+  const chip = (key, label, color) => `<button class="pbm-stat-chip filter-btn ${_pbmAdmState.statusFilter===key?'is-active':''}" data-st="${key}" style="${_pbmAdmState.statusFilter===key?`background:${color};color:#fff;font-weight:700;border-color:${color}`:''};padding:6px 12px;font-size:12px;border-radius:14px;cursor:pointer">${label} <span style="font-size:10px;opacity:.85">${key==='all'?total:counts[key]||0}</span></button>`;
+
+  el.innerHTML = `
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;padding:8px 12px;background:#f9fafb;border:1px solid var(--border);border-radius:8px">
+      <strong style="font-size:13px">フィルター</strong>
+      ${chip('pending','⏳審査中','#b45309')}
+      ${chip('approved','✅承認','#1d4ed8')}
+      ${chip('rejected','❌却下','#b91c1c')}
+      ${chip('paid','💰支払済','#15803d')}
+      ${chip('all','すべて','#374151')}
+      <input type="text" id="adm-pbm-search" class="filter-input" placeholder="🔍 申請者/患者/医院/Dr" value="${escapeHtml(_pbmAdmState.search||'')}" style="margin-left:auto;min-width:200px;font-size:12px;padding:5px 10px">
+      <button class="filter-btn" id="adm-pbm-reload" title="最新を取得" style="padding:5px 10px;font-size:12px">🔄 更新</button>
+    </div>
+    <div style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:8px;padding:6px 10px;background:#fff;border:1px solid var(--border);border-radius:6px;font-size:11px">
+      <span><span style="color:var(--text-sub)">表示中</span> <strong style="font-size:13px">${filtered.length}件</strong> / 全 ${total}件</span>
+      <span style="color:var(--border)">|</span>
+      <span><span style="color:var(--text-sub)">決済金額合計</span> <strong style="font-size:13px">¥${totalAmt.toLocaleString()}</strong></span>
+      <span><span style="color:var(--text-sub)">医院還元合計</span> <strong style="color:#b07800;font-size:13px">¥${totalClinicReward.toLocaleString()}</strong></span>
+      <span><span style="color:var(--text-sub)">Dr還元合計</span> <strong style="color:#b07800;font-size:13px">¥${totalDoctorReward.toLocaleString()}</strong></span>
+    </div>
+    <div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow:auto">
+      <table class="data-table compact" style="width:100%;font-size:12px">
+        <thead><tr>
+          <th style="width:96px">申請日時</th>
+          <th style="width:88px;text-align:left">申請者</th>
+          <th style="width:96px;text-align:left">患者</th>
+          <th style="width:92px;text-align:left">医院</th>
+          <th style="width:84px;text-align:left">担当Dr</th>
+          <th style="width:74px">契約日</th>
+          <th style="width:82px;text-align:right">決済金額</th>
+          <th style="width:74px">入金予定</th>
+          <th style="width:60px;text-align:right">医院還元</th>
+          <th style="width:56px;text-align:right">Dr還元</th>
+          <th style="text-align:left">備考/却下理由</th>
+          <th style="width:110px">ステータス</th>
+        </tr></thead>
+        <tbody>
+          ${filtered.length ? filtered.map(r => {
+            const st = PBM_STATUS_COLOR[r.status] || { bg:'#f3f4f6', fg:'#555', bd:'#d1d5db' };
+            const dt = r.applied_at ? new Date(r.applied_at).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '-';
+            const fmt = (v) => v != null && v !== '' ? '¥' + Number(v).toLocaleString() : '-';
+            const reasonHtml = r.status === 'rejected' && r.rejection_reason
+              ? `<div style="color:#b91c1c;font-size:10px;margin-top:2px">却下: ${escapeHtml(r.rejection_reason)}</div>` : '';
+            return `<tr data-id="${r.id}">
+              <td style="font-size:10px;color:var(--text-sub);font-variant-numeric:tabular-nums">${escapeHtml(dt)}<div style="font-size:9px;color:var(--text-muted)">#${r.id}</div></td>
+              <td style="text-align:left">${escapeHtml(r.applicant_name||'-')}</td>
+              <td style="text-align:left;font-weight:600">${escapeHtml(r.patient_name||'-')}</td>
+              <td style="text-align:left">${escapeHtml(r.clinic_name||'-')}</td>
+              <td style="text-align:left">${escapeHtml(r.doctor_name||'-')}</td>
+              <td style="font-size:10px;font-variant-numeric:tabular-nums">${escapeHtml(r.contract_date||'-')}</td>
+              <td style="text-align:right;font-variant-numeric:tabular-nums">${fmt(r.settlement_amount)}</td>
+              <td style="font-size:10px;font-variant-numeric:tabular-nums">${escapeHtml(r.payment_due_date||'-')}</td>
+              <td style="text-align:right;color:#b07800;font-variant-numeric:tabular-nums">${fmt(r.clinic_reward)}</td>
+              <td style="text-align:right;color:#b07800;font-variant-numeric:tabular-nums">${fmt(r.doctor_reward)}</td>
+              <td style="text-align:left;font-size:11px;color:var(--text-sub);max-width:240px;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(r.notes||'')}">${escapeHtml(r.notes||'')}${reasonHtml}</td>
+              <td><select class="adm-pbm-status-sel" data-id="${r.id}" data-cur="${escapeHtml(r.status)}" style="font-size:11px;padding:3px 6px;border:1px solid ${st.bd};background:${st.bg};color:${st.fg};border-radius:6px;font-weight:700;cursor:pointer;width:100%">
+                <option value="pending"  ${r.status==='pending'?'selected':''}>⏳ 審査中</option>
+                <option value="approved" ${r.status==='approved'?'selected':''}>✅ 承認</option>
+                <option value="rejected" ${r.status==='rejected'?'selected':''}>❌ 却下</option>
+                <option value="paid"     ${r.status==='paid'?'selected':''}>💰 支払済</option>
+              </select></td>
+            </tr>`;
+          }).join('') : '<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-sub)">該当する申請はありません</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+  `;
+
+  // フィルタチップ
+  el.querySelectorAll('.pbm-stat-chip').forEach(b => {
+    b.addEventListener('click', () => {
+      _pbmAdmState.statusFilter = b.dataset.st;
+      _drawPBMTable(el);
+    });
+  });
+  // 検索
+  const searchEl = el.querySelector('#adm-pbm-search');
+  if (searchEl) {
+    let _t;
+    searchEl.addEventListener('input', () => {
+      clearTimeout(_t);
+      _t = setTimeout(() => {
+        _pbmAdmState.search = searchEl.value;
+        _drawPBMTable(el);
+      }, 250);
+    });
+  }
+  // 更新ボタン
+  el.querySelector('#adm-pbm-reload')?.addEventListener('click', () => renderPBMApplications());
+  // ステータス変更
+  el.querySelectorAll('.adm-pbm-status-sel').forEach(sel => {
+    sel.addEventListener('change', async () => {
+      const id = Number(sel.dataset.id);
+      const cur = sel.dataset.cur;
+      const newSt = sel.value;
+      if (cur === newSt) return;
+      let reason = null;
+      if (newSt === 'rejected') {
+        reason = prompt('却下理由を入力してください (申請者に表示されます)', '');
+        if (reason === null) { sel.value = cur; return; }
+      }
+      sel.disabled = true;
+      try {
+        const payload = { status: newSt, updated_at: new Date().toISOString() };
+        if (newSt === 'approved' || newSt === 'paid') {
+          payload.approved_at = new Date().toISOString();
+        }
+        if (newSt === 'rejected') {
+          payload.rejection_reason = reason || '';
+        }
+        const { error } = await sb.from('pbm_applications').update(payload).eq('id', id);
+        if (error) throw error;
+        // ローカルキャッシュ更新
+        const row = (el._pbmAll || []).find(r => r.id === id);
+        if (row) Object.assign(row, payload);
+        showToast(`#${id} を「${PBM_STATUS_LABEL[newSt]}」に変更`);
+        _drawPBMTable(el);
+      } catch (e) {
+        sel.value = cur;
+        showToast('変更失敗: ' + (e.message || e), true);
+      } finally {
+        sel.disabled = false;
+      }
+    });
+  });
 }
 
 async function renderAuthMigration() {

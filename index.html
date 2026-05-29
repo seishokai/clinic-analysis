@@ -1282,6 +1282,7 @@
     <main id="view-admin" class="view" hidden>
       <div class="sub-nav">
         <button class="sub-nav-btn active" data-sub="adm-auth-migration">権限管理</button>
+        <button class="sub-nav-btn" data-sub="adm-pbm">📝 PBM申請</button>
         <button class="sub-nav-btn" data-sub="adm-rates">プロモ別インセ率</button>
         <button class="sub-nav-btn" data-sub="adm-sms">📱 SMS定型文</button>
         <button class="sub-nav-btn" data-sub="adm-history">変更履歴・復元</button>
@@ -1332,6 +1333,11 @@
         </div>
         <div class="data-table-wrap"><table class="data-table" id="pr-table"><thead><tr><th>プロモコード</th><th>インセ率</th><th>更新日</th><th></th></tr></thead><tbody></tbody></table></div>
       </div>
+      </div>
+      <!-- v447: PBM申請管理 -->
+      <div id="sub-adm-pbm" hidden>
+        <div class="page-header"><h2>📝 PBM インセンティブ申請</h2><p class="page-desc">スタッフから届いた PBM 申請を確認・承認・却下・支払済管理</p></div>
+        <div id="adm-pbm-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
       </div>
       <!-- v392: SMS定型文管理 -->
       <div id="sub-adm-sms" hidden>
@@ -1481,7 +1487,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=446"></script>
+  <script src="app.js?v=447"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

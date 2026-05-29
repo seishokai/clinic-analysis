@@ -70,6 +70,24 @@
   .toast.ok{background:#059669}
   .toast.err{background:#b91c1c}
 
+  /* 申請完了モーダル */
+  .success-modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:2000;padding:16px}
+  .success-modal-overlay.show{display:flex}
+  .success-modal{background:#fff;border-radius:18px;padding:28px 24px 22px;max-width:560px;width:100%;text-align:center;box-shadow:0 16px 48px rgba(0,0,0,.32);max-height:90vh;overflow-y:auto;border:3px solid #059669;animation:popin .25s ease-out}
+  @keyframes popin{0%{transform:scale(.85);opacity:0}100%{transform:scale(1);opacity:1}}
+  .success-modal .icon{font-size:64px;line-height:1;margin-bottom:6px}
+  .success-modal h2{font-size:22px;font-weight:900;color:#059669;margin-bottom:6px;letter-spacing:1px}
+  .success-modal .sub{font-size:14px;color:#374151;margin-bottom:14px}
+  .success-modal .list{text-align:left;background:#f0fdf4;border:1px solid #86efac;border-radius:10px;padding:6px 12px;max-height:240px;overflow-y:auto;margin-bottom:14px}
+  .success-modal .list-item{padding:8px 4px;border-bottom:1px dashed #c8e6c9;font-size:12px;line-height:1.5}
+  .success-modal .list-item:last-child{border-bottom:none}
+  .success-modal .list-item .name{font-weight:700;color:#1a1a1a}
+  .success-modal .list-item .meta{font-size:11px;color:#555;margin-top:1px}
+  .success-modal .list-item .id-tag{display:inline-block;background:#15803d;color:#fff;padding:1px 8px;border-radius:10px;font-size:10px;font-weight:700;margin-left:6px}
+  .success-modal .close-btn{padding:12px 28px;font-size:14px;font-weight:700;border-radius:10px;background:linear-gradient(135deg,#059669 0%,#047857 100%);color:#fff;border:none;cursor:pointer;min-width:140px}
+  .success-modal .close-btn:hover{background:linear-gradient(135deg,#047857 0%,#065f46 100%)}
+  .success-modal .note{font-size:11px;color:#888;margin-top:10px}
+
   /* サマリー */
   .summary{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:12px}
   .summary .pill{padding:6px 12px;background:#f8f8f8;border:1px solid #e0e0e0;border-radius:16px;color:#555}
@@ -170,10 +188,32 @@
       <span class="pill">合計還元 <strong id="sum-total">¥0</strong></span>
     </div>
 
-    <!-- 履歴 -->
+    <!-- サーバ上の自分の申請履歴 -->
+    <div class="history" id="server-history">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:10px">
+        <h2 style="margin:0">🌐 サーバ上の自分の申請履歴 (最大200件)</h2>
+        <button class="btn" id="btn-load-server-history">🔄 取得 / 更新</button>
+      </div>
+      <div id="server-history-empty" style="font-size:12px;color:#888;padding:6px 0">上の「申請者名」を入れて「取得 / 更新」を押すと、過去の申請が全部出ます（承認状況も確認できます）</div>
+      <div id="server-history-list"></div>
+    </div>
+
+    <!-- このブラウザのローカル履歴 -->
     <div class="history" id="history" style="display:none">
       <h2>📋 このブラウザの申請履歴 (直近20件)</h2>
       <div id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- 申請完了モーダル -->
+  <div class="success-modal-overlay" id="success-modal">
+    <div class="success-modal">
+      <div class="icon">✅</div>
+      <h2 id="success-title">申請完了</h2>
+      <div class="sub" id="success-sub"></div>
+      <div class="list" id="success-list"></div>
+      <button class="close-btn" id="success-close">OK・閉じる</button>
+      <div class="note">この内容は下の「🌐 サーバ上の自分の申請履歴」でいつでも確認できます</div>
     </div>
   </div>
 
@@ -392,7 +432,7 @@
     btnSubmitAll.textContent = '送信中... (0/' + rows.length + ')';
 
     let okCount = 0, failCount = 0;
-    const successIds = [];
+    const successList = [];
     for (let i = 0; i < rows.length; i++) {
       btnSubmitAll.textContent = `送信中... (${i+1}/${rows.length})`;
       try {
@@ -410,7 +450,14 @@
         if (error) throw error;
         if (!data?.ok) throw new Error(data?.error || 'fail');
         okCount++;
-        successIds.push(data.id);
+        successList.push({
+          id: data.id,
+          applicant_name: rows[i].applicant_name,
+          patient_name: rows[i].patient_name,
+          clinic_name: rows[i].clinic_name,
+          doctor_name: rows[i].doctor_name,
+          settlement_amount: rows[i].settlement_amount
+        });
         addLocalHistory({
           id: data.id,
           applied_at: new Date().toISOString(),
@@ -440,15 +487,112 @@
       while (gridTbody.querySelectorAll('tr').length < 5) addRow();
       updateSummary();
       renderHistory();
-      if (failCount === 0) {
-        showToast('✅ ' + okCount + '件すべて申請完了しました', 'ok');
-      } else {
-        showToast('⚠️ ' + okCount + '件成功 / ' + failCount + '件失敗', 'err');
-      }
+      // 大きな完了モーダルを表示 (失敗があれば併記)
+      showSuccessModal(successList, failCount);
     } else {
       showToast('❌ 全件失敗しました。ネットワークを確認してください', 'err');
     }
   });
+
+  // === 申請完了モーダル ===
+  const successModal = document.getElementById('success-modal');
+  const successCloseBtn = document.getElementById('success-close');
+  function showSuccessModal(list, failCount) {
+    const titleEl = document.getElementById('success-title');
+    const subEl = document.getElementById('success-sub');
+    const listEl = document.getElementById('success-list');
+    const ok = list.length;
+    if (failCount > 0) {
+      titleEl.textContent = '一部完了';
+      titleEl.style.color = '#b45309';
+      successModal.querySelector('.success-modal').style.borderColor = '#b45309';
+      successModal.querySelector('.close-btn').style.background = 'linear-gradient(135deg,#b45309 0%,#92400e 100%)';
+      subEl.innerHTML = `<strong style="color:#059669">✅ ${ok}件 成功</strong> ／ <strong style="color:#b91c1c">❌ ${failCount}件 失敗</strong>`;
+    } else {
+      titleEl.textContent = '申請完了';
+      titleEl.style.color = '#059669';
+      successModal.querySelector('.success-modal').style.borderColor = '#059669';
+      successModal.querySelector('.close-btn').style.background = 'linear-gradient(135deg,#059669 0%,#047857 100%)';
+      subEl.innerHTML = `<strong>${ok}件 すべて申請が届きました</strong>`;
+    }
+    const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
+    listEl.innerHTML = list.map(r => {
+      const amt = r.settlement_amount ? '¥' + Number(r.settlement_amount).toLocaleString() : '';
+      const dr = r.doctor_name ? ' ／ Dr:' + esc(r.doctor_name) : '';
+      return `<div class="list-item">
+        <div class="name">${esc(r.patient_name)}<span class="id-tag">#${r.id}</span></div>
+        <div class="meta">${esc(r.clinic_name)}${dr}${amt ? ' ／ ' + amt : ''}</div>
+      </div>`;
+    }).join('') || '<div class="list-item">(なし)</div>';
+    successModal.classList.add('show');
+  }
+  function hideSuccessModal() { successModal.classList.remove('show'); }
+  successCloseBtn.addEventListener('click', hideSuccessModal);
+  successModal.addEventListener('click', (e) => { if (e.target === successModal) hideSuccessModal(); });
+
+  // === サーバ上の自分の申請履歴 ===
+  const btnLoadServerHistory = document.getElementById('btn-load-server-history');
+  const serverHistoryEmpty = document.getElementById('server-history-empty');
+  const serverHistoryList = document.getElementById('server-history-list');
+  const PBM_STATUS_STYLE = {
+    pending:  { bg:'#fef3c7', fg:'#b45309', label:'⏳ 審査中' },
+    approved: { bg:'#dbeafe', fg:'#1d4ed8', label:'✅ 承認済' },
+    rejected: { bg:'#fee2e2', fg:'#b91c1c', label:'❌ 却下' },
+    paid:     { bg:'#dcfce7', fg:'#15803d', label:'💰 支払済' }
+  };
+  btnLoadServerHistory.addEventListener('click', async () => {
+    const name = (defaultApplicant.value || '').trim();
+    if (!name) {
+      showToast('上の「申請者名」を入力してください', 'err');
+      defaultApplicant.focus();
+      return;
+    }
+    btnLoadServerHistory.disabled = true;
+    const orig = btnLoadServerHistory.textContent;
+    btnLoadServerHistory.textContent = '取得中...';
+    try {
+      const { data, error } = await sb.rpc('list_pbm_applications_by_applicant', {
+        p_password: SHARED_PW,
+        p_applicant_name: name
+      });
+      if (error) throw error;
+      renderServerHistory(data || [], name);
+    } catch (e) {
+      console.error('サーバ履歴取得エラー:', e);
+      showToast('取得失敗: ' + (e.message || '通信エラー'), 'err');
+    } finally {
+      btnLoadServerHistory.disabled = false;
+      btnLoadServerHistory.textContent = orig;
+    }
+  });
+  function renderServerHistory(list, name) {
+    if (!list.length) {
+      serverHistoryEmpty.style.display = 'block';
+      serverHistoryEmpty.textContent = `「${name}」の申請はサーバ上に見つかりませんでした`;
+      serverHistoryList.innerHTML = '';
+      return;
+    }
+    serverHistoryEmpty.style.display = 'none';
+    const esc = s => String(s == null ? '' : s).replace(/[<>&"]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'})[c]);
+    serverHistoryList.innerHTML = list.map(r => {
+      const st = PBM_STATUS_STYLE[r.status] || { bg:'#f3f4f6', fg:'#555', label: esc(r.status || '-') };
+      const dt = r.applied_at ? new Date(r.applied_at).toLocaleString('ja-JP', { month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit' }) : '';
+      const amt = r.settlement_amount ? ' ／ ¥' + Number(r.settlement_amount).toLocaleString() : '';
+      const dr = r.doctor_name ? ' ／ Dr:' + esc(r.doctor_name) : '';
+      const cd = r.contract_date ? ' ／ 契約' + esc(r.contract_date) : '';
+      const reason = r.rejection_reason
+        ? `<div style="color:#b91c1c;font-size:10px;margin-top:2px">却下理由: ${esc(r.rejection_reason)}</div>`
+        : '';
+      return `<div class="history-item">
+        <div class="main">
+          <div class="name">${esc(r.patient_name)} ／ ${esc(r.clinic_name)}${dr}</div>
+          <div class="meta">${dt}${cd}${amt} ／ #${r.id}</div>
+          ${reason}
+        </div>
+        <span class="tag" style="background:${st.bg};color:${st.fg}">${st.label}</span>
+      </div>`;
+    }).join('');
+  }
 
   function addLocalHistory(rec) {
     let list = [];
