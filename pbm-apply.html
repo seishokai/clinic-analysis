@@ -150,15 +150,12 @@
       <table class="grid" id="grid">
         <colgroup>
           <col style="width:36px">
-          <col style="width:100px">
-          <col style="width:120px" class="req">
-          <col style="width:140px" class="req">
-          <col style="width:120px" class="req">
           <col style="width:110px">
-          <col style="width:110px">
-          <col style="width:110px">
-          <col style="width:110px">
-          <col style="width:180px">
+          <col style="width:160px" class="req">
+          <col style="width:120px">
+          <col style="width:120px">
+          <col style="width:120px">
+          <col style="width:200px">
           <col style="width:90px">
           <col style="width:90px">
           <col style="width:40px">
@@ -167,10 +164,7 @@
           <tr>
             <th>No.</th>
             <th>申請日</th>
-            <th>申請者名<span style="color:#d33">*</span></th>
             <th>患者名<span style="color:#d33">*</span></th>
-            <th>医院名<span style="color:#d33">*</span></th>
-            <th>契約日</th>
             <th>決済金額(円)</th>
             <th>入金予定日</th>
             <th>担当Dr</th>
@@ -334,15 +328,7 @@
     tr.innerHTML = `
       <td class="rowno">${rowCounter}</td>
       <td><input type="date" class="cell-applied-date" value="${data.applied_date || todayYMD()}"></td>
-      <td><input type="text" class="cell-applicant" placeholder="(空=上の申請者名を使用)" value="${(data.applicant_name||'').replace(/"/g,'&quot;')}"></td>
       <td><input type="text" class="cell-patient" placeholder="患者名" value="${(data.patient_name||'').replace(/"/g,'&quot;')}"></td>
-      <td>
-        <select class="cell-clinic">
-          <option value="">(空=上の医院名)</option>
-          ${CLINICS.map(c => `<option ${data.clinic_name===c?'selected':''}>${c}</option>`).join('')}
-        </select>
-      </td>
-      <td><input type="date" class="cell-contract-date" value="${data.contract_date||''}"></td>
       <td class="num"><input type="number" class="cell-amount" placeholder="0" value="${data.settlement_amount||''}"></td>
       <td><input type="date" class="cell-payment-date" value="${data.payment_due_date||''}"></td>
       <td><input type="text" class="cell-doctor" placeholder="担当Dr" value="${(data.doctor_name||'').replace(/"/g,'&quot;')}"></td>
@@ -420,36 +406,33 @@
 
   btnSubmitAll.addEventListener('click', async () => {
     const defaultName = defaultApplicant.value.trim();
+    const defaultClinicName = defaultClinic.value.trim();
+    // 上部の必須項目を先にチェック (行ループ前)
+    if (!defaultName) {
+      showToast('上の「申請者名」を入力してください', 'err');
+      defaultApplicant.focus();
+      return;
+    }
+    if (!defaultClinicName) {
+      showToast('上の「デフォルト医院名」を選択してください', 'err');
+      defaultClinic.focus();
+      return;
+    }
     const rows = Array.from(gridTbody.querySelectorAll('tr'))
-      .map(tr => {
-        const rowApplicant = tr.querySelector('.cell-applicant').value.trim();
-        return {
-          // 行の申請者名が空なら上部「申請者名」フィールドで補完
-          applicant_name: rowApplicant || defaultName,
-          patient_name: tr.querySelector('.cell-patient').value.trim(),
-          clinic_name: (tr.querySelector('.cell-clinic').value.trim() || defaultClinic.value.trim()),
-          contract_date: tr.querySelector('.cell-contract-date').value || null,
-          settlement_amount: Number(tr.querySelector('.cell-amount').value) || null,
-          payment_due_date: tr.querySelector('.cell-payment-date').value || null,
-          doctor_name: tr.querySelector('.cell-doctor').value.trim() || null,
-          notes: tr.querySelector('.cell-notes').value.trim() || ''
-        };
-      })
+      .map(tr => ({
+        applicant_name: defaultName,
+        patient_name: tr.querySelector('.cell-patient').value.trim(),
+        clinic_name: defaultClinicName,
+        contract_date: null,
+        settlement_amount: Number(tr.querySelector('.cell-amount').value) || null,
+        payment_due_date: tr.querySelector('.cell-payment-date').value || null,
+        doctor_name: tr.querySelector('.cell-doctor').value.trim() || null,
+        notes: tr.querySelector('.cell-notes').value.trim() || ''
+      }))
       .filter(r => r.patient_name); // 患者名が入ってる行のみ送信対象
 
     if (!rows.length) {
       showToast('入力されている行がありません (患者名が必要です)', 'err');
-      return;
-    }
-
-    // バリデーション
-    const bad = [];
-    rows.forEach((r, i) => {
-      if (!r.applicant_name) bad.push((i+1) + '行目: 申請者名');
-      if (!r.clinic_name) bad.push((i+1) + '行目: 医院名');
-    });
-    if (bad.length) {
-      showToast('必須未入力: ' + bad.slice(0, 3).join(' / '), 'err');
       return;
     }
 
