@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v447';
+const APP_VERSION = 'v448';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -16371,6 +16371,7 @@ function _drawPBMTable(el) {
           <th style="width:56px;text-align:right">Dr還元</th>
           <th style="text-align:left">備考/却下理由</th>
           <th style="width:110px">ステータス</th>
+          <th style="width:40px;text-align:center" title="削除">🗑</th>
         </tr></thead>
         <tbody>
           ${filtered.length ? filtered.map(r => {
@@ -16397,8 +16398,9 @@ function _drawPBMTable(el) {
                 <option value="rejected" ${r.status==='rejected'?'selected':''}>❌ 却下</option>
                 <option value="paid"     ${r.status==='paid'?'selected':''}>💰 支払済</option>
               </select></td>
+              <td style="text-align:center"><button class="adm-pbm-del-btn" data-id="${r.id}" data-name="${escapeHtml(r.patient_name||'')}" title="この申請を削除" style="background:none;border:1px solid #fecaca;color:#b91c1c;border-radius:4px;cursor:pointer;font-size:13px;padding:2px 6px;line-height:1">🗑</button></td>
             </tr>`;
-          }).join('') : '<tr><td colspan="12" style="text-align:center;padding:30px;color:var(--text-sub)">該当する申請はありません</td></tr>'}
+          }).join('') : '<tr><td colspan="13" style="text-align:center;padding:30px;color:var(--text-sub)">該当する申請はありません</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -16425,6 +16427,27 @@ function _drawPBMTable(el) {
   }
   // 更新ボタン
   el.querySelector('#adm-pbm-reload')?.addEventListener('click', () => renderPBMApplications());
+  // 削除ボタン (admin のみ可、DBの DELETE ポリシーで制御)
+  el.querySelectorAll('.adm-pbm-del-btn').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const id = Number(btn.dataset.id);
+      const name = btn.dataset.name || '';
+      if (!confirm(`#${id} ${name} の申請を削除しますか？\nこの操作は取り消せません。`)) return;
+      btn.disabled = true;
+      try {
+        const { error } = await sb.from('pbm_applications').delete().eq('id', id);
+        if (error) throw error;
+        // ローカルキャッシュからも削除
+        el._pbmAll = (el._pbmAll || []).filter(r => r.id !== id);
+        showToast(`#${id} を削除しました`);
+        _drawPBMTable(el);
+      } catch (e) {
+        btn.disabled = false;
+        showToast('削除失敗: ' + (e.message || e), true);
+      }
+    });
+  });
+
   // ステータス変更
   el.querySelectorAll('.adm-pbm-status-sel').forEach(sel => {
     sel.addEventListener('change', async () => {
