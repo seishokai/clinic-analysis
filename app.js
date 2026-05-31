@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v448';
+const APP_VERSION = 'v449';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9246,7 +9246,7 @@ async function loadBFLifecycleData() {
     // ※ DBにカラム未追加の環境では select が失敗する場合があるのでフォールバック付き
     let data;
     try {
-      const r1 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, incentive_paid, paid_at, paid_by, updated_at');
+      const r1 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, expected_amount, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, incentive_paid, paid_at, paid_by, updated_at');
       data = r1.data;
       if (r1.error) throw r1.error;
     } catch(eCol) {
@@ -11021,6 +11021,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
             <th style="width:75px">次回予定</th>
             ${treatment === 'BF' ? '<th style="width:75px">セット医院</th>' : ''}
             <th style="width:85px">売上</th>
+            ${treatment === 'インプラント' ? '<th style="width:90px" title="まだ成約していないが見込みとして把握したい金額">売り上げ見込み</th>' : ''}
             ${treatment === 'BF' ? '<th style="width:70px">交通費</th>' : ''}
             <th>メモ</th>
           </tr></thead>
@@ -11456,6 +11457,7 @@ function drawKaiinRows(treatment, rows, container) {
         ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''} value="${f}">${f||'—'}</option>`).join('')}
       </select></td>` : ''}
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
+      ${treatment === 'インプラント' ? `<td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="expected_amount" value="${info.expected_amount?Number(info.expected_amount).toLocaleString():''}" placeholder="0" title="まだ成約していないが見込みとして把握したい金額" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid #fbbf24;background:#fffbeb;border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>` : ''}
       ${treatment === 'BF' ? `<td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>` : ''}
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? esc(_flattenMemoForDisplay(memo, 60)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
     </tr>`;
