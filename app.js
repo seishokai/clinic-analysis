@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v450';
+const APP_VERSION = 'v451';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10450,7 +10450,7 @@ async function renderKaiinAll(containerId) {
   // === v419: CSV ダウンロード (現在の allRows 絞込結果) ===
   el.querySelector('#kaiin-all-csv')?.addEventListener('click', () => {
     try {
-      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','売上','次回予定','メモ','電話','メール','ツール'];
+      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','成約日','売上','売り上げ見込み','次回予定','メモ','電話','メール','ツール'];
       const csvRows = [headers.join(',')];
       const _csvEsc = (v) => {
         const s = String(v == null ? '' : v);
@@ -10471,7 +10471,9 @@ async function renderKaiinAll(containerId) {
           d.status || '',
           info.bf_status || '',
           d.contractService || info.contract_service || '',
+          info.contract_date || '',
           _amt(d) || 0,
+          info.expected_amount || '',
           info.bf_next_date || '',
           (memo || '').replace(/\r?\n/g, ' '),
           d.phone || '',
@@ -11157,7 +11159,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         const ex = _bkExtraCSV[d.name + '|' + d.applyDate] || {};
         return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
       };
-      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','売上','次回予定','メモ','電話','メール','ツール'];
+      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','成約日','売上','売り上げ見込み','次回予定','メモ','電話','メール','ツール'];
       const _csvEsc = (v) => {
         const s = String(v == null ? '' : v);
         if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -11177,7 +11179,9 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
           d.status || '',
           info.bf_status || '',
           d.contractService || info.contract_service || '',
+          info.contract_date || '',
           _amtCSV(d) || 0,
+          info.expected_amount || '',
           info.bf_next_date || '',
           (memo || '').replace(/\r?\n/g, ' '),
           d.phone || '',
@@ -16480,9 +16484,15 @@ function _drawPBMTable(el) {
       }
       sel.disabled = true;
       try {
+        const row = (el._pbmAll || []).find(r => r.id === id);
         const payload = { status: newSt, updated_at: new Date().toISOString() };
-        if (newSt === 'approved' || newSt === 'paid') {
+        // v451: 承認日時は「初回承認時のみ」記録 (承認→支払済で上書きしないため)
+        if ((newSt === 'approved' || newSt === 'paid') && !row?.approved_at) {
           payload.approved_at = new Date().toISOString();
+        }
+        // 審査中に戻すときは承認日時もクリア (誤承認の取り消し)
+        if (newSt === 'pending' && row?.approved_at) {
+          payload.approved_at = null;
         }
         if (newSt === 'rejected') {
           payload.rejection_reason = reason || '';
