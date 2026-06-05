@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v451';
+const APP_VERSION = 'v452';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -16499,8 +16499,7 @@ function _drawPBMTable(el) {
         }
         const { error } = await sb.from('pbm_applications').update(payload).eq('id', id);
         if (error) throw error;
-        // ローカルキャッシュ更新
-        const row = (el._pbmAll || []).find(r => r.id === id);
+        // ローカルキャッシュ更新 (row は上で取得済み)
         if (row) Object.assign(row, payload);
         showToast(`#${id} を「${PBM_STATUS_LABEL[newSt]}」に変更`);
         _drawPBMTable(el);
