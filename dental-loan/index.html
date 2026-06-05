@@ -151,10 +151,10 @@
     <div class="field">
       <label for="years">支払年数</label>
       <div class="input-row">
-        <input id="years" type="number" min="1" max="30" step="1" value="10" inputmode="numeric">
+        <input id="years" type="number" min="1" max="9" step="1" value="9" inputmode="numeric">
         <span class="unit">年</span>
       </div>
-      <input id="years-range" type="range" min="1" max="20" step="1" value="10">
+      <input id="years-range" type="range" min="1" max="9" step="1" value="9">
     </div>
   </div>
 
@@ -169,8 +169,14 @@
     </div>
   </div>
 
+  <div id="warn-min" class="warn-box" style="display:none;margin-top:10px;padding:10px 14px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;color:#b91c1c;font-size:13px;font-weight:600;line-height:1.5">
+    ⚠ 月々の支払が <strong>3,000円以下</strong> になっています。<br>
+    <span style="font-weight:500">借入額を増やすか、支払年数を減らしてください。</span>
+  </div>
+
   <div class="note">
-    ※ 元利均等返済方式で計算。実際の返済額は提携ローン会社の審査・条件により異なります。
+    ※ 元利均等返済方式で計算。実際の返済額は提携ローン会社の審査・条件により異なります。<br>
+    ※ 支払年数は <strong>最長 9 年</strong>、月々支払は <strong>3,001 円以上</strong> でご利用いただけます。
   </div>
 
   <div class="compare">
@@ -228,12 +234,29 @@
   function update(){
     const p = Math.max(0, parseNum($('amount').value));
     const r = Math.max(0, Number($('rate').value) || 0);
-    const y = Math.max(1, Number($('years').value) || 1);
+    // 年数は 1〜9 の範囲にクランプ (10年以上は不可)
+    let y = Math.max(1, Math.min(9, Math.floor(Number($('years').value) || 1)));
+    if (Number($('years').value) !== y) $('years').value = y;
+    const yrsRange = $('years-range');
+    if (yrsRange && Number(yrsRange.value) !== y) yrsRange.value = y;
 
     const m = calcMonthly(p, r, y);
     const total = m * y * 12;
     $('monthly').textContent = fmt(m);
     $('total').textContent = fmt(total);
+
+    // 月3,000円以下なら赤字警告 + 結果ボックスを赤く
+    const monthlyBox = $('monthly').closest('.result-box');
+    const warn = $('warn-min');
+    if (m > 0 && m <= 3000) {
+      warn.style.display = 'block';
+      $('monthly').style.color = '#b91c1c';
+      if (monthlyBox) monthlyBox.style.borderColor = '#fca5a5';
+    } else {
+      warn.style.display = 'none';
+      $('monthly').style.color = '';
+      if (monthlyBox) monthlyBox.style.borderColor = '';
+    }
 
     // 比較表: 各ローン会社で計算
     const selectedId = $('company').value;
