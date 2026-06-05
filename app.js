@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v449';
+const APP_VERSION = 'v450';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9246,7 +9246,7 @@ async function loadBFLifecycleData() {
     // ※ DBにカラム未追加の環境では select が失敗する場合があるのでフォールバック付き
     let data;
     try {
-      const r1 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, expected_amount, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, incentive_paid, paid_at, paid_by, updated_at');
+      const r1 = await sb.from('booking_status').select('name, apply_date, bf_status, bf_next_date, bf_next_fixed, bf_cs_facility, bf_cs_doctor, bf_set_facility, bf_memo, contract_amount, expected_amount, contract_date, bf_travel_cost, memo, edited_book_date, edited_name, edited_service, incentive_paid, paid_at, paid_by, updated_at');
       data = r1.data;
       if (r1.error) throw r1.error;
     } catch(eCol) {
@@ -10185,6 +10185,7 @@ async function renderKaiinAll(containerId) {
             <th style="width:130px">ステータス</th>
             <th style="width:75px">次回予定</th>
             <th style="width:90px">成約商材</th>
+            <th style="width:80px">成約日</th>
             <th style="width:85px">売上</th>
             <th style="text-align:left">メモ</th>
           </tr></thead>
@@ -10308,11 +10309,12 @@ async function renderKaiinAll(containerId) {
                   <td data-label="ステータス" style="text-align:center">${stBadge}</td>
                   <td data-label="次回予定" style="text-align:center;position:relative">${nextChip}</td>
                   <td data-label="成約商材" style="text-align:center">${contractSel}</td>
+                  <td data-label="成約日" style="text-align:center"><input type="date" class="kaiin-all-contract-date" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml((info?.contract_date)||'')}" title="成約日" style="font-size:10px;padding:2px 4px;width:100%;border:1px solid var(--border);border-radius:4px;background:${(info?.contract_date)?'#dcfce7':'#fff'};box-sizing:border-box"></td>
                   <td data-label="売上" style="text-align:right"><input type="text" inputmode="numeric" class="kaiin-all-money" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${amt ? Number(amt).toLocaleString() : ''}" placeholder="0" style="font-size:11px;padding:3px 8px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;font-weight:600;box-sizing:border-box"></td>
                   <td class="kaiin-all-memo-cell" data-label="メモ" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;${memoStyle}" title="${escapeHtml(memo)}">${memoInner}</td>
                 </tr>`;
-              }).join('') || '<tr><td colspan="10" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
-            ${sortedRows.length > displayLimit ? `<tr><td colspan="10" style="text-align:center;padding:10px"><button type="button" id="kaiin-all-more" class="filter-btn" style="font-size:12px;padding:6px 16px">さらに300件表示（全${sortedRows.length}件中${displayLimit}件）</button></td></tr>` : ''}
+              }).join('') || '<tr><td colspan="11" style="text-align:center;padding:20px;color:var(--text-sub)">該当データがありません</td></tr>'}
+            ${sortedRows.length > displayLimit ? `<tr><td colspan="11" style="text-align:center;padding:10px"><button type="button" id="kaiin-all-more" class="filter-btn" style="font-size:12px;padding:6px 16px">さらに300件表示（全${sortedRows.length}件中${displayLimit}件）</button></td></tr>` : ''}
           </tbody>
         </table>
       </div>
@@ -10594,6 +10596,20 @@ async function renderKaiinAll(containerId) {
         setTimeout(() => { sel.style.outline = ''; renderKaiinAll(containerId); }, 400);
         syncCrossTabRender();
       } catch (e) { console.warn('status save failed', e); showToast('状態の保存に失敗', true); }
+    });
+  });
+
+  // === 編集: 成約日 (contract_date) ===
+  el.querySelectorAll('.kaiin-all-contract-date').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const v = inp.value || null;
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'contract_date', v);
+      if (ok) {
+        inp.style.borderColor = '#16a34a';
+        inp.style.background = v ? '#dcfce7' : '#fff';
+        setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+        syncCrossTabRender();
+      }
     });
   });
 
