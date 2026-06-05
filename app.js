@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v452';
+const APP_VERSION = 'v453';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10088,11 +10088,25 @@ async function renderKaiinAll(containerId) {
   const visitRate = pastBookings.length ? Math.round(pastVisited / pastBookings.length * 100) : 0;
   const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
   const sortMode = state.sortBy || '';
+  const _contractKey = (d) => {
+    const info2 = bfLifecycleCache[d.name + '|' + d.applyDate];
+    return (info2?.contract_date || '').substring(0, 7); // YYYY-MM
+  };
   const sortedRows = allRows.slice().sort((a,b) => {
     if (sortMode === 'sales-desc' || sortMode === 'sales-asc') {
       const av = _amt(a);
       const bv = _amt(b);
       if (av !== bv) return sortMode === 'sales-desc' ? bv - av : av - bv;
+      return bookingBookMs(b) - bookingBookMs(a);
+    }
+    if (sortMode === 'contract-desc' || sortMode === 'contract-asc') {
+      const av = _contractKey(a);
+      const bv = _contractKey(b);
+      // 成約月未設定の行は常に最下段
+      if (!av && !bv) return bookingBookMs(b) - bookingBookMs(a);
+      if (!av) return 1;
+      if (!bv) return -1;
+      if (av !== bv) return sortMode === 'contract-desc' ? bv.localeCompare(av) : av.localeCompare(bv);
       return bookingBookMs(b) - bookingBookMs(a);
     }
     if (sortMode === 'name') return (a.name || '').localeCompare(b.name || '', 'ja');
@@ -10157,6 +10171,8 @@ async function renderKaiinAll(containerId) {
         <select id="kaiin-all-sort" class="filter-select" title="並び順" style="font-size:11px;padding:3px 6px">
           <option value="" ${!state.sortBy?'selected':''}>並び:来院日(新→古)</option>
           <option value="book-asc" ${state.sortBy==='book-asc'?'selected':''}>来院日(古→新)</option>
+          <option value="contract-desc" ${state.sortBy==='contract-desc'?'selected':''}>📅 成約月(新→古)</option>
+          <option value="contract-asc" ${state.sortBy==='contract-asc'?'selected':''}>📅 成約月(古→新)</option>
           <option value="sales-desc" ${state.sortBy==='sales-desc'?'selected':''}>💰 売上(高→低)</option>
           <option value="sales-asc" ${state.sortBy==='sales-asc'?'selected':''}>💰 売上(低→高)</option>
           <option value="name" ${state.sortBy==='name'?'selected':''}>名前順</option>
@@ -10185,7 +10201,7 @@ async function renderKaiinAll(containerId) {
             <th style="width:130px">ステータス</th>
             <th style="width:75px">次回予定</th>
             <th style="width:90px">成約商材</th>
-            <th style="width:80px">成約日</th>
+            <th style="width:80px">成約月</th>
             <th style="width:85px">売上</th>
             <th style="text-align:left">メモ</th>
           </tr></thead>
@@ -10309,7 +10325,7 @@ async function renderKaiinAll(containerId) {
                   <td data-label="ステータス" style="text-align:center">${stBadge}</td>
                   <td data-label="次回予定" style="text-align:center;position:relative">${nextChip}</td>
                   <td data-label="成約商材" style="text-align:center">${contractSel}</td>
-                  <td data-label="成約日" style="text-align:center"><input type="date" class="kaiin-all-contract-date" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml((info?.contract_date)||'')}" title="成約日" style="font-size:10px;padding:2px 4px;width:100%;border:1px solid var(--border);border-radius:4px;background:${(info?.contract_date)?'#dcfce7':'#fff'};box-sizing:border-box"></td>
+                  <td data-label="成約月" style="text-align:center"><input type="month" class="kaiin-all-contract-date" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml((info?.contract_date || '').substring(0,7))}" title="成約月" style="font-size:10px;padding:2px 4px;width:100%;border:1px solid var(--border);border-radius:4px;background:${(info?.contract_date)?'#dcfce7':'#fff'};box-sizing:border-box"></td>
                   <td data-label="売上" style="text-align:right"><input type="text" inputmode="numeric" class="kaiin-all-money" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${amt ? Number(amt).toLocaleString() : ''}" placeholder="0" style="font-size:11px;padding:3px 8px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;font-weight:600;box-sizing:border-box"></td>
                   <td class="kaiin-all-memo-cell" data-label="メモ" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;border-radius:4px;${memoStyle}" title="${escapeHtml(memo)}">${memoInner}</td>
                 </tr>`;
@@ -10450,7 +10466,7 @@ async function renderKaiinAll(containerId) {
   // === v419: CSV ダウンロード (現在の allRows 絞込結果) ===
   el.querySelector('#kaiin-all-csv')?.addEventListener('click', () => {
     try {
-      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','成約日','売上','売り上げ見込み','次回予定','メモ','電話','メール','ツール'];
+      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','成約月','売上','売り上げ見込み','次回予定','メモ','電話','メール','ツール'];
       const csvRows = [headers.join(',')];
       const _csvEsc = (v) => {
         const s = String(v == null ? '' : v);
@@ -10471,7 +10487,7 @@ async function renderKaiinAll(containerId) {
           d.status || '',
           info.bf_status || '',
           d.contractService || info.contract_service || '',
-          info.contract_date || '',
+          (info.contract_date || '').substring(0, 7),
           _amt(d) || 0,
           info.expected_amount || '',
           info.bf_next_date || '',
@@ -10601,10 +10617,12 @@ async function renderKaiinAll(containerId) {
     });
   });
 
-  // === 編集: 成約日 (contract_date) ===
+  // === 編集: 成約月 (contract_date を YYYY-MM-01 で保存) ===
   el.querySelectorAll('.kaiin-all-contract-date').forEach(inp => {
     inp.addEventListener('change', async () => {
-      const v = inp.value || null;
+      // <input type="month"> の値は "YYYY-MM"。DB は DATE 型なので "-01" を付与。
+      const ym = inp.value || '';
+      const v = ym ? `${ym}-01` : null;
       const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'contract_date', v);
       if (ok) {
         inp.style.borderColor = '#16a34a';
@@ -11159,7 +11177,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
         const ex = _bkExtraCSV[d.name + '|' + d.applyDate] || {};
         return Number(ex.contractAmount) || Number(d.contractAmount) || 0;
       };
-      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','成約日','売上','売り上げ見込み','次回予定','メモ','電話','メール','ツール'];
+      const headers = ['来院日','申込日','名前','治療','医院','プロモ','ステータス','BFステータス','成約商材','成約月','売上','売り上げ見込み','次回予定','メモ','電話','メール','ツール'];
       const _csvEsc = (v) => {
         const s = String(v == null ? '' : v);
         if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
@@ -11179,7 +11197,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
           d.status || '',
           info.bf_status || '',
           d.contractService || info.contract_service || '',
-          info.contract_date || '',
+          (info.contract_date || '').substring(0, 7),
           _amtCSV(d) || 0,
           info.expected_amount || '',
           info.bf_next_date || '',
