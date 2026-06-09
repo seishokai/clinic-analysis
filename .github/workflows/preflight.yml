@@ -1,0 +1,109 @@
+name: 構文チェック・整合性チェック
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'app.js'
+      - 'index.html'
+      - 'version.txt'
+      - 'pbm-apply.html'
+      - 'pbm.html'
+      - '.github/workflows/preflight.yml'
+  pull_request:
+    paths:
+      - 'app.js'
+      - 'index.html'
+      - 'version.txt'
+
+permissions:
+  contents: read
+
+jobs:
+  preflight:
+    name: 構文・整合性チェック
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # === 1. app.js の構文チェック ===
+      # 過去に「const row を二重宣言」で app.js 全体が parse エラー→アプリ完全停止
+      # という事故があったため、push時に確実に検出する。
+      - name: app.js 構文チェック
+        run: |
+          node -e "
+            const fs = require('fs');
+            const src = fs.readFileSync('app.js', 'utf8');
+            try {
+              new Function(src);
+              console.log('✅ app.js syntax OK (' + src.length + ' bytes)');
+            } catch (e) {
+              console.error('❌ app.js syntax error:', e.message);
+              process.exit(1);
+            }
+          "
+
+      # === 2. pbm-apply.html / pbm.html の構文チェック ===
+      - name: pbm-apply.html script 構文チェック
+        run: |
+          node -e "
+            const fs = require('fs');
+            const html = fs.readFileSync('pbm-apply.html', 'utf8');
+            // <script>...</script> ブロックを全部抽出して順に new Function に通す
+            const re = /<script(?![^>]*\bsrc=)[^>]*>([\s\S]*?)<\/script>/g;
+            let m, idx = 0, total = 0;
+            while ((m = re.exec(html)) !== null) {
+              idx++;
+              const code = m[1].trim();
+              if (!code) continue;
+              total += code.length;
+              try {
+                new Function(code);
+              } catch (e) {
+                console.error('❌ pbm-apply.html script #' + idx + ' syntax error:', e.message);
+                process.exit(1);
+              }
+            }
+            console.log('✅ pbm-apply.html scripts OK (' + total + ' bytes inline)');
+          "
+
+      # === 3. バージョン3つの整合性 ===
+      # app.js の APP_VERSION / version.txt / index.html の app.js?v=NNN が一致するか
+      # キャッシュバスター不整合でデプロイ後ユーザーが旧版を引いてしまう事故防止。
+      - name: バージョン整合性チェック
+        run: |
+          APP_VER=$(grep -oP "(?<=^const APP_VERSION = ')v[0-9]+" app.js | head -1)
+          FILE_VER=$(cat version.txt | tr -d '[:space:]')
+          HTML_VER=v$(grep -oP '(?<=app\.js\?v=)[0-9]+' index.html | head -1)
+          echo "app.js APP_VERSION   = $APP_VER"
+          echo "version.txt          = $FILE_VER"
+          echo "index.html app.js?v= = $HTML_VER"
+          if [ "$APP_VER" != "$FILE_VER" ] || [ "$APP_VER" != "$HTML_VER" ]; then
+            echo "::error::バージョン不一致 - 3箇所すべてを揃えてください"
+            exit 1
+          fi
+          echo "✅ バージョン3点一致: $APP_VER"
+
+      # === 4. 危険パターンの検出 ===
+      # 過去の事故と同じミスを防ぐための regex 検出
+      - name: 危険パターン検出 (DXHUB原名列の UPDATE)
+        run: |
+          # booking_status の name 列を update する箇所が無いことを確認
+          # (許可: edited_name のみ。name 列直接 update はバグ温床)
+          if grep -nE "\.from\('booking_status'\)\.update\(\{[^}]*\bname\b[^:]*:" app.js; then
+            echo "::error::booking_status の name 列を update しているコードが見つかりました。"
+            echo "::error::DXHUB原名は不変条件です。ユーザー編集は edited_name 列にだけ upsert してください。"
+            echo "::error::詳細は HANDOFF.md の不変条件セクションを参照。"
+            exit 1
+          fi
+          echo "✅ 危険パターンなし"
+
+      - name: 完了
+        run: echo "🟢 全プリフライトチェック合格"

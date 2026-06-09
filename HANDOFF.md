@@ -1,6 +1,68 @@
-# 🔄 セッション引継ぎ (2026-04-27 → v267)
+# 🔄 セッション引継ぎ (2026-04-27 → v267, 不変条件 v455追記)
 
 次のClaudeセッションで作業を継続するための引継ぎ情報。
+
+---
+
+## 🚨 絶対に守るべき不変条件 (再発防止 - v455)
+
+過去にユーザーに大きな迷惑を掛けた事故3件の根本原因と、再発防止のルール。
+**この章は必ず読んでから作業すること。** GitHub Actions の preflight でも
+一部は自動検出されるが、人がコード書く時の意識が最後の砦。
+
+### 1. DXHUB(Google Sheets) が源泉のフィールドは絶対に UPDATE しない
+
+**事故**: `editPatientName` が `booking_status.name` 列自体を新しい名前に
+UPDATE していた → DXHUB が次回 oldName を返してきた時点で DB と結合不能 →
+ステータス・メモが「行方不明 → 表示上消失」になる致命的データ事故。
+
+**ルール**:
+- `booking_status.name` / `booking_status.apply_date` (DXHUBから流れてくる列)
+  を `.update({ name: ... })` で書き換えてはいけない
+- ユーザー編集は **`edited_name` / `edited_book_date` / `edited_service`** 列に
+  upsert する。`onConflict: 'name,apply_date'` で原名キーに紐付け
+- 読み込み側 (`loadBookings`) は `dbRow.edited_name` があれば
+  `d.name = dbRow.edited_name` で表示上書き
+- `bfLifecycleCache` は edited_name でも引けるよう dual-key 登録 (loadBFLifecycleData)
+- GitHub Actions preflight で `\.from\('booking_status'\)\.update\(\{[^}]*\bname\b[^:]*:`
+  を grep 検出 → 違反コミットは CI 落ち
+
+### 2. デプロイ前に必ず構文チェック
+
+**事故**: v451 で PBM admin の change ハンドラに `const row` を二重宣言してしまい、
+app.js 全体が SyntaxError → アプリ完全停止 (ログイン不可)。
+
+**ルール**:
+- push 前にプレビューサーバから `fetch('/app.js').then(r=>r.text()).then(s => new Function(s))`
+  で構文検証する。Preview MCP の `mcp__Claude_Preview__preview_eval` で実行可能
+- GitHub Actions preflight が node ベースで自動チェック (push 時に強制)
+- バージョン3点 (app.js / version.txt / index.html) の整合性も CI で検証
+
+### 3. メモ編集の openMemoModal 第3引数
+
+**事故**: 来院一覧 の memo cell click で `openMemoModal(name, apply, () => render...)` と
+コールバック関数を第3引数に渡していた → `saveMemoModal` 内で `tdEl.innerHTML = ...` が
+**関数オブジェクトへの代入で silent fail**、画面更新も再描画コールバックも動かなくなった。
+
+**ルール**:
+- `openMemoModal` の第3引数は td(DOM要素) を渡す。**コールバックは不可**
+- 保存後の他タブ反映は `saveMemoModal` 内の `syncCrossTabRender()` で行う
+  (個々の呼び出し側でコールバックを渡す必要は無い)
+- 索引キャッシュは `invalidateMemoIndex()` で必ず無効化
+
+### 開発フロー (絶対):
+
+```
+1. コード編集
+2. プレビューで構文チェック (new Function(src))
+3. バージョン3点を bump
+4. commit
+5. 構文チェック再確認
+6. git push origin master
+7. デプロイ確認 (version.txt を curl)
+```
+
+CI が落ちた場合、即座に hotfix (master を v452-style で push) する。
 
 ---
 
