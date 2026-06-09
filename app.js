@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v453';
+const APP_VERSION = 'v454';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8498,8 +8498,13 @@ async function saveMemoModal() {
   // bookingsData の _memo も同期 (findAnyMemo がここから探すため)
   const targetBooking = (bookingsData || []).find(b => b.name === _memoTarget.name && b.applyDate === _memoTarget.apply);
   if (targetBooking) targetBooking._memo = val;
+  // メモ索引キャッシュを無効化 (findMemoForBooking が次回最新を返すように)
+  if (typeof invalidateMemoIndex === 'function') invalidateMemoIndex();
   showToast(val ? 'メモを保存しました' : 'メモを削除しました');
   closeMemoModal();
+  // v454: 予約・来院・電話前確認・追いかけ等、現在表示中のサブタブを再描画
+  //   ← これがないとメモ編集が他タブに即座に反映されない
+  if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
 }
 
 function exportCSV() {
@@ -10671,10 +10676,14 @@ async function renderKaiinAll(containerId) {
   });
 
   // === 編集: メモ (クリックで modal) ===
+  // BUG修正(v454): 第3引数に関数を渡していたため、openMemoModalがそれをtdElとして
+  //   保存し、saveMemoModal内で関数オブジェクトにinnerHTML代入 → DOM更新失敗
+  //   かつコールバックも実行されない不具合になっていた。
+  //   td(DOM)を直接渡し、保存後の他タブ再描画は saveMemoModal の syncCrossTabRender で。
   el.querySelectorAll('.kaiin-all-memo-cell').forEach(cell => {
     cell.addEventListener('click', () => {
       if (typeof openMemoModal === 'function') {
-        openMemoModal(cell.dataset.name, cell.dataset.apply, () => { renderKaiinAll(containerId); syncCrossTabRender(); });
+        openMemoModal(cell.dataset.name, cell.dataset.apply, cell);
       }
     });
   });
