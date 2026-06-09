@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v456';
+const APP_VERSION = 'v457';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12395,24 +12395,43 @@ function renderApplyAnalysis(period) {
     if (facMatrixSorted.length === 0) {
       facSvcTable.innerHTML = '<thead><tr><th>データなし</th></tr></thead>';
     } else {
-      const cellStyle = 'padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums';
-      const headStyle = 'padding:6px 10px;text-align:center;background:#fff8e1;font-weight:700;font-size:11px';
+      // ヒートマップ用: 行内の最大値で各セルの濃度を計算 (横方向)
+      const heat = (v, max) => {
+        if (!v || !max) return '';
+        const r = v / max; // 0..1
+        if (r >= 0.7) return 'background:#fbbf24;color:#92400e;font-weight:800';
+        if (r >= 0.4) return 'background:#fde68a;color:#92400e;font-weight:700';
+        if (r >= 0.15) return 'background:#fef3c7;color:#b45309';
+        return 'color:#374151';
+      };
+      const cellStyle = 'padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;border-right:1px solid #fef3c7';
+      const headStyle = 'padding:6px 8px;text-align:center;background:#fef3c7;color:#92400e;font-weight:800;font-size:11px;border-right:1px solid #fde68a;position:sticky;top:0';
+      facSvcTable.style.borderCollapse = 'collapse';
       facSvcTable.innerHTML = `
         <thead><tr>
-          <th style="${headStyle};text-align:left">医院</th>
-          ${presentSvcs.map(t => `<th style="${headStyle}">${escapeHtml(t)}</th>`).join('')}
-          <th style="${headStyle};background:#fef3c7">計</th>
+          <th style="${headStyle};text-align:left;min-width:80px">医院</th>
+          ${presentSvcs.map(t => `<th style="${headStyle};min-width:54px">${escapeHtml(t)}</th>`).join('')}
+          <th style="${headStyle};background:#fde68a;min-width:50px">計</th>
         </tr></thead>
         <tbody>
-          ${facMatrixSorted.map(([f, row]) => `<tr style="cursor:pointer" data-fac="${escapeHtml(f)}" class="apply-fac-row">
-            <td style="padding:6px 10px;text-align:left;font-weight:600">${escapeHtml(f)}</td>
-            ${presentSvcs.map(t => `<td style="${cellStyle};${row[t]?'':'color:var(--text-muted)'}">${row[t]||'-'}</td>`).join('')}
-            <td style="${cellStyle};font-weight:700;background:#fef3c7">${row.__total}</td>
-          </tr>`).join('')}
-          <tr style="background:#f9fafb;font-weight:700">
-            <td style="padding:6px 10px;text-align:left">計</td>
-            ${presentSvcs.map(t => `<td style="${cellStyle}">${svcTotals[t]||0}</td>`).join('')}
-            <td style="${cellStyle};background:#fde68a">${grandTotal}</td>
+          ${facMatrixSorted.map(([f, row], i) => {
+            // 行内最大値 (計を除く)
+            const rowMax = Math.max(...presentSvcs.map(t => row[t]||0));
+            const stripe = i % 2 === 0 ? 'background:#fffdf5' : '';
+            return `<tr style="cursor:pointer;${stripe}" data-fac="${escapeHtml(f)}" class="apply-fac-row" onmouseover="this.style.outline='2px solid #f59e0b'" onmouseout="this.style.outline=''">
+              <td style="padding:5px 8px;text-align:left;font-weight:700;font-size:12px;border-right:1px solid #fef3c7">${escapeHtml(f)}</td>
+              ${presentSvcs.map(t => {
+                const v = row[t]||0;
+                const isMax = v > 0 && v === rowMax;
+                return `<td style="${cellStyle};${heat(v, rowMax)};${isMax?'text-decoration:underline':''}">${v||'<span style="color:#d1d5db">·</span>'}</td>`;
+              }).join('')}
+              <td style="${cellStyle};font-weight:800;background:#fde68a;color:#78350f">${row.__total}</td>
+            </tr>`;
+          }).join('')}
+          <tr style="background:#fcd34d;font-weight:800;border-top:2px solid #92400e">
+            <td style="padding:6px 8px;text-align:left;color:#78350f;font-size:12px;border-right:1px solid #fde68a">計</td>
+            ${presentSvcs.map(t => `<td style="${cellStyle};color:#78350f">${svcTotals[t]||0}</td>`).join('')}
+            <td style="${cellStyle};background:#f59e0b;color:#fff">${grandTotal}</td>
           </tr>
         </tbody>
       `;
@@ -12441,21 +12460,39 @@ function renderApplyAnalysis(period) {
     if (topPromosForCross.length === 0) {
       promoSvcTable.innerHTML = '<thead><tr><th>データなし</th></tr></thead>';
     } else {
-      const cellStyle = 'padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums';
-      const headStyle = 'padding:6px 10px;text-align:center;background:#e0f2fe;font-weight:700;font-size:11px';
+      // 青系ヒートマップ
+      const heatBlue = (v, max) => {
+        if (!v || !max) return '';
+        const r = v / max;
+        if (r >= 0.7) return 'background:#38bdf8;color:#0c4a6e;font-weight:800';
+        if (r >= 0.4) return 'background:#bae6fd;color:#0c4a6e;font-weight:700';
+        if (r >= 0.15) return 'background:#e0f2fe;color:#075985';
+        return 'color:#374151';
+      };
+      const cellStyle = 'padding:5px 8px;text-align:right;font-variant-numeric:tabular-nums;font-size:12px;border-right:1px solid #e0f2fe';
+      const headStyle = 'padding:6px 8px;text-align:center;background:#e0f2fe;color:#0c4a6e;font-weight:800;font-size:11px;border-right:1px solid #bae6fd';
       const ellip = (str, n) => str.length > n ? str.slice(0, n) + '…' : str;
+      promoSvcTable.style.borderCollapse = 'collapse';
       promoSvcTable.innerHTML = `
         <thead><tr>
-          <th style="${headStyle};text-align:left">プロモ</th>
-          ${presentSvcs.map(t => `<th style="${headStyle}">${escapeHtml(t)}</th>`).join('')}
-          <th style="${headStyle};background:#bae6fd">計</th>
+          <th style="${headStyle};text-align:left;min-width:120px">プロモ</th>
+          ${presentSvcs.map(t => `<th style="${headStyle};min-width:54px">${escapeHtml(t)}</th>`).join('')}
+          <th style="${headStyle};background:#bae6fd;min-width:50px">計</th>
         </tr></thead>
         <tbody>
-          ${topPromosForCross.map(pr => `<tr style="cursor:pointer" data-promo="${escapeHtml(pr)}" class="apply-promo-row">
-            <td style="padding:6px 10px;text-align:left;font-size:11px" title="${escapeHtml(pr)}">${escapeHtml(ellip(pr, 24))}</td>
-            ${presentSvcs.map(t => `<td style="${cellStyle};${promoMatrix[pr][t]?'':'color:var(--text-muted)'}">${promoMatrix[pr][t]||'-'}</td>`).join('')}
-            <td style="${cellStyle};font-weight:700;background:#bae6fd">${promoMatrix[pr].__total}</td>
-          </tr>`).join('')}
+          ${topPromosForCross.map((pr, i) => {
+            const rowMax = Math.max(...presentSvcs.map(t => promoMatrix[pr][t]||0));
+            const stripe = i % 2 === 0 ? 'background:#f7fdff' : '';
+            return `<tr style="cursor:pointer;${stripe}" data-promo="${escapeHtml(pr)}" class="apply-promo-row" onmouseover="this.style.outline='2px solid #38bdf8'" onmouseout="this.style.outline=''">
+              <td style="padding:5px 8px;text-align:left;font-size:11px;font-weight:600;border-right:1px solid #e0f2fe" title="${escapeHtml(pr)}">${escapeHtml(ellip(pr, 22))}</td>
+              ${presentSvcs.map(t => {
+                const v = promoMatrix[pr][t]||0;
+                const isMax = v > 0 && v === rowMax;
+                return `<td style="${cellStyle};${heatBlue(v, rowMax)};${isMax?'text-decoration:underline':''}">${v||'<span style="color:#d1d5db">·</span>'}</td>`;
+              }).join('')}
+              <td style="${cellStyle};font-weight:800;background:#bae6fd;color:#0c4a6e">${promoMatrix[pr].__total}</td>
+            </tr>`;
+          }).join('')}
         </tbody>
       `;
       promoSvcTable.querySelectorAll('.apply-promo-row').forEach(tr => {
