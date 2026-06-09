@@ -723,19 +723,43 @@
         </div>
       </div>
       <div id="sub-bk-apply" hidden>
-        <div class="page-header"><h2>申込分析</h2></div>
-        <div style="display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap">
+        <div class="page-header"><h2>申込分析</h2><p class="page-desc">期間+絞込で 医院×治療 など多次元に集計できます</p></div>
+        <!-- 期間切替 -->
+        <div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap">
           <button class="btn btn-dark apply-period-btn" data-period="today" style="font-size:11px;padding:6px 12px;min-height:28px">今日</button>
           <button class="btn btn-outline apply-period-btn" data-period="yesterday" style="font-size:11px;padding:6px 12px;min-height:28px">昨日</button>
           <button class="btn btn-outline apply-period-btn" data-period="week" style="font-size:11px;padding:6px 12px;min-height:28px">今週</button>
           <button class="btn btn-outline apply-period-btn" data-period="month" style="font-size:11px;padding:6px 12px;min-height:28px">今月</button>
+          <button class="btn btn-outline apply-period-btn" data-period="last-month" style="font-size:11px;padding:6px 12px;min-height:28px">先月</button>
           <button class="btn btn-outline apply-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button>
         </div>
-        <div class="stats-row" id="apply-stats" style="margin-bottom:16px"></div>
-        <div class="card" style="margin-bottom:16px"><div class="card-header">日別申込数</div><div class="bar-chart" id="apply-daily-chart"></div></div>
-        <div class="card" style="margin-bottom:16px"><div class="card-header">プロモ別申込数</div><div class="bar-chart" id="apply-promo-chart"></div></div>
-        <div class="card" style="margin-bottom:16px"><div class="card-header">医院別申込数</div><div class="bar-chart" id="apply-facility-chart"></div></div>
-        <div class="card"><div class="card-header">相談別申込数</div><div class="bar-chart" id="apply-service-chart"></div></div>
+        <!-- 絞込フィルター (期間内のデータをさらに絞る) -->
+        <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;padding:8px 12px;background:#f9fafb;border:1px solid var(--border);border-radius:8px">
+          <strong style="font-size:11px;color:var(--text-sub)">絞込:</strong>
+          <select id="apply-filter-fac" class="form-select" style="width:auto;font-size:11px;padding:5px 8px"><option value="">医院: 全て</option></select>
+          <select id="apply-filter-svc" class="form-select" style="width:auto;font-size:11px;padding:5px 8px"><option value="">治療: 全て</option></select>
+          <select id="apply-filter-promo" class="form-select" style="width:auto;font-size:11px;padding:5px 8px"><option value="">プロモ: 全て</option></select>
+          <select id="apply-filter-tool" class="form-select" style="width:auto;font-size:11px;padding:5px 8px"><option value="">ツール: 全て</option><option value="DXHUB">DXHUB</option><option value="セレクト">セレクト</option><option value="手動">手動</option></select>
+          <button class="btn btn-outline" id="apply-filter-reset" style="font-size:11px;padding:5px 10px">🔄 リセット</button>
+        </div>
+        <div class="stats-row" id="apply-stats" style="margin-bottom:12px"></div>
+        <!-- クロス集計: 医院 × 治療 -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-header">医院 × 治療 クロス集計</div>
+          <div style="overflow-x:auto"><table class="data-table" id="apply-cross-fac-svc" style="font-size:12px;width:100%"></table></div>
+        </div>
+        <!-- クロス集計: プロモ × 治療 -->
+        <div class="card" style="margin-bottom:12px">
+          <div class="card-header">プロモ × 治療 クロス集計 (申込上位15プロモ)</div>
+          <div style="overflow-x:auto"><table class="data-table" id="apply-cross-promo-svc" style="font-size:12px;width:100%"></table></div>
+        </div>
+        <!-- 既存のバーチャート (3カラムで横並び) -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-bottom:12px">
+          <div class="card"><div class="card-header">医院別申込数</div><div class="bar-chart" id="apply-facility-chart"></div></div>
+          <div class="card"><div class="card-header">治療別申込数</div><div class="bar-chart" id="apply-service-chart"></div></div>
+          <div class="card"><div class="card-header">プロモ別 (上位15)</div><div class="bar-chart" id="apply-promo-chart"></div></div>
+        </div>
+        <div class="card"><div class="card-header">日別申込数</div><div class="bar-chart" id="apply-daily-chart"></div></div>
       </div>
       <div id="sub-bk-fac" hidden>
         <div class="page-header"><h2 id="fac-title">医院</h2></div>
@@ -1487,7 +1511,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=455"></script>
+  <script src="app.js?v=456"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

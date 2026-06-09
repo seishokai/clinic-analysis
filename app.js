@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v455';
+const APP_VERSION = 'v456';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12286,26 +12286,18 @@ function renderBFBookings(allBFData) {
   }
 }
 
-// === 申込分析 ===
+// === 申込分析 (v456: 多次元クロス集計対応) ===
+// 期間 + 絞込 (医院/治療/プロモ/ツール) で絞り、医院×治療 / プロモ×治療 の
+// クロス集計テーブル + 各ディメンションのバーチャートを表示。
+let _applyAnalysisState = { period: 'today', filterFac: '', filterSvc: '', filterPromo: '', filterTool: '' };
+
 function renderApplyAnalysis(period) {
-  period = period || 'today';
-  const sFac = (f) => {
-    if (!f) return '-';
-    if (f.includes('銀座')) return 'BF銀座'; if (f.includes('ウィズ')||f.includes('WITH')) return 'ウィズ';
-    if (f.includes('エスカ')) return 'エスカ'; if (f.includes('アール')) return 'アール';
-    if (f.includes('ルミナス')) return 'ルミナス'; if (f.includes('茶屋')) return '茶屋';
-    if (f.includes('小牧')) return '小牧'; if (f.includes('知立')) return '知立';
-    if (f.includes('八事')) return '八事'; if (f.includes('岩田')) return '岩田';
-    if (f.includes('大森')) return '大森'; if (f.includes('京都')) return '京都';
-    return f.length > 8 ? f.slice(0,8)+'…' : f;
-  };
-  const sSvc = (s) => {
-    if (!s) return '-';
-    if (s.includes('ラミネート')||s.includes('ブラックフィルム')) return 'BF';
-    if (s.includes('矯正')) return '矯正'; if (s.includes('セラミック')) return 'セラミック';
-    if (s.includes('インプラント')) return 'インプラント';
-    return s.replace(/相談|無料|　/g,'').slice(0,6);
-  };
+  if (period) _applyAnalysisState.period = period;
+  const s = _applyAnalysisState;
+  // 治療カテゴリは getTreatmentCategory に統一 (BF/矯正/インプラント/ラブリエ/自費補綴/自費根治/ホワイトニング/リップアート/ティースジュエリー/その他)
+  const TREATMENT_ORDER = ['BF','矯正','インプラント','ラブリエ','自費補綴','自費根治','ホワイトニング','リップアート','ティースジュエリー','その他'];
+  const svcOf = (d) => (typeof getTreatmentCategory === 'function' ? getTreatmentCategory(d) : 'その他');
+  const facOf = (d) => (typeof normFac === 'function' ? (normFac(d.facility) || '未設定') : (d.facility || '未設定'));
 
   let data = bookingsData.filter(d => d.status !== '除外');
 
@@ -12315,42 +12307,164 @@ function renderApplyAnalysis(period) {
   const yesterday = new Date(now); yesterday.setDate(yesterday.getDate()-1);
   const yesterdayStr = `${yesterday.getFullYear()}/${String(yesterday.getMonth()+1).padStart(2,'0')}/${String(yesterday.getDate()).padStart(2,'0')}`;
   const weekAgo = new Date(now); weekAgo.setDate(weekAgo.getDate()-7);
+  const weekAgoStr = `${weekAgo.getFullYear()}/${String(weekAgo.getMonth()+1).padStart(2,'0')}/${String(weekAgo.getDate()).padStart(2,'0')}`;
   const monthStart = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/01`;
-
+  const lastMonth = new Date(now.getFullYear(), now.getMonth()-1, 1);
+  const lastMonthStart = `${lastMonth.getFullYear()}/${String(lastMonth.getMonth()+1).padStart(2,'0')}/01`;
+  const lastMonthEnd = `${lastMonth.getFullYear()}/${String(lastMonth.getMonth()+1).padStart(2,'0')}/31`;
   const getApplyDateStr = (d) => {
     if (!d.applyDate) return '';
     const m = d.applyDate.match(/(\d{4})\D+(\d{1,2})\D+(\d{1,2})/);
     if (!m) return '';
     return `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}/${String(parseInt(m[3])).padStart(2,'0')}`;
   };
+  const p = s.period;
+  if (p === 'today') data = data.filter(d => getApplyDateStr(d) === todayStr);
+  else if (p === 'yesterday') data = data.filter(d => getApplyDateStr(d) === yesterdayStr);
+  else if (p === 'week') data = data.filter(d => { const ds = getApplyDateStr(d); return ds && ds >= weekAgoStr; });
+  else if (p === 'month') data = data.filter(d => { const ds = getApplyDateStr(d); return ds && ds >= monthStart; });
+  else if (p === 'last-month') data = data.filter(d => { const ds = getApplyDateStr(d); return ds && ds >= lastMonthStart && ds <= lastMonthEnd; });
 
-  if (period === 'today') {
-    data = data.filter(d => getApplyDateStr(d) === todayStr);
-  } else if (period === 'yesterday') {
-    data = data.filter(d => getApplyDateStr(d) === yesterdayStr);
-  } else if (period === 'week') {
-    data = data.filter(d => { const ds = getApplyDateStr(d); return ds >= `${weekAgo.getFullYear()}/${String(weekAgo.getMonth()+1).padStart(2,'0')}/${String(weekAgo.getDate()).padStart(2,'0')}`; });
-  } else if (period === 'month') {
-    data = data.filter(d => { const ds = getApplyDateStr(d); return ds >= monthStart; });
-  }
+  // 期間内の data を baseRows として保持 (フィルター選択肢生成用)
+  const baseRows = data.slice();
 
-  // 統計
+  // 絞込フィルター適用
+  if (s.filterFac) data = data.filter(d => facOf(d) === s.filterFac);
+  if (s.filterSvc) data = data.filter(d => svcOf(d) === s.filterSvc);
+  if (s.filterPromo) data = data.filter(d => (d.source || '(なし)') === s.filterPromo);
+  if (s.filterTool) data = data.filter(d => (d.tool || '') === s.filterTool);
+
+  // === 統計 (申込数 + ツール内訳) ===
   const total = data.length;
-  const byTool = {}; data.forEach(d => { byTool[d.tool||'不明'] = (byTool[d.tool||'不明']||0)+1; });
-
-  // BUG#9 修正: 手動登録ツールも表示 (合計と内訳の食い違いをなくす)
-  const toolKeysOrder = ['DXHUB', 'セレクト', '手動'];
-  const knownSum = toolKeysOrder.reduce((s, k) => s + (byTool[k] || 0), 0);
-  const otherSum = total - knownSum;
+  const byTool = {};
+  data.forEach(d => { byTool[d.tool||'不明'] = (byTool[d.tool||'不明']||0)+1; });
   document.getElementById('apply-stats').innerHTML = `
     <div class="stat-card"><span class="stat-label">申込数</span><span class="stat-num">${total}</span></div>
     <div class="stat-card"><span class="stat-label">DXHUB</span><span class="stat-num">${byTool['DXHUB']||0}</span></div>
     <div class="stat-card"><span class="stat-label">セレクト</span><span class="stat-num">${byTool['セレクト']||0}</span></div>
     <div class="stat-card"><span class="stat-label">手動</span><span class="stat-num">${byTool['手動']||0}</span></div>
-    ${otherSum > 0 ? `<div class="stat-card"><span class="stat-label">その他</span><span class="stat-num">${otherSum}</span></div>` : ''}
   `;
 
-  // 日別チャート
+  // === 期間バー(today/...) の active 切替 ===
+  document.querySelectorAll('.apply-period-btn').forEach(b => {
+    if (b.dataset.period === p) { b.classList.remove('btn-outline'); b.classList.add('btn-dark'); }
+    else { b.classList.remove('btn-dark'); b.classList.add('btn-outline'); }
+  });
+
+  // === フィルター選択肢を baseRows から生成 ===
+  const facOpts = [...new Set(baseRows.map(facOf).filter(Boolean))].sort();
+  const svcOpts = TREATMENT_ORDER.filter(t => baseRows.some(d => svcOf(d) === t));
+  const promoCount = {};
+  baseRows.forEach(d => { const k = d.source || '(なし)'; promoCount[k] = (promoCount[k]||0)+1; });
+  const promoOpts = Object.entries(promoCount).sort((a,b) => b[1]-a[1]).map(([k]) => k);
+  const fillSelect = (id, label, opts, cur) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.innerHTML = `<option value="">${label}: 全て</option>` + opts.map(o => `<option value="${escapeHtml(o)}" ${o===cur?'selected':''}>${escapeHtml(o)} (${o==='(なし)'?promoCount[o]||0:baseRows.filter(d => (id==='apply-filter-fac'?facOf(d):id==='apply-filter-svc'?svcOf(d):d.source||'(なし)')===o).length})</option>`).join('');
+  };
+  fillSelect('apply-filter-fac', '医院', facOpts, s.filterFac);
+  fillSelect('apply-filter-svc', '治療', svcOpts, s.filterSvc);
+  // プロモは上位15件のみ (件数が多いプロモを優先表示)
+  const topPromos = promoOpts.slice(0, 30);
+  const promoEl = document.getElementById('apply-filter-promo');
+  if (promoEl) {
+    promoEl.innerHTML = `<option value="">プロモ: 全て</option>` + topPromos.map(o => `<option value="${escapeHtml(o)}" ${o===s.filterPromo?'selected':''}>${escapeHtml(o)} (${promoCount[o]||0})</option>`).join('');
+    if (s.filterPromo && !topPromos.includes(s.filterPromo)) {
+      promoEl.insertAdjacentHTML('beforeend', `<option value="${escapeHtml(s.filterPromo)}" selected>${escapeHtml(s.filterPromo)} (${promoCount[s.filterPromo]||0})</option>`);
+    }
+  }
+  const toolEl = document.getElementById('apply-filter-tool');
+  if (toolEl) toolEl.value = s.filterTool || '';
+
+  // === クロス集計 1: 医院 × 治療 ===
+  const presentSvcs = TREATMENT_ORDER.filter(t => data.some(d => svcOf(d) === t));
+  const facMatrix = {};
+  facOpts.forEach(f => { facMatrix[f] = {}; presentSvcs.forEach(t => { facMatrix[f][t] = 0; }); facMatrix[f].__total = 0; });
+  data.forEach(d => {
+    const f = facOf(d); const t = svcOf(d);
+    if (!facMatrix[f]) { facMatrix[f] = {}; presentSvcs.forEach(tt => { facMatrix[f][tt] = 0; }); facMatrix[f].__total = 0; }
+    if (presentSvcs.includes(t)) facMatrix[f][t] = (facMatrix[f][t]||0)+1;
+    facMatrix[f].__total++;
+  });
+  const facMatrixSorted = Object.entries(facMatrix).filter(([f, row]) => row.__total > 0).sort((a,b) => b[1].__total - a[1].__total);
+  const svcTotals = {};
+  presentSvcs.forEach(t => { svcTotals[t] = facMatrixSorted.reduce((s, [, row]) => s + (row[t]||0), 0); });
+  const grandTotal = facMatrixSorted.reduce((s, [, row]) => s + row.__total, 0);
+  const facSvcTable = document.getElementById('apply-cross-fac-svc');
+  if (facSvcTable) {
+    if (facMatrixSorted.length === 0) {
+      facSvcTable.innerHTML = '<thead><tr><th>データなし</th></tr></thead>';
+    } else {
+      const cellStyle = 'padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums';
+      const headStyle = 'padding:6px 10px;text-align:center;background:#fff8e1;font-weight:700;font-size:11px';
+      facSvcTable.innerHTML = `
+        <thead><tr>
+          <th style="${headStyle};text-align:left">医院</th>
+          ${presentSvcs.map(t => `<th style="${headStyle}">${escapeHtml(t)}</th>`).join('')}
+          <th style="${headStyle};background:#fef3c7">計</th>
+        </tr></thead>
+        <tbody>
+          ${facMatrixSorted.map(([f, row]) => `<tr style="cursor:pointer" data-fac="${escapeHtml(f)}" class="apply-fac-row">
+            <td style="padding:6px 10px;text-align:left;font-weight:600">${escapeHtml(f)}</td>
+            ${presentSvcs.map(t => `<td style="${cellStyle};${row[t]?'':'color:var(--text-muted)'}">${row[t]||'-'}</td>`).join('')}
+            <td style="${cellStyle};font-weight:700;background:#fef3c7">${row.__total}</td>
+          </tr>`).join('')}
+          <tr style="background:#f9fafb;font-weight:700">
+            <td style="padding:6px 10px;text-align:left">計</td>
+            ${presentSvcs.map(t => `<td style="${cellStyle}">${svcTotals[t]||0}</td>`).join('')}
+            <td style="${cellStyle};background:#fde68a">${grandTotal}</td>
+          </tr>
+        </tbody>
+      `;
+      // 行クリックで facility フィルター
+      facSvcTable.querySelectorAll('.apply-fac-row').forEach(tr => {
+        tr.addEventListener('click', () => { _applyAnalysisState.filterFac = tr.dataset.fac; renderApplyAnalysis(); });
+      });
+    }
+  }
+
+  // === クロス集計 2: プロモ × 治療 (上位15プロモ) ===
+  const promoTotal = {};
+  data.forEach(d => { const k = d.source || '(なし)'; promoTotal[k] = (promoTotal[k]||0)+1; });
+  const topPromosForCross = Object.entries(promoTotal).sort((a,b) => b[1]-a[1]).slice(0, 15).map(([k]) => k);
+  const promoMatrix = {};
+  topPromosForCross.forEach(pr => { promoMatrix[pr] = {}; presentSvcs.forEach(t => { promoMatrix[pr][t] = 0; }); promoMatrix[pr].__total = 0; });
+  data.forEach(d => {
+    const k = d.source || '(なし)';
+    if (!promoMatrix[k]) return;
+    const t = svcOf(d);
+    if (presentSvcs.includes(t)) promoMatrix[k][t] = (promoMatrix[k][t]||0)+1;
+    promoMatrix[k].__total++;
+  });
+  const promoSvcTable = document.getElementById('apply-cross-promo-svc');
+  if (promoSvcTable) {
+    if (topPromosForCross.length === 0) {
+      promoSvcTable.innerHTML = '<thead><tr><th>データなし</th></tr></thead>';
+    } else {
+      const cellStyle = 'padding:6px 10px;text-align:right;font-variant-numeric:tabular-nums';
+      const headStyle = 'padding:6px 10px;text-align:center;background:#e0f2fe;font-weight:700;font-size:11px';
+      const ellip = (str, n) => str.length > n ? str.slice(0, n) + '…' : str;
+      promoSvcTable.innerHTML = `
+        <thead><tr>
+          <th style="${headStyle};text-align:left">プロモ</th>
+          ${presentSvcs.map(t => `<th style="${headStyle}">${escapeHtml(t)}</th>`).join('')}
+          <th style="${headStyle};background:#bae6fd">計</th>
+        </tr></thead>
+        <tbody>
+          ${topPromosForCross.map(pr => `<tr style="cursor:pointer" data-promo="${escapeHtml(pr)}" class="apply-promo-row">
+            <td style="padding:6px 10px;text-align:left;font-size:11px" title="${escapeHtml(pr)}">${escapeHtml(ellip(pr, 24))}</td>
+            ${presentSvcs.map(t => `<td style="${cellStyle};${promoMatrix[pr][t]?'':'color:var(--text-muted)'}">${promoMatrix[pr][t]||'-'}</td>`).join('')}
+            <td style="${cellStyle};font-weight:700;background:#bae6fd">${promoMatrix[pr].__total}</td>
+          </tr>`).join('')}
+        </tbody>
+      `;
+      promoSvcTable.querySelectorAll('.apply-promo-row').forEach(tr => {
+        tr.addEventListener('click', () => { _applyAnalysisState.filterPromo = tr.dataset.promo; renderApplyAnalysis(); });
+      });
+    }
+  }
+
+  // === 日別チャート ===
   const daily = {};
   data.forEach(d => { const ds = getApplyDateStr(d); if (ds) { const short = ds.slice(5); daily[short] = (daily[short]||0)+1; } });
   const dailySorted = Object.entries(daily).sort((a,b) => b[0].localeCompare(a[0])).slice(0, 14);
@@ -12359,18 +12473,27 @@ function renderApplyAnalysis(period) {
     `<div class="bar-row"><div class="bar-label">${day}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(count/maxDaily*100),5)}%"><span>${count}</span></div></div><div class="bar-value">${count}件</div></div>`
   ).join('') || '<p style="color:var(--text-muted);font-size:13px">データなし</p>';
 
-  // プロモ別
-  const promoG = {}; data.forEach(d => { const p = d.source||'(なし)'; promoG[p] = (promoG[p]||0)+1; });
-  const promoS = Object.entries(promoG).sort((a,b) => b[1]-a[1]);
-  renderBarChart('apply-promo-chart', promoS.slice(0,15).map(([name,count]) => ({ name: name.length>20?name.slice(0,20)+'…':name, rate: total>0?Math.round(count/total*100):0, decided: count, consulted: total })));
-
-  // 医院別
-  const facG = {}; data.forEach(d => { const f = sFac(d.facility); facG[f] = (facG[f]||0)+1; });
+  // === プロモ別 / 医院別 / 治療別 バーチャート ===
+  const promoG = {}; data.forEach(d => { const pp = d.source||'(なし)'; promoG[pp] = (promoG[pp]||0)+1; });
+  renderBarChart('apply-promo-chart', Object.entries(promoG).sort((a,b) => b[1]-a[1]).slice(0,15).map(([name,count]) => ({ name: name.length>20?name.slice(0,20)+'…':name, rate: total>0?Math.round(count/total*100):0, decided: count, consulted: total })));
+  const facG = {}; data.forEach(d => { const f = facOf(d); facG[f] = (facG[f]||0)+1; });
   renderBarChart('apply-facility-chart', Object.entries(facG).sort((a,b) => b[1]-a[1]).map(([name,count]) => ({ name, rate: total>0?Math.round(count/total*100):0, decided: count, consulted: total })));
-
-  // 相談別
-  const svcG = {}; data.forEach(d => { const s = sSvc(d.service); svcG[s] = (svcG[s]||0)+1; });
+  const svcG = {}; data.forEach(d => { const t = svcOf(d); svcG[t] = (svcG[t]||0)+1; });
   renderBarChart('apply-service-chart', Object.entries(svcG).sort((a,b) => b[1]-a[1]).map(([name,count]) => ({ name, rate: total>0?Math.round(count/total*100):0, decided: count, consulted: total })));
+
+  // === フィルター select の change ハンドラ (idempotent: 既にバインド済みなら無視) ===
+  if (!renderApplyAnalysis._bound) {
+    renderApplyAnalysis._bound = true;
+    document.getElementById('apply-filter-fac')?.addEventListener('change', e => { _applyAnalysisState.filterFac = e.target.value; renderApplyAnalysis(); });
+    document.getElementById('apply-filter-svc')?.addEventListener('change', e => { _applyAnalysisState.filterSvc = e.target.value; renderApplyAnalysis(); });
+    document.getElementById('apply-filter-promo')?.addEventListener('change', e => { _applyAnalysisState.filterPromo = e.target.value; renderApplyAnalysis(); });
+    document.getElementById('apply-filter-tool')?.addEventListener('change', e => { _applyAnalysisState.filterTool = e.target.value; renderApplyAnalysis(); });
+    document.getElementById('apply-filter-reset')?.addEventListener('click', () => {
+      _applyAnalysisState.filterFac = ''; _applyAnalysisState.filterSvc = '';
+      _applyAnalysisState.filterPromo = ''; _applyAnalysisState.filterTool = '';
+      renderApplyAnalysis();
+    });
+  }
 }
 
 function renderAnalysis() {
