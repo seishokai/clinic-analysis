@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v454';
+const APP_VERSION = 'v455';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6936,6 +6936,9 @@ async function loadBookings() {
             // v404: 電話前確認の月別集計用に updated_at を保持
             if (dbRow.updated_at) d.updated_at = dbRow.updated_at;
             if (dbRow.book_date) d.bookDate = dbRow.book_date;
+            // v455: edited_name が DB に保存されていれば表示用 name を上書き
+            //   (DB の name 列は DXHUB の原名のままで join 可能なまま保たれる)
+            if (dbRow.edited_name) d.name = dbRow.edited_name;
           }
           // メモだけは名前だけのフォールバック: 同じ正規化名+医院 の booking_status 行からメモを取得
           if (!d._memo) {
@@ -9276,6 +9279,14 @@ async function loadBFLifecycleData() {
       bfLifecycleCache[key] = r;
       // 正規化キーでも引ける (空白有無どちらでもヒット) - 同一参照 r を共有
       if (!bfLifecycleCache[normKey]) bfLifecycleCache[normKey] = r;
+      // v455: edited_name でも引けるようにする。loadBookings が d.name を edited_name
+      //   に上書きするため、後段の bfLifecycleCache[d.name|apply] が edited 側で検索される
+      if (r.edited_name) {
+        const editedKey = r.edited_name + '|' + r.apply_date;
+        const editedNormKey = normName(r.edited_name) + '|' + (r.apply_date||'').substring(0,10);
+        if (!bfLifecycleCache[editedKey]) bfLifecycleCache[editedKey] = r;
+        if (!bfLifecycleCache[editedNormKey]) bfLifecycleCache[editedNormKey] = r;
+      }
       if (r.updated_at) setVersion('booking_status', key, r.updated_at);
       // edited_* がDB側にあれば bk-extra にマージ (DB優先、ローカルを更新)
       try {
@@ -9578,11 +9589,18 @@ async function deleteBFRow(name, applyDate) {
 async function editPatientName(oldName, applyDate, newName, bfRows) {
   if (!newName) return;
   try {
-    // bookingsDataのキャッシュ更新
+    // === v455: 修正 ===
+    //   旧実装は booking_status.name 列自体を newName で UPDATE していたため、
+    //   DXHUB(Google Sheets)が次回 oldName を返してきた瞬間に DB との結合が
+    //   壊れ、ステータス/メモが「行方不明 → 表示上消失」する重大バグだった。
+    //   修正後は name 列(=DXHUB原名)を変えず、edited_name 列にのみ保存する。
+    //   表示時は loadBookings 側で edited_name override を適用する。
+
+    // bookingsData の即時表示反映
     const d = bookingsData.find(b => b.name === oldName && b.applyDate === applyDate);
     if (d) d.name = newName;
 
-    // bk-extra (localStorage) 更新
+    // bk-extra (localStorage) も更新 (キーは元の oldName のまま)
     try {
       const bkEx = loadData('bk-extra', {});
       const key = oldName + '|' + applyDate;
@@ -9591,29 +9609,27 @@ async function editPatientName(oldName, applyDate, newName, bfRows) {
       saveData('bk-extra', bkEx);
     } catch(_){}
 
-    // booking_status を name update (同じ apply_date で新しい name に)
-    await sb.from('booking_status').update({ name: newName }).eq('name', oldName).eq('apply_date', applyDate);
-    // manual_bookings も (手動登録分)
+    // booking_status: name 列はそのままで、edited_name のみ upsert
+    //   onConflict=name,apply_date なので、既存行があればそこに edited_name を追加、
+    //   無ければ (oldName, applyDate, edited_name=newName) で新規行を作成。
+    await safeSave({
+      type:'upsert', table:'booking_status',
+      payload: { name: oldName, apply_date: applyDate, edited_name: newName },
+      options: { onConflict:'name,apply_date' }
+    });
+    // manual_bookings は手動登録(DXHUB起源ではない)なので従来どおり name 直接更新でOK
     await sb.from('manual_bookings').update({ name: newName }).eq('name', oldName).eq('apply_date', applyDate).catch(()=>{});
-    // bfLifecycleCacheキー付け替え (#11: normKey キャッシュも同期削除/付け替え)
-    const oldKey = oldName + '|' + applyDate;
-    const newKey = newName + '|' + applyDate;
-    const dateSuffix = (applyDate || '').substring(0,10);
-    const oldNormKey = normName(oldName) + '|' + dateSuffix;
-    const newNormKey = normName(newName) + '|' + dateSuffix;
-    if (bfLifecycleCache[oldKey]) {
-      bfLifecycleCache[newKey] = { ...bfLifecycleCache[oldKey], name: newName };
-      delete bfLifecycleCache[oldKey];
+
+    // bfLifecycleCache は oldName キーのままで表示用 name のみ更新
+    //   (cache の key=oldName で DB と一貫し、d.name=newName で表示)
+    const key = oldName + '|' + applyDate;
+    if (bfLifecycleCache[key]) {
+      bfLifecycleCache[key].edited_name = newName;
     }
-    // normKey 側のキャッシュ (loadBFLifecycleData が 2キー登録する実装に対応)
-    // 元の normKey は必ず掃除、新しい normKey は newKey と同一参照になるよう再登録
-    if (bfLifecycleCache[oldNormKey] && oldNormKey !== oldKey) delete bfLifecycleCache[oldNormKey];
-    if (bfLifecycleCache[newKey] && newNormKey !== newKey) bfLifecycleCache[newNormKey] = bfLifecycleCache[newKey];
-    // GAS (Google Sheets) にも反映
-    fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type':'application/json' }, body: JSON.stringify({ oldName, applyDate, newName }) }).catch(()=>{});
+
+    // GAS (Sheets) には反映しない (Sheets は DXHUB が更新するので競合になる)
 
     showToast(`${oldName} → ${newName} に変更`);
-    // 予約一覧とBFセット進捗 両方再描画
     if (typeof renderBookings === 'function') renderBookings();
     if (bfRows) updateBFFunnelAndTable(bfRows);
   } catch(e) {
