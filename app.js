@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v459';
+const APP_VERSION = 'v460';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12959,7 +12959,9 @@ function showPromoDetail(promoName) {
     if (bkExtra[key] && bkExtra[key].contractAmount) totalAmt += Number(bkExtra[key].contractAmount);
   });
 
-  const detailVisitRate = total > 0 ? Math.round((total - cancelled) / total * 100) : 0;
+  // v460: バグ修正 — 旧式 (total-cancelled)/total は「未キャンセル率」だった。
+  // 来院率は実際に来院した数(visited) / 予約総数 が正解。
+  const detailVisitRate = total > 0 ? Math.round(visited / total * 100) : 0;
   const detailContractRate = visited > 0 ? pct(contracted, visited) : 0;
   const detailUnit = contracted > 0 ? Math.round(totalAmt / contracted) : 0;
 
