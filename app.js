@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v457';
+const APP_VERSION = 'v458';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12693,7 +12693,9 @@ function renderAnalysis() {
   if (thAxis) thAxis.textContent = axisLabel;
   if (chartEl) {
     chartEl.innerHTML = sorted.slice(0,20).map(([name,v]) => {
-      const gvr = v.total>0?Math.round((v.total-v.cancelled)/v.total*100):0;
+      // v458: バグ修正 — 旧式 (total-cancelled)/total は「未キャンセル率」だった。
+      // 来院率は visited / total が正解 (キャンセルだけでなく未来店も母数のうち)
+      const gvr = v.total>0?Math.round(v.visited/v.total*100):0;
       const gcr = v.visited>0?pct(v.contracted,v.visited):0;
       return `<div class="bar-row"><div class="bar-label">${name}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(Math.round(v.total/total*100),3)}%"><span>${Math.round(v.total/total*100)}%</span></div></div><div class="bar-value" style="min-width:130px;font-size:10px">${v.total}件 来院${gvr}% 成約${gcr}%</div></div>`;
     }).join('') || '<p style="color:var(--text-muted)">データなし</p>';
@@ -12703,7 +12705,8 @@ function renderAnalysis() {
   const tbody = document.getElementById('an-tbody');
   if (tbody) {
     tbody.innerHTML = sorted.map(([name,v]) => {
-      const gvr = v.total>0?Math.round((v.total-v.cancelled)/v.total*100):0;
+      // v458: 同上バグ修正
+      const gvr = v.total>0?Math.round(v.visited/v.total*100):0;
       const gcr = v.visited>0?pct(v.contracted,v.visited):0;
       const gu = v.contracted>0?Math.round(v.amount/v.contracted):0;
       return `<tr><td style="font-size:12px">${name}</td><td>${v.total}</td><td style="color:var(--red)">${v.cancelled}</td><td>${v.visited}</td><td>${gvr}%</td><td style="color:var(--green)">${v.contracted}</td><td><span style="color:${gcr>=30?'var(--green)':'var(--red)'};font-weight:600">${gcr}%</span></td><td>${gu?'¥'+fmt(gu):'-'}</td><td>${v.amount?'¥'+fmt(v.amount):'-'}</td></tr>`;
