@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v458';
+const APP_VERSION = 'v459';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3443,8 +3443,11 @@ function renderHomeDashboard() {
   const todaySorted = today.slice().sort((a,b) => (a.bookDate||'').localeCompare(b.bookDate||''));
 
   // v273: KPI計算 (期間範囲対応)
-  const visitedStatuses = new Set(['来院済', '成約']);
-  const isVisited = (s) => visitedStatuses.has(s) || (typeof IMPLANT_TREATMENT_STAGES !== 'undefined' && Array.isArray(IMPLANT_TREATMENT_STAGES) && IMPLANT_TREATMENT_STAGES.includes(s));
+  // v458: 旧版は visitedStatuses=['来院済','成約'] と狭く定義していて
+  //       検討中/BF印象待ち/セット完了/インプラント治療段階 等を「来院済」扱いせず、
+  //       ホームの来院・来院率だけが他画面より小さく出ていた不整合を修正。
+  //       グローバルの isVisitedStatus を使い、来院一覧・予約一覧・予約分析と数字を揃える。
+  const isVisited = (s) => (typeof isVisitedStatus === 'function') ? isVisitedStatus(s) : (s === '来院済' || s === '成約');
   const calcKPI = (rows) => {
     const booking = rows.length;
     const visited = rows.filter(d => isVisited(d.status)).length;
@@ -12289,7 +12292,7 @@ function renderBFBookings(allBFData) {
 // === 申込分析 (v456: 多次元クロス集計対応) ===
 // 期間 + 絞込 (医院/治療/プロモ/ツール) で絞り、医院×治療 / プロモ×治療 の
 // クロス集計テーブル + 各ディメンションのバーチャートを表示。
-let _applyAnalysisState = { period: 'today', filterFac: '', filterSvc: '', filterPromo: '', filterTool: '' };
+let _applyAnalysisState = { period: 'today', filterFac: '', filterSvc: '', filterPromo: '', filterTool: '', rangeFrom: '', rangeTo: '' };
 
 function renderApplyAnalysis(period) {
   if (period) _applyAnalysisState.period = period;
@@ -12324,6 +12327,15 @@ function renderApplyAnalysis(period) {
   else if (p === 'week') data = data.filter(d => { const ds = getApplyDateStr(d); return ds && ds >= weekAgoStr; });
   else if (p === 'month') data = data.filter(d => { const ds = getApplyDateStr(d); return ds && ds >= monthStart; });
   else if (p === 'last-month') data = data.filter(d => { const ds = getApplyDateStr(d); return ds && ds >= lastMonthStart && ds <= lastMonthEnd; });
+  else if (p === 'range' && s.rangeFrom && s.rangeTo) {
+    // 月範囲: rangeFrom = "YYYY-MM", rangeTo = "YYYY-MM"
+    // 月の最終日は文字列比較なので "YYYY/MM/31" を上限としてOK (区切り違いに注意)
+    const fromYM = s.rangeFrom.replace('-', '/'); // "YYYY/MM"
+    const toYM = s.rangeTo.replace('-', '/');
+    const fromStr = `${fromYM}/01`;
+    const toStr = `${toYM}/31`;
+    data = data.filter(d => { const ds = getApplyDateStr(d); return ds && ds >= fromStr && ds <= toStr; });
+  }
 
   // 期間内の data を baseRows として保持 (フィルター選択肢生成用)
   const baseRows = data.slice();
@@ -12530,6 +12542,26 @@ function renderApplyAnalysis(period) {
       _applyAnalysisState.filterPromo = ''; _applyAnalysisState.filterTool = '';
       renderApplyAnalysis();
     });
+    // 月範囲 適用ボタン
+    document.getElementById('apply-range-apply')?.addEventListener('click', () => {
+      const fromEl = document.getElementById('apply-range-from');
+      const toEl = document.getElementById('apply-range-to');
+      const from = (fromEl?.value || '').trim();
+      const to = (toEl?.value || '').trim();
+      if (!from || !to) { showToast('開始月と終了月を両方選択してください', true); return; }
+      if (from > to) { showToast('開始月は終了月以前を指定してください', true); return; }
+      _applyAnalysisState.period = 'range';
+      _applyAnalysisState.rangeFrom = from;
+      _applyAnalysisState.rangeTo = to;
+      renderApplyAnalysis();
+    });
+  }
+  // 月範囲入力欄の値を状態と同期 (range モード時)
+  if (s.period === 'range') {
+    const fromEl = document.getElementById('apply-range-from');
+    const toEl = document.getElementById('apply-range-to');
+    if (fromEl && s.rangeFrom) fromEl.value = s.rangeFrom;
+    if (toEl && s.rangeTo) toEl.value = s.rangeTo;
   }
 }
 

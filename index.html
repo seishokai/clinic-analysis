@@ -732,6 +732,14 @@
           <button class="btn btn-outline apply-period-btn" data-period="month" style="font-size:11px;padding:6px 12px;min-height:28px">今月</button>
           <button class="btn btn-outline apply-period-btn" data-period="last-month" style="font-size:11px;padding:6px 12px;min-height:28px">先月</button>
           <button class="btn btn-outline apply-period-btn" data-period="all" style="font-size:11px;padding:6px 12px;min-height:28px">全期間</button>
+          <!-- 月範囲指定 (1月〜3月などの複数月跨ぎ) -->
+          <span style="display:inline-flex;align-items:center;gap:4px;margin-left:8px;padding:0 8px;border-left:1px solid var(--border)">
+            <span style="font-size:11px;color:var(--text-sub)">範囲:</span>
+            <input type="month" id="apply-range-from" style="padding:5px 8px;font-size:11px;border:1px solid #d1d5db;border-radius:6px">
+            <span style="font-size:11px;color:var(--text-sub)">〜</span>
+            <input type="month" id="apply-range-to" style="padding:5px 8px;font-size:11px;border:1px solid #d1d5db;border-radius:6px">
+            <button class="btn btn-outline" id="apply-range-apply" style="font-size:11px;padding:5px 10px;min-height:28px">適用</button>
+          </span>
         </div>
         <!-- 絞込フィルター (期間内のデータをさらに絞る) -->
         <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center;padding:8px 12px;background:#f9fafb;border:1px solid var(--border);border-radius:8px">
@@ -1511,7 +1519,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=458"></script>
+  <script src="app.js?v=459"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
