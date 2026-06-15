@@ -9,6 +9,13 @@ on:
 permissions:
   contents: write   # data/reservation-status.json を commit するため
 
+# E2 fix: 同 workflow の並列実行を完全に防ぐ
+# 連打/Scheduled と手動の重複時、後発 Run は前のキャンセル待ちはせず in_progress を打ち切る
+# (4分後の最新データが欲しいだけなので、走り直しのほうが速い)
+concurrency:
+  group: monitor-slots
+  cancel-in-progress: true
+
 jobs:
   check-slots:
     runs-on: ubuntu-latest
@@ -47,13 +54,25 @@ jobs:
           git commit -m "chore(availability): auto-update reservation-status [skip ci]"
           # 並列 Run (手動連打 + Scheduled) で push 競合が起きるため
           # rebase してリトライ。4回まで試行。
+          # E1 fix: data/reservation-status.json のコンフリクト時は
+          #   我々の (たった今生成した) バージョンを優先 (-X theirs during rebase)
           for attempt in 1 2 3 4; do
             if git push; then
               echo "✓ Push succeeded (attempt $attempt)"
               exit 0
             fi
-            echo "⚠ Push rejected (attempt $attempt). Pulling with rebase..."
-            git pull --rebase origin master || true
+            echo "⚠ Push rejected (attempt $attempt). Pulling with rebase (theirs strategy)..."
+            if ! git pull --rebase -X theirs origin master; then
+              echo "⚠ Rebase failed, aborting and retrying"
+              git rebase --abort 2>/dev/null || true
+              # 最後の手段: 完全に origin に巻き戻して我々の変更だけ再適用
+              git stash --include-untracked >/dev/null 2>&1 || true
+              git fetch origin master
+              git reset --hard origin/master
+              git stash pop >/dev/null 2>&1 || true
+              git add data/reservation-status.json
+              git commit -m "chore(availability): auto-update reservation-status [skip ci]" || true
+            fi
             sleep $((attempt * 2))
           done
           echo "::error::Failed to push after 4 attempts"
