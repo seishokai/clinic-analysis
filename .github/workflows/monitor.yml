@@ -42,7 +42,19 @@ jobs:
           git add data/reservation-status.json
           if git diff --cached --quiet; then
             echo "No changes to reservation-status.json"
-          else
-            git commit -m "chore(availability): auto-update reservation-status [skip ci]"
-            git push
+            exit 0
           fi
+          git commit -m "chore(availability): auto-update reservation-status [skip ci]"
+          # 並列 Run (手動連打 + Scheduled) で push 競合が起きるため
+          # rebase してリトライ。4回まで試行。
+          for attempt in 1 2 3 4; do
+            if git push; then
+              echo "✓ Push succeeded (attempt $attempt)"
+              exit 0
+            fi
+            echo "⚠ Push rejected (attempt $attempt). Pulling with rebase..."
+            git pull --rebase origin master || true
+            sleep $((attempt * 2))
+          done
+          echo "::error::Failed to push after 4 attempts"
+          exit 1
