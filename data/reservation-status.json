@@ -1,7 +1,7 @@
 {
-  "lastUpdated": "2026-06-15T09:06:14.169Z",
-  "checkRangeFrom": "2026-06-29",
-  "checkRangeTo": "2026-07-15",
+  "lastUpdated": "2026-06-15T23:32:58.377Z",
+  "checkRangeFrom": "2026-06-30",
+  "checkRangeTo": "2026-07-16",
   "treatment": "矯正無料相談",
   "source": "https://reserve.shareconnect.co.jp/?r=u5iewf&treatment_ids=1766627271947",
   "clinics": [
@@ -30,12 +30,11 @@
     {
       "name": "大森",
       "available": true,
-      "availableDays": 13,
-      "totalSlots": 140,
-      "earliestDate": "2026-06-29",
+      "availableDays": 12,
+      "totalSlots": 130,
+      "earliestDate": "2026-06-30",
       "latestDate": "2026-07-15",
       "slotsByDate": {
-        "2026-06-29": 10,
         "2026-06-30": 10,
         "2026-07-01": 12,
         "2026-07-03": 12,
@@ -54,11 +53,10 @@
       "name": "エスカ",
       "available": true,
       "availableDays": 15,
-      "totalSlots": 194,
-      "earliestDate": "2026-06-29",
-      "latestDate": "2026-07-15",
+      "totalSlots": 193,
+      "earliestDate": "2026-06-30",
+      "latestDate": "2026-07-16",
       "slotsByDate": {
-        "2026-06-29": 14,
         "2026-06-30": 14,
         "2026-07-01": 13,
         "2026-07-02": 13,
@@ -72,7 +70,8 @@
         "2026-07-10": 13,
         "2026-07-11": 12,
         "2026-07-13": 13,
-        "2026-07-15": 13
+        "2026-07-15": 13,
+        "2026-07-16": 13
       }
     },
     {
@@ -80,10 +79,9 @@
       "available": true,
       "availableDays": 15,
       "totalSlots": 189,
-      "earliestDate": "2026-06-29",
-      "latestDate": "2026-07-15",
+      "earliestDate": "2026-06-30",
+      "latestDate": "2026-07-16",
       "slotsByDate": {
-        "2026-06-29": 13,
         "2026-06-30": 13,
         "2026-07-01": 13,
         "2026-07-02": 13,
@@ -97,18 +95,18 @@
         "2026-07-10": 13,
         "2026-07-11": 12,
         "2026-07-13": 13,
-        "2026-07-15": 13
+        "2026-07-15": 13,
+        "2026-07-16": 13
       }
     },
     {
       "name": "ウィズ",
       "available": true,
       "availableDays": 16,
-      "totalSlots": 176,
-      "earliestDate": "2026-06-29",
-      "latestDate": "2026-07-15",
+      "totalSlots": 173,
+      "earliestDate": "2026-06-30",
+      "latestDate": "2026-07-16",
       "slotsByDate": {
-        "2026-06-29": 14,
         "2026-06-30": 14,
         "2026-07-01": 11,
         "2026-07-02": 11,
@@ -123,18 +121,18 @@
         "2026-07-12": 7,
         "2026-07-13": 11,
         "2026-07-14": 11,
-        "2026-07-15": 11
+        "2026-07-15": 11,
+        "2026-07-16": 11
       }
     },
     {
       "name": "ルミナス",
       "available": true,
-      "availableDays": 15,
-      "totalSlots": 186,
-      "earliestDate": "2026-06-29",
+      "availableDays": 14,
+      "totalSlots": 174,
+      "earliestDate": "2026-06-30",
       "latestDate": "2026-07-15",
       "slotsByDate": {
-        "2026-06-29": 12,
         "2026-06-30": 12,
         "2026-07-01": 14,
         "2026-07-02": 12,
@@ -154,12 +152,11 @@
     {
       "name": "茶屋",
       "available": true,
-      "availableDays": 11,
-      "totalSlots": 132,
-      "earliestDate": "2026-06-29",
+      "availableDays": 10,
+      "totalSlots": 120,
+      "earliestDate": "2026-06-30",
       "latestDate": "2026-07-15",
       "slotsByDate": {
-        "2026-06-29": 12,
         "2026-06-30": 12,
         "2026-07-01": 12,
         "2026-07-03": 12,
@@ -175,12 +172,11 @@
     {
       "name": "小牧",
       "available": true,
-      "availableDays": 14,
-      "totalSlots": 139,
-      "earliestDate": "2026-06-29",
+      "availableDays": 13,
+      "totalSlots": 122,
+      "earliestDate": "2026-07-01",
       "latestDate": "2026-07-15",
       "slotsByDate": {
-        "2026-06-29": 17,
         "2026-07-01": 10,
         "2026-07-02": 10,
         "2026-07-03": 10,
@@ -200,11 +196,10 @@
       "name": "知立",
       "available": true,
       "availableDays": 14,
-      "totalSlots": 136,
-      "earliestDate": "2026-06-29",
-      "latestDate": "2026-07-14",
+      "totalSlots": 134,
+      "earliestDate": "2026-06-30",
+      "latestDate": "2026-07-16",
       "slotsByDate": {
-        "2026-06-29": 12,
         "2026-06-30": 12,
         "2026-07-02": 10,
         "2026-07-03": 10,
@@ -217,18 +212,18 @@
         "2026-07-11": 8,
         "2026-07-12": 8,
         "2026-07-13": 10,
-        "2026-07-14": 10
+        "2026-07-14": 10,
+        "2026-07-16": 10
       }
     },
     {
       "name": "八事",
       "available": true,
-      "availableDays": 17,
-      "totalSlots": 180,
-      "earliestDate": "2026-06-29",
+      "availableDays": 16,
+      "totalSlots": 169,
+      "earliestDate": "2026-06-30",
       "latestDate": "2026-07-15",
       "slotsByDate": {
-        "2026-06-29": 11,
         "2026-06-30": 11,
         "2026-07-01": 11,
         "2026-07-02": 9,
@@ -250,12 +245,11 @@
     {
       "name": "京都",
       "available": true,
-      "availableDays": 10,
-      "totalSlots": 100,
-      "earliestDate": "2026-06-29",
+      "availableDays": 9,
+      "totalSlots": 90,
+      "earliestDate": "2026-06-30",
       "latestDate": "2026-07-15",
       "slotsByDate": {
-        "2026-06-29": 10,
         "2026-06-30": 11,
         "2026-07-01": 2,
         "2026-07-03": 13,
