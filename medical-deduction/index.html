@@ -503,6 +503,54 @@
     $('barTail').style.flexBasis = tailPct + '%';
     $('barGold').style.flexBasis = goldPct + '%';
 
+    // 参考表
+    renderRefTable(医療費, income);
+  }
+
+  // ===== 参考表: 医療費 × 年収 のマトリクス =====
+  const REF_MEDICAL = [100000, 200000, 400000, 600000, 800000, 1000000, 1500000, 2000000];
+  const REF_INCOME  = [3000000, 5000000, 7000000, 10000000, 15000000];
+
+  function 軽減合計(medical, income){
+    const { 控除 } = 医療費控除計算(medical, 0, income);
+    const 税率 = 限界税率(課税所得(income));
+    return Math.round(控除 * (税率 + 0.10));
+  }
+
+  function closestVal(arr, target){
+    return arr.reduce((p, c) => Math.abs(c - target) < Math.abs(p - target) ? c : p, arr[0]);
+  }
+
+  function renderRefTable(curM, curI){
+    const tb = $('ref-tbody');
+    if (!tb) return;
+    const closeM = closestVal(REF_MEDICAL, curM);
+    const closeI = closestVal(REF_INCOME, curI);
+
+    // 列ヘッダーの限界税率を更新 (年収/万)
+    REF_INCOME.forEach(inc => {
+      const r = 限界税率(課税所得(inc));
+      const el = document.getElementById('rate-' + (inc / 10000));
+      if (el) el.textContent = (r * 100).toFixed(0) + '%';
+    });
+
+    let html = '';
+    REF_MEDICAL.forEach(m => {
+      const isHlRow = m === closeM;
+      html += `<tr class="${isHlRow ? 'hl-row' : ''}">`;
+      html += `<th>${fmt(m / 10000)}万円</th>`;
+      REF_INCOME.forEach(inc => {
+        const isHlCol = inc === closeI;
+        const v = 軽減合計(m, inc);
+        let cls = '';
+        if (isHlRow && isHlCol) cls = 'hl-cell';
+        else if (isHlCol) cls = 'hl-col';
+        if (v > 0) html += `<td class="${cls}">${fmt(v)}</td>`;
+        else html += `<td class="empty ${cls}">—</td>`;
+      });
+      html += '</tr>';
+    });
+    tb.innerHTML = html;
   }
 
   // 入力欄: カンマ整形 + sync
