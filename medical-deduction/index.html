@@ -213,18 +213,13 @@
 
   <div class="card">
     <div class="field">
-      <label for="medical">医療費（年間合計）</label>
+      <label for="medical">医療費（年間合計・税込）</label>
       <div class="input-row">
         <input id="medical" type="text" inputmode="numeric" autocomplete="off" value="400,000">
         <span class="unit">円</span>
       </div>
       <input id="medical-range" type="range" min="0" max="2000000" step="10000" value="400000">
-      <div class="chips" role="group" aria-label="医療費 クイック選択">
-        <button class="chip" type="button" data-medical="120000">セラミック 12万</button>
-        <button class="chip" type="button" data-medical="400000">インプラント 40万</button>
-        <button class="chip" type="button" data-medical="800000">矯正 80万</button>
-        <button class="chip" type="button" data-medical="1500000">フルマウス 150万</button>
-      </div>
+      <div class="hint">窓口で実際に支払った金額（消費税込み）を入力してください。1年間の家族分の医療費を合算可能です。</div>
     </div>
 
     <div class="field">
@@ -237,19 +232,13 @@
     </div>
 
     <div class="field">
-      <label for="income">年収（給与・税込）</label>
+      <label for="income">年収（給与・額面／税込）</label>
       <div class="input-row">
         <input id="income" type="text" inputmode="numeric" autocomplete="off" value="5,000,000">
         <span class="unit">円</span>
       </div>
       <input id="income-range" type="range" min="1000000" max="20000000" step="100000" value="5000000">
-      <div class="chips" role="group" aria-label="年収 クイック選択">
-        <button class="chip" type="button" data-income="3500000">350万</button>
-        <button class="chip" type="button" data-income="5000000">500万</button>
-        <button class="chip" type="button" data-income="7000000">700万</button>
-        <button class="chip" type="button" data-income="10000000">1000万</button>
-        <button class="chip" type="button" data-income="15000000">1500万</button>
-      </div>
+      <div class="hint">源泉徴収票の「支払金額」または年俸（社会保険料・税金が引かれる前の金額）を入力してください。</div>
     </div>
   </div>
 
@@ -456,13 +445,6 @@
     $('barTail').style.flexBasis = tailPct + '%';
     $('barGold').style.flexBasis = goldPct + '%';
 
-    // チップの選択ハイライト同期
-    document.querySelectorAll('.chip[data-medical]').forEach(b=>{
-      b.classList.toggle('on', Number(b.dataset.medical) === 医療費);
-    });
-    document.querySelectorAll('.chip[data-income]').forEach(b=>{
-      b.classList.toggle('on', Number(b.dataset.income) === income);
-    });
   }
 
   // 入力欄: カンマ整形 + sync
@@ -489,24 +471,6 @@
   setupNumberField('medical', 'medical-range', 99999999);
   setupNumberField('reimburse', null, 99999999);
   setupNumberField('income', 'income-range', 99999999);
-
-  // チップクリック
-  document.querySelectorAll('.chip[data-medical]').forEach(b => {
-    b.addEventListener('click', () => {
-      const v = Number(b.dataset.medical);
-      $('medical').value = v.toLocaleString('ja-JP');
-      $('medical-range').value = String(Math.min(Number($('medical-range').max), v));
-      update();
-    });
-  });
-  document.querySelectorAll('.chip[data-income]').forEach(b => {
-    b.addEventListener('click', () => {
-      const v = Number(b.dataset.income);
-      $('income').value = v.toLocaleString('ja-JP');
-      $('income-range').value = String(Math.min(Number($('income-range').max), v));
-      update();
-    });
-  });
 
   // コピー
   $('btnCopy').addEventListener('click', () => {
