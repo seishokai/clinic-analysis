@@ -269,11 +269,11 @@
     <div class="field">
       <label for="income">年収（給与・額面／税込）</label>
       <div class="input-row">
-        <input id="income" type="text" inputmode="numeric" autocomplete="off" value="5,000,000">
-        <span class="unit">円</span>
+        <input id="income" type="text" inputmode="numeric" autocomplete="off" value="500">
+        <span class="unit">万円</span>
       </div>
-      <input id="income-range" type="range" min="1000000" max="200000000" step="100000" value="5000000">
-      <div class="hint">源泉徴収票の「支払金額」または年俸（社会保険料・税金が引かれる前の金額）を入力してください。</div>
+      <input id="income-range" type="range" min="100" max="20000" step="10" value="500">
+      <div class="hint">源泉徴収票の「支払金額」を <strong>万円単位</strong> で入力。例：500万円なら「500」、1億円なら「10000」。</div>
     </div>
   </div>
 
@@ -459,7 +459,8 @@
   function update(){
     const 医療費 = parseNum($('medical').value);
     const 補填 = parseNum($('reimburse').value);
-    const income = parseNum($('income').value);
+    // 年収は 万円 単位入力 → 内部計算は円ベースなので ×10000
+    const income = parseNum($('income').value) * 10000;
 
     const 課税 = 課税所得(income);
     const 税率 = 限界税率(課税);
@@ -576,17 +577,18 @@
   }
   setupNumberField('medical', 'medical-range', 99999999);
   setupNumberField('reimburse', null, 99999999);
-  setupNumberField('income', 'income-range', 99999999);
+  // 年収は 万円 単位なので max=99999 (= 9.9億)
+  setupNumberField('income', 'income-range', 99999);
 
   // コピー
   $('btnCopy').addEventListener('click', () => {
     const 医療費 = parseNum($('medical').value);
     const 補填 = parseNum($('reimburse').value);
-    const income = parseNum($('income').value);
+    const incomeWan = parseNum($('income').value);
     const text = `【医療費控除シミュレーション結果】
 医療費: ${fmt(医療費)}円
 補填額: ${fmt(補填)}円
-年収: ${fmt(income)}円
+年収: ${fmt(incomeWan)}万円
 
 自己負担: ${$('selfBurden').textContent}円
 医療費控除額: ${$('deduction').textContent}円
