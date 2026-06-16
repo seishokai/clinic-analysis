@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>医療費控除 シミュレーション / Aladdin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap">
+<style>
+  :root{
+    --bg:#fafafa; --card:#fff; --border:#e5e7eb; --text:#1a1a1a; --text-sub:#6b7280;
+    --accent:#1a1a1a; --hi:#fffbea; --hi-border:#d4a010; --hi-text:#b07800;
+    --tail:#e5e7eb; --gold:#d4a010;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans',Meiryo,sans-serif;
+    background:var(--bg); color:var(--text); line-height:1.5;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap{max-width:680px; margin:0 auto; padding:32px 20px 60px}
+  header{text-align:center; margin-bottom:32px}
+  .brand{
+    font-family:'Great Vibes', cursive; font-size:56px; line-height:1;
+    background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+    margin:0;
+  }
+  .subtitle{font-size:13px; letter-spacing:3px; color:var(--text-sub); margin-top:6px; text-transform:uppercase}
+  h1{font-size:20px; font-weight:700; margin:24px 0 4px; letter-spacing:1px}
+  .lead{font-size:13px; color:var(--text-sub); margin:0 0 16px}
+  .disclaimer{
+    background:#fff7ed; border:1px solid #fed7aa; border-radius:10px;
+    padding:12px 14px; font-size:12px; color:#9a3412; line-height:1.6;
+    margin-bottom:24px;
+  }
+  .disclaimer strong{color:#c2410c; font-weight:700}
+
+  .card{
+    background:var(--card); border:1px solid var(--border); border-radius:14px;
+    padding:24px; margin-bottom:20px;
+  }
+  .field{margin-bottom:18px}
+  .field:last-child{margin-bottom:0}
+  .field label{
+    display:block; font-size:12px; font-weight:600; color:var(--text-sub);
+    letter-spacing:1px; text-transform:uppercase; margin-bottom:8px;
+  }
+  .input-row{display:flex; align-items:stretch; gap:0; border:1px solid var(--border); border-radius:10px; overflow:hidden; background:#fff}
+  .input-row:focus-within{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+  .input-row input{
+    flex:1; min-width:0; padding:14px 16px; font-size:18px; font-weight:600;
+    border:none; outline:none; background:transparent; color:var(--text);
+    text-align:right; font-family:inherit;
+    font-variant-numeric:tabular-nums;
+  }
+  .input-row .unit{
+    display:flex; align-items:center; padding:0 16px; font-size:13px; color:var(--text-sub);
+    background:#f5f5f5; border-left:1px solid var(--border); white-space:nowrap;
+  }
+  .field .hint{font-size:11px; color:var(--text-sub); margin-top:6px}
+  input[type="range"]{width:100%; margin-top:8px; accent-color:#1a1a1a}
+
+  /* クイック入力チップ */
+  .chips{display:flex; gap:6px; flex-wrap:wrap; margin-top:8px}
+  .chip{
+    border:1px solid var(--border); background:#fff; border-radius:18px;
+    padding:6px 12px; font-size:12px; font-weight:600; color:var(--text); cursor:pointer;
+    font-family:inherit; transition:all .15s;
+  }
+  .chip:hover{border-color:var(--accent); background:var(--accent); color:#fff}
+  .chip.on{border-color:var(--accent); background:var(--accent); color:#fff}
+
+  /* 結果ヒーロー */
+  .hero{
+    background:linear-gradient(135deg,#fffbea 0%,#fff 100%);
+    border:2px solid var(--hi-border); border-radius:14px;
+    padding:24px; text-align:center; margin-bottom:20px;
+  }
+  .hero-label{
+    font-size:11px; font-weight:700; letter-spacing:2px;
+    color:var(--text-sub); text-transform:uppercase;
+  }
+  .hero-value{
+    font-size:42px; font-weight:800; margin-top:6px;
+    letter-spacing:-1px; line-height:1; color:var(--hi-text);
+    font-variant-numeric:tabular-nums;
+  }
+  .hero-value .yen{font-size:22px; font-weight:600; color:var(--text-sub); margin-right:2px}
+  .hero-note{
+    font-size:11.5px; color:var(--text-sub); margin-top:10px; line-height:1.6;
+  }
+
+  /* 内訳 */
+  .breakdown{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:20px}
+  @media(max-width:480px){.breakdown{grid-template-columns:1fr}}
+  .result-box{
+    background:#fff; border:1px solid var(--border); border-radius:12px;
+    padding:18px; text-align:center;
+  }
+  .result-label{font-size:11px; font-weight:700; letter-spacing:1.5px; color:var(--text-sub); text-transform:uppercase}
+  .result-value{
+    font-size:24px; font-weight:800; margin-top:6px; letter-spacing:-.5px; line-height:1;
+    font-variant-numeric:tabular-nums;
+  }
+  .result-value .yen{font-size:14px; font-weight:600; color:var(--text-sub); margin-right:2px}
+  .result-sub{font-size:10.5px; color:var(--text-sub); margin-top:4px}
+
+  /* 実質負担ビジュアル */
+  .bar-card{
+    background:#fff; border:1px solid var(--border); border-radius:12px;
+    padding:18px 20px; margin-bottom:20px;
+  }
+  .bar-h{
+    font-size:11px; font-weight:700; letter-spacing:2px; color:var(--text-sub);
+    text-transform:uppercase; margin-bottom:12px;
+  }
+  .bar-track{
+    display:flex; height:32px; border-radius:8px; overflow:hidden; background:var(--tail);
+    border:1px solid var(--border);
+  }
+  .bar-tail{background:#374151; transition:flex-basis .35s ease}
+  .bar-gold{background:linear-gradient(90deg,#d4a010 0%,#f0c040 100%); transition:flex-basis .35s ease}
+  .bar-legend{
+    display:flex; justify-content:space-between; margin-top:10px; font-size:11.5px; color:var(--text-sub);
+  }
+  .bar-legend .left,.bar-legend .right{display:flex; align-items:center; gap:6px}
+  .bar-legend .swatch{width:11px; height:11px; border-radius:3px}
+  .bar-legend b{color:var(--text); font-variant-numeric:tabular-nums}
+
+  /* 控除額表 */
+  .compare{margin-top:24px}
+  .compare h2{
+    font-size:14px; font-weight:700; letter-spacing:2px; margin:0 0 12px;
+    text-transform:uppercase; color:var(--text-sub);
+  }
+  table{width:100%; border-collapse:collapse; background:#fff; border:1px solid var(--border); border-radius:10px; overflow:hidden; font-size:13px}
+  th,td{padding:11px 12px; text-align:right; border-bottom:1px solid var(--border)}
+  th:first-child,td:first-child{text-align:left}
+  thead th{background:#f5f5f5; font-weight:700; color:var(--text-sub); font-size:11px; letter-spacing:1px; text-transform:uppercase}
+  tbody tr:last-child td{border-bottom:none}
+  tbody td{font-variant-numeric:tabular-nums}
+  tbody tr.total td{background:#fffbea; font-weight:700; color:var(--hi-text)}
+
+  /* 対象/対象外 解説 */
+  .info-card{
+    background:#fff; border:1px solid var(--border); border-radius:12px;
+    padding:18px 20px; margin-top:20px;
+  }
+  .info-card h3{
+    font-size:12px; font-weight:700; letter-spacing:2px; color:var(--text-sub);
+    text-transform:uppercase; margin:0 0 10px;
+  }
+  .info-card h3:not(:first-child){margin-top:18px}
+  .info-card ul{margin:0; padding:0 0 0 18px; font-size:13px; line-height:1.7}
+  .info-card li{margin-bottom:4px}
+  .info-card .ng li{color:#9a3412}
+
+  /* コピー ボタン */
+  .actions{display:flex; gap:8px; margin-top:16px; flex-wrap:wrap}
+  .btn{
+    flex:1; min-height:44px; padding:10px 16px; border-radius:10px;
+    font-size:13px; font-weight:700; letter-spacing:1px;
+    border:1px solid var(--border); background:#fff; color:var(--text);
+    cursor:pointer; font-family:inherit; transition:all .15s;
+    display:inline-flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .btn:hover{border-color:var(--accent); color:var(--text)}
+  .btn.primary{background:var(--accent); color:#fff; border-color:var(--accent)}
+  .btn.primary:hover{opacity:.85}
+
+  footer{text-align:center; margin-top:40px; font-size:11px; color:var(--text-sub); letter-spacing:1px}
+  .note{font-size:11px; color:var(--text-sub); margin-top:14px; line-height:1.7}
+
+  /* トースト */
+  .toast{
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%) translateY(20px);
+    background:#1a1a1a; color:#fff; padding:11px 20px; border-radius:10px;
+    font-size:13px; box-shadow:0 8px 30px rgba(0,0,0,.2); opacity:0;
+    transition:.25s; pointer-events:none; z-index:60; max-width:90vw; text-align:center;
+  }
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+  /* 基準額未満時 */
+  .under-base{
+    background:#fff7ed; border:1.5px solid #fed7aa; border-radius:10px;
+    padding:12px 14px; margin-top:14px; font-size:12.5px; color:#9a3412; line-height:1.6;
+  }
+  .under-base strong{color:#c2410c}
+
+  @media (prefers-reduced-motion: reduce){
+    *{transition:none !important; animation:none !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">Aladdin</div>
+    <div class="subtitle">Medical Deduction Simulator</div>
+  </header>
+
+  <h1>医療費控除 シミュレーション</h1>
+  <p class="lead">医療費・補填額・年収を入力すると、軽減される税金（所得税還付＋住民税軽減）がリアルタイムで表示されます。</p>
+
+  <div class="disclaimer">
+    <strong>※ 簡易概算です。</strong>
+    単身・給与所得のみ・2025年改正後の税制を想定した概算です。実際の控除額・還付額は配偶者控除・扶養控除・社会保険料の実額などにより異なります。確定申告時は国税庁の正式な計算にてご確認ください。
+  </div>
+
+  <div class="card">
+    <div class="field">
+      <label for="medical">医療費（年間合計）</label>
+      <div class="input-row">
+        <input id="medical" type="text" inputmode="numeric" autocomplete="off" value="400,000">
+        <span class="unit">円</span>
+      </div>
+      <input id="medical-range" type="range" min="0" max="2000000" step="10000" value="400000">
+      <div class="chips" role="group" aria-label="医療費 クイック選択">
+        <button class="chip" type="button" data-medical="120000">セラミック 12万</button>
+        <button class="chip" type="button" data-medical="400000">インプラント 40万</button>
+        <button class="chip" type="button" data-medical="800000">矯正 80万</button>
+        <button class="chip" type="button" data-medical="1500000">フルマウス 150万</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="reimburse">補填額（保険金など）</label>
+      <div class="input-row">
+        <input id="reimburse" type="text" inputmode="numeric" autocomplete="off" value="0">
+        <span class="unit">円</span>
+      </div>
+      <div class="hint">高額療養費・生命保険からの給付など医療費を補填する金額があれば入力してください。</div>
+    </div>
+
+    <div class="field">
+      <label for="income">年収（給与・税込）</label>
+      <div class="input-row">
+        <input id="income" type="text" inputmode="numeric" autocomplete="off" value="5,000,000">
+        <span class="unit">円</span>
+      </div>
+      <input id="income-range" type="range" min="1000000" max="20000000" step="100000" value="5000000">
+      <div class="chips" role="group" aria-label="年収 クイック選択">
+        <button class="chip" type="button" data-income="3500000">350万</button>
+        <button class="chip" type="button" data-income="5000000">500万</button>
+        <button class="chip" type="button" data-income="7000000">700万</button>
+        <button class="chip" type="button" data-income="10000000">1000万</button>
+        <button class="chip" type="button" data-income="15000000">1500万</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 結果ヒーロー -->
+  <div class="hero" id="hero">
+    <div class="hero-label">軽減される税金 合計</div>
+    <div class="hero-value"><span class="yen">¥</span><span id="totalSaving">0</span></div>
+    <div class="hero-note" id="heroNote"></div>
+  </div>
+
+  <!-- 内訳 -->
+  <div class="breakdown">
+    <div class="result-box">
+      <div class="result-label">所得税還付</div>
+      <div class="result-value"><span class="yen">¥</span><span id="incomeTaxRefund">0</span></div>
+      <div class="result-sub">限界税率 <span id="marginalRate">5</span>%</div>
+    </div>
+    <div class="result-box">
+      <div class="result-label">住民税軽減</div>
+      <div class="result-value"><span class="yen">¥</span><span id="residentReduction">0</span></div>
+      <div class="result-sub">税率 10% (一律)</div>
+    </div>
+  </div>
+
+  <!-- 実質負担ビジュアル -->
+  <div class="bar-card">
+    <div class="bar-h">実質負担の内訳</div>
+    <div class="bar-track" id="barTrack">
+      <div class="bar-tail" id="barTail" style="flex-basis:80%"></div>
+      <div class="bar-gold" id="barGold" style="flex-basis:20%"></div>
+    </div>
+    <div class="bar-legend">
+      <div class="left">
+        <span class="swatch" style="background:#374151"></span>
+        実質負担 <b><span id="netCost">0</span> 円</b>
+      </div>
+      <div class="right">
+        <span class="swatch" style="background:linear-gradient(90deg,#d4a010 0%,#f0c040 100%)"></span>
+        軽減分 <b><span id="totalSaving2">0</span> 円</b>
+      </div>
+    </div>
+    <div class="under-base" id="underBase" style="display:none">
+      <strong>基準額に達していません。</strong>
+      自己負担が <strong><span id="needMore">0</span>円</strong> を超えると控除が発生します。
+    </div>
+  </div>
+
+  <!-- 控除額表 -->
+  <div class="compare">
+    <h2>計算過程</h2>
+    <table>
+      <tbody>
+        <tr><td>医療費 − 補填額（自己負担）</td><td><span id="selfBurden">0</span> 円</td></tr>
+        <tr><td>基準額（10万円 or 所得×5% の少ない方）</td><td><span id="baseAmount">0</span> 円</td></tr>
+        <tr><td>医療費控除額</td><td><span id="deduction">0</span> 円</td></tr>
+        <tr class="total"><td>軽減税額 = 控除額 ×（所得税率 + 10%）</td><td><span id="totalSaving3">0</span> 円</td></tr>
+      </tbody>
+    </table>
+    <div class="note">
+      ※ 控除額の上限は 200万円。基準額の自動計算（所得 × 5%）は所得200万円以下の場合に適用されます。
+    </div>
+  </div>
+
+  <!-- 対象/対象外 -->
+  <div class="info-card">
+    <h3>歯科治療で対象になるもの</h3>
+    <ul>
+      <li>虫歯・歯周病などの治療費</li>
+      <li>インプラント治療（治療目的）</li>
+      <li>金歯・セラミックなど一般的に必要と認められる材料</li>
+      <li>子どもの歯列矯正（発育上必要と判断されたもの）</li>
+      <li>通院のための公共交通機関の交通費</li>
+    </ul>
+
+    <h3>対象にならないもの</h3>
+    <ul class="ng">
+      <li>美容目的のホワイトニング・歯列矯正（成人）</li>
+      <li>歯ブラシ・歯磨き粉などの予防用品</li>
+      <li>自家用車での通院ガソリン代・駐車場代</li>
+      <li>サプリメント・健康食品</li>
+    </ul>
+
+    <div class="actions">
+      <button class="btn primary" type="button" id="btnCopy">📋 結果をコピー</button>
+      <button class="btn" type="button" onclick="window.print()">🖨 印刷／PDF</button>
+    </div>
+  </div>
+
+  <footer>SEISHOKAI Group / Aladdin</footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+  'use strict';
+  const $ = id => document.getElementById(id);
+  const fmt = n => Math.max(0, Math.round(n)).toLocaleString('ja-JP');
+  const parseNum = s => Number(String(s).replace(/[^\d.-]/g,'')) || 0;
+
+  // 給与所得控除 (2025年改正後想定: 最低65万円)
+  function 給与所得控除(income){
+    if (income <= 1625000) return Math.min(income, 650000);
+    if (income <= 1800000) return Math.round(income * 0.40 - 100000);
+    if (income <= 3600000) return Math.round(income * 0.30 + 80000);
+    if (income <= 6600000) return Math.round(income * 0.20 + 440000);
+    if (income <= 8500000) return Math.round(income * 0.10 + 1100000);
+    return 1950000;
+  }
+
+  // 基礎控除 (2025年改正後想定: 最大95万)
+  function 基礎控除(income){
+    if (income <= 24000000) return 950000;
+    if (income <= 24500000) return 320000;
+    if (income <= 25000000) return 160000;
+    return 0;
+  }
+
+  // 社会保険料控除 (年収の約14%概算)
+  function 社会保険料控除(income){
+    return Math.round(income * 0.14);
+  }
+
+  // 給与所得 (年収 - 給与所得控除)
+  function 給与所得(income){
+    return Math.max(0, income - 給与所得控除(income));
+  }
+
+  // 課税所得 (給与所得 - 社会保険料控除 - 基礎控除)
+  function 課税所得(income){
+    return Math.max(0, 給与所得(income) - 社会保険料控除(income) - 基礎控除(income));
+  }
+
+  // 所得税の限界税率
+  function 限界税率(課税){
+    if (課税 <= 1950000) return 0.05;
+    if (課税 <= 3300000) return 0.10;
+    if (課税 <= 6950000) return 0.20;
+    if (課税 <= 9000000) return 0.23;
+    if (課税 <= 18000000) return 0.33;
+    if (課税 <= 40000000) return 0.40;
+    return 0.45;
+  }
+
+  // 医療費控除 (国税庁 No.1120 ベース)
+  function 医療費控除計算(医療費, 補填, income){
+    const 自己負担 = Math.max(0, 医療費 - 補填);
+    const 給与 = 給与所得(income);
+    // 基準額: min(10万円, 所得×5%) — 所得200万以下なら 所得×5% < 10万 で割安
+    const 基準 = Math.min(100000, Math.round(給与 * 0.05));
+    const 控除 = Math.min(2000000, Math.max(0, 自己負担 - 基準));
+    return { 自己負担, 基準, 控除 };
+  }
+
+  function toast(msg){
+    const t = $('toast'); t.textContent = msg; t.classList.add('show');
+    clearTimeout(t._t); t._t = setTimeout(()=>t.classList.remove('show'), 2000);
+  }
+
+  function update(){
+    const 医療費 = parseNum($('medical').value);
+    const 補填 = parseNum($('reimburse').value);
+    const income = parseNum($('income').value);
+
+    const 課税 = 課税所得(income);
+    const 税率 = 限界税率(課税);
+    const { 自己負担, 基準, 控除 } = 医療費控除計算(医療費, 補填, income);
+    const 所得税還付 = Math.round(控除 * 税率);
+    const 住民税軽減 = Math.round(控除 * 0.10);
+    const 軽減合計 = 所得税還付 + 住民税軽減;
+    const 実質負担 = Math.max(0, 自己負担 - 軽減合計);
+
+    // ヒーロー
+    $('totalSaving').textContent = fmt(軽減合計);
+    $('totalSaving2').textContent = fmt(軽減合計);
+    $('totalSaving3').textContent = fmt(軽減合計);
+    $('incomeTaxRefund').textContent = fmt(所得税還付);
+    $('residentReduction').textContent = fmt(住民税軽減);
+    $('marginalRate').textContent = (税率 * 100).toFixed(0);
+    $('selfBurden').textContent = fmt(自己負担);
+    $('baseAmount').textContent = fmt(基準);
+    $('deduction').textContent = fmt(控除);
+    $('netCost').textContent = fmt(実質負担);
+
+    // ヒーロー注記
+    let note = '';
+    if (控除 >= 2000000) note = '⚠ 控除上限 200万円に達しています。';
+    else if (控除 > 0) note = `自己負担 ${fmt(自己負担)}円 のうち、${fmt(軽減合計)}円 が税金から戻ります。`;
+    else note = '医療費控除の対象になる金額がまだありません。';
+    $('heroNote').textContent = note;
+
+    // 基準額未満 案内
+    if (自己負担 > 0 && 控除 === 0) {
+      $('underBase').style.display = 'block';
+      $('needMore').textContent = fmt(基準 - 自己負担 + 1);
+    } else {
+      $('underBase').style.display = 'none';
+    }
+
+    // 実質負担ビジュアル (実質負担 vs 軽減分)
+    const total = 自己負担 || 1;
+    const tailPct = Math.max(0, Math.min(100, (実質負担 / total) * 100));
+    const goldPct = 100 - tailPct;
+    $('barTail').style.flexBasis = tailPct + '%';
+    $('barGold').style.flexBasis = goldPct + '%';
+
+    // チップの選択ハイライト同期
+    document.querySelectorAll('.chip[data-medical]').forEach(b=>{
+      b.classList.toggle('on', Number(b.dataset.medical) === 医療費);
+    });
+    document.querySelectorAll('.chip[data-income]').forEach(b=>{
+      b.classList.toggle('on', Number(b.dataset.income) === income);
+    });
+  }
+
+  // 入力欄: カンマ整形 + sync
+  function setupNumberField(inputId, rangeId, max){
+    const inp = $(inputId), rng = rangeId ? $(rangeId) : null;
+    inp.addEventListener('input', e => {
+      let v = parseNum(e.target.value);
+      if (max && v > max) v = max;
+      const pos = inp.selectionEnd;
+      inp.value = v.toLocaleString('ja-JP');
+      if (rng) rng.value = String(Math.min(Number(rng.max), v));
+      update();
+    });
+    inp.addEventListener('blur', () => {
+      inp.value = parseNum(inp.value).toLocaleString('ja-JP');
+    });
+    if (rng) {
+      rng.addEventListener('input', e => {
+        inp.value = Number(e.target.value).toLocaleString('ja-JP');
+        update();
+      });
+    }
+  }
+  setupNumberField('medical', 'medical-range', 99999999);
+  setupNumberField('reimburse', null, 99999999);
+  setupNumberField('income', 'income-range', 99999999);
+
+  // チップクリック
+  document.querySelectorAll('.chip[data-medical]').forEach(b => {
+    b.addEventListener('click', () => {
+      const v = Number(b.dataset.medical);
+      $('medical').value = v.toLocaleString('ja-JP');
+      $('medical-range').value = String(Math.min(Number($('medical-range').max), v));
+      update();
+    });
+  });
+  document.querySelectorAll('.chip[data-income]').forEach(b => {
+    b.addEventListener('click', () => {
+      const v = Number(b.dataset.income);
+      $('income').value = v.toLocaleString('ja-JP');
+      $('income-range').value = String(Math.min(Number($('income-range').max), v));
+      update();
+    });
+  });
+
+  // コピー
+  $('btnCopy').addEventListener('click', () => {
+    const 医療費 = parseNum($('medical').value);
+    const 補填 = parseNum($('reimburse').value);
+    const income = parseNum($('income').value);
+    const text = `【医療費控除シミュレーション結果】
+医療費: ${fmt(医療費)}円
+補填額: ${fmt(補填)}円
+年収: ${fmt(income)}円
+
+自己負担: ${$('selfBurden').textContent}円
+医療費控除額: ${$('deduction').textContent}円
+所得税還付: ${$('incomeTaxRefund').textContent}円 (限界税率 ${$('marginalRate').textContent}%)
+住民税軽減: ${$('residentReduction').textContent}円
+─────────────
+軽減税額 合計: ${$('totalSaving').textContent}円
+実質負担: ${$('netCost').textContent}円
+
+※ 単身・給与所得のみ・2025年改正後を想定した簡易概算です。`;
+
+    const fallback = () => {
+      try {
+        const ta = document.createElement('textarea');
+        ta.value = text; document.body.appendChild(ta);
+        ta.select(); document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('コピーしました');
+      } catch { toast('コピー失敗'); }
+    };
+    try {
+      if (!navigator.clipboard?.writeText) { fallback(); return; }
+      navigator.clipboard.writeText(text).then(() => toast('コピーしました')).catch(fallback);
+    } catch { fallback(); }
+  });
+
+  // 初期計算
+  update();
+})();
+</script>
+</body>
+</html>
