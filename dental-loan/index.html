@@ -174,10 +174,10 @@
     <div class="field">
       <label for="years">支払年数</label>
       <div class="input-row">
-        <input id="years" type="number" min="1" max="9" step="1" value="9" inputmode="numeric">
+        <input id="years" type="number" min="1" max="10" step="1" value="9" inputmode="numeric">
         <span class="unit">年</span>
       </div>
-      <input id="years-range" type="range" min="1" max="9" step="1" value="9">
+      <input id="years-range" type="range" min="1" max="10" step="1" value="9">
     </div>
   </div>
 
@@ -206,7 +206,7 @@
 
   <div class="note">
     ※ 元利均等返済方式で計算。実際の返済額は提携ローン会社の審査・条件により異なります。<br>
-    ※ 支払年数は <strong>最長 9 年</strong>、月々支払は <strong>3,001 円以上</strong> でご利用いただけます。
+    ※ 支払年数は <strong>最長 10 年</strong>、月々支払は <strong>3,001 円以上</strong> でご利用いただけます。
   </div>
 
   <div class="compare">
@@ -265,8 +265,8 @@
   function update(){
     const p = Math.max(0, parseNum($('amount').value));
     const r = Math.max(0, Number($('rate').value) || 0);
-    // 年数は 1〜9 の範囲にクランプ (10年以上は不可)
-    let y = Math.max(1, Math.min(9, Math.floor(Number($('years').value) || 1)));
+    // 年数は 1〜10 の範囲にクランプ
+    let y = Math.max(1, Math.min(10, Math.floor(Number($('years').value) || 1)));
     if (Number($('years').value) !== y) $('years').value = y;
     const yrsRange = $('years-range');
     if (yrsRange && Number(yrsRange.value) !== y) yrsRange.value = y;
