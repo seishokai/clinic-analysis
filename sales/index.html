@@ -35,22 +35,34 @@
   .auth-btn{font-size:11px; padding:4px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; color:var(--text-sub); cursor:pointer; font-family:inherit}
   .auth-btn:hover{background:var(--bg); color:var(--text)}
 
-  /* v320: PC ファーストビューに全カード収まるようヘッダー圧縮 */
-  header.brand-head{text-align:center; margin:8px 0 6px}
+  /* v321: ヘッダー横並び (Aladdin | HOME) */
+  .hero-flex{
+    display:flex; align-items:center; justify-content:center;
+    gap:36px; margin:10px 0 18px; flex-wrap:nowrap;
+  }
+  .vert-divider{width:1px; height:50px; background:var(--border); flex-shrink:0}
+  header.brand-head{text-align:right; margin:0}
   .brand{
-    font-family:'Great Vibes', cursive; font-size:40px; line-height:1;
+    font-family:'Great Vibes', cursive; font-size:44px; line-height:1;
     background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);
     -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
     margin:0;
   }
   .subtitle{font-size:11px; letter-spacing:3px; color:var(--text-sub); margin-top:4px; text-transform:uppercase}
+  .page-head{text-align:left}
   .page-title{
-    text-align:center; margin:14px 0 2px; font-size:20px; font-weight:300;
-    letter-spacing:5px; color:#1a1a1a;
+    margin:0; font-size:22px; font-weight:300;
+    letter-spacing:6px; color:#1a1a1a; line-height:1;
   }
   .page-subtitle{
-    text-align:center; font-size:10px; letter-spacing:3px;
-    color:var(--text-sub); text-transform:uppercase; margin-bottom:16px;
+    font-size:10px; letter-spacing:3px;
+    color:var(--text-sub); text-transform:uppercase; margin:5px 0 0;
+  }
+  @media (max-width: 640px){
+    .hero-flex{flex-direction:column; gap:8px}
+    .vert-divider{display:none}
+    header.brand-head{text-align:center}
+    .page-head{text-align:center}
   }
 
   /* v320: メイングリッドも圧縮 (170→130, gap 18→14) */
@@ -278,14 +290,18 @@
     </div>
   </div>
 
-  <header class="brand-head">
-    <h1 class="brand">Aladdin</h1>
-    <div class="subtitle">Sales Portal</div>
-  </header>
-
-  <!-- v302: Dental Connect 風タイトルセクション -->
-  <div class="page-title">HOME</div>
-  <div class="page-subtitle">SELECT WHAT YOU'D LIKE TO DO</div>
+  <!-- v321: Aladdin / HOME を横並びにレイアウト -->
+  <div class="hero-flex">
+    <header class="brand-head">
+      <h1 class="brand">Aladdin</h1>
+      <div class="subtitle">Sales Portal</div>
+    </header>
+    <div class="vert-divider" aria-hidden="true"></div>
+    <div class="page-head">
+      <div class="page-title">HOME</div>
+      <div class="page-subtitle">SELECT WHAT YOU'D LIKE TO DO</div>
+    </div>
+  </div>
 
   <div id="loading">読み込み中…</div>
   <div id="empty" hidden>タブが登録されていません。</div>
