@@ -27,35 +27,14 @@ button{font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparen
 input{font-family:inherit;font-size:16px}
 a{color:inherit}
 
-/* ======== Login Gate ======== */
-.gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
-.gate.hide{display:none}
-.login-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:42px 32px;width:100%;max-width:380px;text-align:center;box-shadow:0 4px 30px rgba(0,0,0,.04)}
-.brand-script{font-family:'Great Vibes',cursive;font-weight:400;font-size:60px;letter-spacing:1px;line-height:1;background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;display:inline-block}
-.brand-tagline{color:var(--text-sub);font-size:11px;margin-top:8px;letter-spacing:.18em;text-transform:uppercase}
-.gate-title{font-size:14px;font-weight:700;color:var(--text);margin-top:20px;margin-bottom:22px;letter-spacing:.1em}
-.input-group{text-align:left;margin-bottom:14px}
-.input-group label{display:block;font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
-.input-group input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:8px;font-size:16px;outline:none;background:var(--bg)}
-.input-group input:focus{border-color:var(--accent)}
-.btn-primary{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;min-height:48px;transition:opacity .15s}
-.btn-primary:hover{opacity:.85}
-.err{color:var(--red);font-size:13px;margin-top:10px;display:none}
-.err.show{display:block}
-.login-check{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:12px;color:var(--text-sub);justify-content:center}
-.login-check input{width:auto;margin:0}
-
-/* ======== App ======== */
-.app{display:none;min-height:100dvh}
-.app.show{display:block}
+/* ======== Header ======== */
+.app{min-height:100dvh}
 .header{
   background:#fff;border-bottom:1px solid var(--border);
   padding:0 18px;height:52px;display:flex;align-items:center;gap:10px;
   position:sticky;top:0;z-index:50;
 }
-.header-brand{
-  display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);
-}
+.header-brand{display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text)}
 .header-brand .b{font-family:'Great Vibes',cursive;font-size:26px;line-height:1}
 .header-brand .t{font-size:11px;font-weight:700;letter-spacing:.18em;color:var(--text-sub);text-transform:uppercase}
 .spacer{flex:1}
@@ -64,37 +43,52 @@ a{color:inherit}
   background:var(--bg);border-radius:8px;padding:6px 12px;font-size:13px;min-width:200px;
 }
 .search-box input{background:none;border:none;outline:none;flex:1;font-size:13px}
-.btn-logout{padding:7px 12px;border:1px solid var(--border);background:transparent;border-radius:8px;font-size:12px;color:var(--text-sub);cursor:pointer}
-.btn-logout:hover{border-color:var(--red);color:var(--red)}
 
 .wrap{max-width:1280px;margin:0 auto;padding:24px 24px 60px}
 .page-header{margin-bottom:24px}
 .page-header h1{font-size:24px;font-weight:700;letter-spacing:.05em}
 .page-header p{color:var(--text-sub);font-size:13px;margin-top:4px}
 
-/* ======== Category ======== */
-.cat-block{margin-bottom:32px}
-.cat-head{
+/* ======== Section / Category ======== */
+.section-block{margin-bottom:36px}
+.section-head{
   display:flex;align-items:center;gap:10px;margin-bottom:12px;
-  padding-bottom:8px;border-bottom:1px solid var(--border);
+  padding-bottom:8px;border-bottom:2px solid var(--accent);
+}
+.section-head .ico{
+  width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:18px;flex-shrink:0;background:var(--bg);
+}
+.section-head .nm{font-size:16px;font-weight:700;letter-spacing:.06em;color:var(--text)}
+.section-head .lock{font-size:11px;color:var(--text-muted);font-weight:600;margin-left:6px;letter-spacing:.06em}
+.section-head .lock.locked{color:#9a3412}
+.section-head .lock.unlocked{color:#15803d}
+
+/* オープンセクションのアクセント */
+.section-block[data-open="1"] .section-head{border-bottom-color:var(--green)}
+.section-block[data-open="1"] .section-head .ico{background:#dcfce7}
+
+/* ロックセクションのアクセント */
+.section-block[data-locked="1"] .section-head{border-bottom-color:#fdba74}
+.section-block[data-locked="1"] .section-head .ico{background:#fff7ed}
+.section-block[data-locked="1"].unlocked .section-head{border-bottom-color:#86efac}
+.section-block[data-locked="1"].unlocked .section-head .ico{background:#dcfce7}
+
+.cat-block{margin-bottom:24px}
+.cat-head{
+  display:flex;align-items:center;gap:8px;margin-bottom:10px;
+  padding-bottom:6px;border-bottom:1px solid var(--border);
 }
 .cat-head .ico{
-  width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
-  font-size:16px;flex-shrink:0;
+  width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:13px;flex-shrink:0;background:var(--bg);
 }
-.cat-head .nm{font-size:14px;font-weight:700;letter-spacing:.05em;color:var(--text)}
+.cat-head .nm{font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--text-sub);text-transform:uppercase}
 .cat-head .ct{font-size:11px;color:var(--text-muted);font-weight:500;margin-left:4px}
-
-/* カテゴリーカラー */
-.cat-block[data-c="入社"] .cat-head .ico{background:#dbeafe;color:#1d4ed8}
-.cat-block[data-c="インセン"] .cat-head .ico{background:#fef3c7;color:#b45309}
-.cat-block[data-c="給与"] .cat-head .ico{background:#dcfce7;color:#15803d}
-.cat-block[data-c="経理"] .cat-head .ico{background:#fae8ff;color:#7e22ce}
-.cat-block[data-c="運営"] .cat-head .ico{background:#fed7aa;color:#c2410c}
-.cat-block[data-c="その他"] .cat-head .ico{background:#f3f4f6;color:#6b7280}
 
 .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 
+/* ======== Tool Card ======== */
 .tool-card{
   background:#fff;border:1px solid var(--border);border-radius:12px;
   padding:14px 16px;display:flex;flex-direction:column;gap:6px;
@@ -119,14 +113,39 @@ a{color:inherit}
 .tc-badge.internal{background:#dbeafe;color:#1d4ed8}
 .tc-badge.todo{background:#fef3c7;color:#92400e}
 
-.add-card{
-  background:transparent;border:1.5px dashed var(--border);color:var(--text-muted);
-  display:flex;align-items:center;justify-content:center;gap:6px;
-  font-size:12px;font-weight:600;cursor:default;min-height:96px;border-radius:12px;
+/* ======== Lock UI ======== */
+.lock-box{
+  background:linear-gradient(135deg, #fff7ed 0%, #fef3c7 100%);
+  border:1.5px dashed #fdba74; border-radius:14px;
+  padding:24px;display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center;
 }
+.lock-box .lock-ico{font-size:36px;opacity:.7}
+.lock-box .lock-msg{font-size:13px;color:#9a3412;font-weight:600;line-height:1.7}
+.lock-box .lock-msg b{color:#7c2d12}
+.lock-box form{display:flex;gap:8px;flex-wrap:wrap;justify-content:center;max-width:380px;width:100%}
+.lock-box input[type=password]{
+  flex:1;min-width:0;padding:12px 14px;border:1px solid #fdba74;border-radius:8px;
+  font-size:15px;outline:none;background:#fff;color:var(--text);
+}
+.lock-box input[type=password]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(253,186,116,.25)}
+.lock-box button{
+  padding:12px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;
+  font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.05em;
+}
+.lock-box button:hover{opacity:.85}
+.lock-box .lock-err{font-size:12px;color:var(--red);margin-top:2px;font-weight:600;display:none}
+.lock-box .lock-err.show{display:block}
+.unlock-meta{
+  display:flex;justify-content:flex-end;margin-top:6px;
+}
+.btn-relock{
+  padding:5px 10px;border:1px solid var(--border);background:#fff;border-radius:6px;
+  font-size:11px;color:var(--text-sub);cursor:pointer;
+}
+.btn-relock:hover{border-color:var(--red);color:var(--red)}
 
-.empty-state{text-align:center;padding:80px 20px;color:var(--text-sub)}
-.empty-state h3{color:var(--text);font-size:18px;margin-bottom:8px}
+.empty-state{text-align:center;padding:60px 20px;color:var(--text-sub)}
+.empty-state h3{color:var(--text);font-size:16px;margin-bottom:6px}
 
 .toast{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
@@ -134,6 +153,7 @@ a{color:inherit}
   font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:200;
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.err{background:var(--red)}
 
 @media(max-width:920px){
   .wrap{padding:18px 14px 60px}
@@ -141,28 +161,14 @@ a{color:inherit}
   .cat-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
   .tool-card{padding:12px 14px;min-height:88px}
   .tool-card .tc-title{font-size:13px}
+  .section-head .nm{font-size:14px}
+  .lock-box{padding:20px 16px}
 }
 </style>
 </head>
 <body>
 
-<!-- ===== Login Gate ===== -->
-<div class="gate" id="gate">
-  <div class="login-card">
-    <div class="brand-script">Aladdin</div>
-    <div class="brand-tagline">Back Office · 清翔会</div>
-    <div class="gate-title">事務ダッシュボード</div>
-    <div class="input-group">
-      <label for="pw">パスワード</label>
-      <input type="password" id="pw" autocomplete="current-password" autofocus placeholder="共通パスワード">
-    </div>
-    <button class="btn-primary" id="pwBtn">ログイン</button>
-    <div class="err" id="pwErr">パスワードが違います</div>
-    <label class="login-check"><input type="checkbox" id="pwRemember" checked>この端末で次回も省略</label>
-  </div>
-</div>
-
-<!-- ===== App ===== -->
+<!-- ===== App (no main gate — open access for top-level page) ===== -->
 <div class="app" id="app">
   <header class="header">
     <a href="../sales/" class="header-brand" title="HOME へ戻る">
@@ -174,16 +180,15 @@ a{color:inherit}
       <span>🔍</span>
       <input type="search" id="search" placeholder="ツール検索 (名前)" autocomplete="off">
     </div>
-    <button class="btn-logout" onclick="logout()">ログアウト</button>
   </header>
 
   <div class="wrap">
     <div class="page-header">
       <h1>事務ダッシュボード</h1>
-      <p>清翔会の事務作業を一括管理。各カードのリンク先 (スプレッドシート等) には個別の閲覧権限が設定されています。</p>
+      <p>シフト・入社・予約などはオープンです。<strong>人事・労務 / 財務・給料</strong>のフォルダはそれぞれ別パスワードでロック。</p>
     </div>
 
-    <div id="tools"></div>
+    <div id="sections"></div>
 
     <div class="empty-state" id="emptyState" style="display:none">
       <h3>該当するツールがありません</h3>
@@ -197,114 +202,236 @@ a{color:inherit}
 <script>
 'use strict';
 
-const SHARED_PW = 'kanri1234';
-const UNLOCK_KEY = 'admin_pw_ok';
-
 /* ============================================================
-   ツール一覧 (カテゴリ別)
-   - 新しいツールは TOOLS 配列に追加するだけで表示
-   - url が空文字なら「準備中」(todo) として控えめ表示
+   セクション定義
+   - open: 認証なし
+   - locked: それぞれ独立のパスワード (sessionStorage 単位で記憶)
+   各ツール: cat (小カテゴリ), ico, title, desc, url, badge
+   url 空文字 → 準備中
    ============================================================ */
-const TOOLS = [
-  // ===== 入社・退社 =====
-  {cat:'入社・退社処理', ico:'📥', title:'新入社員 連絡票',     desc:'新入社員の基本情報・配属を一覧集約', url:'', badge:'sheets'},
-  {cat:'入社・退社処理', ico:'📋', title:'入社オンボーディング', desc:'入社手続きのご案内ページ',           url:'../welcome/',  badge:'internal'},
-  {cat:'入社・退社処理', ico:'📤', title:'退職手続き',           desc:'退職時の手続き・書類チェックリスト',  url:'', badge:'sheets'},
-  {cat:'入社・退社処理', ico:'📄', title:'雇用契約書テンプレ',   desc:'医院・職種別の契約書ひな形',         url:'', badge:'sheets'},
 
-  // ===== インセンティブ =====
-  {cat:'インセンティブ管理', ico:'🎯', title:'PBM 申請管理',       desc:'スタッフからのPBM 申請を承認',        url:'../pbm.html',     badge:'internal'},
-  {cat:'インセンティブ管理', ico:'📊', title:'PBM 集計表',          desc:'月次の支給額一覧',                  url:'', badge:'sheets'},
-  {cat:'インセンティブ管理', ico:'💎', title:'矯正・BFインセンティブ', desc:'矯正/BFの個別実績と支給計算',         url:'', badge:'sheets'},
-  {cat:'インセンティブ管理', ico:'🏆', title:'ボーナス計算',         desc:'賞与の集計表',                     url:'', badge:'sheets'},
+// 🟢 オープンセクション — 全員アクセス可能
+const OPEN_SECTION = {
+  key: 'open',
+  title: 'オープン — 全員アクセス可',
+  icon: '🟢',
+  tools: [
+    // ===== 入社・退社 =====
+    {cat:'入社・退社処理', ico:'📋', title:'入社オンボーディング', desc:'入社手続きのご案内ページ (4ステップ)', url:'../welcome/', badge:'internal'},
+    {cat:'入社・退社処理', ico:'📤', title:'退職手続き',           desc:'退職時の手続き・書類チェック',     url:'', badge:'sheets'},
 
-  // ===== 給与・社労 =====
-  {cat:'給与・社労',     ico:'💰', title:'給与計算',             desc:'月次給与計算ワークシート',           url:'', badge:'sheets'},
-  {cat:'給与・社労',     ico:'⏰', title:'勤怠管理',             desc:'タイムカード集計',                  url:'', badge:'sheets'},
-  {cat:'給与・社労',     ico:'📑', title:'社労情報',             desc:'労務関係資料・各種申請書',           url:'', badge:'sheets'},
+    // ===== 運営・予約 =====
+    {cat:'運営・予約',     ico:'📅', title:'予約枠監視',           desc:'shareconnect の枠状況',           url:'../sales/', badge:'internal'},
+    {cat:'運営・予約',     ico:'🦷', title:'ドクターシフト',       desc:'医院別ドクター配置 (Google Sheets)', url:'https://docs.google.com/spreadsheets/d/1tKjXNJNPInAl0CTXHKd3G-792JNiU37inY0p6hlUPwM/edit?usp=sharing', badge:'sheets'},
+    {cat:'運営・予約',     ico:'🗓️', title:'アポツール (stransa)',  desc:'外部アポ管理ツール',              url:'https://user.stransa.co.jp/login', badge:'sheets'},
+    {cat:'運営・予約',     ico:'📆', title:'新予約ツール',          desc:'shareconnect 予約管理ダッシュ',    url:'https://reserve.shareconnect.co.jp/admin/dashboard', badge:'sheets'},
+    {cat:'運営・予約',     ico:'📈', title:'追いかけリスト',       desc:'再アプローチ対象一覧',             url:'../#follow-up', badge:'internal'},
 
-  // ===== 経理・財務 =====
-  {cat:'経理・財務',     ico:'💹', title:'月次売上集計',         desc:'医院別の月次売上',                  url:'', badge:'sheets'},
-  {cat:'経理・財務',     ico:'💴', title:'入金管理',             desc:'デンタルローン入金確認',             url:'', badge:'sheets'},
-  {cat:'経理・財務',     ico:'🧾', title:'経費精算',             desc:'経費申請のとりまとめ',               url:'', badge:'sheets'},
+    // ===== その他 =====
+    {cat:'その他重要事項', ico:'🎓', title:'スキル評価',           desc:'ドクター・スタッフのスキル評価',   url:'https://skill-eval.tkm-koike.workers.dev', badge:'internal'},
+    {cat:'その他重要事項', ico:'📢', title:'重要連絡事項',         desc:'社内お知らせ・告知事項',           url:'', badge:'sheets'},
+    {cat:'その他重要事項', ico:'📝', title:'議事録',               desc:'会議録の蓄積',                   url:'', badge:'sheets'},
+  ]
+};
 
-  // ===== 運営・予約 =====
-  {cat:'運営・予約',     ico:'📅', title:'予約枠監視',           desc:'shareconnect の枠状況',             url:'../sales/',       badge:'internal'},
-  {cat:'運営・予約',     ico:'🦷', title:'ドクターシフト',       desc:'医院別のドクター配置 (Google Sheets)', url:'https://docs.google.com/spreadsheets/d/1tKjXNJNPInAl0CTXHKd3G-792JNiU37inY0p6hlUPwM/edit?usp=sharing', badge:'sheets'},
-  {cat:'運営・予約',     ico:'🗓️', title:'アポツール (stransa)',  desc:'外部アポ管理ツール',                url:'https://user.stransa.co.jp/login', badge:'sheets'},
-  {cat:'運営・予約',     ico:'📆', title:'新予約ツール',          desc:'shareconnect 予約管理ダッシュ',      url:'https://reserve.shareconnect.co.jp/admin/dashboard', badge:'sheets'},
-  {cat:'運営・予約',     ico:'📈', title:'追いかけリスト',       desc:'再アプローチ対象一覧',               url:'../#follow-up',   badge:'internal'},
+// 🔒 ロックセクション 1: 人事・労務
+const HR_SECTION = {
+  key: 'hr',
+  title: '人事・労務',
+  icon: '🏢',
+  password: 'jinji1234',
+  hint: '人事・労務担当のスタッフのみアクセス可',
+  tools: [
+    {cat:'入社処理 (機密)', ico:'📥', title:'新入社員 連絡票',     desc:'新入社員の基本情報・配属を一覧集約', url:'', badge:'sheets'},
+    {cat:'入社処理 (機密)', ico:'📄', title:'雇用契約書テンプレ',   desc:'医院・職種別の契約書ひな形',       url:'', badge:'sheets'},
+    {cat:'勤怠・労務',     ico:'⏰', title:'勤怠管理',             desc:'タイムカード集計',                url:'', badge:'sheets'},
+    {cat:'勤怠・労務',     ico:'📑', title:'社労情報',             desc:'労務関係資料・各種申請書',          url:'', badge:'sheets'},
+    {cat:'勤怠・労務',     ico:'🗂️', title:'休暇・有給管理',        desc:'有給・特別休暇の集計',             url:'', badge:'sheets'},
+    {cat:'評価',           ico:'⭐', title:'評価面談記録',          desc:'年次・半期面談の記録',              url:'', badge:'sheets'},
+  ]
+};
 
-  // ===== その他 =====
-  {cat:'その他重要事項', ico:'🎓', title:'スキル評価',           desc:'ドクター・スタッフのスキル評価',     url:'https://skill-eval.tkm-koike.workers.dev', badge:'internal'},
-  {cat:'その他重要事項', ico:'📢', title:'重要連絡事項',         desc:'社内お知らせ・告知事項',             url:'', badge:'sheets'},
-  {cat:'その他重要事項', ico:'📝', title:'議事録',               desc:'会議録の蓄積',                     url:'', badge:'sheets'},
-];
+// 🔒 ロックセクション 2: 財務・給料
+const FIN_SECTION = {
+  key: 'fin',
+  title: '財務・給料',
+  icon: '💼',
+  password: 'keiri1234',
+  hint: '財務・経理担当のスタッフのみアクセス可',
+  tools: [
+    {cat:'給与',           ico:'💰', title:'給与計算',             desc:'月次給与計算ワークシート',          url:'', badge:'sheets'},
+    {cat:'給与',           ico:'🏆', title:'ボーナス計算',         desc:'賞与の集計表',                    url:'', badge:'sheets'},
+    {cat:'インセン管理',   ico:'🎯', title:'PBM 申請管理',         desc:'スタッフからのPBM 申請を承認',      url:'../pbm.html', badge:'internal'},
+    {cat:'インセン管理',   ico:'📊', title:'PBM 集計表',            desc:'月次の支給額一覧',                url:'', badge:'sheets'},
+    {cat:'インセン管理',   ico:'💎', title:'矯正・BFインセンティブ', desc:'矯正/BFの個別実績と支給計算',       url:'', badge:'sheets'},
+    {cat:'経理',           ico:'💹', title:'月次売上集計',         desc:'医院別の月次売上',                url:'', badge:'sheets'},
+    {cat:'経理',           ico:'💴', title:'入金管理',             desc:'デンタルローン入金確認',           url:'', badge:'sheets'},
+    {cat:'経理',           ico:'🧾', title:'経費精算',             desc:'経費申請のとりまとめ',             url:'', badge:'sheets'},
+  ]
+};
 
-/* ---------- render ---------- */
+const LOCKED_SECTIONS = [HR_SECTION, FIN_SECTION];
+
+/* ---------- helpers ---------- */
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function toast(m, isErr){
+  const t = document.getElementById('toast');
+  t.textContent = m; t.className = 'toast show' + (isErr?' err':'');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+function isUnlocked(sectionKey){
+  try{ return sessionStorage.getItem('admin_unlock_' + sectionKey) === '1'; }
+  catch{ return false; }
+}
+function unlockSection(sectionKey){
+  try{ sessionStorage.setItem('admin_unlock_' + sectionKey, '1'); }catch{}
+}
+function relockSection(sectionKey){
+  try{ sessionStorage.removeItem('admin_unlock_' + sectionKey); }catch{}
+}
 
-function render(filter){
-  const q = (filter || '').trim().toLowerCase();
-  const tools = q
-    ? TOOLS.filter(t => (t.title + ' ' + t.desc + ' ' + t.cat).toLowerCase().includes(q))
-    : TOOLS;
-  // カテゴリーごとにグループ化 (定義順を維持)
+/* ---------- rendering ---------- */
+function renderToolCard(t){
+  const ready = !!t.url;
+  const isExternal = ready && /^https?:\/\//.test(t.url) && !/seishokai\.github\.io|tkm-koike|skill-eval/.test(t.url);
+  const badgeKey = ready ? (t.badge || (isExternal ? 'sheets' : 'internal')) : 'todo';
+  const badgeText = {'sheets':'SHEETS', 'internal':'INTERNAL', 'todo':'準備中'}[badgeKey];
+  if (ready){
+    return `<a class="tool-card" href="${esc(t.url)}" target="_blank" rel="noopener">
+      <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
+      <div class="tc-desc">${esc(t.desc)}</div>
+      <div class="tc-meta">
+        <span class="tc-badge ${badgeKey}">${badgeText}</span>
+        <span class="tc-ext">${isExternal?'外部 ↗':'内部 →'}</span>
+      </div>
+    </a>`;
+  } else {
+    return `<div class="tool-card empty">
+      <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
+      <div class="tc-desc">${esc(t.desc)}</div>
+      <div class="tc-meta"><span class="tc-badge todo">準備中</span></div>
+    </div>`;
+  }
+}
+
+function renderToolsByCategory(tools){
   const byCat = new Map();
   tools.forEach(t => {
     if (!byCat.has(t.cat)) byCat.set(t.cat, []);
     byCat.get(t.cat).push(t);
   });
-  const host = document.getElementById('tools');
-  const emp = document.getElementById('emptyState');
-  if (!tools.length){
-    host.innerHTML = '';
-    emp.style.display = 'block';
-    return;
-  }
-  emp.style.display = 'none';
   let h = '';
   for (const [cat, list] of byCat){
-    const shortKey = cat.replace(/[・処理管理]/g,'').slice(0,4);
-    const catIco = {'入社':'📥','インセン':'🎯','給与':'💰','経理':'💹','運営':'📅','その他':'⭐'}[shortKey] || '📁';
-    h += `<div class="cat-block" data-c="${esc(shortKey)}">
+    h += `<div class="cat-block">
       <div class="cat-head">
-        <span class="ico">${catIco}</span>
         <span class="nm">${esc(cat)}</span>
         <span class="ct">${list.length}件</span>
       </div>
-      <div class="cat-grid">`;
-    list.forEach(t => {
-      const ready = !!t.url;
-      const isExternal = ready && /^https?:\/\//.test(t.url) && !/seishokai\.github\.io|tkm-koike|skill-eval/.test(t.url);
-      const badgeKey = ready ? (t.badge || (isExternal ? 'sheets' : 'internal')) : 'todo';
-      const badgeText = {'sheets':'SHEETS', 'internal':'INTERNAL', 'todo':'準備中'}[badgeKey];
-      if (ready){
-        h += `<a class="tool-card" href="${esc(t.url)}" target="_blank" rel="noopener">
-          <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
-          <div class="tc-desc">${esc(t.desc)}</div>
-          <div class="tc-meta">
-            <span class="tc-badge ${badgeKey}">${badgeText}</span>
-            <span class="tc-ext">${isExternal?'外部 ↗':'内部 →'}</span>
-          </div>
-        </a>`;
-      } else {
-        h += `<div class="tool-card empty">
-          <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
-          <div class="tc-desc">${esc(t.desc)}</div>
-          <div class="tc-meta"><span class="tc-badge todo">準備中</span></div>
-        </div>`;
-      }
-    });
-    h += `</div></div>`;
+      <div class="cat-grid">${list.map(renderToolCard).join('')}</div>
+    </div>`;
   }
-  host.innerHTML = h;
+  return h;
 }
 
-function toast(msg){
-  const t = document.getElementById('toast');
-  t.textContent = msg; t.classList.add('show');
-  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2000);
+function renderOpenSection(filter){
+  const q = (filter || '').trim().toLowerCase();
+  const tools = q
+    ? OPEN_SECTION.tools.filter(t => (t.title + ' ' + t.desc + ' ' + t.cat).toLowerCase().includes(q))
+    : OPEN_SECTION.tools;
+  if (!tools.length) return '';
+  return `<div class="section-block" data-open="1">
+    <div class="section-head">
+      <span class="ico">${OPEN_SECTION.icon}</span>
+      <span class="nm">${esc(OPEN_SECTION.title)}</span>
+      <span class="lock unlocked">✓ オープン</span>
+    </div>
+    ${renderToolsByCategory(tools)}
+  </div>`;
+}
+
+function renderLockedSection(section, filter){
+  const unlocked = isUnlocked(section.key);
+  const q = (filter || '').trim().toLowerCase();
+
+  if (!unlocked){
+    // ロック状態 — 検索中はちらつかせない
+    if (q) return '';   // ロック中はサーチに引っかけない
+    return `<div class="section-block" data-locked="1" data-key="${esc(section.key)}">
+      <div class="section-head">
+        <span class="ico">${section.icon}</span>
+        <span class="nm">${esc(section.title)}</span>
+        <span class="lock locked">🔒 ロック中</span>
+      </div>
+      <div class="lock-box">
+        <div class="lock-ico">🔒</div>
+        <div class="lock-msg"><b>${esc(section.title)}</b> はパスワード保護されています。<br>${esc(section.hint || '')}</div>
+        <form onsubmit="tryUnlock('${section.key}', event); return false;">
+          <input type="password" id="pw-${section.key}" autocomplete="off" placeholder="パスワードを入力">
+          <button type="submit">開く</button>
+        </form>
+        <div class="lock-err" id="err-${section.key}">パスワードが違います</div>
+      </div>
+    </div>`;
+  }
+
+  // 解除済み
+  const tools = q
+    ? section.tools.filter(t => (t.title + ' ' + t.desc + ' ' + t.cat).toLowerCase().includes(q))
+    : section.tools;
+  if (!tools.length && q) return '';
+  return `<div class="section-block unlocked" data-locked="1" data-key="${esc(section.key)}">
+    <div class="section-head">
+      <span class="ico">${section.icon}</span>
+      <span class="nm">${esc(section.title)}</span>
+      <span class="lock unlocked">✓ 解除済</span>
+    </div>
+    ${renderToolsByCategory(tools)}
+    <div class="unlock-meta">
+      <button class="btn-relock" onclick="relock('${section.key}')">🔒 このフォルダをロックする</button>
+    </div>
+  </div>`;
+}
+
+function renderAll(){
+  const filter = document.getElementById('search').value;
+  const host = document.getElementById('sections');
+  const emp = document.getElementById('emptyState');
+
+  const openHtml = renderOpenSection(filter);
+  const lockedHtml = LOCKED_SECTIONS.map(s => renderLockedSection(s, filter)).join('');
+
+  if (!openHtml && !lockedHtml){
+    host.innerHTML = '';
+    emp.style.display = 'block';
+  } else {
+    host.innerHTML = openHtml + lockedHtml;
+    emp.style.display = 'none';
+  }
+}
+
+/* ---------- unlock handlers ---------- */
+function tryUnlock(sectionKey, evt){
+  if (evt && evt.preventDefault) evt.preventDefault();
+  const section = LOCKED_SECTIONS.find(s => s.key === sectionKey);
+  if (!section) return;
+  const inp = document.getElementById('pw-' + sectionKey);
+  const err = document.getElementById('err-' + sectionKey);
+  if (!inp) return;
+  if (inp.value === section.password){
+    err.classList.remove('show');
+    unlockSection(sectionKey);
+    toast(`${section.title} のロック解除`);
+    renderAll();
+  } else {
+    err.classList.add('show');
+    inp.focus(); inp.select();
+  }
+}
+function relock(sectionKey){
+  const section = LOCKED_SECTIONS.find(s => s.key === sectionKey);
+  relockSection(sectionKey);
+  toast(`${section ? section.title : '対象'} を再ロックしました`);
+  renderAll();
 }
 
 /* ---------- search ---------- */
@@ -313,57 +440,13 @@ function setupSearch(){
   let timer = null;
   box.addEventListener('input', () => {
     clearTimeout(timer);
-    timer = setTimeout(() => render(box.value), 120);
-  });
-}
-
-/* ---------- gate ---------- */
-function isUnlocked(){
-  try{ return sessionStorage.getItem(UNLOCK_KEY)==='1' || localStorage.getItem(UNLOCK_KEY)==='1'; }
-  catch{ return false; }
-}
-function unlock(remember){
-  try{
-    sessionStorage.setItem(UNLOCK_KEY,'1');
-    if(remember) localStorage.setItem(UNLOCK_KEY,'1');
-  }catch{}
-  document.getElementById('gate').classList.add('hide');
-  document.getElementById('app').classList.add('show');
-  render();
-  setupSearch();
-}
-function logout(){
-  try{ sessionStorage.removeItem(UNLOCK_KEY); localStorage.removeItem(UNLOCK_KEY); }catch{}
-  location.reload();
-}
-function setupGate(){
-  const pw = document.getElementById('pw');
-  const btn = document.getElementById('pwBtn');
-  const err = document.getElementById('pwErr');
-  const remember = document.getElementById('pwRemember');
-  function tryLogin(){
-    if (pw.value === SHARED_PW){
-      err.classList.remove('show');
-      unlock(remember.checked);
-    } else {
-      err.classList.add('show');
-      pw.focus(); pw.select();
-    }
-  }
-  btn.addEventListener('click', tryLogin);
-  pw.addEventListener('keydown', e => {
-    if (e.key === 'Enter'){ e.preventDefault(); tryLogin(); }
+    timer = setTimeout(renderAll, 120);
   });
 }
 
 (function init(){
-  setupGate();
-  if (isUnlocked()){
-    document.getElementById('gate').classList.add('hide');
-    document.getElementById('app').classList.add('show');
-    render();
-    setupSearch();
-  }
+  renderAll();
+  setupSearch();
 })();
 </script>
 </body>
