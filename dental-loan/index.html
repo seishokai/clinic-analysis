@@ -72,7 +72,8 @@
   }
   select.company:focus{border-color:var(--accent); box-shadow:0 0 0 3px rgba(0,0,0,.05)}
 
-  .result-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+  .result-grid{display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px}
+  @media(max-width:680px){.result-grid{grid-template-columns:1fr 1fr}}
   @media(max-width:480px){.result-grid{grid-template-columns:1fr}}
   .result-box{
     background:#fff; border:2px solid var(--accent); border-radius:12px;
@@ -184,10 +185,17 @@
     <div class="result-box primary">
       <div class="result-label">月々の支払額</div>
       <div class="result-value"><span class="yen">¥</span><span id="monthly">6,588</span></div>
+      <div style="font-size:10.5px;color:var(--text-sub);margin-top:4px;letter-spacing:1px">元金+利息合計</div>
+    </div>
+    <div class="result-box">
+      <div class="result-label">月々の手数料</div>
+      <div class="result-value"><span class="yen">¥</span><span id="monthly-fee">0</span></div>
+      <div style="font-size:10.5px;color:var(--text-sub);margin-top:4px;letter-spacing:1px">利息平均 (期間中の総利息÷月数)</div>
     </div>
     <div class="result-box">
       <div class="result-label">支払総額</div>
       <div class="result-value"><span class="yen">¥</span><span id="total">790,618</span></div>
+      <div style="font-size:10.5px;color:var(--text-sub);margin-top:4px;letter-spacing:1px">うち手数料 <span id="total-fee">0</span>円</div>
     </div>
   </div>
 
@@ -209,6 +217,7 @@
           <th>会社</th>
           <th>年利</th>
           <th>月々</th>
+          <th>月々手数料</th>
           <th>支払総額</th>
         </tr>
       </thead>
@@ -264,8 +273,14 @@
 
     const m = calcMonthly(p, r, y);
     const total = m * y * 12;
+    // 利息合計 = 支払総額 − 借入元金 (0未満になることはないが念のためclamp)
+    const totalFee = Math.max(0, total - p);
+    // 月平均利息 = 利息合計 / 月数
+    const monthlyFee = (y > 0) ? totalFee / (y * 12) : 0;
     $('monthly').textContent = fmt(m);
+    $('monthly-fee').textContent = fmt(monthlyFee);
     $('total').textContent = fmt(total);
+    $('total-fee').textContent = fmt(totalFee);
 
     // 月3,000円以下なら赤字警告 + 結果ボックスを赤く
     const monthlyBox = $('monthly').closest('.result-box');
@@ -286,12 +301,14 @@
     tb.innerHTML = COMPANIES.map(c => {
       const mm = calcMonthly(p, c.rate, y);
       const tt = mm * y * 12;
+      const mFee = (y > 0) ? Math.max(0, tt - p) / (y * 12) : 0;
       const rateLabel = c.rateLabel || `${fmtFix(c.rate)}%`;
       const isCurrent = c.id === selectedId;
       return `<tr class="${isCurrent ? 'current' : ''}">
         <td>${c.label}</td>
         <td>${rateLabel}</td>
         <td>¥${fmt(mm)}</td>
+        <td>¥${fmt(mFee)}</td>
         <td>¥${fmt(tt)}</td>
       </tr>`;
     }).join('');
