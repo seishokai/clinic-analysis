@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="robots" content="noindex">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>事務ダッシュボード / Aladdin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap">
+<style>
+:root{
+  --bg:#f8f9fa; --card:#fff; --border:#e5e7eb; --border-light:#f0f0f0;
+  --text:#1a1a1a; --text-sub:#6b7280; --text-muted:#9ca3af;
+  --accent:#1a1a1a; --gold:#c9a55c; --paper:#fdfaf3;
+  --green:#22c55e; --blue:#3b82f6; --red:#dc2626; --orange:#f97316; --purple:#8b5cf6;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Hiragino Sans','Noto Sans JP',sans-serif;
+  background:var(--bg);color:var(--text);line-height:1.55;
+  -webkit-font-smoothing:antialiased;font-size:14px;
+}
+button{font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
+input{font-family:inherit;font-size:16px}
+a{color:inherit}
+
+/* ======== Login Gate ======== */
+.gate{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;z-index:100}
+.gate.hide{display:none}
+.login-card{background:#fff;border:1px solid var(--border);border-radius:16px;padding:42px 32px;width:100%;max-width:380px;text-align:center;box-shadow:0 4px 30px rgba(0,0,0,.04)}
+.brand-script{font-family:'Great Vibes',cursive;font-weight:400;font-size:60px;letter-spacing:1px;line-height:1;background:linear-gradient(135deg,#1a1a1a 0%,#555 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;display:inline-block}
+.brand-tagline{color:var(--text-sub);font-size:11px;margin-top:8px;letter-spacing:.18em;text-transform:uppercase}
+.gate-title{font-size:14px;font-weight:700;color:var(--text);margin-top:20px;margin-bottom:22px;letter-spacing:.1em}
+.input-group{text-align:left;margin-bottom:14px}
+.input-group label{display:block;font-size:11px;font-weight:700;color:var(--text-sub);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px}
+.input-group input{width:100%;padding:12px 14px;border:1px solid var(--border);border-radius:8px;font-size:16px;outline:none;background:var(--bg)}
+.input-group input:focus{border-color:var(--accent)}
+.btn-primary{width:100%;padding:13px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;cursor:pointer;min-height:48px;transition:opacity .15s}
+.btn-primary:hover{opacity:.85}
+.err{color:var(--red);font-size:13px;margin-top:10px;display:none}
+.err.show{display:block}
+.login-check{display:flex;align-items:center;gap:6px;margin-top:12px;font-size:12px;color:var(--text-sub);justify-content:center}
+.login-check input{width:auto;margin:0}
+
+/* ======== App ======== */
+.app{display:none;min-height:100dvh}
+.app.show{display:block}
+.header{
+  background:#fff;border-bottom:1px solid var(--border);
+  padding:0 18px;height:52px;display:flex;align-items:center;gap:10px;
+  position:sticky;top:0;z-index:50;
+}
+.header-brand{
+  display:flex;align-items:center;gap:10px;text-decoration:none;color:var(--text);
+}
+.header-brand .b{font-family:'Great Vibes',cursive;font-size:26px;line-height:1}
+.header-brand .t{font-size:11px;font-weight:700;letter-spacing:.18em;color:var(--text-sub);text-transform:uppercase}
+.spacer{flex:1}
+.search-box{
+  display:flex;align-items:center;gap:6px;border:1px solid var(--border);
+  background:var(--bg);border-radius:8px;padding:6px 12px;font-size:13px;min-width:200px;
+}
+.search-box input{background:none;border:none;outline:none;flex:1;font-size:13px}
+.btn-logout{padding:7px 12px;border:1px solid var(--border);background:transparent;border-radius:8px;font-size:12px;color:var(--text-sub);cursor:pointer}
+.btn-logout:hover{border-color:var(--red);color:var(--red)}
+
+.wrap{max-width:1280px;margin:0 auto;padding:24px 24px 60px}
+.page-header{margin-bottom:24px}
+.page-header h1{font-size:24px;font-weight:700;letter-spacing:.05em}
+.page-header p{color:var(--text-sub);font-size:13px;margin-top:4px}
+
+/* ======== Category ======== */
+.cat-block{margin-bottom:32px}
+.cat-head{
+  display:flex;align-items:center;gap:10px;margin-bottom:12px;
+  padding-bottom:8px;border-bottom:1px solid var(--border);
+}
+.cat-head .ico{
+  width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:16px;flex-shrink:0;
+}
+.cat-head .nm{font-size:14px;font-weight:700;letter-spacing:.05em;color:var(--text)}
+.cat-head .ct{font-size:11px;color:var(--text-muted);font-weight:500;margin-left:4px}
+
+/* カテゴリーカラー */
+.cat-block[data-c="入社"] .cat-head .ico{background:#dbeafe;color:#1d4ed8}
+.cat-block[data-c="インセン"] .cat-head .ico{background:#fef3c7;color:#b45309}
+.cat-block[data-c="給与"] .cat-head .ico{background:#dcfce7;color:#15803d}
+.cat-block[data-c="経理"] .cat-head .ico{background:#fae8ff;color:#7e22ce}
+.cat-block[data-c="運営"] .cat-head .ico{background:#fed7aa;color:#c2410c}
+.cat-block[data-c="その他"] .cat-head .ico{background:#f3f4f6;color:#6b7280}
+
+.cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+
+.tool-card{
+  background:#fff;border:1px solid var(--border);border-radius:12px;
+  padding:14px 16px;display:flex;flex-direction:column;gap:6px;
+  text-decoration:none;color:var(--text);transition:all .15s;
+  cursor:pointer;position:relative;min-height:96px;
+}
+.tool-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.06)}
+.tool-card.empty{background:#fafafa;border-style:dashed;color:var(--text-muted);cursor:default}
+.tool-card.empty:hover{transform:none;box-shadow:none;border-color:var(--border)}
+.tool-card .tc-head{display:flex;align-items:center;gap:8px}
+.tool-card .tc-ico{font-size:18px;flex-shrink:0}
+.tool-card .tc-title{font-size:13.5px;font-weight:700;color:var(--text);letter-spacing:.02em;line-height:1.3;flex:1;min-width:0;word-break:break-all}
+.tool-card.empty .tc-title{color:var(--text-muted)}
+.tool-card .tc-desc{font-size:11.5px;color:var(--text-sub);line-height:1.55;flex:1}
+.tool-card .tc-meta{
+  display:flex;align-items:center;gap:6px;margin-top:auto;
+  font-size:10.5px;color:var(--text-muted);font-weight:600;letter-spacing:.04em;
+}
+.tool-card .tc-ext{display:inline-flex;align-items:center;gap:3px}
+.tool-card .tc-badge{padding:2px 6px;border-radius:4px;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
+.tc-badge.sheets{background:#dcfce7;color:#15803d}
+.tc-badge.internal{background:#dbeafe;color:#1d4ed8}
+.tc-badge.todo{background:#fef3c7;color:#92400e}
+
+.add-card{
+  background:transparent;border:1.5px dashed var(--border);color:var(--text-muted);
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:12px;font-weight:600;cursor:default;min-height:96px;border-radius:12px;
+}
+
+.empty-state{text-align:center;padding:80px 20px;color:var(--text-sub)}
+.empty-state h3{color:var(--text);font-size:18px;margin-bottom:8px}
+
+.toast{
+  position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
+  background:var(--accent);color:#fff;padding:11px 22px;border-radius:10px;
+  font-size:13px;opacity:0;transition:.25s;pointer-events:none;z-index:200;
+}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+
+@media(max-width:920px){
+  .wrap{padding:18px 14px 60px}
+  .search-box{min-width:auto;flex:1}
+  .cat-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:10px}
+  .tool-card{padding:12px 14px;min-height:88px}
+  .tool-card .tc-title{font-size:13px}
+}
+</style>
+</head>
+<body>
+
+<!-- ===== Login Gate ===== -->
+<div class="gate" id="gate">
+  <div class="login-card">
+    <div class="brand-script">Aladdin</div>
+    <div class="brand-tagline">Back Office · 清翔会</div>
+    <div class="gate-title">事務ダッシュボード</div>
+    <div class="input-group">
+      <label for="pw">パスワード</label>
+      <input type="password" id="pw" autocomplete="current-password" autofocus placeholder="共通パスワード">
+    </div>
+    <button class="btn-primary" id="pwBtn">ログイン</button>
+    <div class="err" id="pwErr">パスワードが違います</div>
+    <label class="login-check"><input type="checkbox" id="pwRemember" checked>この端末で次回も省略</label>
+  </div>
+</div>
+
+<!-- ===== App ===== -->
+<div class="app" id="app">
+  <header class="header">
+    <a href="../sales/" class="header-brand" title="HOME へ戻る">
+      <span class="b">Aladdin</span>
+      <span class="t">Back Office</span>
+    </a>
+    <div class="spacer"></div>
+    <div class="search-box">
+      <span>🔍</span>
+      <input type="search" id="search" placeholder="ツール検索 (名前)" autocomplete="off">
+    </div>
+    <button class="btn-logout" onclick="logout()">ログアウト</button>
+  </header>
+
+  <div class="wrap">
+    <div class="page-header">
+      <h1>事務ダッシュボード</h1>
+      <p>清翔会の事務作業を一括管理。各カードのリンク先 (スプレッドシート等) には個別の閲覧権限が設定されています。</p>
+    </div>
+
+    <div id="tools"></div>
+
+    <div class="empty-state" id="emptyState" style="display:none">
+      <h3>該当するツールがありません</h3>
+      <p>検索ワードを変えてみてください。</p>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+
+const SHARED_PW = 'kanri1234';
+const UNLOCK_KEY = 'admin_pw_ok';
+
+/* ============================================================
+   ツール一覧 (カテゴリ別)
+   - 新しいツールは TOOLS 配列に追加するだけで表示
+   - url が空文字なら「準備中」(todo) として控えめ表示
+   ============================================================ */
+const TOOLS = [
+  // ===== 入社・退社 =====
+  {cat:'入社・退社処理', ico:'📥', title:'新入社員 連絡票',     desc:'新入社員の基本情報・配属を一覧集約', url:'', badge:'sheets'},
+  {cat:'入社・退社処理', ico:'📋', title:'入社オンボーディング', desc:'入社手続きのご案内ページ',           url:'../welcome/',  badge:'internal'},
+  {cat:'入社・退社処理', ico:'📤', title:'退職手続き',           desc:'退職時の手続き・書類チェックリスト',  url:'', badge:'sheets'},
+  {cat:'入社・退社処理', ico:'📄', title:'雇用契約書テンプレ',   desc:'医院・職種別の契約書ひな形',         url:'', badge:'sheets'},
+
+  // ===== インセンティブ =====
+  {cat:'インセンティブ管理', ico:'🎯', title:'PBM 申請管理',       desc:'スタッフからのPBM 申請を承認',        url:'../pbm.html',     badge:'internal'},
+  {cat:'インセンティブ管理', ico:'📊', title:'PBM 集計表',          desc:'月次の支給額一覧',                  url:'', badge:'sheets'},
+  {cat:'インセンティブ管理', ico:'💎', title:'矯正・BFインセンティブ', desc:'矯正/BFの個別実績と支給計算',         url:'', badge:'sheets'},
+  {cat:'インセンティブ管理', ico:'🏆', title:'ボーナス計算',         desc:'賞与の集計表',                     url:'', badge:'sheets'},
+
+  // ===== 給与・社労 =====
+  {cat:'給与・社労',     ico:'💰', title:'給与計算',             desc:'月次給与計算ワークシート',           url:'', badge:'sheets'},
+  {cat:'給与・社労',     ico:'⏰', title:'勤怠管理',             desc:'タイムカード集計',                  url:'', badge:'sheets'},
+  {cat:'給与・社労',     ico:'📑', title:'社労情報',             desc:'労務関係資料・各種申請書',           url:'', badge:'sheets'},
+
+  // ===== 経理・財務 =====
+  {cat:'経理・財務',     ico:'💹', title:'月次売上集計',         desc:'医院別の月次売上',                  url:'', badge:'sheets'},
+  {cat:'経理・財務',     ico:'💴', title:'入金管理',             desc:'デンタルローン入金確認',             url:'', badge:'sheets'},
+  {cat:'経理・財務',     ico:'🧾', title:'経費精算',             desc:'経費申請のとりまとめ',               url:'', badge:'sheets'},
+
+  // ===== 運営・予約 =====
+  {cat:'運営・予約',     ico:'📅', title:'予約枠監視',           desc:'shareconnect の枠状況',             url:'../sales/',       badge:'internal'},
+  {cat:'運営・予約',     ico:'🦷', title:'ドクターシフト',       desc:'医院別のドクター配置',               url:'', badge:'sheets'},
+  {cat:'運営・予約',     ico:'📈', title:'追いかけリスト',       desc:'再アプローチ対象一覧',               url:'../#follow-up',   badge:'internal'},
+
+  // ===== その他 =====
+  {cat:'その他重要事項', ico:'🎓', title:'スキル評価',           desc:'ドクター・スタッフのスキル評価',     url:'https://skill-eval.tkm-koike.workers.dev', badge:'internal'},
+  {cat:'その他重要事項', ico:'📢', title:'重要連絡事項',         desc:'社内お知らせ・告知事項',             url:'', badge:'sheets'},
+  {cat:'その他重要事項', ico:'📝', title:'議事録',               desc:'会議録の蓄積',                     url:'', badge:'sheets'},
+];
+
+/* ---------- render ---------- */
+function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+function render(filter){
+  const q = (filter || '').trim().toLowerCase();
+  const tools = q
+    ? TOOLS.filter(t => (t.title + ' ' + t.desc + ' ' + t.cat).toLowerCase().includes(q))
+    : TOOLS;
+  // カテゴリーごとにグループ化 (定義順を維持)
+  const byCat = new Map();
+  tools.forEach(t => {
+    if (!byCat.has(t.cat)) byCat.set(t.cat, []);
+    byCat.get(t.cat).push(t);
+  });
+  const host = document.getElementById('tools');
+  const emp = document.getElementById('emptyState');
+  if (!tools.length){
+    host.innerHTML = '';
+    emp.style.display = 'block';
+    return;
+  }
+  emp.style.display = 'none';
+  let h = '';
+  for (const [cat, list] of byCat){
+    const shortKey = cat.replace(/[・処理管理]/g,'').slice(0,4);
+    const catIco = {'入社':'📥','インセン':'🎯','給与':'💰','経理':'💹','運営':'📅','その他':'⭐'}[shortKey] || '📁';
+    h += `<div class="cat-block" data-c="${esc(shortKey)}">
+      <div class="cat-head">
+        <span class="ico">${catIco}</span>
+        <span class="nm">${esc(cat)}</span>
+        <span class="ct">${list.length}件</span>
+      </div>
+      <div class="cat-grid">`;
+    list.forEach(t => {
+      const ready = !!t.url;
+      const isExternal = ready && /^https?:\/\//.test(t.url) && !/seishokai\.github\.io|tkm-koike|skill-eval/.test(t.url);
+      const badgeKey = ready ? (t.badge || (isExternal ? 'sheets' : 'internal')) : 'todo';
+      const badgeText = {'sheets':'SHEETS', 'internal':'INTERNAL', 'todo':'準備中'}[badgeKey];
+      if (ready){
+        h += `<a class="tool-card" href="${esc(t.url)}" target="_blank" rel="noopener">
+          <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
+          <div class="tc-desc">${esc(t.desc)}</div>
+          <div class="tc-meta">
+            <span class="tc-badge ${badgeKey}">${badgeText}</span>
+            <span class="tc-ext">${isExternal?'外部 ↗':'内部 →'}</span>
+          </div>
+        </a>`;
+      } else {
+        h += `<div class="tool-card empty">
+          <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
+          <div class="tc-desc">${esc(t.desc)}</div>
+          <div class="tc-meta"><span class="tc-badge todo">準備中</span></div>
+        </div>`;
+      }
+    });
+    h += `</div></div>`;
+  }
+  host.innerHTML = h;
+}
+
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2000);
+}
+
+/* ---------- search ---------- */
+function setupSearch(){
+  const box = document.getElementById('search');
+  let timer = null;
+  box.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => render(box.value), 120);
+  });
+}
+
+/* ---------- gate ---------- */
+function isUnlocked(){
+  try{ return sessionStorage.getItem(UNLOCK_KEY)==='1' || localStorage.getItem(UNLOCK_KEY)==='1'; }
+  catch{ return false; }
+}
+function unlock(remember){
+  try{
+    sessionStorage.setItem(UNLOCK_KEY,'1');
+    if(remember) localStorage.setItem(UNLOCK_KEY,'1');
+  }catch{}
+  document.getElementById('gate').classList.add('hide');
+  document.getElementById('app').classList.add('show');
+  render();
+  setupSearch();
+}
+function logout(){
+  try{ sessionStorage.removeItem(UNLOCK_KEY); localStorage.removeItem(UNLOCK_KEY); }catch{}
+  location.reload();
+}
+function setupGate(){
+  const pw = document.getElementById('pw');
+  const btn = document.getElementById('pwBtn');
+  const err = document.getElementById('pwErr');
+  const remember = document.getElementById('pwRemember');
+  function tryLogin(){
+    if (pw.value === SHARED_PW){
+      err.classList.remove('show');
+      unlock(remember.checked);
+    } else {
+      err.classList.add('show');
+      pw.focus(); pw.select();
+    }
+  }
+  btn.addEventListener('click', tryLogin);
+  pw.addEventListener('keydown', e => {
+    if (e.key === 'Enter'){ e.preventDefault(); tryLogin(); }
+  });
+}
+
+(function init(){
+  setupGate();
+  if (isUnlocked()){
+    document.getElementById('gate').classList.add('hide');
+    document.getElementById('app').classList.add('show');
+    render();
+    setupSearch();
+  }
+})();
+</script>
+</body>
+</html>
