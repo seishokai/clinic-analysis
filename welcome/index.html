@@ -438,17 +438,123 @@
     transform: translateY(0);
   }
 
+  /* ── Sticky Progress Nav (新規) ── */
+  .progress-nav{
+    position:sticky; top:0; z-index:50;
+    background:rgba(253,250,243,0.96); backdrop-filter:blur(8px);
+    border-bottom:1px solid var(--border);
+    padding:10px 14px;
+  }
+  .progress-list{
+    display:flex; gap:6px; max-width:900px; margin:0 auto; overflow-x:auto;
+    scrollbar-width:none;
+  }
+  .progress-list::-webkit-scrollbar{display:none}
+  .progress-item{
+    flex:1; min-width:80px; text-decoration:none; color:var(--sub);
+    display:flex; flex-direction:column; align-items:center; gap:2px;
+    padding:6px 4px; border-radius:6px; transition:all .2s;
+    font-size:11px; letter-spacing:.05em; text-align:center; line-height:1.2;
+  }
+  .progress-item:hover{background:var(--paper); color:var(--ink)}
+  .progress-item.active{color:var(--gold); font-weight:600}
+  .progress-num{
+    font-family:'Cormorant Garamond',serif; font-size:14px; font-weight:600;
+    color:inherit; line-height:1;
+  }
+  .progress-bar{
+    height:2px; background:var(--border); border-radius:1px;
+    margin-top:8px; max-width:900px; margin-left:auto; margin-right:auto;
+    overflow:hidden;
+  }
+  .progress-bar i{
+    display:block; height:100%; background:var(--gold);
+    width:0%; transition:width .4s ease;
+  }
+
+  /* ── Next-step CTA (新規) ── */
+  .next-step{
+    margin-top:22px; padding:14px 18px;
+    background:linear-gradient(90deg, var(--paper) 0%, transparent 100%);
+    border-left:3px solid var(--gold); border-radius:0 4px 4px 0;
+    display:flex; align-items:center; gap:10px;
+    font-size:13px; color:var(--sub);
+  }
+  .next-step a{color:var(--gold); text-decoration:none; font-weight:500}
+  .next-step .arrow{font-size:18px; color:var(--gold)}
+
+  /* ── Final LINE section 強調 ── */
+  .step.final-line{
+    background:linear-gradient(135deg, #f0fdf4 0%, #fff 100%);
+    border-color:#86efac;
+    box-shadow:0 4px 32px rgba(21,196,101,.10);
+  }
+  .step.final-line .step-num{
+    border-color:var(--line); color:var(--line); background:#fff;
+  }
+  .final-checklist{
+    margin-top:14px; padding:14px 16px;
+    background:#fff; border:1px solid #bbf7d0; border-radius:6px;
+  }
+  .final-checklist h4{
+    font-size:12px; font-weight:600; color:#15803d; letter-spacing:.1em;
+    margin-bottom:10px; text-transform:uppercase;
+  }
+  .final-checklist ul{list-style:none; padding:0; margin:0}
+  .final-checklist li{
+    padding:8px 0 8px 28px; position:relative; font-size:13px;
+    line-height:1.7; border-bottom:1px dashed #e5dcc0;
+  }
+  .final-checklist li:last-child{border-bottom:none}
+  .final-checklist li::before{
+    content:'✓'; position:absolute; left:0; top:8px;
+    width:18px; height:18px; border-radius:50%;
+    background:var(--line); color:#fff; font-size:10px;
+    display:flex; align-items:center; justify-content:center; font-weight:700;
+  }
+  .final-checklist li strong{color:var(--ink); font-weight:600}
+
   /* ── Mobile ── */
   @media (max-width: 640px) {
-    section { padding: 60px 18px; }
-    .step { padding: 22px 18px; gap: 16px; flex-direction: column; }
-    .step-num { width: 56px; height: 56px; font-size: 20px; }
-    .docs-row { grid-template-columns: 32px 1fr 1.2fr; font-size: 11.5px; }
-    .docs-row > div { padding: 10px 8px; }
+    .hero{min-height:60vh; padding:30px 16px}
+    .hero-script{font-size:64px !important; margin-bottom:8px}
+    .hero-jp{font-size:18px !important; letter-spacing:.3em !important; margin-bottom:12px}
+    .hero-sub{font-size:12px !important; padding:0 16px}
+    section { padding: 44px 16px; }
+    .section-label{font-size:30px}
+    .section-title{margin-bottom:30px; font-size:18px !important; letter-spacing:.18em !important}
+    .step { padding: 20px 16px; gap: 14px; flex-direction: column; }
+    .step-num { width: 48px; height: 48px; font-size: 18px; }
+    .step-title{font-size:15.5px !important; letter-spacing:.06em !important}
+    .step-desc{font-size:13px; line-height:1.85}
+    .docs-row { grid-template-columns: 28px 1fr 1.1fr; font-size: 11px; }
+    .docs-row > div { padding: 10px 6px; }
     .bank-row { grid-template-columns: 1fr; }
     .bank-row.header { display: none; }
     .bank-row > div:first-child { border-bottom: 1px dashed var(--border); border-right: none; font-weight: 600; }
+    .step-btn{padding:14px 22px; font-size:14px; width:100%; justify-content:center}
+    .next-step{flex-direction:column; align-items:flex-start; gap:4px}
+    .progress-item{font-size:10px; min-width:64px}
+    .closing{padding:60px 18px 50px}
   }
+
+  /* ── 折りたたみ (通勤手当表など) ── */
+  details.collapse{
+    margin-top:16px; border:1px solid var(--border);
+    border-radius:6px; background:#fff; overflow:hidden;
+  }
+  details.collapse summary{
+    list-style:none; cursor:pointer; padding:14px 18px;
+    font-size:13px; font-weight:600; color:var(--ink);
+    background:var(--paper); display:flex; justify-content:space-between;
+    align-items:center; letter-spacing:.08em;
+  }
+  details.collapse summary::-webkit-details-marker{display:none}
+  details.collapse summary::after{
+    content:'▼'; font-size:10px; color:var(--gold); transition:transform .2s;
+  }
+  details.collapse[open] summary::after{transform:rotate(180deg)}
+  details.collapse .collapse-body{padding:14px 18px}
 </style>
 </head>
 <body>
@@ -463,6 +569,17 @@
 </section>
 
 <!-- メッセージ -->
+<!-- Progress Nav (sticky) -->
+<nav class="progress-nav" aria-label="入社ステップ">
+  <div class="progress-list">
+    <a href="#step1" class="progress-item" data-step="1"><span class="progress-num">01</span>フォーム入力</a>
+    <a href="#step2" class="progress-item" data-step="2"><span class="progress-num">02</span>口座開設</a>
+    <a href="#step3" class="progress-item" data-step="3"><span class="progress-num">03</span>書類の準備</a>
+    <a href="#step4" class="progress-item" data-step="4"><span class="progress-num">04</span>LINE提出</a>
+  </div>
+  <div class="progress-bar"><i id="progBar"></i></div>
+</nav>
+
 <section class="reveal">
   <div class="section-label">Message</div>
   <h2 class="section-title">はじめに</h2>
@@ -471,61 +588,34 @@
     数ある選択肢の中から、<strong>清翔会</strong>を選んでくださり<br>
     本当にありがとうございます。<br><br>
     このページでは、入社までに必要なお手続きを<br>
-    5つのステップでご案内しております。<br>
-    すべて<strong>ピノキオ社労システム</strong> (公式LINE) より<br>
-    お手続きいただけます。<br><br>
-    ご不明な点がございましたら、<br>
-    お気軽にピノキオまでお問い合わせください。
+    <strong>4つのステップ</strong>で順番にご案内します。<br>
+    上から順に進めていただければ大丈夫です。<br><br>
+    最後のステップで <strong>ピノキオ公式LINE</strong> に友だち登録し、<br>
+    準備した情報・書類を一気に送付して完了となります。
   </div>
 </section>
 
 <!-- ステップ -->
 <section class="reveal">
   <div class="section-label">Onboarding</div>
-  <h2 class="section-title">入社までの 5 ステップ</h2>
+  <h2 class="section-title">入社までの 4 ステップ</h2>
   <div class="steps">
 
-    <!-- STEP 1 -->
-    <div class="step">
+    <!-- STEP 1: 各種フォーム入力 -->
+    <div class="step" id="step1">
       <div class="step-num">01</div>
       <div class="step-body">
-        <div class="step-title">ピノキオ LINE 公式アカウントを友だち追加</div>
-        <p class="step-desc">下記のリンクまたは QR コードから、ピノキオ公式LINEを友だち登録してください。すべての入社手続きはこちらから進みます。</p>
-        <a class="step-btn line-btn" href="https://lin.ee/m9cRa0b" target="_blank" rel="noopener">公式LINEを友だち追加</a>
-      </div>
-    </div>
-
-    <!-- STEP 2 -->
-    <div class="step">
-      <div class="step-num">02</div>
-      <div class="step-body">
-        <div class="step-title">トーク画面に基本情報を送信</div>
-        <p class="step-desc">ピノキオのトーク画面に、下記の情報をご送信ください。</p>
-        <ul class="step-list">
-          <li>名前 (漢字)</li>
-          <li>名前 (ふりがな)</li>
-          <li>職種 (Dr / DH / DA / 事務)</li>
-          <li>所属医院</li>
-          <li>電話番号</li>
-        </ul>
-        <div class="step-note">※ ドクターや所属が決まっていない方は、<strong>所属医院欄は空白で構いません</strong>。</div>
-      </div>
-    </div>
-
-    <!-- STEP 3 -->
-    <div class="step">
-      <div class="step-num">03</div>
-      <div class="step-body">
         <div class="step-title">各種フォームを入力</div>
-        <p class="step-desc">下記の <strong>2つのフォーム</strong> をご入力ください。LINE メニュー下部の「入社が決まった方」からもアクセスできます。</p>
+        <p class="step-desc">まずは下記の <strong>2つのフォーム</strong> を入力してください。<br>所要時間 約5分。スマホからそのまま入力できます。</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
           <a class="step-btn alt" href="https://docs.google.com/forms/d/e/1FAIpQLSdTWF_bqq_44gbdEP5BKNTpw1U6fFCNXUadp7i0UBfPsBggiA/viewform" target="_blank" rel="noopener">📝 入社フォーム</a>
           <a class="step-btn alt" href="https://docs.google.com/forms/d/e/1FAIpQLScgiFT0G-KCwt_j_IMBUjREI_rR-gUQiigv0WnADrPj2g-AwA/viewform" target="_blank" rel="noopener">🚉 通勤経路フォーム</a>
         </div>
 
-        <!-- 通勤手当について -->
-        <div style="margin-top:18px;padding:14px 16px;background:var(--paper);border:1px solid var(--border);border-radius:4px">
-          <div style="font-size:13px;font-weight:600;color:var(--ink);margin-bottom:8px;letter-spacing:0.1em">🚗 通勤手当について</div>
+        <!-- 通勤手当 (折りたたみ) -->
+        <details class="collapse">
+          <summary>🚗 通勤手当について (タップで開く)</summary>
+          <div class="collapse-body">
           <ul class="step-list" style="margin-bottom:8px">
             <li><strong>公共交通機関 (電車・バス)</strong>: 1ヶ月分の定期代をご入力ください</li>
             <li><strong>マイカー・バイク通勤</strong>: 片道距離 (km) をご入力ください (下表参照)</li>
@@ -599,18 +689,67 @@
             </div>
           </div>
           <div style="margin-top:8px;font-size:10px;color:var(--text-muted)">※ 非課税限度額は税法上の上限。これを超える支給分は所得税の対象となります。</div>
-        </div>
+          </div>
+        </details>
 
         <div class="step-note" style="margin-top:14px">※ <strong>歯科医師の方</strong>: 通勤経路は <strong>名古屋駅まで</strong> をご入力ください。名古屋駅以外の医院への通勤経路は、別途「通勤申請書」を入社書類と一緒にお送りいたします。</div>
+
+        <div class="next-step">
+          <span class="arrow">↓</span>
+          <span>入力できたら次は <a href="#step2">STEP 2: 銀行口座の開設</a> へ</span>
+        </div>
       </div>
     </div>
 
-    <!-- STEP 4 -->
-    <div class="step">
-      <div class="step-num">04</div>
+    <!-- STEP 2: 銀行口座の開設 -->
+    <div class="step" id="step2">
+      <div class="step-num">02</div>
       <div class="step-body">
-        <div class="step-title">必要書類の写真を LINE で送付</div>
-        <p class="step-desc">下記の書類を写真に撮り、ピノキオ LINE のトーク画面へ送信してください。</p>
+        <div class="step-title">銀行口座の開設</div>
+        <p class="step-desc">所属医院により、開設する銀行が異なります。下記の表でご確認ください。スマホから簡単に口座開設できます。</p>
+
+        <div class="bank-table">
+          <div class="bank-row header">
+            <div>医院</div>
+            <div>開設先銀行</div>
+          </div>
+          <div class="bank-row">
+            <div class="bank-name">エスカ / アール / ウィズ / ルミナス / 茶屋 / 知立 / 小牧 / 八事 / アサノ / 中日</div>
+            <div>岐阜信用金庫 名古屋支店</div>
+          </div>
+          <div class="bank-row">
+            <div class="bank-name">大森 / 銀座 / 京都河原町</div>
+            <div>ゆうちょ銀行</div>
+          </div>
+          <div class="bank-row">
+            <div class="bank-name">岩田</div>
+            <div>どちらの口座でも可</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+          <a class="step-btn alt" href="https://www.gifushin.co.jp/service/spkaisetsu/index.html" target="_blank" rel="noopener">🏦 岐阜信用金庫 開設ガイド</a>
+          <a class="step-btn alt" href="https://www.jp-bank.japanpost.jp/kaisetu/kat_index.html" target="_blank" rel="noopener">📮 ゆうちょ銀行 開設ガイド</a>
+        </div>
+
+        <div class="step-note" style="margin-top:14px">
+          ※ 勤務先名入力欄は、<strong>所属医院名</strong> をご入力ください。所属不明時や医院名が入りきらない場合は <strong>「医療法人清翔会」</strong> とご入力ください。<br>
+          ※ 入社翌月の <strong>10日まで</strong> に口座開設・通帳写真の送付をいただければ問題ございません。
+        </div>
+
+        <div class="next-step">
+          <span class="arrow">↓</span>
+          <span>口座開設できたら次は <a href="#step3">STEP 3: 必要書類の準備</a> へ</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- STEP 3: 必要書類の準備 -->
+    <div class="step" id="step3">
+      <div class="step-num">03</div>
+      <div class="step-body">
+        <div class="step-title">必要書類の写真を準備</div>
+        <p class="step-desc">下記の書類を <strong>スマホで写真撮影</strong> しておいてください。送信は次のSTEP 4で行います。</p>
 
         <div class="docs-table">
           <div class="docs-row header">
@@ -636,7 +775,7 @@
           <div class="docs-row">
             <div class="docs-num">④</div>
             <div>通帳の見開きページ</div>
-            <div class="docs-target">STEP 5 で開設後</div>
+            <div class="docs-target">STEP 2 で開設後</div>
           </div>
           <div class="docs-row">
             <div class="docs-num">⑤</div>
@@ -656,44 +795,34 @@
         </div>
 
         <div class="step-note">※ パート・アルバイトで出勤頻度が少なく、定期代の方が高くなる方は <strong>⑤は不要</strong> です。</div>
+
+        <div class="next-step">
+          <span class="arrow">↓</span>
+          <span>準備できたら最終ステップ <a href="#step4">STEP 4: LINEで一気に提出</a> へ</span>
+        </div>
       </div>
     </div>
 
-    <!-- STEP 5 -->
-    <div class="step">
-      <div class="step-num">05</div>
+    <!-- STEP 4: ピノキオ LINE 登録 + 一気に提出 (最終) -->
+    <div class="step final-line" id="step4">
+      <div class="step-num">04</div>
       <div class="step-body">
-        <div class="step-title">銀行口座の開設</div>
-        <p class="step-desc">所属医院により、開設する銀行が異なります。下記の表をご確認のうえ口座開設をお願いいたします。</p>
+        <div class="step-title">ピノキオ公式LINEで すべて送付（最終ステップ）</div>
+        <p class="step-desc">最後に <strong>ピノキオ公式LINE</strong> に友だち登録し、STEP 1〜3 で準備した内容をまとめて送付してください。これで完了です！</p>
 
-        <div class="bank-table">
-          <div class="bank-row header">
-            <div>医院</div>
-            <div>開設先銀行</div>
-          </div>
-          <div class="bank-row">
-            <div class="bank-name">エスカ / アール / ウィズ / ルミナス / 茶屋 / 知立 / 小牧 / 八事 / アサノ / 中日</div>
-            <div>岐阜信用金庫 名古屋支店</div>
-          </div>
-          <div class="bank-row">
-            <div class="bank-name">大森 / 銀座 / 京都河原町</div>
-            <div>ゆうちょ銀行</div>
-          </div>
-          <div class="bank-row">
-            <div class="bank-name">岩田</div>
-            <div>どちらの口座でも可</div>
-          </div>
+        <a class="step-btn line-btn" href="https://lin.ee/m9cRa0b" target="_blank" rel="noopener" style="width:100%;justify-content:center;padding:16px 24px;font-size:15px">公式LINEを友だち追加</a>
+
+        <div class="final-checklist">
+          <h4>友だち追加後にLINEで送るもの</h4>
+          <ul>
+            <li><strong>① 基本情報</strong>：名前 (漢字/ふりがな) / 職種 (Dr・DH・DA・事務) / 所属医院 / 電話番号</li>
+            <li><strong>② 書類の写真</strong>：STEP 3 で準備した書類 ①〜⑦</li>
+          </ul>
         </div>
 
-        <p class="step-desc" style="margin-top:14px">スマートフォンから簡単に口座開設できます。下記の公式ガイドをご参照ください。</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:10px">
-          <a class="step-btn alt" href="https://www.gifushin.co.jp/service/spkaisetsu/index.html" target="_blank" rel="noopener">🏦 岐阜信用金庫 開設ガイド</a>
-          <a class="step-btn alt" href="https://www.jp-bank.japanpost.jp/kaisetu/kat_index.html" target="_blank" rel="noopener">📮 ゆうちょ銀行 開設ガイド</a>
-        </div>
-
-        <div class="step-note" style="margin-top:14px">
-          ※ 勤務先名入力欄は、<strong>所属医院名</strong> をご入力ください。所属不明時や医院名が入りきらない場合は <strong>「医療法人清翔会」</strong> とご入力ください。<br>
-          ※ 入社翌月の <strong>10日まで</strong> に口座開設・通帳写真の送付をいただければ問題ございません。
+        <div class="step-note">
+          ※ ドクターや所属が決まっていない方は、<strong>所属医院欄は空白</strong>で構いません。<br>
+          ※ ④通帳写真は STEP 2 の口座開設後でOK。順次送付してください。
         </div>
       </div>
     </div>
@@ -732,6 +861,41 @@
     });
   }, { threshold: 0.15 });
   document.querySelectorAll('.reveal').forEach(el => io.observe(el));
+
+  // Sticky progress nav: 現在のセクション ハイライト + 進捗バー
+  (function(){
+    const items = Array.from(document.querySelectorAll('.progress-item'));
+    const steps = items.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+    const bar = document.getElementById('progBar');
+    if(!steps.length || !bar) return;
+
+    function updateProgress(){
+      const vy = window.scrollY + window.innerHeight * 0.35;
+      let activeIdx = -1;
+      steps.forEach((s, i) => {
+        const top = s.getBoundingClientRect().top + window.scrollY;
+        if(vy >= top) activeIdx = i;
+      });
+      items.forEach((a, i) => a.classList.toggle('active', i === activeIdx));
+      // 進捗バー (各stepを通過すると 25%, 50%, 75%, 100%)
+      const pct = activeIdx < 0 ? 0 : ((activeIdx + 1) / steps.length) * 100;
+      bar.style.width = pct + '%';
+    }
+    window.addEventListener('scroll', updateProgress, {passive:true});
+    window.addEventListener('resize', updateProgress);
+    updateProgress();
+
+    // アンカークリック時のオフセット調整 (sticky nav 分)
+    items.forEach(a => {
+      a.addEventListener('click', e => {
+        const target = document.querySelector(a.getAttribute('href'));
+        if(!target) return;
+        e.preventDefault();
+        const top = target.getBoundingClientRect().top + window.scrollY - 80;
+        window.scrollTo({top, behavior:'smooth'});
+      });
+    });
+  })();
 </script>
 
 </body>
