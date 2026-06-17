@@ -9,11 +9,12 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Great+Vibes&display=swap">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#f8f9fa; --card:#fff; --border:#e5e7eb; --border-light:#f0f0f0;
   --text:#1a1a1a; --text-sub:#6b7280; --text-muted:#9ca3af;
-  --accent:#1a1a1a; --gold:#c9a55c; --paper:#fdfaf3;
+  --accent:#1a1a1a; --gold:#c9a55c;
   --green:#22c55e; --blue:#3b82f6; --red:#dc2626; --orange:#f97316; --purple:#8b5cf6;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -24,11 +25,10 @@ body{
   -webkit-font-smoothing:antialiased;font-size:14px;
 }
 button{font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent}
-input{font-family:inherit;font-size:16px}
+input,select,textarea{font-family:inherit;font-size:16px}
 a{color:inherit}
 
 /* ======== Header ======== */
-.app{min-height:100dvh}
 .header{
   background:#fff;border-bottom:1px solid var(--border);
   padding:0 18px;height:52px;display:flex;align-items:center;gap:10px;
@@ -43,13 +43,35 @@ a{color:inherit}
   background:var(--bg);border-radius:8px;padding:6px 12px;font-size:13px;min-width:200px;
 }
 .search-box input{background:none;border:none;outline:none;flex:1;font-size:13px}
+.btn-mini{
+  padding:7px 12px;border:1px solid var(--border);background:#fff;border-radius:8px;
+  font-size:12px;font-weight:600;color:var(--text-sub);cursor:pointer;
+  display:inline-flex;align-items:center;gap:5px;
+}
+.btn-mini:hover{border-color:var(--accent);color:var(--text)}
+.btn-mini.danger:hover{border-color:var(--red);color:var(--red)}
+.btn-mini.editor{background:#dcfce7;border-color:#86efac;color:#15803d}
+.btn-mini.editor:hover{background:#bbf7d0}
 
-.wrap{max-width:1280px;margin:0 auto;padding:24px 24px 60px}
-.page-header{margin-bottom:24px}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 24px 80px}
+.page-header{margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap}
 .page-header h1{font-size:24px;font-weight:700;letter-spacing:.05em}
 .page-header p{color:var(--text-sub);font-size:13px;margin-top:4px}
 
-/* ======== Section / Category ======== */
+/* ======== Sync badge ======== */
+.sync-badge{
+  display:inline-flex;align-items:center;gap:5px;font-size:11px;padding:5px 10px;
+  border-radius:14px;background:var(--bg);border:1px solid var(--border);
+  color:var(--text-sub);font-weight:600;
+}
+.sync-badge .dot{width:7px;height:7px;border-radius:50%}
+.sync-badge[data-s="synced"] .dot{background:var(--green)}
+.sync-badge[data-s="syncing"] .dot{background:var(--orange);animation:pulse 1.2s ease-in-out infinite}
+.sync-badge[data-s="error"] .dot{background:var(--red)}
+.sync-badge[data-s="init"] .dot{background:var(--text-muted)}
+@keyframes pulse{0%,100%{opacity:.4}50%{opacity:1}}
+
+/* ======== Section ======== */
 .section-block{margin-bottom:36px}
 .section-head{
   display:flex;align-items:center;gap:10px;margin-bottom:12px;
@@ -63,12 +85,10 @@ a{color:inherit}
 .section-head .lock{font-size:11px;color:var(--text-muted);font-weight:600;margin-left:6px;letter-spacing:.06em}
 .section-head .lock.locked{color:#9a3412}
 .section-head .lock.unlocked{color:#15803d}
+.section-head .sp{flex:1}
 
-/* オープンセクションのアクセント */
 .section-block[data-open="1"] .section-head{border-bottom-color:var(--green)}
 .section-block[data-open="1"] .section-head .ico{background:#dcfce7}
-
-/* ロックセクションのアクセント */
 .section-block[data-locked="1"] .section-head{border-bottom-color:#fdba74}
 .section-block[data-locked="1"] .section-head .ico{background:#fff7ed}
 .section-block[data-locked="1"].unlocked .section-head{border-bottom-color:#86efac}
@@ -79,12 +99,10 @@ a{color:inherit}
   display:flex;align-items:center;gap:8px;margin-bottom:10px;
   padding-bottom:6px;border-bottom:1px solid var(--border);
 }
-.cat-head .ico{
-  width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;
-  font-size:13px;flex-shrink:0;background:var(--bg);
-}
 .cat-head .nm{font-size:13px;font-weight:700;letter-spacing:.05em;color:var(--text-sub);text-transform:uppercase}
 .cat-head .ct{font-size:11px;color:var(--text-muted);font-weight:500;margin-left:4px}
+.cat-head .sp{flex:1}
+.cat-head .cat-actions{display:flex;gap:4px}
 
 .cat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 
@@ -96,22 +114,45 @@ a{color:inherit}
   cursor:pointer;position:relative;min-height:96px;
 }
 .tool-card:hover{border-color:var(--accent);transform:translateY(-2px);box-shadow:0 6px 18px rgba(0,0,0,.06)}
-.tool-card.empty{background:#fafafa;border-style:dashed;color:var(--text-muted);cursor:default}
+.tool-card.empty{background:#fafafa;border-style:dashed;color:var(--text-muted)}
 .tool-card.empty:hover{transform:none;box-shadow:none;border-color:var(--border)}
 .tool-card .tc-head{display:flex;align-items:center;gap:8px}
 .tool-card .tc-ico{font-size:18px;flex-shrink:0}
 .tool-card .tc-title{font-size:13.5px;font-weight:700;color:var(--text);letter-spacing:.02em;line-height:1.3;flex:1;min-width:0;word-break:break-all}
 .tool-card.empty .tc-title{color:var(--text-muted)}
 .tool-card .tc-desc{font-size:11.5px;color:var(--text-sub);line-height:1.55;flex:1}
-.tool-card .tc-meta{
-  display:flex;align-items:center;gap:6px;margin-top:auto;
-  font-size:10.5px;color:var(--text-muted);font-weight:600;letter-spacing:.04em;
-}
+.tool-card .tc-meta{display:flex;align-items:center;gap:6px;margin-top:auto;font-size:10.5px;color:var(--text-muted);font-weight:600;letter-spacing:.04em}
 .tool-card .tc-ext{display:inline-flex;align-items:center;gap:3px}
 .tool-card .tc-badge{padding:2px 6px;border-radius:4px;font-size:9.5px;font-weight:700;letter-spacing:.04em;text-transform:uppercase}
 .tc-badge.sheets{background:#dcfce7;color:#15803d}
 .tc-badge.internal{background:#dbeafe;color:#1d4ed8}
 .tc-badge.todo{background:#fef3c7;color:#92400e}
+
+/* ======== Editor (admin) mode ======== */
+.editor-mode .tool-card{padding-top:30px}
+.editor-mode .tool-actions{
+  position:absolute;top:6px;right:6px;display:flex;gap:3px;
+  background:rgba(255,255,255,.95);border:1px solid var(--border);border-radius:8px;padding:2px;
+  opacity:0;transition:opacity .12s;
+}
+.editor-mode .tool-card:hover .tool-actions,
+.editor-mode .tool-card.touched .tool-actions{opacity:1}
+.tool-actions{display:none}
+.editor-mode .tool-actions{display:flex}
+.tool-actions button{
+  width:24px;height:24px;border:none;background:transparent;border-radius:5px;
+  font-size:13px;cursor:pointer;color:var(--text-sub);padding:0;
+  display:inline-flex;align-items:center;justify-content:center;
+}
+.tool-actions button:hover{background:var(--bg);color:var(--text)}
+.tool-actions button.del:hover{background:#fee2e2;color:#dc2626}
+.add-card{
+  background:transparent;border:1.5px dashed var(--border);color:var(--text-muted);
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:12px;font-weight:600;cursor:pointer;min-height:96px;border-radius:12px;
+  transition:all .15s;
+}
+.add-card:hover{border-color:var(--accent);color:var(--text);background:#fafafa}
 
 /* ======== Lock UI ======== */
 .lock-box{
@@ -128,16 +169,14 @@ a{color:inherit}
   font-size:15px;outline:none;background:#fff;color:var(--text);
 }
 .lock-box input[type=password]:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(253,186,116,.25)}
-.lock-box button{
+.lock-box button[type=submit]{
   padding:12px 20px;background:var(--accent);color:#fff;border:none;border-radius:8px;
   font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.05em;
 }
-.lock-box button:hover{opacity:.85}
+.lock-box button[type=submit]:hover{opacity:.85}
 .lock-box .lock-err{font-size:12px;color:var(--red);margin-top:2px;font-weight:600;display:none}
 .lock-box .lock-err.show{display:block}
-.unlock-meta{
-  display:flex;justify-content:flex-end;margin-top:6px;
-}
+.unlock-meta{display:flex;justify-content:flex-end;margin-top:6px}
 .btn-relock{
   padding:5px 10px;border:1px solid var(--border);background:#fff;border-radius:6px;
   font-size:11px;color:var(--text-sub);cursor:pointer;
@@ -147,6 +186,7 @@ a{color:inherit}
 .empty-state{text-align:center;padding:60px 20px;color:var(--text-sub)}
 .empty-state h3{color:var(--text);font-size:16px;margin-bottom:6px}
 
+/* ======== Toast / Banner ======== */
 .toast{
   position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
   background:var(--accent);color:#fff;padding:11px 22px;border-radius:10px;
@@ -154,6 +194,65 @@ a{color:inherit}
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.err{background:var(--red)}
+
+.setup-banner{
+  display:none;margin-bottom:14px;padding:12px 16px;
+  border:1px solid #fdba74;background:#fff7ed;border-radius:8px;
+  color:#9a3412;font-size:13px;line-height:1.6;
+  gap:10px;align-items:flex-start;
+}
+.setup-banner.show{display:flex}
+.setup-banner b{color:#7c2d12}
+
+/* ======== Modal ======== */
+.modal{position:fixed;inset:0;background:rgba(8,24,29,.65);z-index:300;display:none;align-items:center;justify-content:center;padding:18px}
+.modal.show{display:flex}
+.modal-body{background:#fff;border-radius:14px;padding:24px;max-width:560px;width:100%;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.3)}
+.modal-head{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px;gap:10px}
+.modal-title{font-size:16px;font-weight:700;color:var(--text);letter-spacing:.05em}
+.modal-sub{font-size:11.5px;color:var(--text-sub);margin-top:2px}
+.modal-close{
+  width:32px;height:32px;border-radius:50%;border:1px solid var(--border);background:#fff;
+  color:var(--text-sub);font-size:18px;cursor:pointer;
+}
+.modal-close:hover{border-color:var(--red);color:var(--red)}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.form-grid .full{grid-column:1/-1}
+.field{display:flex;flex-direction:column;gap:4px}
+.field label{font-size:10.5px;font-weight:700;color:var(--text-sub);text-transform:uppercase;letter-spacing:.3px}
+.field input, .field select, .field textarea{
+  width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:8px;
+  font-size:14px;background:#fff;outline:none;color:var(--text);
+}
+.field input:focus, .field select:focus, .field textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(0,0,0,.05)}
+.field textarea{min-height:60px;resize:vertical;line-height:1.5}
+.field .hint{font-size:10.5px;color:var(--text-muted);line-height:1.4;margin-top:2px}
+
+.icon-pick{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
+.icon-pick button{
+  width:34px;height:34px;border:1px solid var(--border);background:#fff;border-radius:8px;
+  font-size:18px;cursor:pointer;padding:0;
+}
+.icon-pick button:hover{border-color:var(--accent)}
+.icon-pick button.on{background:var(--accent);border-color:var(--accent)}
+
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap}
+.btn-primary{
+  padding:11px 22px;background:var(--accent);color:#fff;border:none;border-radius:8px;
+  font-size:13px;font-weight:700;letter-spacing:.05em;cursor:pointer;
+}
+.btn-primary:hover{opacity:.85}
+.btn-secondary{
+  padding:11px 18px;background:#fff;color:var(--text-sub);border:1px solid var(--border);border-radius:8px;
+  font-size:13px;font-weight:600;cursor:pointer;
+}
+.btn-secondary:hover{border-color:var(--accent);color:var(--text)}
+.btn-danger{
+  padding:11px 18px;background:#fff;color:var(--red);border:1px solid var(--red);border-radius:8px;
+  font-size:13px;font-weight:600;cursor:pointer;
+}
+.btn-danger:hover{background:var(--red);color:#fff}
 
 @media(max-width:920px){
   .wrap{padding:18px 14px 60px}
@@ -163,13 +262,13 @@ a{color:inherit}
   .tool-card .tc-title{font-size:13px}
   .section-head .nm{font-size:14px}
   .lock-box{padding:20px 16px}
+  .form-grid{grid-template-columns:1fr}
 }
 </style>
 </head>
 <body>
 
-<!-- ===== App (no main gate — open access for top-level page) ===== -->
-<div class="app" id="app">
+<div class="app">
   <header class="header">
     <a href="../sales/" class="header-brand" title="HOME へ戻る">
       <span class="b">Aladdin</span>
@@ -178,14 +277,28 @@ a{color:inherit}
     <div class="spacer"></div>
     <div class="search-box">
       <span>🔍</span>
-      <input type="search" id="search" placeholder="ツール検索 (名前)" autocomplete="off">
+      <input type="search" id="search" placeholder="ツール検索" autocomplete="off">
     </div>
+    <div class="sync-badge" id="syncBadge" data-s="init"><span class="dot"></span><span id="syncText">準備中</span></div>
+    <button class="btn-mini" id="editorBtn" onclick="toggleEditor()">✏ 編集</button>
   </header>
 
   <div class="wrap">
     <div class="page-header">
-      <h1>事務ダッシュボード</h1>
-      <p>シフト・入社・予約などはオープンです。<strong>人事・労務 / 財務・給料</strong>のフォルダはそれぞれ別パスワードでロック。</p>
+      <div>
+        <h1>事務ダッシュボード</h1>
+        <p>シフト・入社・予約などはオープン。<strong>人事・労務 / 財務・給料</strong>はそれぞれパスワード保護。</p>
+      </div>
+    </div>
+
+    <div class="setup-banner" id="setupBanner">
+      <span style="font-size:18px">⚙</span>
+      <div>
+        <b>クラウド同期のセットアップが未完了です。</b><br>
+        Supabase に <code>admin_tools</code> テーブルが見つかりません。
+        <a href="https://supabase.com/dashboard/project/ndlfqrvoejwgqfdtghmg/sql" target="_blank" rel="noopener">SQL Editor</a>
+        で <code>migrations/admin_tools.sql</code> を実行してください。
+      </div>
     </div>
 
     <div id="sections"></div>
@@ -197,80 +310,102 @@ a{color:inherit}
   </div>
 </div>
 
+<!-- ======== Edit Modal ======== -->
+<div class="modal" id="toolModal" onclick="if(event.target.id==='toolModal')closeModal()">
+  <div class="modal-body">
+    <div class="modal-head">
+      <div>
+        <div class="modal-title" id="modalTitle">ツールを追加</div>
+        <div class="modal-sub" id="modalSub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <form id="toolForm" onsubmit="saveTool(event); return false">
+      <div class="form-grid">
+        <div class="field">
+          <label>セクション</label>
+          <select id="f-section">
+            <option value="open">🟢 オープン</option>
+            <option value="hr">🏢 人事・労務</option>
+            <option value="fin">💼 財務・給料</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>カテゴリー</label>
+          <input id="f-category" list="cat-options" placeholder="例: 入社・退社処理" required>
+          <datalist id="cat-options"></datalist>
+          <div class="hint">既存のカテゴリ名を選ぶか、新しい名前を入力</div>
+        </div>
+        <div class="field">
+          <label>アイコン (絵文字1個)</label>
+          <input id="f-icon" maxlength="4" placeholder="📋" required>
+          <div class="icon-pick" id="iconPick"></div>
+        </div>
+        <div class="field">
+          <label>並び順 (10刻み推奨)</label>
+          <input id="f-sort" type="number" step="10" value="100">
+        </div>
+        <div class="field full">
+          <label>タイトル</label>
+          <input id="f-title" maxlength="60" required>
+        </div>
+        <div class="field full">
+          <label>説明文</label>
+          <textarea id="f-desc" maxlength="200" placeholder="ツールの説明 (200文字まで)"></textarea>
+        </div>
+        <div class="field full">
+          <label>URL (空欄なら「準備中」)</label>
+          <input id="f-url" type="url" placeholder="https://docs.google.com/...">
+        </div>
+        <div class="field full">
+          <label>バッジ</label>
+          <select id="f-badge">
+            <option value="sheets">🟢 SHEETS (外部スプレッドシート)</option>
+            <option value="internal">🔵 INTERNAL (Aladdin内ページ)</option>
+            <option value="todo">🟠 準備中 (URL 設定後に開放)</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button type="button" class="btn-danger" id="btnDelete" style="display:none" onclick="deleteTool()">🗑 削除</button>
+        <div style="flex:1"></div>
+        <button type="button" class="btn-secondary" onclick="closeModal()">キャンセル</button>
+        <button type="submit" class="btn-primary" id="btnSave">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
 'use strict';
 
 /* ============================================================
-   セクション定義
-   - open: 認証なし
-   - locked: それぞれ独立のパスワード (sessionStorage 単位で記憶)
-   各ツール: cat (小カテゴリ), ico, title, desc, url, badge
-   url 空文字 → 準備中
+   Supabase 接続
    ============================================================ */
+const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+const CACHE_KEY = 'admin_tools_cache_v1';
 
-// 🟢 オープンセクション — 全員アクセス可能
-const OPEN_SECTION = {
-  key: 'open',
-  title: 'オープン — 全員アクセス可',
-  icon: '🟢',
-  tools: [
-    // ===== 入社・退社 =====
-    {cat:'入社・退社処理', ico:'🌸', title:'入社時',               desc:'入社手続きのご案内ページ (社員名簿フォーム含む 4ステップ)', url:'../welcome/', badge:'internal'},
-    {cat:'入社・退社処理', ico:'📤', title:'退職手続き',           desc:'退職時の手続きフォーム',           url:'https://forms.gle/8bvCP99ZHuTXrTxo9', badge:'sheets'},
+/* 編集モード パスワード (誰でもアクセスはできるが編集は保護) */
+const EDITOR_PW = 'kanri1234';
 
-    // ===== 運営・予約 =====
-    {cat:'運営・予約',     ico:'📅', title:'予約枠監視',           desc:'shareconnect の枠状況',           url:'../sales/', badge:'internal'},
-    {cat:'運営・予約',     ico:'🦷', title:'ドクターシフト',       desc:'医院別ドクター配置 (Google Sheets)', url:'https://docs.google.com/spreadsheets/d/1tKjXNJNPInAl0CTXHKd3G-792JNiU37inY0p6hlUPwM/edit?usp=sharing', badge:'sheets'},
-    {cat:'運営・予約',     ico:'🗓️', title:'アポツール (stransa)',  desc:'外部アポ管理ツール',              url:'https://user.stransa.co.jp/login', badge:'sheets'},
-    {cat:'運営・予約',     ico:'📆', title:'新予約ツール',          desc:'shareconnect 予約管理ダッシュ',    url:'https://reserve.shareconnect.co.jp/admin/dashboard', badge:'sheets'},
-    {cat:'運営・予約',     ico:'📈', title:'追いかけリスト',       desc:'再アプローチ対象一覧',             url:'../#follow-up', badge:'internal'},
-
-    // ===== その他 =====
-    {cat:'その他重要事項', ico:'🎓', title:'スキル評価',           desc:'ドクター・スタッフのスキル評価',   url:'https://skill-eval.tkm-koike.workers.dev', badge:'internal'},
-    {cat:'その他重要事項', ico:'📢', title:'重要連絡事項',         desc:'社内お知らせ・告知事項',           url:'', badge:'sheets'},
-    {cat:'その他重要事項', ico:'📝', title:'議事録',               desc:'会議録の蓄積',                   url:'', badge:'sheets'},
-  ]
+/* セクション定義 (固定。passwords は HR / FIN のみ) */
+const SECTIONS = {
+  open: { key:'open', title:'オープン — 全員アクセス可',      icon:'🟢', open:true,  password:null,        hint:'' },
+  hr:   { key:'hr',   title:'人事・労務',                       icon:'🏢', open:false, password:'jinji1234', hint:'人事・労務担当のスタッフのみアクセス可' },
+  fin:  { key:'fin',  title:'財務・給料',                       icon:'💼', open:false, password:'keiri1234', hint:'財務・経理担当のスタッフのみアクセス可' },
 };
+const SECTION_ORDER = ['open','hr','fin'];
 
-// 🔒 ロックセクション 1: 人事・労務
-const HR_SECTION = {
-  key: 'hr',
-  title: '人事・労務',
-  icon: '🏢',
-  password: 'jinji1234',
-  hint: '人事・労務担当のスタッフのみアクセス可',
-  tools: [
-    {cat:'入社処理 (機密)', ico:'📥', title:'新入社員 連絡票',     desc:'新入社員の基本情報・配属を一覧集約', url:'', badge:'sheets'},
-    {cat:'入社処理 (機密)', ico:'📄', title:'雇用契約書テンプレ',   desc:'医院・職種別の契約書ひな形',       url:'', badge:'sheets'},
-    {cat:'勤怠・労務',     ico:'⏰', title:'勤怠管理',             desc:'タイムカード集計',                url:'', badge:'sheets'},
-    {cat:'勤怠・労務',     ico:'📑', title:'社労情報',             desc:'労務関係資料・各種申請書',          url:'', badge:'sheets'},
-    {cat:'勤怠・労務',     ico:'🗂️', title:'休暇・有給管理',        desc:'有給・特別休暇の集計',             url:'', badge:'sheets'},
-    {cat:'評価',           ico:'⭐', title:'評価面談記録',          desc:'年次・半期面談の記録',              url:'', badge:'sheets'},
-  ]
-};
+const POPULAR_ICONS = ['📋','📥','📤','📄','📑','📞','📧','📅','📆','🗓️','⏰','📊','📈','📉','💰','💴','💸','💼','🏆','🎯','🎓','⭐','🌸','🦷','💎','🗂️','📇','📝','📢','💹','🧾','🏢'];
 
-// 🔒 ロックセクション 2: 財務・給料
-const FIN_SECTION = {
-  key: 'fin',
-  title: '財務・給料',
-  icon: '💼',
-  password: 'keiri1234',
-  hint: '財務・経理担当のスタッフのみアクセス可',
-  tools: [
-    {cat:'給与',           ico:'💰', title:'給与計算',             desc:'月次給与計算ワークシート',          url:'', badge:'sheets'},
-    {cat:'給与',           ico:'🏆', title:'ボーナス計算',         desc:'賞与の集計表',                    url:'', badge:'sheets'},
-    {cat:'インセン管理',   ico:'🎯', title:'PBM 申請管理',         desc:'スタッフからのPBM 申請を承認',      url:'../pbm.html', badge:'internal'},
-    {cat:'インセン管理',   ico:'📊', title:'PBM 集計表',            desc:'月次の支給額一覧',                url:'', badge:'sheets'},
-    {cat:'インセン管理',   ico:'💎', title:'矯正・BFインセンティブ', desc:'矯正/BFの個別実績と支給計算',       url:'', badge:'sheets'},
-    {cat:'経理',           ico:'💹', title:'月次売上集計',         desc:'医院別の月次売上',                url:'', badge:'sheets'},
-    {cat:'経理',           ico:'💴', title:'入金管理',             desc:'デンタルローン入金確認',           url:'', badge:'sheets'},
-    {cat:'経理',           ico:'🧾', title:'経費精算',             desc:'経費申請のとりまとめ',             url:'', badge:'sheets'},
-  ]
-};
-
-const LOCKED_SECTIONS = [HR_SECTION, FIN_SECTION];
+let sb = null;
+let allTools = [];          // raw rows from DB
+let editorMode = false;
+let editingId = null;       // null = create, uuid = edit
+let syncDebounce = null;
 
 /* ---------- helpers ---------- */
 function esc(s){return String(s||'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
@@ -279,84 +414,137 @@ function toast(m, isErr){
   t.textContent = m; t.className = 'toast show' + (isErr?' err':'');
   clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('show'), 2000);
 }
+function setSync(state){
+  const b = document.getElementById('syncBadge'), tx = document.getElementById('syncText');
+  if(!b) return;
+  b.dataset.s = state;
+  tx.textContent = ({init:'準備中',syncing:'同期中',synced:'同期済',error:'同期エラー'}[state]) || state;
+}
 function isUnlocked(sectionKey){
-  try{ return sessionStorage.getItem('admin_unlock_' + sectionKey) === '1'; }
-  catch{ return false; }
+  try{ return sessionStorage.getItem('admin_unlock_'+sectionKey)==='1'; }catch{ return false; }
 }
 function unlockSection(sectionKey){
-  try{ sessionStorage.setItem('admin_unlock_' + sectionKey, '1'); }catch{}
+  try{ sessionStorage.setItem('admin_unlock_'+sectionKey,'1'); }catch{}
 }
 function relockSection(sectionKey){
-  try{ sessionStorage.removeItem('admin_unlock_' + sectionKey); }catch{}
+  try{ sessionStorage.removeItem('admin_unlock_'+sectionKey); }catch{}
+}
+
+/* ---------- Supabase load ---------- */
+async function loadFromCloud(){
+  setSync('syncing');
+  try{
+    const { data, error } = await sb.from('admin_tools').select('*').eq('is_active', true).order('sort_order');
+    if(error) throw error;
+    allTools = data || [];
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify(allTools)); }catch{}
+    setSync('synced');
+    document.getElementById('setupBanner').classList.remove('show');
+    renderAll();
+  }catch(e){
+    console.error('Cloud load failed', e);
+    setSync('error');
+    // schema missing detection
+    const msg = (e?.message||'').toLowerCase();
+    if(msg.includes('does not exist') || msg.includes('schema cache') || e?.code==='PGRST205' || e?.code==='42P01'){
+      document.getElementById('setupBanner').classList.add('show');
+    }
+    // ローカルキャッシュにフォールバック
+    try{
+      const cached = localStorage.getItem(CACHE_KEY);
+      if(cached){
+        allTools = JSON.parse(cached);
+        renderAll();
+      }
+    }catch{}
+  }
 }
 
 /* ---------- rendering ---------- */
-function renderToolCard(t){
-  const ready = !!t.url;
+function renderToolCard(t, sectionKey, category){
+  const ready = !!(t.url && t.url.trim());
   const isExternal = ready && /^https?:\/\//.test(t.url) && !/seishokai\.github\.io|tkm-koike|skill-eval/.test(t.url);
-  const badgeKey = ready ? (t.badge || (isExternal ? 'sheets' : 'internal')) : 'todo';
-  const badgeText = {'sheets':'SHEETS', 'internal':'INTERNAL', 'todo':'準備中'}[badgeKey];
-  if (ready){
-    return `<a class="tool-card" href="${esc(t.url)}" target="_blank" rel="noopener">
-      <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
-      <div class="tc-desc">${esc(t.desc)}</div>
+  const badgeKey = ready ? (t.badge || (isExternal?'sheets':'internal')) : 'todo';
+  const badgeText = {'sheets':'SHEETS','internal':'INTERNAL','todo':'準備中'}[badgeKey];
+
+  const actions = `<div class="tool-actions">
+    <button title="上へ" onclick="event.stopPropagation();event.preventDefault();moveTool('${t.id}',-1)">▲</button>
+    <button title="下へ" onclick="event.stopPropagation();event.preventDefault();moveTool('${t.id}',1)">▼</button>
+    <button title="編集" onclick="event.stopPropagation();event.preventDefault();openEditModal('${t.id}')">✏</button>
+    <button class="del" title="削除" onclick="event.stopPropagation();event.preventDefault();deleteToolById('${t.id}')">🗑</button>
+  </div>`;
+
+  if(ready){
+    return `<a class="tool-card" href="${esc(t.url)}" target="_blank" rel="noopener" data-id="${t.id}">
+      ${editorMode ? actions : ''}
+      <div class="tc-head"><span class="tc-ico">${esc(t.icon)}</span><span class="tc-title">${esc(t.title)}</span></div>
+      <div class="tc-desc">${esc(t.description||'')}</div>
       <div class="tc-meta">
         <span class="tc-badge ${badgeKey}">${badgeText}</span>
         <span class="tc-ext">${isExternal?'外部 ↗':'内部 →'}</span>
       </div>
     </a>`;
   } else {
-    return `<div class="tool-card empty">
-      <div class="tc-head"><span class="tc-ico">${t.ico}</span><span class="tc-title">${esc(t.title)}</span></div>
-      <div class="tc-desc">${esc(t.desc)}</div>
+    return `<div class="tool-card empty" data-id="${t.id}" ${editorMode?`onclick="openEditModal('${t.id}')"`:''} style="${editorMode?'cursor:pointer':''}">
+      ${editorMode ? actions : ''}
+      <div class="tc-head"><span class="tc-ico">${esc(t.icon)}</span><span class="tc-title">${esc(t.title)}</span></div>
+      <div class="tc-desc">${esc(t.description||'')}</div>
       <div class="tc-meta"><span class="tc-badge todo">準備中</span></div>
     </div>`;
   }
 }
 
-function renderToolsByCategory(tools){
+function renderToolsByCategory(tools, sectionKey){
+  // category別グループ
   const byCat = new Map();
   tools.forEach(t => {
-    if (!byCat.has(t.cat)) byCat.set(t.cat, []);
-    byCat.get(t.cat).push(t);
+    const c = t.category || '';
+    if(!byCat.has(c)) byCat.set(c, []);
+    byCat.get(c).push(t);
+  });
+  // 各カテゴリの最初の sort_order でソートして安定化
+  const cats = Array.from(byCat.entries()).sort((a,b) => {
+    const minA = Math.min(...a[1].map(x=>x.sort_order));
+    const minB = Math.min(...b[1].map(x=>x.sort_order));
+    return minA - minB;
   });
   let h = '';
-  for (const [cat, list] of byCat){
+  for(const [cat, list] of cats){
+    list.sort((a,b)=>a.sort_order-b.sort_order);
     h += `<div class="cat-block">
       <div class="cat-head">
         <span class="nm">${esc(cat)}</span>
         <span class="ct">${list.length}件</span>
+        <span class="sp"></span>
+        ${editorMode?`<div class="cat-actions">
+          <button class="btn-mini" onclick="openAddModal('${sectionKey}','${esc(cat)}')">＋ 追加</button>
+        </div>`:''}
       </div>
-      <div class="cat-grid">${list.map(renderToolCard).join('')}</div>
+      <div class="cat-grid">
+        ${list.map(t => renderToolCard(t, sectionKey, cat)).join('')}
+      </div>
     </div>`;
+  }
+  if(editorMode){
+    h += `<div style="margin-top:8px"><button class="btn-mini" onclick="openAddModal('${sectionKey}','')">＋ 新規カテゴリを追加</button></div>`;
   }
   return h;
 }
 
-function renderOpenSection(filter){
-  const q = (filter || '').trim().toLowerCase();
-  const tools = q
-    ? OPEN_SECTION.tools.filter(t => (t.title + ' ' + t.desc + ' ' + t.cat).toLowerCase().includes(q))
-    : OPEN_SECTION.tools;
-  if (!tools.length) return '';
-  return `<div class="section-block" data-open="1">
-    <div class="section-head">
-      <span class="ico">${OPEN_SECTION.icon}</span>
-      <span class="nm">${esc(OPEN_SECTION.title)}</span>
-      <span class="lock unlocked">✓ オープン</span>
-    </div>
-    ${renderToolsByCategory(tools)}
-  </div>`;
-}
+function renderSection(sectionKey, filter){
+  const section = SECTIONS[sectionKey];
+  const q = (filter||'').trim().toLowerCase();
+  let tools = allTools.filter(t => t.section_key === sectionKey);
+  if(q){
+    tools = tools.filter(t => (t.title+' '+t.description+' '+t.category).toLowerCase().includes(q));
+  }
 
-function renderLockedSection(section, filter){
-  const unlocked = isUnlocked(section.key);
-  const q = (filter || '').trim().toLowerCase();
+  // ロックチェック (open は常に解除済み, editorMode 中も全部見える)
+  const unlocked = section.open || editorMode || isUnlocked(sectionKey);
 
-  if (!unlocked){
-    // ロック状態 — 検索中はちらつかせない
-    if (q) return '';   // ロック中はサーチに引っかけない
-    return `<div class="section-block" data-locked="1" data-key="${esc(section.key)}">
+  if(!unlocked){
+    if(q) return '';   // ロック中は検索結果に出さない
+    return `<div class="section-block" data-locked="1" data-key="${sectionKey}">
       <div class="section-head">
         <span class="ico">${section.icon}</span>
         <span class="nm">${esc(section.title)}</span>
@@ -364,31 +552,35 @@ function renderLockedSection(section, filter){
       </div>
       <div class="lock-box">
         <div class="lock-ico">🔒</div>
-        <div class="lock-msg"><b>${esc(section.title)}</b> はパスワード保護されています。<br>${esc(section.hint || '')}</div>
-        <form onsubmit="tryUnlock('${section.key}', event); return false;">
-          <input type="password" id="pw-${section.key}" autocomplete="off" placeholder="パスワードを入力">
+        <div class="lock-msg"><b>${esc(section.title)}</b> はパスワード保護されています。<br>${esc(section.hint||'')}</div>
+        <form onsubmit="tryUnlock('${sectionKey}', event); return false">
+          <input type="password" id="pw-${sectionKey}" autocomplete="off" placeholder="パスワードを入力">
           <button type="submit">開く</button>
         </form>
-        <div class="lock-err" id="err-${section.key}">パスワードが違います</div>
+        <div class="lock-err" id="err-${sectionKey}">パスワードが違います</div>
       </div>
     </div>`;
   }
 
-  // 解除済み
-  const tools = q
-    ? section.tools.filter(t => (t.title + ' ' + t.desc + ' ' + t.cat).toLowerCase().includes(q))
-    : section.tools;
-  if (!tools.length && q) return '';
-  return `<div class="section-block unlocked" data-locked="1" data-key="${esc(section.key)}">
+  if(!tools.length && q) return '';
+
+  const lockBadge = section.open
+    ? '<span class="lock unlocked">✓ オープン</span>'
+    : (editorMode ? '<span class="lock unlocked">✏ 編集中 (ロック解除)</span>' : '<span class="lock unlocked">✓ 解除済</span>');
+
+  const dataAttr = section.open ? 'data-open="1"' : 'data-locked="1"';
+  const classAttr = section.open ? '' : ' unlocked';
+
+  return `<div class="section-block${classAttr}" ${dataAttr} data-key="${sectionKey}">
     <div class="section-head">
       <span class="ico">${section.icon}</span>
       <span class="nm">${esc(section.title)}</span>
-      <span class="lock unlocked">✓ 解除済</span>
+      ${lockBadge}
+      <span class="sp"></span>
+      ${editorMode ? `<button class="btn-mini" onclick="openAddModal('${sectionKey}','')">＋ ツール追加</button>` : ''}
     </div>
-    ${renderToolsByCategory(tools)}
-    <div class="unlock-meta">
-      <button class="btn-relock" onclick="relock('${section.key}')">🔒 このフォルダをロックする</button>
-    </div>
+    ${tools.length ? renderToolsByCategory(tools, sectionKey) : `<div style="color:var(--text-muted);font-size:12px;text-align:center;padding:24px">ツールがありません${editorMode?'。「＋ ツール追加」で追加してください。':''}</div>`}
+    ${!section.open && !editorMode ? `<div class="unlock-meta"><button class="btn-relock" onclick="relock('${sectionKey}')">🔒 このフォルダをロックする</button></div>` : ''}
   </div>`;
 }
 
@@ -396,42 +588,18 @@ function renderAll(){
   const filter = document.getElementById('search').value;
   const host = document.getElementById('sections');
   const emp = document.getElementById('emptyState');
+  document.body.classList.toggle('editor-mode', editorMode);
+  document.getElementById('editorBtn').classList.toggle('editor', editorMode);
+  document.getElementById('editorBtn').textContent = editorMode ? '✓ 編集モード ON' : '✏ 編集';
 
-  const openHtml = renderOpenSection(filter);
-  const lockedHtml = LOCKED_SECTIONS.map(s => renderLockedSection(s, filter)).join('');
-
-  if (!openHtml && !lockedHtml){
+  const sectionHtml = SECTION_ORDER.map(k => renderSection(k, filter)).join('');
+  if(!sectionHtml.trim()){
     host.innerHTML = '';
     emp.style.display = 'block';
-  } else {
-    host.innerHTML = openHtml + lockedHtml;
+  }else{
+    host.innerHTML = sectionHtml;
     emp.style.display = 'none';
   }
-}
-
-/* ---------- unlock handlers ---------- */
-function tryUnlock(sectionKey, evt){
-  if (evt && evt.preventDefault) evt.preventDefault();
-  const section = LOCKED_SECTIONS.find(s => s.key === sectionKey);
-  if (!section) return;
-  const inp = document.getElementById('pw-' + sectionKey);
-  const err = document.getElementById('err-' + sectionKey);
-  if (!inp) return;
-  if (inp.value === section.password){
-    err.classList.remove('show');
-    unlockSection(sectionKey);
-    toast(`${section.title} のロック解除`);
-    renderAll();
-  } else {
-    err.classList.add('show');
-    inp.focus(); inp.select();
-  }
-}
-function relock(sectionKey){
-  const section = LOCKED_SECTIONS.find(s => s.key === sectionKey);
-  relockSection(sectionKey);
-  toast(`${section ? section.title : '対象'} を再ロックしました`);
-  renderAll();
 }
 
 /* ---------- search ---------- */
@@ -444,9 +612,246 @@ function setupSearch(){
   });
 }
 
-(function init(){
+/* ---------- section lock/unlock ---------- */
+function tryUnlock(sectionKey, evt){
+  if(evt && evt.preventDefault) evt.preventDefault();
+  const sec = SECTIONS[sectionKey];
+  if(!sec) return;
+  const inp = document.getElementById('pw-'+sectionKey);
+  const err = document.getElementById('err-'+sectionKey);
+  if(!inp) return;
+  if(inp.value === sec.password){
+    err.classList.remove('show');
+    unlockSection(sectionKey);
+    toast(`${sec.title} のロック解除`);
+    renderAll();
+  }else{
+    err.classList.add('show');
+    inp.focus(); inp.select();
+  }
+}
+function relock(sectionKey){
+  relockSection(sectionKey);
+  toast(`${SECTIONS[sectionKey]?.title || '対象'} を再ロック`);
   renderAll();
+}
+
+/* ---------- editor mode ---------- */
+function toggleEditor(){
+  if(editorMode){
+    editorMode = false;
+    toast('編集モードを終了しました');
+    renderAll();
+    return;
+  }
+  const pw = prompt('編集モードのパスワードを入力してください');
+  if(pw === null) return;
+  if(pw !== EDITOR_PW){
+    toast('パスワードが違います', true);
+    return;
+  }
+  editorMode = true;
+  toast('編集モード ON ✏');
+  renderAll();
+}
+
+/* ---------- modal: open / close / fill ---------- */
+function openAddModal(sectionKey, category){
+  editingId = null;
+  document.getElementById('modalTitle').textContent = '新しいツールを追加';
+  document.getElementById('modalSub').textContent = '';
+  document.getElementById('btnDelete').style.display = 'none';
+  document.getElementById('btnSave').textContent = '追加';
+
+  document.getElementById('f-section').value = sectionKey || 'open';
+  document.getElementById('f-category').value = category || '';
+  document.getElementById('f-icon').value = '📋';
+  document.getElementById('f-title').value = '';
+  document.getElementById('f-desc').value = '';
+  document.getElementById('f-url').value = '';
+  document.getElementById('f-badge').value = 'sheets';
+  // sort_order デフォルト = 同カテゴリ最大+10
+  const same = allTools.filter(t => t.section_key === (sectionKey||'open') && t.category === (category||''));
+  const maxSort = same.length ? Math.max(...same.map(t=>t.sort_order)) : 0;
+  document.getElementById('f-sort').value = maxSort + 10;
+
+  rebuildCategoryDatalist(sectionKey);
+  rebuildIconPicker('📋');
+  document.getElementById('toolModal').classList.add('show');
+  setTimeout(()=>document.getElementById('f-title').focus(), 100);
+}
+
+function openEditModal(id){
+  const t = allTools.find(x => x.id === id);
+  if(!t){ toast('ツールが見つかりません', true); return; }
+  editingId = id;
+  document.getElementById('modalTitle').textContent = 'ツールを編集';
+  document.getElementById('modalSub').textContent = `${SECTIONS[t.section_key]?.title || ''} ／ ${t.category}`;
+  document.getElementById('btnDelete').style.display = 'inline-flex';
+  document.getElementById('btnSave').textContent = '保存';
+
+  document.getElementById('f-section').value = t.section_key;
+  document.getElementById('f-category').value = t.category;
+  document.getElementById('f-icon').value = t.icon;
+  document.getElementById('f-title').value = t.title;
+  document.getElementById('f-desc').value = t.description || '';
+  document.getElementById('f-url').value = t.url || '';
+  document.getElementById('f-badge').value = t.badge || 'sheets';
+  document.getElementById('f-sort').value = t.sort_order;
+
+  rebuildCategoryDatalist(t.section_key);
+  rebuildIconPicker(t.icon);
+  document.getElementById('toolModal').classList.add('show');
+}
+
+function closeModal(){
+  document.getElementById('toolModal').classList.remove('show');
+  editingId = null;
+}
+
+function rebuildCategoryDatalist(sectionKey){
+  const cats = [...new Set(allTools.filter(t => t.section_key === sectionKey).map(t => t.category))];
+  document.getElementById('cat-options').innerHTML = cats.map(c => `<option value="${esc(c)}">`).join('');
+}
+
+function rebuildIconPicker(current){
+  const host = document.getElementById('iconPick');
+  host.innerHTML = POPULAR_ICONS.map(ic => `<button type="button" class="${ic===current?'on':''}" onclick="document.getElementById('f-icon').value='${ic}';rebuildIconPicker('${ic}')">${ic}</button>`).join('');
+}
+
+/* セクション変更時 datalist 更新 */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('f-section').addEventListener('change', e => rebuildCategoryDatalist(e.target.value));
+  document.addEventListener('keydown', e => {
+    if(e.key === 'Escape'){
+      const m = document.getElementById('toolModal');
+      if(m && m.classList.contains('show')) closeModal();
+    }
+  });
+});
+
+/* ---------- save ---------- */
+async function saveTool(evt){
+  if(evt && evt.preventDefault) evt.preventDefault();
+  const payload = {
+    section_key: document.getElementById('f-section').value,
+    category:    document.getElementById('f-category').value.trim(),
+    icon:        document.getElementById('f-icon').value.trim() || '📋',
+    title:       document.getElementById('f-title').value.trim(),
+    description: document.getElementById('f-desc').value.trim(),
+    url:         document.getElementById('f-url').value.trim() || null,
+    badge:       document.getElementById('f-badge').value,
+    sort_order:  Number(document.getElementById('f-sort').value) || 0,
+    is_active:   true,
+  };
+  if(!payload.title || !payload.category){
+    toast('タイトルとカテゴリーは必須です', true); return;
+  }
+  setSync('syncing');
+  try{
+    if(editingId){
+      const { error } = await sb.from('admin_tools').update(payload).eq('id', editingId);
+      if(error) throw error;
+      // ローカル更新
+      const idx = allTools.findIndex(t => t.id === editingId);
+      if(idx >= 0) allTools[idx] = { ...allTools[idx], ...payload };
+      toast('更新しました');
+    }else{
+      const { data, error } = await sb.from('admin_tools').insert(payload).select().single();
+      if(error) throw error;
+      allTools.push(data);
+      toast('追加しました');
+    }
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify(allTools)); }catch{}
+    setSync('synced');
+    closeModal();
+    renderAll();
+  }catch(e){
+    console.error('save error', e);
+    toast('保存に失敗しました', true);
+    setSync('error');
+  }
+}
+
+/* ---------- delete ---------- */
+async function deleteToolById(id){
+  const t = allTools.find(x => x.id === id);
+  if(!t) return;
+  if(!confirm(`「${t.title}」を削除しますか？`)) return;
+  setSync('syncing');
+  try{
+    const { error } = await sb.from('admin_tools').delete().eq('id', id);
+    if(error) throw error;
+    allTools = allTools.filter(x => x.id !== id);
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify(allTools)); }catch{}
+    toast('削除しました');
+    setSync('synced');
+    renderAll();
+  }catch(e){
+    console.error('delete error', e);
+    toast('削除に失敗しました', true);
+    setSync('error');
+  }
+}
+function deleteTool(){
+  if(!editingId) return;
+  deleteToolById(editingId);
+  closeModal();
+}
+
+/* ---------- move (sort_order swap) ---------- */
+async function moveTool(id, dir){
+  const t = allTools.find(x => x.id === id);
+  if(!t) return;
+  // 同セクション同カテゴリ内で並ぶ隣接ツールを探す
+  const peers = allTools
+    .filter(x => x.section_key === t.section_key && x.category === t.category)
+    .sort((a,b)=>a.sort_order-b.sort_order);
+  const idx = peers.findIndex(x => x.id === id);
+  const nextIdx = idx + (dir > 0 ? 1 : -1);
+  if(nextIdx < 0 || nextIdx >= peers.length) return;
+  const other = peers[nextIdx];
+  const aSort = t.sort_order, bSort = other.sort_order;
+  // 同じ sort_order の場合は片方を +/-1
+  const newA = bSort, newB = aSort === bSort ? bSort + (dir > 0 ? -1 : 1) : aSort;
+  setSync('syncing');
+  try{
+    const { error } = await sb.from('admin_tools').upsert([
+      { id: t.id, sort_order: newA },
+      { id: other.id, sort_order: newB },
+    ], { onConflict: 'id' });
+    if(error) throw error;
+    t.sort_order = newA;
+    other.sort_order = newB;
+    try{ localStorage.setItem(CACHE_KEY, JSON.stringify(allTools)); }catch{}
+    setSync('synced');
+    renderAll();
+  }catch(e){
+    console.error('move error', e);
+    toast('並び替えに失敗', true);
+    setSync('error');
+  }
+}
+
+/* ---------- boot ---------- */
+(async function boot(){
+  // キャッシュ即時表示
+  try{
+    const cached = localStorage.getItem(CACHE_KEY);
+    if(cached){
+      allTools = JSON.parse(cached);
+      renderAll();
+    }
+  }catch{}
   setupSearch();
+  try{
+    sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {auth:{persistSession:false}});
+  }catch(e){
+    console.error('Supabase init failed', e);
+    setSync('error');
+    return;
+  }
+  await loadFromCloud();
 })();
 </script>
 </body>
