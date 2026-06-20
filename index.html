@@ -953,6 +953,14 @@
         <div style="display:flex;gap:4px;margin-bottom:16px"><button class="btn btn-dark an-axis-btn" data-axis="promo" style="font-size:11px;padding:6px 12px;min-height:28px">プロモ別</button><button class="btn btn-outline an-axis-btn" data-axis="facility" style="font-size:11px;padding:6px 12px;min-height:28px">医院別</button><button class="btn btn-outline an-axis-btn" data-axis="service" style="font-size:11px;padding:6px 12px;min-height:28px">相談別</button></div>
         <div class="card" style="margin-bottom:16px"><div class="card-header" id="an-chart-title">プロモ別</div><div class="bar-chart" id="an-chart"></div></div>
         <div class="card"><div class="card-header" id="an-table-title">詳細テーブル</div><div class="data-table-wrap"><table class="data-table"><thead><tr><th id="an-th-axis">プロモーション</th><th>予約</th><th>キャンセル</th><th>来院</th><th>来院率</th><th>成約</th><th>成約率</th><th>成約単価</th><th>成約金額</th></tr></thead><tbody id="an-tbody"></tbody></table></div></div>
+        <!-- 月別推移 (直近 12ヶ月) -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>📅 月別推移 (直近 12ヶ月)</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400" id="an-monthly-note">期間フィルタ(月)は無視 ／ 他フィルタは反映</span>
+          </div>
+          <div class="data-table-wrap"><table class="data-table"><thead><tr><th>月</th><th>予約</th><th>キャンセル</th><th>来院</th><th>来院率</th><th>成約</th><th>成約率</th><th>成約金額</th><th style="min-width:160px">予約数 推移</th></tr></thead><tbody id="an-monthly-tbody"></tbody></table></div>
+        </div>
       </div>
     </main>
 
@@ -1519,7 +1527,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=460"></script>
+  <script src="app.js?v=461"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

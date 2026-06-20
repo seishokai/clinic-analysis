@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v460';
+const APP_VERSION = 'v461';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12743,6 +12743,85 @@ function renderAnalysis() {
       const gu = v.contracted>0?Math.round(v.amount/v.contracted):0;
       return `<tr><td style="font-size:12px">${name}</td><td>${v.total}</td><td style="color:var(--red)">${v.cancelled}</td><td>${v.visited}</td><td>${gvr}%</td><td style="color:var(--green)">${v.contracted}</td><td><span style="color:${gcr>=30?'var(--green)':'var(--red)'};font-weight:600">${gcr}%</span></td><td>${gu?'¥'+fmt(gu):'-'}</td><td>${v.amount?'¥'+fmt(v.amount):'-'}</td></tr>`;
     }).join('') || '<tr><td colspan="9" style="text-align:center;color:var(--text-muted)">データなし</td></tr>';
+  }
+
+  // === 月別推移 (直近 12ヶ月) ===
+  // 月フィルタは無視、他のフィルタ(医院・相談・プロモ・ツール)は適用済みデータを使う
+  // ただし anMonth が掛かっている場合は anMonth を解除した baseData を別途作る
+  let monthlyBase = bookingsData.filter(d => d.status !== '除外');
+  if (_hasPromoRestriction()) monthlyBase = monthlyBase.filter(d => _matchesAllowedPromo(d.source));
+  if (userRole === 'custom') {
+    const cp = JSON.parse(sessionStorage.getItem('customPromos')||'[]');
+    if (cp.length) monthlyBase = monthlyBase.filter(d => d.source && cp.includes(d.source));
+  }
+  if (anFac && anFac.value) monthlyBase = monthlyBase.filter(d => sFac(d.facility) === anFac.value);
+  if (anSvc && anSvc.value) monthlyBase = monthlyBase.filter(d => sSvc(d.service) === anSvc.value);
+  if (anPromo && anPromo.value) monthlyBase = monthlyBase.filter(d => d.source === anPromo.value);
+  if (anTool && anTool.value) monthlyBase = monthlyBase.filter(d => d.tool === anTool.value);
+  // ※ anMonth は意図的に適用しない (推移なので)
+
+  // 月別グループ化 (bookDate 優先、なければ applyDate)
+  const monthlyMap = {};
+  monthlyBase.forEach(d => {
+    const src = d.bookDate || d.applyDate;
+    if (!src) return;
+    const m = src.match(/(\d{4})\D+(\d{1,2})/);
+    if (!m) return;
+    const ym = m[1] + '-' + String(parseInt(m[2])).padStart(2,'0');
+    if (!monthlyMap[ym]) monthlyMap[ym] = {total:0,cancelled:0,visited:0,contracted:0,amount:0};
+    const g = monthlyMap[ym];
+    g.total++;
+    if (d.status==='キャンセル') g.cancelled++;
+    if (isVisitedStatus(d.status)) g.visited++;
+    if (d.status==='成約') g.contracted++;
+    const ek = d.name+'|'+d.applyDate;
+    if (bkExtra[ek]&&bkExtra[ek].contractAmount) g.amount+=Number(bkExtra[ek].contractAmount);
+  });
+
+  // 直近 12ヶ月のキーを生成 (今月から遡る)
+  const today = new Date();
+  const months12 = [];
+  for (let i = 0; i < 12; i++) {
+    const dt = new Date(today.getFullYear(), today.getMonth() - i, 1);
+    months12.push(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`);
+  }
+  // 古い順 (左から新) → 表は新→旧 で見やすい (新しい月が上)
+  // ここでは新→旧 (上から最新)
+  const maxTotal = Math.max(...months12.map(ym => (monthlyMap[ym]?.total || 0)), 1);
+
+  const monthlyTbody = document.getElementById('an-monthly-tbody');
+  if (monthlyTbody) {
+    monthlyTbody.innerHTML = months12.map((ym, idx) => {
+      const v = monthlyMap[ym] || {total:0,cancelled:0,visited:0,contracted:0,amount:0};
+      const mvr = v.total>0 ? Math.round(v.visited/v.total*100) : 0;
+      const mcr = v.visited>0 ? pct(v.contracted, v.visited) : 0;
+      const barW = Math.max(Math.round(v.total / maxTotal * 100), v.total>0 ? 3 : 0);
+      // 前月との差 (idx=0 が最新月、idx+1 が前月)
+      const prev = monthlyMap[months12[idx+1]];
+      let trendArrow = '';
+      if (prev && prev.total > 0) {
+        const diff = v.total - prev.total;
+        const dpct = Math.round(diff / prev.total * 100);
+        if (diff > 0) trendArrow = `<span style="color:#15803d;font-size:10px;margin-left:4px">▲${dpct}%</span>`;
+        else if (diff < 0) trendArrow = `<span style="color:#b91c1c;font-size:10px;margin-left:4px">▼${Math.abs(dpct)}%</span>`;
+        else trendArrow = `<span style="color:var(--text-muted);font-size:10px;margin-left:4px">±0</span>`;
+      }
+      const isCurrentMonth = idx === 0;
+      const rowStyle = isCurrentMonth ? 'background:#fffbea' : '';
+      return `<tr style="${rowStyle}">
+        <td style="font-size:12px;font-weight:${isCurrentMonth?'700':'500'}">${ym}${isCurrentMonth?'<span style="color:#b45309;font-size:9px;margin-left:4px">今月</span>':''}</td>
+        <td>${v.total||'-'}${trendArrow}</td>
+        <td style="color:var(--red)">${v.cancelled||'-'}</td>
+        <td>${v.visited||'-'}</td>
+        <td>${v.total>0?mvr+'%':'-'}</td>
+        <td style="color:var(--green)">${v.contracted||'-'}</td>
+        <td><span style="color:${mcr>=30?'var(--green)':mcr>0?'var(--red)':'var(--text-muted)'};font-weight:${v.visited>0?'600':'400'}">${v.visited>0?mcr+'%':'-'}</span></td>
+        <td>${v.amount?'¥'+fmt(v.amount):'-'}</td>
+        <td><div style="background:#f3f4f6;border-radius:4px;height:14px;overflow:hidden;position:relative">
+          <div style="background:linear-gradient(90deg,#6366f1,#8b5cf6);height:100%;width:${barW}%;transition:width .3s"></div>
+        </div></td>
+      </tr>`;
+    }).join('');
   }
 }
 
