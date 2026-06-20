@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v461';
+const APP_VERSION = 'v462';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12822,6 +12822,153 @@ function renderAnalysis() {
         </div></td>
       </tr>`;
     }).join('');
+  }
+
+  // === 月別 × 軸 のクロス集計 (予約数) ===
+  // monthlyBase をそのまま使い、軸(プロモ/医院/治療)別に直近12ヶ月の予約数を集計
+  function _buildCrosstab(getKey, opts) {
+    const map = {}; // {axisKey: {ym: count}}
+    const axisTotals = {};
+    monthlyBase.forEach(d => {
+      const src = d.bookDate || d.applyDate;
+      if (!src) return;
+      const m = src.match(/(\d{4})\D+(\d{1,2})/);
+      if (!m) return;
+      const ym = m[1] + '-' + String(parseInt(m[2])).padStart(2,'0');
+      if (!months12.includes(ym)) return;
+      const k = getKey(d);
+      if (!k) return;
+      if (!map[k]) map[k] = {};
+      map[k][ym] = (map[k][ym]||0) + 1;
+      axisTotals[k] = (axisTotals[k]||0) + 1;
+    });
+    // 上位 N 件を予約数で抽出
+    const limit = opts.limit || 100;
+    const topKeys = Object.keys(axisTotals).sort((a,b)=>axisTotals[b]-axisTotals[a]).slice(0, limit);
+    // 各月の合計 (列合計)
+    const monthTotals = {};
+    months12.forEach(ym => {
+      monthTotals[ym] = topKeys.reduce((s,k)=>s+(map[k]?.[ym]||0), 0);
+    });
+    return { map, axisTotals, topKeys, monthTotals };
+  }
+
+  function _renderCrosstab(tableId, getKey, opts) {
+    const tbl = document.getElementById(tableId);
+    if (!tbl) return;
+    const { map, axisTotals, topKeys, monthTotals } = _buildCrosstab(getKey, opts);
+    if (!topKeys.length) {
+      tbl.innerHTML = '<tr><td style="text-align:center;color:var(--text-muted);padding:24px">データなし</td></tr>';
+      return;
+    }
+    const baseColor = opts.color || '37,99,235'; // blue rgb
+    const stickyTh = 'position:sticky;top:0;background:#f8f9fa;z-index:2;border-bottom:2px solid #e5e7eb;font-size:11px;color:var(--text-muted);font-weight:600;padding:8px 6px;text-align:right;white-space:nowrap';
+    const stickyThLeft = 'position:sticky;top:0;left:0;background:#f8f9fa;z-index:3;border-bottom:2px solid #e5e7eb;font-size:11px;color:var(--text-muted);font-weight:600;padding:8px 6px;text-align:left';
+    let html = '<thead><tr>';
+    html += `<th style="${stickyThLeft}">月</th>`;
+    topKeys.forEach(k => {
+      const lbl = (k.length > 10) ? k.slice(0,10) + '…' : k;
+      html += `<th style="${stickyTh}" title="${k}">${lbl}</th>`;
+    });
+    html += `<th style="${stickyTh};color:#1a1a1a">合計</th>`;
+    html += '</tr></thead><tbody>';
+    months12.forEach((ym, idx) => {
+      const row = topKeys.map(k => map[k]?.[ym] || 0);
+      const rowMax = Math.max(...row, 1);
+      const rowTotal = row.reduce((a,b)=>a+b, 0);
+      const isCur = idx === 0;
+      const rowBg = isCur ? 'background:#fffbea;' : (idx % 2 ? 'background:#fafafa;' : '');
+      html += `<tr style="${rowBg}border-bottom:1px solid #f0f0f0">`;
+      html += `<td style="position:sticky;left:0;background:${isCur?'#fffbea':(idx%2?'#fafafa':'#fff')};padding:6px 8px;font-size:12px;font-weight:${isCur?'700':'500'};white-space:nowrap">${ym}${isCur?'<span style="color:#b45309;font-size:9px;margin-left:4px">今月</span>':''}</td>`;
+      row.forEach(v => {
+        const intensity = rowMax > 0 ? v / rowMax : 0;
+        const bg = v > 0 ? `background:rgba(${baseColor},${(intensity*0.55+0.05).toFixed(2)});` : '';
+        const fg = intensity > 0.6 ? 'color:#fff;font-weight:600;' : (v>0?'color:#1a1a1a;':'color:#d1d5db;');
+        html += `<td style="${bg}${fg}text-align:right;padding:6px 8px;font-size:12px">${v||'-'}</td>`;
+      });
+      html += `<td style="text-align:right;padding:6px 8px;font-size:12px;font-weight:700;color:#1a1a1a;border-left:2px solid #e5e7eb">${rowTotal||'-'}</td>`;
+      html += '</tr>';
+    });
+    // 列合計
+    const colTotalRow = topKeys.map(k => axisTotals[k]||0);
+    const grandTotal = colTotalRow.reduce((a,b)=>a+b, 0);
+    html += '<tr style="background:#1a1a1a;color:#fff;font-weight:700;border-top:2px solid #1a1a1a">';
+    html += `<td style="position:sticky;left:0;background:#1a1a1a;color:#fff;padding:8px;font-size:12px">合計</td>`;
+    colTotalRow.forEach(v => {
+      html += `<td style="text-align:right;padding:8px;font-size:12px">${v||'-'}</td>`;
+    });
+    html += `<td style="text-align:right;padding:8px;font-size:13px;border-left:2px solid #fff">${grandTotal}</td>`;
+    html += '</tr>';
+    html += '</tbody>';
+    tbl.innerHTML = html;
+  }
+
+  _renderCrosstab('an-monthly-promo', d => d.source, { limit: 10, color: '37,99,235' });
+  _renderCrosstab('an-monthly-fac', d => sFac(d.facility), { limit: 30, color: '234,88,12' });
+  _renderCrosstab('an-monthly-svc', d => sSvc(d.service), { limit: 20, color: '22,163,74' });
+
+  // === 月別サマリー (来院率 / 成約率 / 成約金額) 上位5 × 直近6ヶ月 ===
+  const summaryEl = document.getElementById('an-monthly-summary');
+  if (summaryEl) {
+    const months6 = months12.slice(0, 6);
+    function _buildMetricTable(getKey, axisLabel, limit) {
+      const map = {}; // {axisKey: {ym: {total, visited, contracted, amount}}}
+      const totals = {};
+      monthlyBase.forEach(d => {
+        const src = d.bookDate || d.applyDate;
+        if (!src) return;
+        const m = src.match(/(\d{4})\D+(\d{1,2})/);
+        if (!m) return;
+        const ym = m[1] + '-' + String(parseInt(m[2])).padStart(2,'0');
+        if (!months6.includes(ym)) return;
+        const k = getKey(d);
+        if (!k) return;
+        if (!map[k]) map[k] = {};
+        if (!map[k][ym]) map[k][ym] = {total:0,visited:0,contracted:0,amount:0};
+        const g = map[k][ym];
+        g.total++;
+        if (isVisitedStatus(d.status)) g.visited++;
+        if (d.status==='成約') g.contracted++;
+        const ek = d.name+'|'+d.applyDate;
+        if (bkExtra[ek]&&bkExtra[ek].contractAmount) g.amount+=Number(bkExtra[ek].contractAmount);
+        totals[k] = (totals[k]||0) + 1;
+      });
+      const topKeys = Object.keys(totals).sort((a,b)=>totals[b]-totals[a]).slice(0, limit);
+      if (!topKeys.length) return `<div style="text-align:center;color:var(--text-muted);padding:24px">${axisLabel}: データなし</div>`;
+      let h = `<div style="font-weight:600;font-size:13px;margin:12px 0 6px;color:#1a1a1a">${axisLabel} 上位${topKeys.length}</div>`;
+      h += '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>';
+      h += '<th style="text-align:left;padding:6px;border-bottom:2px solid #e5e7eb;background:#f8f9fa;position:sticky;left:0;z-index:1">' + axisLabel + '</th>';
+      months6.forEach((ym,i) => {
+        h += `<th style="text-align:center;padding:6px;border-bottom:2px solid #e5e7eb;background:#f8f9fa;min-width:90px${i===0?';color:#b45309':''}">${ym}${i===0?'<br><span style="font-size:9px">今月</span>':''}</th>`;
+      });
+      h += '</tr></thead><tbody>';
+      topKeys.forEach((k,idx) => {
+        const rowBg = idx % 2 ? 'background:#fafafa' : '';
+        h += `<tr style="${rowBg};border-bottom:1px solid #f0f0f0">`;
+        const lbl = (k.length>16)?k.slice(0,16)+'…':k;
+        h += `<td style="padding:6px;font-weight:500;position:sticky;left:0;background:${idx%2?'#fafafa':'#fff'}" title="${k}">${lbl}</td>`;
+        months6.forEach(ym => {
+          const v = map[k]?.[ym];
+          if (!v || v.total===0) { h += '<td style="padding:6px;text-align:center;color:#d1d5db">-</td>'; return; }
+          const vr = v.total>0 ? Math.round(v.visited/v.total*100) : 0;
+          const cr = v.visited>0 ? Math.round(v.contracted/v.visited*100) : 0;
+          const amt = v.amount;
+          h += `<td style="padding:6px;text-align:center;line-height:1.4">
+            <div style="font-weight:600;color:#1a1a1a">${v.total}件</div>
+            <div style="font-size:10px;color:#6b7280">来院 ${vr}%</div>
+            <div style="font-size:10px;color:${cr>=30?'#15803d':'#b91c1c'}">成約 ${cr}%</div>
+            ${amt?`<div style="font-size:10px;color:#1a1a1a">¥${fmt(amt)}</div>`:''}
+          </td>`;
+        });
+        h += '</tr>';
+      });
+      h += '</tbody></table>';
+      return h;
+    }
+    summaryEl.innerHTML =
+      _buildMetricTable(d => d.source, '🎯 プロモ', 5) +
+      _buildMetricTable(d => sFac(d.facility), '🏥 医院', 5) +
+      _buildMetricTable(d => sSvc(d.service), '🦷 治療', 5);
   }
 }
 

@@ -961,6 +961,42 @@
           </div>
           <div class="data-table-wrap"><table class="data-table"><thead><tr><th>月</th><th>予約</th><th>キャンセル</th><th>来院</th><th>来院率</th><th>成約</th><th>成約率</th><th>成約金額</th><th style="min-width:160px">予約数 推移</th></tr></thead><tbody id="an-monthly-tbody"></tbody></table></div>
         </div>
+
+        <!-- 月別 × プロモ (上位10 / 予約数) -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🎯 月別 × プロモ (上位10 / 予約数)</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400">行ごとの最大値で青色濃度</span>
+          </div>
+          <div class="data-table-wrap" style="max-height:520px;overflow:auto"><table id="an-monthly-promo" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>
+        </div>
+
+        <!-- 月別 × 医院 (予約数) -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🏥 月別 × 医院 (予約数)</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400">行ごとの最大値で橙色濃度</span>
+          </div>
+          <div class="data-table-wrap" style="max-height:520px;overflow:auto"><table id="an-monthly-fac" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>
+        </div>
+
+        <!-- 月別 × 治療 (予約数) -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>🦷 月別 × 治療 (予約数)</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400">行ごとの最大値で緑色濃度</span>
+          </div>
+          <div class="data-table-wrap" style="max-height:520px;overflow:auto"><table id="an-monthly-svc" style="width:100%;border-collapse:collapse;font-size:12px"></table></div>
+        </div>
+
+        <!-- 月別 × 成約率 (プロモ・医院・治療) -->
+        <div class="card" style="margin-top:16px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center">
+            <span>💎 月別サマリー (来院率 / 成約率 / 成約金額)</span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400">プロモ・医院・治療 上位5 × 直近6ヶ月</span>
+          </div>
+          <div class="data-table-wrap" style="max-height:600px;overflow:auto"><div id="an-monthly-summary"></div></div>
+        </div>
       </div>
     </main>
 
@@ -1527,7 +1563,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=461"></script>
+  <script src="app.js?v=462"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
