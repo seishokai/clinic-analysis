@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v462';
+const APP_VERSION = 'v463';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -12861,51 +12861,75 @@ function renderAnalysis() {
       tbl.innerHTML = '<tr><td style="text-align:center;color:var(--text-muted);padding:24px">データなし</td></tr>';
       return;
     }
-    const baseColor = opts.color || '37,99,235'; // blue rgb
-    const stickyTh = 'position:sticky;top:0;background:#f8f9fa;z-index:2;border-bottom:2px solid #e5e7eb;font-size:11px;color:var(--text-muted);font-weight:600;padding:8px 6px;text-align:right;white-space:nowrap';
-    const stickyThLeft = 'position:sticky;top:0;left:0;background:#f8f9fa;z-index:3;border-bottom:2px solid #e5e7eb;font-size:11px;color:var(--text-muted);font-weight:600;padding:8px 6px;text-align:left';
+    // 段階パステル (白→淡→中→濃) + 同系の濃いテキスト色で常に高コントラスト
+    const palette = opts.palette || ['#eff6ff','#dbeafe','#93c5fd','#3b82f6']; // blue
+    const textColor = opts.text || '#1e3a8a';
+    // ページレベルで thead を吸着 (.header が height 48px sticky)
+    const stickyTop = 'position:sticky;top:48px;z-index:5';
+    const thBase = 'background:#f8f9fa;border-bottom:2px solid #1a1a1a;font-size:11px;color:#1a1a1a;font-weight:700;padding:10px 8px;text-align:right;white-space:nowrap';
+    const thLeft = 'background:#f8f9fa;border-bottom:2px solid #1a1a1a;font-size:11px;color:#1a1a1a;font-weight:700;padding:10px 12px;text-align:left;position:sticky;left:0;z-index:6;border-right:2px solid #e5e7eb';
     let html = '<thead><tr>';
-    html += `<th style="${stickyThLeft}">月</th>`;
+    html += `<th style="${stickyTop};${thLeft}">月</th>`;
     topKeys.forEach(k => {
-      const lbl = (k.length > 10) ? k.slice(0,10) + '…' : k;
-      html += `<th style="${stickyTh}" title="${k}">${lbl}</th>`;
+      const lbl = (k && k.length > 10) ? k.slice(0,10) + '…' : (k || '-');
+      html += `<th style="${stickyTop};${thBase}" title="${k}">${lbl}</th>`;
     });
-    html += `<th style="${stickyTh};color:#1a1a1a">合計</th>`;
+    html += `<th style="${stickyTop};${thBase};border-left:2px solid #1a1a1a;background:#1a1a1a;color:#fff">合計</th>`;
     html += '</tr></thead><tbody>';
     months12.forEach((ym, idx) => {
       const row = topKeys.map(k => map[k]?.[ym] || 0);
       const rowMax = Math.max(...row, 1);
       const rowTotal = row.reduce((a,b)=>a+b, 0);
       const isCur = idx === 0;
-      const rowBg = isCur ? 'background:#fffbea;' : (idx % 2 ? 'background:#fafafa;' : '');
-      html += `<tr style="${rowBg}border-bottom:1px solid #f0f0f0">`;
-      html += `<td style="position:sticky;left:0;background:${isCur?'#fffbea':(idx%2?'#fafafa':'#fff')};padding:6px 8px;font-size:12px;font-weight:${isCur?'700':'500'};white-space:nowrap">${ym}${isCur?'<span style="color:#b45309;font-size:9px;margin-left:4px">今月</span>':''}</td>`;
+      const monthBg = isCur ? '#fffbea' : '#fff';
+      html += `<tr>`;
+      html += `<td style="position:sticky;left:0;background:${monthBg};padding:8px 12px;font-size:12px;font-weight:${isCur?'700':'600'};white-space:nowrap;border-bottom:1px solid #f0f0f0;border-right:2px solid #e5e7eb;z-index:1">${ym}${isCur?'<span style="color:#b45309;font-size:9px;margin-left:6px;background:#fde68a;padding:1px 5px;border-radius:8px">今月</span>':''}</td>`;
       row.forEach(v => {
-        const intensity = rowMax > 0 ? v / rowMax : 0;
-        const bg = v > 0 ? `background:rgba(${baseColor},${(intensity*0.55+0.05).toFixed(2)});` : '';
-        const fg = intensity > 0.6 ? 'color:#fff;font-weight:600;' : (v>0?'color:#1a1a1a;':'color:#d1d5db;');
-        html += `<td style="${bg}${fg}text-align:right;padding:6px 8px;font-size:12px">${v||'-'}</td>`;
+        let bg = '#fff', weight = '500';
+        if (v > 0) {
+          const intensity = v / rowMax;
+          let band = 0;
+          if (intensity >= 0.75) { band = 3; weight = '700'; }
+          else if (intensity >= 0.5) band = 2;
+          else if (intensity >= 0.25) band = 1;
+          else band = 0;
+          bg = palette[band];
+        }
+        const fg = v>0 ? textColor : '#d1d5db';
+        html += `<td style="background:${bg};color:${fg};font-weight:${weight};text-align:right;padding:8px;font-size:13px;border-bottom:1px solid #f0f0f0">${v||'-'}</td>`;
       });
-      html += `<td style="text-align:right;padding:6px 8px;font-size:12px;font-weight:700;color:#1a1a1a;border-left:2px solid #e5e7eb">${rowTotal||'-'}</td>`;
+      html += `<td style="text-align:right;padding:8px;font-size:13px;font-weight:700;color:#1a1a1a;border-left:2px solid #1a1a1a;border-bottom:1px solid #f0f0f0;background:#f9fafb">${rowTotal||'-'}</td>`;
       html += '</tr>';
     });
     // 列合計
     const colTotalRow = topKeys.map(k => axisTotals[k]||0);
     const grandTotal = colTotalRow.reduce((a,b)=>a+b, 0);
-    html += '<tr style="background:#1a1a1a;color:#fff;font-weight:700;border-top:2px solid #1a1a1a">';
-    html += `<td style="position:sticky;left:0;background:#1a1a1a;color:#fff;padding:8px;font-size:12px">合計</td>`;
+    html += '<tr style="font-weight:700">';
+    html += `<td style="position:sticky;left:0;background:#1a1a1a;color:#fff;padding:10px 12px;font-size:12px;border-right:2px solid #1a1a1a;z-index:1">合計</td>`;
     colTotalRow.forEach(v => {
-      html += `<td style="text-align:right;padding:8px;font-size:12px">${v||'-'}</td>`;
+      html += `<td style="text-align:right;padding:10px 8px;font-size:13px;background:#1a1a1a;color:#fff">${v||'-'}</td>`;
     });
-    html += `<td style="text-align:right;padding:8px;font-size:13px;border-left:2px solid #fff">${grandTotal}</td>`;
+    html += `<td style="text-align:right;padding:10px 8px;font-size:14px;border-left:2px solid #fff;background:#1a1a1a;color:#fff">${grandTotal}</td>`;
     html += '</tr>';
     html += '</tbody>';
     tbl.innerHTML = html;
   }
 
-  _renderCrosstab('an-monthly-promo', d => d.source, { limit: 10, color: '37,99,235' });
-  _renderCrosstab('an-monthly-fac', d => sFac(d.facility), { limit: 30, color: '234,88,12' });
-  _renderCrosstab('an-monthly-svc', d => sSvc(d.service), { limit: 20, color: '22,163,74' });
+  _renderCrosstab('an-monthly-promo', d => d.source, {
+    limit: 10,
+    palette: ['#eff6ff','#dbeafe','#93c5fd','#3b82f6'],
+    text: '#1e3a8a'
+  });
+  _renderCrosstab('an-monthly-fac', d => sFac(d.facility), {
+    limit: 30,
+    palette: ['#fff7ed','#ffedd5','#fdba74','#f97316'],
+    text: '#7c2d12'
+  });
+  _renderCrosstab('an-monthly-svc', d => sSvc(d.service), {
+    limit: 20,
+    palette: ['#f0fdf4','#dcfce7','#86efac','#22c55e'],
+    text: '#14532d'
+  });
 
   // === 月別サマリー (来院率 / 成約率 / 成約金額) 上位5 × 直近6ヶ月 ===
   const summaryEl = document.getElementById('an-monthly-summary');
@@ -12935,29 +12959,29 @@ function renderAnalysis() {
       });
       const topKeys = Object.keys(totals).sort((a,b)=>totals[b]-totals[a]).slice(0, limit);
       if (!topKeys.length) return `<div style="text-align:center;color:var(--text-muted);padding:24px">${axisLabel}: データなし</div>`;
-      let h = `<div style="font-weight:600;font-size:13px;margin:12px 0 6px;color:#1a1a1a">${axisLabel} 上位${topKeys.length}</div>`;
-      h += '<table style="width:100%;border-collapse:collapse;font-size:11px"><thead><tr>';
-      h += '<th style="text-align:left;padding:6px;border-bottom:2px solid #e5e7eb;background:#f8f9fa;position:sticky;left:0;z-index:1">' + axisLabel + '</th>';
+      let h = `<div style="font-weight:700;font-size:14px;margin:16px 0 6px;color:#1a1a1a">${axisLabel} 上位${topKeys.length}</div>`;
+      h += '<table style="width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:760px"><thead><tr>';
+      h += '<th style="text-align:left;padding:8px 10px;border-bottom:2px solid #1a1a1a;background:#f8f9fa;position:sticky;top:48px;left:0;z-index:6;color:#1a1a1a;font-weight:700;border-right:2px solid #e5e7eb">' + axisLabel + '</th>';
       months6.forEach((ym,i) => {
-        h += `<th style="text-align:center;padding:6px;border-bottom:2px solid #e5e7eb;background:#f8f9fa;min-width:90px${i===0?';color:#b45309':''}">${ym}${i===0?'<br><span style="font-size:9px">今月</span>':''}</th>`;
+        h += `<th style="text-align:center;padding:8px 6px;border-bottom:2px solid #1a1a1a;background:${i===0?'#fffbea':'#f8f9fa'};min-width:110px;position:sticky;top:48px;z-index:5;color:#1a1a1a;font-weight:700${i===0?';color:#b45309':''}">${ym}${i===0?'<br><span style="font-size:9px;background:#fde68a;padding:1px 5px;border-radius:8px">今月</span>':''}</th>`;
       });
       h += '</tr></thead><tbody>';
       topKeys.forEach((k,idx) => {
-        const rowBg = idx % 2 ? 'background:#fafafa' : '';
-        h += `<tr style="${rowBg};border-bottom:1px solid #f0f0f0">`;
+        h += `<tr>`;
         const lbl = (k.length>16)?k.slice(0,16)+'…':k;
-        h += `<td style="padding:6px;font-weight:500;position:sticky;left:0;background:${idx%2?'#fafafa':'#fff'}" title="${k}">${lbl}</td>`;
-        months6.forEach(ym => {
+        h += `<td style="padding:8px 10px;font-weight:600;position:sticky;left:0;background:#fff;z-index:1;border-bottom:1px solid #f0f0f0;border-right:2px solid #e5e7eb;color:#1a1a1a" title="${k}">${lbl}</td>`;
+        months6.forEach((ym, mi) => {
           const v = map[k]?.[ym];
-          if (!v || v.total===0) { h += '<td style="padding:6px;text-align:center;color:#d1d5db">-</td>'; return; }
+          const cellBg = mi===0 ? '#fffbea' : '#fff';
+          if (!v || v.total===0) { h += `<td style="padding:8px;text-align:center;color:#d1d5db;background:${cellBg};border-bottom:1px solid #f0f0f0">-</td>`; return; }
           const vr = v.total>0 ? Math.round(v.visited/v.total*100) : 0;
           const cr = v.visited>0 ? Math.round(v.contracted/v.visited*100) : 0;
           const amt = v.amount;
-          h += `<td style="padding:6px;text-align:center;line-height:1.4">
-            <div style="font-weight:600;color:#1a1a1a">${v.total}件</div>
-            <div style="font-size:10px;color:#6b7280">来院 ${vr}%</div>
-            <div style="font-size:10px;color:${cr>=30?'#15803d':'#b91c1c'}">成約 ${cr}%</div>
-            ${amt?`<div style="font-size:10px;color:#1a1a1a">¥${fmt(amt)}</div>`:''}
+          h += `<td style="padding:8px;text-align:center;line-height:1.5;background:${cellBg};border-bottom:1px solid #f0f0f0">
+            <div style="font-weight:700;color:#1a1a1a;font-size:13px">${v.total}件</div>
+            <div style="font-size:10px;color:#6b7280">来院 <b style="color:#1a1a1a">${vr}%</b></div>
+            <div style="font-size:10px;color:#6b7280">成約 <b style="color:${cr>=30?'#15803d':cr>0?'#b91c1c':'#9ca3af'}">${cr}%</b></div>
+            ${amt?`<div style="font-size:10px;color:#1a1a1a;font-weight:600">¥${fmt(amt)}</div>`:''}
           </td>`;
         });
         h += '</tr>';
