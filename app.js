@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v468';
+const APP_VERSION = 'v469';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13257,6 +13257,229 @@ function renderDashboard() {
       });
       _dashJumpWired = true;
     }
+  }
+
+  // === v469: 前月比 詳細 3カード (治療別 / 治療×プロモ / プロモ別) ===
+  // 現スコープ (絞込) を取得
+  const anFacVal = document.getElementById('an-facility')?.value || '';
+  const anSvcVal = document.getElementById('an-service')?.value || '';
+  const anPromoVal = document.getElementById('an-promo')?.value || '';
+  const activeFac = facFilter || anFacVal;
+
+  // YM 抽出 (regex で / と - 両対応)
+  const _ymOf = (d) => {
+    const bd = d.bookDate || d.applyDate || '';
+    const m = bd.match(/(\d{4})\D+(\d{1,2})/);
+    if (!m) return '';
+    return `${m[1]}-${String(parseInt(m[2])).padStart(2,'0')}`;
+  };
+  const thisMonScope = bookingsData.filter(d => {
+    if (d.status === '除外') return false;
+    if (activeFac && sFac(d.facility) !== activeFac) return false;
+    if (anSvcVal && sSvc(d.service) !== anSvcVal) return false;
+    if (anPromoVal && d.source !== anPromoVal) return false;
+    return _ymOf(d) === thisYM;
+  });
+  const lastMonScope = bookingsData.filter(d => {
+    if (d.status === '除外') return false;
+    if (activeFac && sFac(d.facility) !== activeFac) return false;
+    if (anSvcVal && sSvc(d.service) !== anSvcVal) return false;
+    if (anPromoVal && d.source !== anPromoVal) return false;
+    return _ymOf(d) === lastYM;
+  });
+
+  function _aggBy(rows, keyFn) {
+    const m = {};
+    rows.forEach(d => {
+      const k = keyFn(d) || '-';
+      if (!m[k]) m[k] = {booking:0, visited:0, contracted:0, amount:0};
+      m[k].booking++;
+      if (typeof isVisitedStatus === 'function' && isVisitedStatus(d.status)) m[k].visited++;
+      if (d.status === '成約') {
+        m[k].contracted++;
+        const ek = d.name+'|'+d.applyDate;
+        m[k].amount += Number(bkExtra[ek]?.contractAmount) || Number(d.contractAmount) || 0;
+      }
+    });
+    return m;
+  }
+
+  const _treatThis = _aggBy(thisMonScope, d => sSvc(d.service));
+  const _treatLast = _aggBy(lastMonScope, d => sSvc(d.service));
+  const _promoThis = _aggBy(thisMonScope, d => d.source || '(なし)');
+  const _promoLast = _aggBy(lastMonScope, d => d.source || '(なし)');
+
+  // スコープラベルを表示
+  const scopeTxt = activeFac ? ` (🏥 ${activeFac})` : (anSvcVal ? ` (🦷 ${anSvcVal})` : (anPromoVal ? ` (🎯 ${anPromoVal})` : ' (全体)'));
+  ['dash-treat-scope','dash-promo-scope','dash-tp-scope'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.textContent = scopeTxt;
+  });
+
+  // 共通: 前月比セル生成 (今月 / 先月 ▲▼%)
+  function _momCell(cur, prv, isYen) {
+    if (cur === 0 && prv === 0) return '<span style="color:#d1d5db">-</span>';
+    const fv = isYen ? (v => (typeof fmt === 'function' ? '¥'+fmt(v) : '¥'+v)) : (v => v);
+    let badge = '';
+    if (prv === 0 && cur > 0) badge = '<span style="background:#dcfce7;color:#15803d;font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px">新規</span>';
+    else if (prv > 0) {
+      const pct = Math.round((cur - prv) / prv * 100);
+      const c = pct > 0 ? '#15803d' : pct < 0 ? '#b91c1c' : '#6b7280';
+      const bg = pct > 0 ? '#dcfce7' : pct < 0 ? '#fee2e2' : '#f3f4f6';
+      const arrow = pct > 0 ? '▲' : pct < 0 ? '▼' : '±';
+      badge = `<span style="background:${bg};color:${c};font-size:9px;font-weight:700;padding:1px 5px;border-radius:8px;margin-left:4px">${arrow}${Math.abs(pct)}%</span>`;
+    }
+    return `<span style="font-weight:600;color:#1a1a1a">${fv(cur)}</span><span style="font-size:10px;color:#9ca3af;margin:0 3px">/</span><span style="font-size:10px;color:#6b7280">${fv(prv)}</span>${badge}`;
+  }
+
+  // === Card 1: 治療別 前月比 ===
+  const treatTbl = document.getElementById('dash-treat-mom');
+  if (treatTbl) {
+    const allKeys = new Set([...Object.keys(_treatThis), ...Object.keys(_treatLast)]);
+    const ordered = [...allKeys].sort((a,b) => {
+      const ta = (_treatThis[a]?.booking||0) + (_treatLast[a]?.booking||0);
+      const tb = (_treatThis[b]?.booking||0) + (_treatLast[b]?.booking||0);
+      return tb - ta;
+    });
+    const thS = 'background:#f8f9fa;border-bottom:2px solid #1a1a1a;color:#1a1a1a;font-weight:700;font-size:11px;padding:8px;text-align:right;white-space:nowrap';
+    const thL = thS + ';text-align:left;position:sticky;left:0;border-right:2px solid #e5e7eb;z-index:1';
+    let html = '<thead><tr>';
+    html += `<th style="${thL}">治療</th>`;
+    html += `<th style="${thS}">予約</th><th style="${thS}">来院</th><th style="${thS}">来院率</th><th style="${thS}">成約</th><th style="${thS}">決定率</th><th style="${thS}">成約金額</th>`;
+    html += '</tr></thead><tbody>';
+    if (!ordered.length) {
+      html += '<tr><td colspan="7" style="padding:24px;text-align:center;color:#9ca3af">該当データなし</td></tr>';
+    } else {
+      ordered.forEach((k, idx) => {
+        const c = _treatThis[k] || {booking:0,visited:0,contracted:0,amount:0};
+        const p = _treatLast[k] || {booking:0,visited:0,contracted:0,amount:0};
+        const cvr = c.booking ? Math.round(c.visited/c.booking*100) : 0;
+        const pvr = p.booking ? Math.round(p.visited/p.booking*100) : 0;
+        const ccr = c.visited ? Math.round(c.contracted/c.visited*100) : 0;
+        const pcr = p.visited ? Math.round(p.contracted/p.visited*100) : 0;
+        const rowBg = idx % 2 ? '#fafafa' : '#fff';
+        html += `<tr style="background:${rowBg};border-bottom:1px solid #f0f0f0">`;
+        html += `<td style="padding:8px 12px;font-weight:600;color:#1a1a1a;position:sticky;left:0;background:${rowBg};border-right:2px solid #e5e7eb">${escapeHtml(k)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.booking, p.booking, false)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.visited, p.visited, false)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(cvr, pvr, false)}%</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.contracted, p.contracted, false)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(ccr, pcr, false)}%</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.amount, p.amount, true)}</td>`;
+        html += '</tr>';
+      });
+    }
+    html += '</tbody>';
+    treatTbl.innerHTML = html;
+  }
+
+  // === Card 2: 治療 × プロモ クロス前月比 ===
+  const tpTbl = document.getElementById('dash-treat-promo-mom');
+  if (tpTbl) {
+    // プロモ上位を予約合計で選出 (今+先)
+    const promoTotals = {};
+    [_promoThis, _promoLast].forEach(map => {
+      Object.entries(map).forEach(([k,v]) => { promoTotals[k] = (promoTotals[k]||0) + v.booking; });
+    });
+    const topPromos = Object.keys(promoTotals).sort((a,b) => promoTotals[b]-promoTotals[a]).slice(0, 8);
+    const allTreats = new Set([...Object.keys(_treatThis), ...Object.keys(_treatLast)]);
+    const orderedTreats = [...allTreats].sort((a,b) => {
+      const ta = (_treatThis[a]?.booking||0) + (_treatLast[a]?.booking||0);
+      const tb = (_treatThis[b]?.booking||0) + (_treatLast[b]?.booking||0);
+      return tb - ta;
+    });
+    // 治療×プロモ 集計 (件数のみ)
+    const tpThis = _aggBy(thisMonScope, d => `${sSvc(d.service)}||${d.source || '(なし)'}`);
+    const tpLast = _aggBy(lastMonScope, d => `${sSvc(d.service)}||${d.source || '(なし)'}`);
+    const cellOf = (treat, promo, mo) => {
+      const k = `${treat}||${promo}`;
+      return mo[k]?.booking || 0;
+    };
+    const thS = 'background:#f8f9fa;border-bottom:2px solid #1a1a1a;color:#1a1a1a;font-weight:700;font-size:11px;padding:8px 6px;text-align:right;white-space:nowrap';
+    const thL = thS + ';text-align:left;position:sticky;left:0;border-right:2px solid #e5e7eb;z-index:2';
+    let html = '<thead><tr>';
+    html += `<th style="${thL}">治療 ＼ プロモ</th>`;
+    topPromos.forEach(p => {
+      const lbl = (p && p.length > 10) ? p.slice(0,10)+'…' : (p || '-');
+      html += `<th style="${thS}" title="${escapeHtml(p)}">${escapeHtml(lbl)}</th>`;
+    });
+    html += `<th style="${thS};border-left:2px solid #1a1a1a">行合計</th>`;
+    html += '</tr></thead><tbody>';
+    if (!orderedTreats.length || !topPromos.length) {
+      html += '<tr><td colspan="' + (topPromos.length+2) + '" style="padding:24px;text-align:center;color:#9ca3af">該当データなし</td></tr>';
+    } else {
+      orderedTreats.forEach((tk, idx) => {
+        const rowBg = idx % 2 ? '#fafafa' : '#fff';
+        html += `<tr style="background:${rowBg};border-bottom:1px solid #f0f0f0">`;
+        html += `<td style="padding:8px 10px;font-weight:600;color:#1a1a1a;position:sticky;left:0;background:${rowBg};border-right:2px solid #e5e7eb">${escapeHtml(tk)}</td>`;
+        let rowCur = 0, rowPrv = 0;
+        topPromos.forEach(pk => {
+          const c = cellOf(tk, pk, tpThis);
+          const p = cellOf(tk, pk, tpLast);
+          rowCur += c; rowPrv += p;
+          html += `<td style="padding:6px 6px;text-align:right">${_momCell(c, p, false)}</td>`;
+        });
+        html += `<td style="padding:8px;text-align:right;font-weight:700;border-left:2px solid #1a1a1a;background:#f9fafb">${_momCell(rowCur, rowPrv, false)}</td>`;
+        html += '</tr>';
+      });
+      // 列合計
+      html += '<tr style="background:#1a1a1a;color:#fff;font-weight:700">';
+      html += `<td style="padding:8px 10px;position:sticky;left:0;background:#1a1a1a;border-right:2px solid #1a1a1a">列合計</td>`;
+      let grdCur = 0, grdPrv = 0;
+      topPromos.forEach(pk => {
+        let cs = 0, ps = 0;
+        orderedTreats.forEach(tk => { cs += cellOf(tk, pk, tpThis); ps += cellOf(tk, pk, tpLast); });
+        grdCur += cs; grdPrv += ps;
+        const txt = (cs===0&&ps===0)?'-':`<span style="color:#fff">${cs}</span><span style="color:#9ca3af;font-size:10px"> / ${ps}</span>`;
+        html += `<td style="padding:8px;text-align:right">${txt}</td>`;
+      });
+      const tot = (grdCur===0&&grdPrv===0)?'-':`<span>${grdCur}</span><span style="color:#9ca3af"> / ${grdPrv}</span>`;
+      html += `<td style="padding:8px;text-align:right;border-left:2px solid #fff">${tot}</td>`;
+      html += '</tr>';
+    }
+    html += '</tbody>';
+    tpTbl.innerHTML = html;
+  }
+
+  // === Card 3: プロモ別 前月比 ===
+  const promoTbl = document.getElementById('dash-promo-mom');
+  if (promoTbl) {
+    const allKeys = new Set([...Object.keys(_promoThis), ...Object.keys(_promoLast)]);
+    const ordered = [...allKeys].sort((a,b) => {
+      const ta = (_promoThis[a]?.booking||0) + (_promoLast[a]?.booking||0);
+      const tb = (_promoThis[b]?.booking||0) + (_promoLast[b]?.booking||0);
+      return tb - ta;
+    });
+    const thS = 'background:#f8f9fa;border-bottom:2px solid #1a1a1a;color:#1a1a1a;font-weight:700;font-size:11px;padding:8px;text-align:right;white-space:nowrap';
+    const thL = thS + ';text-align:left;position:sticky;left:0;border-right:2px solid #e5e7eb;z-index:1';
+    let html = '<thead><tr>';
+    html += `<th style="${thL}">プロモ</th>`;
+    html += `<th style="${thS}">予約</th><th style="${thS}">来院</th><th style="${thS}">来院率</th><th style="${thS}">成約</th><th style="${thS}">決定率</th><th style="${thS}">成約金額</th>`;
+    html += '</tr></thead><tbody>';
+    if (!ordered.length) {
+      html += '<tr><td colspan="7" style="padding:24px;text-align:center;color:#9ca3af">該当データなし</td></tr>';
+    } else {
+      ordered.forEach((k, idx) => {
+        const c = _promoThis[k] || {booking:0,visited:0,contracted:0,amount:0};
+        const p = _promoLast[k] || {booking:0,visited:0,contracted:0,amount:0};
+        const cvr = c.booking ? Math.round(c.visited/c.booking*100) : 0;
+        const pvr = p.booking ? Math.round(p.visited/p.booking*100) : 0;
+        const ccr = c.visited ? Math.round(c.contracted/c.visited*100) : 0;
+        const pcr = p.visited ? Math.round(p.contracted/p.visited*100) : 0;
+        const rowBg = idx % 2 ? '#fafafa' : '#fff';
+        html += `<tr style="background:${rowBg};border-bottom:1px solid #f0f0f0">`;
+        html += `<td style="padding:8px 12px;font-weight:600;color:#1a1a1a;position:sticky;left:0;background:${rowBg};border-right:2px solid #e5e7eb" title="${escapeHtml(k)}">${escapeHtml(k.length>20?k.slice(0,20)+'…':k)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.booking, p.booking, false)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.visited, p.visited, false)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(cvr, pvr, false)}%</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.contracted, p.contracted, false)}</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(ccr, pcr, false)}%</td>`;
+        html += `<td style="padding:8px;text-align:right">${_momCell(c.amount, p.amount, true)}</td>`;
+        html += '</tr>';
+      });
+    }
+    html += '</tbody>';
+    promoTbl.innerHTML = html;
   }
 
   // 詳細分析テーブル (既存 renderAnalysis を呼ぶ)

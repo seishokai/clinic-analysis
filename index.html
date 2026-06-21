@@ -975,6 +975,31 @@
           </div>
         </div>
 
+        <!-- v469: 前月比 詳細 3カード (治療別 / 治療×プロモ / プロモ別) -->
+        <div class="card" style="margin-top:14px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <span>🦷 治療別 前月比 <span id="dash-treat-scope" style="font-size:11px;color:var(--text-muted);font-weight:400"></span></span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400">今カレンダー月 vs 先カレンダー月</span>
+          </div>
+          <div style="overflow-x:auto"><table id="dash-treat-mom" style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:840px"></table></div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <span>🦷×🎯 治療 × プロモ 前月比 <span id="dash-tp-scope" style="font-size:11px;color:var(--text-muted);font-weight:400"></span></span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400">各セル: 今月件数 / 先月件数 ▲▼%</span>
+          </div>
+          <div style="overflow-x:auto"><table id="dash-treat-promo-mom" style="width:100%;border-collapse:separate;border-spacing:0;font-size:11px;min-width:840px"></table></div>
+        </div>
+
+        <div class="card" style="margin-top:14px">
+          <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+            <span>🎯 プロモ別 前月比 <span id="dash-promo-scope" style="font-size:11px;color:var(--text-muted);font-weight:400"></span></span>
+            <span style="font-size:11px;color:var(--text-muted);font-weight:400">今カレンダー月 vs 先カレンダー月</span>
+          </div>
+          <div style="overflow-x:auto"><table id="dash-promo-mom" style="width:100%;border-collapse:separate;border-spacing:0;font-size:12px;min-width:840px"></table></div>
+        </div>
+
         <div class="page-header" style="margin-top:18px;border-top:1px solid #e5e7eb;padding-top:14px"><h2 style="font-size:15px;margin:0">📋 詳細分析 (フィルタ可)</h2></div>
         <div class="card" style="margin-bottom:16px;padding:12px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
@@ -1600,7 +1625,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=468"></script>
+  <script src="app.js?v=469"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
