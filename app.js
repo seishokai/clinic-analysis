@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v466';
+const APP_VERSION = 'v467';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3498,15 +3498,24 @@ function renderHomeDashboard() {
     return `<span style="font-size:9px;color:${color};font-weight:600;margin-left:4px">${arrow}${Math.abs(d)}%</span>`;
   };
 
-  // 既存指標 (互換性のため)
-  const thisMonthAll = active.filter(d => (d.bookDate || '').startsWith(thisMonth));
+  // v467: bookDate 形式 (YYYY/MM/DD, YYYY-MM-DD, M/D, M-D, スペース区切 etc.) から YM を頑健に抽出
+  const _bookYM = (d) => {
+    const bd = d.bookDate || '';
+    const m = bd.match(/(\d{4})\D+(\d{1,2})/);
+    if (!m) return '';
+    return `${m[1]}/${String(parseInt(m[2])).padStart(2,'0')}`;
+  };
+  const _thisYM = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}`;
+  const _lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const _lastYM = `${_lm.getFullYear()}/${String(_lm.getMonth()+1).padStart(2,'0')}`;
+
+  // 既存指標 (互換性のため) — v467 で regex ベースに置換
+  const thisMonthAll = active.filter(d => _bookYM(d) === _thisYM);
+  const lastMonthAll = active.filter(d => _bookYM(d) === _lastYM);
   const thisMonthContracted = thisMonthAll.filter(d => d.status === '成約');
   const thisMonthAmount = thisMonthContracted.reduce((s,d) => s + Number(d.contractAmount||0), 0);
 
   // v466: 前月比 (今カレンダー月 vs 先カレンダー月) — 選択期間とは独立して算出
-  const _lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-  const lastMonthYM = `${_lm.getFullYear()}/${String(_lm.getMonth()+1).padStart(2,'0')}`;
-  const lastMonthAll = active.filter(d => (d.bookDate || '').startsWith(lastMonthYM));
   const kpiThisMo = calcKPI(thisMonthAll);
   const kpiLastMo = calcKPI(lastMonthAll);
   const _moLabel = `${now.getFullYear()}年${now.getMonth()+1}月`;
@@ -3543,6 +3552,13 @@ function renderHomeDashboard() {
   const byFacPrev = aggregateBy(prevRangeRows, facKey);
   const byTreatPrev = aggregateBy(prevRangeRows, treatKey);
   const byPromoPrev = aggregateBy(prevRangeRows, promoKey);
+  // v467: 各軸の「今月」「先月」 (カレンダー月、期間と独立)
+  const byFacThisMo = aggregateBy(thisMonthAll, facKey);
+  const byFacLastMo = aggregateBy(lastMonthAll, facKey);
+  const byTreatThisMo = aggregateBy(thisMonthAll, treatKey);
+  const byTreatLastMo = aggregateBy(lastMonthAll, treatKey);
+  const byPromoThisMo = aggregateBy(thisMonthAll, promoKey);
+  const byPromoLastMo = aggregateBy(lastMonthAll, promoKey);
   const facList = Object.keys(byFacMonth).sort((a,b) => byFacMonth[b].booking - byFacMonth[a].booking);
   const treatList = Object.keys(byTreatMonth).sort((a,b) => byTreatMonth[b].booking - byTreatMonth[a].booking);
   const promoList = Object.keys(byPromoMonth).sort((a,b) => byPromoMonth[b].booking - byPromoMonth[a].booking);
@@ -3694,13 +3710,17 @@ function renderHomeDashboard() {
             const dim = _homeAnalysisDim;
             const data = dim==='facility' ? byFacMonth : dim==='treatment' ? byTreatMonth : byPromoMonth;
             const prev = dim==='facility' ? byFacPrev : dim==='treatment' ? byTreatPrev : byPromoPrev;
+            // v467: 各軸の今月/先月 (期間と独立)
+            const thisMo = dim==='facility' ? byFacThisMo : dim==='treatment' ? byTreatThisMo : byPromoThisMo;
+            const lastMo = dim==='facility' ? byFacLastMo : dim==='treatment' ? byTreatLastMo : byPromoLastMo;
             const baseList = dim==='facility' ? facList : dim==='treatment' ? treatList : promoList;
             const dimLabel = dim==='facility' ? '医院' : dim==='treatment' ? '治療' : 'プロモ';
             if (!baseList.length) return '<div style="padding:20px;text-align:center;color:var(--text-sub)">データなし</div>';
             // 各キーごとの metric 値を取得
             const metric = (k, key) => {
               const v = data[k] || { booking:0, visited:0, contracted:0, amount:0 };
-              const p = prev[k] || { booking:0, visited:0, contracted:0, amount:0 };
+              const tm = thisMo[k] || { booking:0, visited:0, contracted:0, amount:0 };
+              const lm = lastMo[k] || { booking:0, visited:0, contracted:0, amount:0 };
               switch (key) {
                 case 'name':       return k;
                 case 'booking':    return v.booking;
@@ -3709,7 +3729,8 @@ function renderHomeDashboard() {
                 case 'contracted': return v.contracted;
                 case 'decideRate': return v.visited ? v.contracted/v.visited : -1;
                 case 'amount':     return v.amount;
-                case 'deltaAmt':   return p.amount ? (v.amount - p.amount)/p.amount : (v.amount > 0 ? 999 : -999);
+                case 'moBookDelta':  return lm.booking ? (tm.booking - lm.booking)/lm.booking : (tm.booking > 0 ? 999 : -999);
+                case 'moAmtDelta':   return lm.amount ? (tm.amount - lm.amount)/lm.amount : (tm.amount > 0 ? 999 : -999);
                 default:           return 0;
               }
             };
@@ -3726,17 +3747,27 @@ function renderHomeDashboard() {
               s.booking += v.booking; s.visited += v.visited; s.contracted += v.contracted; s.amount += v.amount;
               return s;
             }, { booking:0, visited:0, contracted:0, amount:0 });
-            const totPrev = baseList.reduce((s,k) => {
-              const v = prev[k] || { booking:0, visited:0, contracted:0, amount:0 };
+            const totThisMo = baseList.reduce((s,k) => {
+              const v = thisMo[k] || { booking:0, visited:0, contracted:0, amount:0 };
               s.booking += v.booking; s.visited += v.visited; s.contracted += v.contracted; s.amount += v.amount;
               return s;
             }, { booking:0, visited:0, contracted:0, amount:0 });
-            // 統合テーブル: 予約 / 来院 / 来院率 / 成約 / 決定率 / 金額 / 前期比金額
-            const cols = (cur, prv) => {
+            const totLastMo = baseList.reduce((s,k) => {
+              const v = lastMo[k] || { booking:0, visited:0, contracted:0, amount:0 };
+              s.booking += v.booking; s.visited += v.visited; s.contracted += v.contracted; s.amount += v.amount;
+              return s;
+            }, { booking:0, visited:0, contracted:0, amount:0 });
+            // 統合テーブル: 予約 / 来院 / 来院率 / 成約 / 決定率 / 金額 / 前月予約 / 前月比金額
+            const cols = (cur, tm, lm) => {
               const visitRate = cur.booking ? Math.round(cur.visited/cur.booking*100) : 0;
               const decideRate = cur.visited ? Math.round(cur.contracted/cur.visited*100) : 0;
               const visitColor = visitRate>=50?'#059669':visitRate>=30?'#d97706':'#dc2626';
               const decideColor = decideRate>=40?'#059669':decideRate>=20?'#d97706':'#dc2626';
+              // 前月比 (今月 vs 先月)
+              const bookCmp = (tm.booking===0 && lm.booking===0) ? '<span style="color:var(--text-muted)">-</span>'
+                : `<span style="font-size:10px;color:#6b7280">${tm.booking} / ${lm.booking}</span>${fmtDelta(tm.booking, lm.booking)}`;
+              const amtCmp = (tm.amount===0 && lm.amount===0) ? '<span style="color:var(--text-muted)">-</span>'
+                : `<span style="font-size:10px;color:#6b7280">${fmtYen(tm.amount)} / ${fmtYen(lm.amount)}</span>${fmtDelta(tm.amount, lm.amount)}`;
               return [
                 `${cur.booking}`,
                 `<span style="color:#1d4ed8;font-weight:700">${cur.visited}</span>`,
@@ -3744,23 +3775,25 @@ function renderHomeDashboard() {
                 `<span style="color:#059669;font-weight:700">${cur.contracted}</span>`,
                 cur.visited ? `<span style="color:${decideColor};font-weight:700">${decideRate}%</span>` : '<span style="color:var(--text-muted)">-</span>',
                 cur.amount ? `<span style="color:#0e7490;font-weight:700">${fmtYen(cur.amount)}</span>` : '<span style="color:var(--text-muted)">-</span>',
-                fmtDelta(cur.amount, prv.amount) || '<span style="color:var(--text-muted);font-size:10px">-</span>',
+                bookCmp,
+                amtCmp,
               ];
             };
             const rowsHtml = list.map(k => {
               const cur = data[k] || { booking:0, visited:0, contracted:0, amount:0 };
-              const prv = prev[k] || { booking:0, visited:0, contracted:0, amount:0 };
-              return `<tr><td style="font-weight:600;text-align:left">${escapeHtml(k)}</td>${cols(cur, prv).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
+              const tm = thisMo[k] || { booking:0, visited:0, contracted:0, amount:0 };
+              const lm = lastMo[k] || { booking:0, visited:0, contracted:0, amount:0 };
+              return `<tr class="home-dim-row" data-dim="${dim}" data-key="${escapeHtml(k)}" style="cursor:pointer" title="クリックで詳細へ"><td style="font-weight:600;text-align:left;color:#1d4ed8;text-decoration:underline">${escapeHtml(k)}</td>${cols(cur, tm, lm).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
             }).join('');
-            const totalHtml = `<tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border)"><td style="text-align:left">合計</td>${cols(tot, totPrev).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
+            const totalHtml = `<tr style="background:#f9fafb;font-weight:700;border-top:2px solid var(--border)"><td style="text-align:left">合計</td>${cols(tot, totThisMo, totLastMo).map(c => `<td style="text-align:right;font-variant-numeric:tabular-nums">${c}</td>`).join('')}</tr>`;
             // ソート可能ヘッダー
-            const sortHdr = (key, label, align='right') => {
+            const sortHdr = (key, label, align='right', title='') => {
               const isActive = sort.key === key;
               const arrow = isActive ? (sort.dir==='asc' ? ' ▲' : ' ▼') : '';
               const color = isActive ? '#1d4ed8' : 'var(--text-sub)';
-              return `<th class="home-sort-th" data-sortkey="${key}" style="text-align:${align};cursor:pointer;color:${color};user-select:none" title="クリックでソート">${label}${arrow}</th>`;
+              return `<th class="home-sort-th" data-sortkey="${key}" style="text-align:${align};cursor:pointer;color:${color};user-select:none" title="${title || 'クリックでソート'}">${label}${arrow}</th>`;
             };
-            return `<table class="data-table"><thead><tr>${sortHdr('name', dimLabel, 'left')}${sortHdr('booking', '予約')}${sortHdr('visited', '来院')}${sortHdr('visitRate', '来院率')}${sortHdr('contracted', '成約')}${sortHdr('decideRate', '決定率')}${sortHdr('amount', '金額')}${sortHdr('deltaAmt', '前期比金額')}</tr></thead><tbody>${rowsHtml}${totalHtml}</tbody></table>`;
+            return `<table class="data-table"><thead><tr>${sortHdr('name', dimLabel, 'left')}${sortHdr('booking', '予約')}${sortHdr('visited', '来院')}${sortHdr('visitRate', '来院率')}${sortHdr('contracted', '成約')}${sortHdr('decideRate', '決定率')}${sortHdr('amount', '金額')}${sortHdr('moBookDelta', '前月比予約', 'right', '今月予約 / 先月予約 (前月比)')}${sortHdr('moAmtDelta', '前月比金額', 'right', '今月金額 / 先月金額 (前月比)')}</tr></thead><tbody>${rowsHtml}${totalHtml}</tbody></table>`;
           })()}
         </div>
       </div>
@@ -3804,6 +3837,39 @@ function renderHomeDashboard() {
       const s = btn.dataset.sub;
       try { switchView(v); } catch(_){}
       if (s) setTimeout(() => switchBookingSub(s), 120);
+    });
+  });
+  // v467: 詳細分析テーブルの行クリックで詳細へ遷移
+  el.querySelectorAll('.home-dim-row').forEach(tr => {
+    tr.addEventListener('click', () => {
+      const dim = tr.dataset.dim;
+      const key = tr.dataset.key;
+      if (!dim || !key) return;
+      try {
+        if (dim === 'facility') {
+          // 予約タブ → 医院別タブをクリック (data-fac で照合、normFac 経由でマッチ)
+          switchView('bookings');
+          setTimeout(() => {
+            // bk-fac-tab の data-fac は短縮形 (BF銀座, ウィズ, など)。key も normFac 結果なので原則一致
+            const btn = document.querySelector(`.bk-fac-tab[data-fac="${key}"]`)
+                     || [...document.querySelectorAll('.bk-fac-tab')].find(b => normFac(b.dataset.fac) === key);
+            if (btn) btn.click();
+            else { switchBookingSub('bk-list'); }
+          }, 120);
+        } else if (dim === 'treatment') {
+          // 来院タブ → 該当治療サブタブ
+          const map = {'BF':'kaiin-bf','矯正':'kaiin-kyosei','インプラント':'kaiin-implant','ラブリエ':'kaiin-labrie','自費補綴':'kaiin-hotetsu','自費根治':'kaiin-konchi','ホワイトニング':'kaiin-whitening','リップアート':'kaiin-lipart','ティースジュエリー':'kaiin-jewelry'};
+          const targetSub = map[key] || 'kaiin-other';
+          switchView('kaiin');
+          setTimeout(() => {
+            const btn = document.querySelector(`#kaiin-sub-nav .sub-nav-btn[data-sub="${targetSub}"]`);
+            if (btn) btn.click();
+          }, 120);
+        } else if (dim === 'promo') {
+          // プロモタブ
+          switchView('promo');
+        }
+      } catch(_){}
     });
   });
   el.querySelectorAll('.home-link-btn').forEach(btn => {
