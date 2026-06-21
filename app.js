@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v467';
+const APP_VERSION = 'v468';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3839,36 +3839,22 @@ function renderHomeDashboard() {
       if (s) setTimeout(() => switchBookingSub(s), 120);
     });
   });
-  // v467: 詳細分析テーブルの行クリックで詳細へ遷移
+  // v467/v468: 詳細分析テーブルの行クリック → 📊分析タブに該当絞込で遷移
   el.querySelectorAll('.home-dim-row').forEach(tr => {
     tr.addEventListener('click', () => {
       const dim = tr.dataset.dim;
       const key = tr.dataset.key;
       if (!dim || !key) return;
       try {
+        // v468: 医院/治療/プロモ いずれも 📊分析 タブで絞り込み (KPIstrip + 月別 + クロス集計が全部見える)
         if (dim === 'facility') {
-          // 予約タブ → 医院別タブをクリック (data-fac で照合、normFac 経由でマッチ)
-          switchView('bookings');
-          setTimeout(() => {
-            // bk-fac-tab の data-fac は短縮形 (BF銀座, ウィズ, など)。key も normFac 結果なので原則一致
-            const btn = document.querySelector(`.bk-fac-tab[data-fac="${key}"]`)
-                     || [...document.querySelectorAll('.bk-fac-tab')].find(b => normFac(b.dataset.fac) === key);
-            if (btn) btn.click();
-            else { switchBookingSub('bk-list'); }
-          }, 120);
+          window._dashPresetFilter = { kpiFac: key, anFacility: key, scopeLabel: '🏥 '+key };
         } else if (dim === 'treatment') {
-          // 来院タブ → 該当治療サブタブ
-          const map = {'BF':'kaiin-bf','矯正':'kaiin-kyosei','インプラント':'kaiin-implant','ラブリエ':'kaiin-labrie','自費補綴':'kaiin-hotetsu','自費根治':'kaiin-konchi','ホワイトニング':'kaiin-whitening','リップアート':'kaiin-lipart','ティースジュエリー':'kaiin-jewelry'};
-          const targetSub = map[key] || 'kaiin-other';
-          switchView('kaiin');
-          setTimeout(() => {
-            const btn = document.querySelector(`#kaiin-sub-nav .sub-nav-btn[data-sub="${targetSub}"]`);
-            if (btn) btn.click();
-          }, 120);
+          window._dashPresetFilter = { anService: key, scopeLabel: '🦷 '+key };
         } else if (dim === 'promo') {
-          // プロモタブ
-          switchView('promo');
+          window._dashPresetFilter = { anPromo: key, scopeLabel: '🎯 '+key };
         }
+        switchView('dashboard');
       } catch(_){}
     });
   });
@@ -13077,6 +13063,10 @@ function renderDashboard() {
     return;
   }
 
+  // v468: ホームから渡された絞り込みプリセットを適用 (1回のみ)
+  const preset = window._dashPresetFilter;
+  if (preset) window._dashPresetFilter = null;
+
   // 医院セレクトを populate (重複防止: 既に同じオプションがあれば再構築しない)
   const facSel = document.getElementById('dash-kpi-fac');
   if (facSel) {
@@ -13089,9 +13079,48 @@ function renderDashboard() {
       facSel.innerHTML = '<option value="">全医院</option>' + wanted.map(f => `<option value="${f}">${f}</option>`).join('');
       facSel.value = cur;
     }
+    // プリセットがあれば適用 (populate 後でも options に存在すれば反映)
+    if (preset && preset.kpiFac !== undefined) facSel.value = preset.kpiFac;
     if (!facSel._dashWired) {
       facSel.addEventListener('change', () => renderDashboard());
       facSel._dashWired = true;
+    }
+  }
+  // 詳細分析側 (an-*) のプリセット適用 — renderAnalysis 内で populate するため
+  // 一旦値だけセット (renderAnalysis は preserve-current-value 方式)
+  if (preset) {
+    const setIf = (id, val) => {
+      if (val === undefined) return;
+      const el = document.getElementById(id);
+      if (!el) return;
+      // option がまだ無い場合は追加 (renderAnalysis が次の populate で正規化)
+      if (val && ![...el.options].some(o => o.value === val)) {
+        const opt = document.createElement('option');
+        opt.value = val; opt.textContent = val;
+        el.appendChild(opt);
+      }
+      el.value = val;
+    };
+    setIf('an-facility', preset.anFacility);
+    setIf('an-service', preset.anService);
+    setIf('an-promo', preset.anPromo);
+  }
+
+  // 絞込ハイライトバナー
+  const updEl0 = document.getElementById('dash-last-updated');
+  if (updEl0) {
+    if (preset && preset.scopeLabel) {
+      updEl0.innerHTML = `<span style="background:#fde68a;color:#92400e;padding:3px 10px;border-radius:14px;font-weight:700;font-size:11px">🔍 ${escapeHtml(preset.scopeLabel)} で絞込中</span> <button id="dash-clear-scope" class="btn btn-outline" style="font-size:10px;padding:2px 8px;min-height:24px;margin-left:6px">×解除</button>`;
+      setTimeout(() => {
+        const clr = document.getElementById('dash-clear-scope');
+        if (clr) clr.addEventListener('click', () => {
+          const f = document.getElementById('dash-kpi-fac'); if (f) f.value = '';
+          const af = document.getElementById('an-facility'); if (af) af.value = '';
+          const as = document.getElementById('an-service'); if (as) as.value = '';
+          const ap = document.getElementById('an-promo'); if (ap) ap.value = '';
+          renderDashboard();
+        });
+      }, 30);
     }
   }
 
@@ -13233,9 +13262,9 @@ function renderDashboard() {
   // 詳細分析テーブル (既存 renderAnalysis を呼ぶ)
   if (typeof renderAnalysis === 'function') renderAnalysis();
 
-  // 最終更新時刻
+  // 最終更新時刻 (scope バナーがある場合は上書きしない)
   const updEl = document.getElementById('dash-last-updated');
-  if (updEl) {
+  if (updEl && !(preset && preset.scopeLabel)) {
     const t = new Date();
     updEl.textContent = `更新 ${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
   }
