@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v465';
+const APP_VERSION = 'v466';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3503,6 +3503,15 @@ function renderHomeDashboard() {
   const thisMonthContracted = thisMonthAll.filter(d => d.status === '成約');
   const thisMonthAmount = thisMonthContracted.reduce((s,d) => s + Number(d.contractAmount||0), 0);
 
+  // v466: 前月比 (今カレンダー月 vs 先カレンダー月) — 選択期間とは独立して算出
+  const _lm = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastMonthYM = `${_lm.getFullYear()}/${String(_lm.getMonth()+1).padStart(2,'0')}`;
+  const lastMonthAll = active.filter(d => (d.bookDate || '').startsWith(lastMonthYM));
+  const kpiThisMo = calcKPI(thisMonthAll);
+  const kpiLastMo = calcKPI(lastMonthAll);
+  const _moLabel = `${now.getFullYear()}年${now.getMonth()+1}月`;
+  const _lmLabel = `${_lm.getFullYear()}年${_lm.getMonth()+1}月`;
+
   // 医院別 / 治療別 (選択期間)
   // Phase1: amount 計算 (bk-extra 優先)
   const _bkExtraHome = (typeof loadData === 'function') ? loadData('bk-extra', {}) : {};
@@ -3651,6 +3660,19 @@ function renderHomeDashboard() {
         <input type="month" id="home-to-month" value="${escapeHtml(monthInputValue(range.toYM))}" style="font-size:11px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-family:inherit">
       </div>
       <div style="margin-top:4px;font-size:10px;color:var(--text-sub)">前期間比較: ${escapeHtml(prevFromYM === prevToYM ? ymToLabel(prevFromYM) : ymToLabel(prevFromYM)+'〜'+ymToLabel(prevToYM))}</div>
+      <!-- v466: 前月比 (今月 vs 先月) — 期間選択と独立 -->
+      <div style="margin-top:8px;padding:8px 10px;background:linear-gradient(90deg,#f0f9ff 0%,#fff 100%);border:1px solid #bfdbfe;border-left:3px solid #1d4ed8;border-radius:8px">
+        <div style="font-size:11px;font-weight:700;color:#1d4ed8;margin-bottom:4px">📅 前月比 <span style="color:#6b7280;font-weight:500;margin-left:4px">${escapeHtml(_moLabel)} vs ${escapeHtml(_lmLabel)}</span></div>
+        <div style="display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px">
+          <span><b style="color:#1a1a1a">予約</b> ${kpiThisMo.booking} / <span style="color:#6b7280">先月 ${kpiLastMo.booking}</span>${fmtDelta(kpiThisMo.booking, kpiLastMo.booking)}</span>
+          <span><b style="color:#1d4ed8">来院</b> ${kpiThisMo.visited} / <span style="color:#6b7280">先月 ${kpiLastMo.visited}</span>${fmtDelta(kpiThisMo.visited, kpiLastMo.visited)}</span>
+          <span><b style="color:#d97706">来院率</b> ${kpiThisMo.booking?kpiThisMo.visitRate+'%':'-'} / <span style="color:#6b7280">先月 ${kpiLastMo.booking?kpiLastMo.visitRate+'%':'-'}</span>${fmtDelta(kpiThisMo.visitRate, kpiLastMo.visitRate)}</span>
+          <span><b style="color:#059669">成約</b> ${kpiThisMo.contracted} / <span style="color:#6b7280">先月 ${kpiLastMo.contracted}</span>${fmtDelta(kpiThisMo.contracted, kpiLastMo.contracted)}</span>
+          <span><b style="color:#059669">決定率</b> ${kpiThisMo.visited?kpiThisMo.decideRate+'%':'-'} / <span style="color:#6b7280">先月 ${kpiLastMo.visited?kpiLastMo.decideRate+'%':'-'}</span>${fmtDelta(kpiThisMo.decideRate, kpiLastMo.decideRate)}</span>
+          <span><b style="color:#0e7490">売上</b> ${fmtYen(kpiThisMo.amount)} / <span style="color:#6b7280">先月 ${fmtYen(kpiLastMo.amount)}</span>${fmtDelta(kpiThisMo.amount, kpiLastMo.amount)}</span>
+          <span><b style="color:#0e7490">単価</b> ${kpiThisMo.unitPrice?fmtYen(kpiThisMo.unitPrice):'-'} / <span style="color:#6b7280">先月 ${kpiLastMo.unitPrice?fmtYen(kpiLastMo.unitPrice):'-'}</span>${fmtDelta(kpiThisMo.unitPrice, kpiLastMo.unitPrice)}</span>
+        </div>
+      </div>
       ${weekCancel > 0 ? `<div style="margin-top:8px;font-size:11px;color:#dc2626">🚫 今週キャンセル ${weekCancel}件</div>` : ''}
     </div>
 

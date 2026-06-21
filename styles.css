@@ -162,9 +162,11 @@ body {
 }
 
 /* Desktop Nav */
-.desktop-nav { display: flex; gap: 2px; margin-left: 0; }
+.desktop-nav { display: flex; gap: 2px; margin-left: 0; flex-wrap: nowrap; overflow-x: auto; min-width: 0; scrollbar-width: thin; }
+.desktop-nav::-webkit-scrollbar { height: 4px; }
+.desktop-nav::-webkit-scrollbar-thumb { background: #d1d5db; border-radius: 2px; }
 .nav-btn {
-  padding: 8px 18px;
+  padding: 8px 14px;
   border: none;
   background: transparent;
   border-radius: var(--radius-sm);
@@ -174,6 +176,8 @@ body {
   cursor: pointer;
   transition: all 0.15s;
   min-height: 36px;
+  white-space: nowrap;
+  flex: 0 0 auto;
   -webkit-tap-highlight-color: transparent;
 }
 .nav-btn:hover { background: var(--bg); color: var(--text); }
