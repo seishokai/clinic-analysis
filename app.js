@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v463';
+const APP_VERSION = 'v464';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -5335,7 +5335,7 @@ function switchView(view) {
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.view').forEach(v => v.hidden = v.id !== `view-${view}`);
   window.scrollTo(0, 0);
-  const titles = {home:'ホーム',tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',promo:'プロモ',followup:'追いかけ',admin:'管理',reviews:'口コミ',settings:'設定'};
+  const titles = {home:'ホーム',tc:'TC',sales:'売上',bookings:'予約',kaiin:'来院',monshin:'問診票',adbudget:'広告',promo:'プロモ',dashboard:'分析',followup:'追いかけ',admin:'管理',reviews:'口コミ',settings:'設定'};
   document.title = '清翔会 - ' + (titles[view] || '');
   try { sessionStorage.setItem('lastView', view); } catch(_){}
   // v359: ホームタブ切替時にダッシュボードを描画 (旧: 分析タブ + 予約サブタブ統合)
@@ -5345,6 +5345,10 @@ function switchView(view) {
   // v379: プロモタブ切替時に renderPromo
   if (view === 'promo') {
     setTimeout(() => { if (typeof renderPromo === 'function') renderPromo(); }, 50);
+  }
+  // v464: 📊 分析ダッシュボードタブ
+  if (view === 'dashboard') {
+    setTimeout(() => { if (typeof renderDashboard === 'function') renderDashboard(); }, 50);
   }
   // v393: 追いかけタブ切替時に renderFollowup
   if (view === 'followup') {
@@ -5381,8 +5385,6 @@ function switchView(view) {
         if (typeof renderPhoneCheck === 'function') renderPhoneCheck();
       } else if (activeSub === 'bk-list') {
         if (typeof renderBookings === 'function') renderBookings();
-      } else if (activeSub === 'bk-analysis' && bookingsData.length > 0) {
-        if (typeof renderAnalysis === 'function') renderAnalysis();
       } else if (activeSub === 'bk-apply' && bookingsData.length > 0) {
         if (typeof renderApplyAnalysis === 'function') renderApplyAnalysis('today');
       } else if (activeSub === 'bk-availability') {
@@ -12997,6 +12999,180 @@ function renderAnalysis() {
 }
 
 function renderPromoDash() { renderAnalysis(); }
+
+// === v464: 📊 分析ダッシュボード ===
+// 旧 予約→分析 を最上位タブに昇格、KPI strip と他分析へのジャンプを追加
+let _dashJumpWired = false;
+function renderDashboard() {
+  if (!Array.isArray(bookingsData) || bookingsData.length === 0) {
+    const strip = document.getElementById('dash-kpi-strip');
+    if (strip) strip.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:20px;color:var(--text-muted)">読み込み中...</div>';
+    return;
+  }
+
+  // 医院セレクトを populate (重複防止: 既に同じオプションがあれば再構築しない)
+  const facSel = document.getElementById('dash-kpi-fac');
+  if (facSel) {
+    const fset = new Set();
+    bookingsData.forEach(d => { const f = sFac(d.facility); if (f) fset.add(f); });
+    const wanted = [...fset].sort();
+    const current = [...facSel.options].slice(1).map(o => o.value).join('|');
+    if (current !== wanted.join('|')) {
+      const cur = facSel.value;
+      facSel.innerHTML = '<option value="">全医院</option>' + wanted.map(f => `<option value="${f}">${f}</option>`).join('');
+      facSel.value = cur;
+    }
+    if (!facSel._dashWired) {
+      facSel.addEventListener('change', () => renderDashboard());
+      facSel._dashWired = true;
+    }
+  }
+
+  // KPI 計算: 今月 vs 先月
+  const now = new Date();
+  const thisY = now.getFullYear();
+  const thisM = now.getMonth();
+  const last = new Date(thisY, thisM - 1, 1);
+  const thisYM = `${thisY}-${String(thisM+1).padStart(2,'0')}`;
+  const lastYM = `${last.getFullYear()}-${String(last.getMonth()+1).padStart(2,'0')}`;
+  const periodLabel = `${thisY}年${thisM+1}月`;
+  const periodEl = document.getElementById('dash-kpi-period');
+  if (periodEl) periodEl.textContent = `(${periodLabel} 速報)`;
+
+  const facFilter = facSel ? facSel.value : '';
+  const bkExtra = loadData('bk-extra', {});
+
+  // 月別バケットを作る関数
+  function bucket(rows) {
+    const m = {};
+    rows.forEach(d => {
+      if (d.status === '除外') return;
+      const src = d.bookDate || d.applyDate;
+      if (!src) return;
+      const mm = src.match(/(\d{4})\D+(\d{1,2})/);
+      if (!mm) return;
+      const ym = mm[1] + '-' + String(parseInt(mm[2])).padStart(2,'0');
+      if (!m[ym]) m[ym] = {total:0, visited:0, pastBookings:0, contracted:0, cancelled:0, amount:0};
+      const g = m[ym];
+      g.total++;
+      // 日付 string 比較で過去かどうか判定 (YYYY/MM/DD 想定)
+      const isPast = src.replace(/\D/g,'') <= (now.getFullYear()+''+String(now.getMonth()+1).padStart(2,'0')+String(now.getDate()).padStart(2,'0'));
+      if (isPast) g.pastBookings++;
+      if (d.status === 'キャンセル') g.cancelled++;
+      if (typeof isVisitedStatus === 'function' && isVisitedStatus(d.status)) g.visited++;
+      if (d.status === '成約') g.contracted++;
+      const ek = d.name+'|'+d.applyDate;
+      const amt = Number(bkExtra[ek]?.contractAmount) || Number(d.contractAmount) || 0;
+      if (amt > 0 && d.status === '成約') g.amount += amt;
+    });
+    return m;
+  }
+
+  let rows = bookingsData;
+  if (facFilter) rows = rows.filter(d => sFac(d.facility) === facFilter);
+  // プロモ制限 (custom user) も反映
+  if (typeof _hasPromoRestriction === 'function' && _hasPromoRestriction()) {
+    rows = rows.filter(d => _matchesAllowedPromo(d.source));
+  }
+  const monthly = bucket(rows);
+  const cur = monthly[thisYM] || {total:0, visited:0, pastBookings:0, contracted:0, cancelled:0, amount:0};
+  const prev = monthly[lastYM] || {total:0, visited:0, pastBookings:0, contracted:0, cancelled:0, amount:0};
+
+  function delta(c, p) {
+    if (p === 0) return c > 0 ? {label:'新規', cls:'badge-new'} : null;
+    const pct = Math.round((c - p) / p * 100);
+    if (pct > 0) return {label:`▲${pct}%`, cls:'badge-up'};
+    if (pct < 0) return {label:`▼${Math.abs(pct)}%`, cls:'badge-down'};
+    return {label:'±0', cls:'badge-flat'};
+  }
+  function dPct(c, p) {
+    if (p === 0) return c > 0 ? '新規' : '-';
+    const d = Math.round((c - p) / p * 100);
+    return (d>0?'+':'') + d + '%';
+  }
+
+  const vr = cur.pastBookings > 0 ? Math.round(cur.visited / cur.pastBookings * 100) : 0;
+  const vrPrev = prev.pastBookings > 0 ? Math.round(prev.visited / prev.pastBookings * 100) : 0;
+  const cr = cur.visited > 0 ? Math.round(cur.contracted / cur.visited * 100) : 0;
+  const crPrev = prev.visited > 0 ? Math.round(prev.contracted / prev.visited * 100) : 0;
+  const avg = cur.contracted > 0 ? Math.round(cur.amount / cur.contracted) : 0;
+  const avgPrev = prev.contracted > 0 ? Math.round(prev.amount / prev.contracted) : 0;
+
+  // 12ヶ月分の売上
+  const months12 = [];
+  for (let i = 0; i < 12; i++) {
+    const dt = new Date(thisY, thisM - i, 1);
+    months12.push(`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}`);
+  }
+  const sales12m = months12.reduce((s, ym) => s + (monthly[ym]?.amount || 0), 0);
+  const total12m = months12.reduce((s, ym) => s + (monthly[ym]?.total || 0), 0);
+
+  // 追いかけ要対応 (簡易: 状況が未対応・要対応・検討中の総数。bk-extra も見る)
+  const followupCount = bookingsData.filter(d => {
+    if (d.status === '除外') return false;
+    if (facFilter && sFac(d.facility) !== facFilter) return false;
+    const ek = d.name+'|'+d.applyDate;
+    const eff = bkExtra[ek]?.editedStatus || d.status;
+    return ['要対応','未対応','検討中'].includes(eff);
+  }).length;
+
+  // ヘルパー: KPI カード
+  function card(opts) {
+    const { icon, label, value, sub, deltaTxt, cls } = opts;
+    const dColor = !deltaTxt ? '' : (deltaTxt.startsWith('▲') ? '#15803d' : deltaTxt.startsWith('▼') ? '#b91c1c' : '#6b7280');
+    const dBg = !deltaTxt ? '' : (deltaTxt.startsWith('▲') ? '#dcfce7' : deltaTxt.startsWith('▼') ? '#fee2e2' : '#f3f4f6');
+    return `<div style="background:${cls||'#fff'};border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px;min-height:84px;display:flex;flex-direction:column;justify-content:space-between">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <span style="font-size:11px;color:#6b7280;font-weight:600">${icon} ${label}</span>
+        ${deltaTxt ? `<span style="font-size:10px;font-weight:700;color:${dColor};background:${dBg};padding:1px 6px;border-radius:8px">${deltaTxt}</span>` : ''}
+      </div>
+      <div>
+        <div style="font-size:20px;font-weight:800;color:#1a1a1a;line-height:1.2">${value}</div>
+        ${sub ? `<div style="font-size:10px;color:#6b7280;margin-top:2px">${sub}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  const yenFmt = (n) => '¥' + (typeof fmt === 'function' ? fmt(n) : n.toLocaleString());
+
+  const strip = document.getElementById('dash-kpi-strip');
+  if (strip) {
+    strip.innerHTML = [
+      card({ icon:'💰', label:'今月売上', value: yenFmt(cur.amount), sub: `先月 ${yenFmt(prev.amount)}`, deltaTxt: delta(cur.amount, prev.amount)?.label }),
+      card({ icon:'📅', label:'予約数', value: cur.total + '件', sub: `先月 ${prev.total}件`, deltaTxt: delta(cur.total, prev.total)?.label }),
+      card({ icon:'🚶', label:'来院 / 来院率', value: cur.visited + '件', sub: `率 ${vr}% (先月 ${vrPrev}%)`, deltaTxt: delta(vr, vrPrev)?.label }),
+      card({ icon:'✅', label:'成約 / 成約率', value: cur.contracted + '件', sub: `率 ${cr}% (先月 ${crPrev}%)`, deltaTxt: delta(cr, crPrev)?.label }),
+      card({ icon:'💎', label:'平均成約単価', value: avg ? yenFmt(avg) : '-', sub: avgPrev ? `先月 ${yenFmt(avgPrev)}` : '-', deltaTxt: delta(avg, avgPrev)?.label }),
+      card({ icon:'❌', label:'キャンセル', value: cur.cancelled + '件', sub: cur.total > 0 ? `率 ${Math.round(cur.cancelled/cur.total*100)}%` : '-', deltaTxt: delta(cur.cancelled, prev.cancelled)?.label }),
+      card({ icon:'📊', label:'直近12ヶ月 売上', value: yenFmt(sales12m), sub: `予約 ${total12m}件`, cls:'#f0f9ff' }),
+      card({ icon:'🎯', label:'追いかけ要対応', value: followupCount + '件', sub: '→ 追いかけタブで対応', cls:'#fef3c7' }),
+    ].join('');
+  }
+
+  // ジャンプリンクを 1 回だけ wire
+  if (!_dashJumpWired) {
+    const linksWrap = document.getElementById('dash-jump-links');
+    if (linksWrap) {
+      linksWrap.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-jump]');
+        if (!btn) return;
+        const v = btn.getAttribute('data-jump');
+        if (typeof switchView === 'function') switchView(v);
+      });
+      _dashJumpWired = true;
+    }
+  }
+
+  // 詳細分析テーブル (既存 renderAnalysis を呼ぶ)
+  if (typeof renderAnalysis === 'function') renderAnalysis();
+
+  // 最終更新時刻
+  const updEl = document.getElementById('dash-last-updated');
+  if (updEl) {
+    const t = new Date();
+    updEl.textContent = `更新 ${t.getHours()}:${String(t.getMinutes()).padStart(2,'0')}`;
+  }
+}
 
 // Legacy renderPromoDash - now calls renderAnalysis
 function _oldRenderPromoDash() {

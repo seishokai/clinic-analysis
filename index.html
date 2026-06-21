@@ -438,6 +438,7 @@
         <button class="nav-btn" data-view="monshin">問診票</button>
         <button class="nav-btn" data-view="adbudget">広告</button>
         <button class="nav-btn" data-view="promo">プロモ</button>
+        <button class="nav-btn" data-view="dashboard" style="background:linear-gradient(135deg,#dbeafe 0%,#bfdbfe 100%);color:#1e3a8a;font-weight:700;border:1px solid #3b82f6">📊 分析</button>
         <button class="nav-btn" data-view="followup" style="background:linear-gradient(135deg,#fef3c7 0%,#fde68a 100%);color:#b45309;font-weight:700;border:1px solid #f59e0b">🎯 追いかけ</button>
         <button class="nav-btn" data-view="tc">TC</button>
         <button class="nav-btn" data-view="sales">売上</button>
@@ -486,6 +487,10 @@
       <button class="bottom-nav-btn" data-view="promo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
         <span>プロモ</span>
+      </button>
+      <button class="bottom-nav-btn" data-view="dashboard">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9"/><rect x="14" y="3" width="7" height="5"/><rect x="14" y="12" width="7" height="9"/><rect x="3" y="16" width="7" height="5"/></svg>
+        <span>分析</span>
       </button>
       <button class="bottom-nav-btn" data-view="followup">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
@@ -598,7 +603,6 @@
         <button class="sub-nav-btn" data-sub="bk-availability">📅 予約枠確認<span id="bk-availability-badge" class="badge badge-danger" style="display:none;margin-left:6px;font-size:10px;padding:1px 6px;border-radius:10px">!</span></button>
         <button class="sub-nav-btn" data-sub="bk-search">患者検索</button>
         <button class="sub-nav-btn" data-sub="bk-apply">申込分析</button>
-        <button class="sub-nav-btn" data-sub="bk-analysis">予約分析</button>
         <div class="sub-divider"></div>
         <button class="sub-nav-btn" data-sub="bk-bf" id="bf-tab-btn" style="display:none">BF</button>
         <button class="sub-nav-btn bk-fac-tab" data-sub="bk-fac" data-fac="BF銀座">BF銀座</button>
@@ -936,8 +940,42 @@
         <div id="bf-contracts" hidden><div class="page-header"><h2>BF 成約リスト</h2></div><div class="card"><div class="card-header">成約リスト <span id="bf-contract-count" style="font-weight:400;color:var(--text-muted)"></span></div><div class="data-table-wrap" style="max-height:calc(100vh - 280px);overflow-y:auto"><table class="data-table"><thead><tr><th>日付</th><th>名前</th><th>経路</th><th>医院</th><th>治療予約</th><th>印象予約</th><th>入金</th><th>完了</th><th>売上</th></tr></thead><tbody id="bf-contract-tbody"></tbody></table></div></div></div>
         <div id="bf-bookings" hidden><div class="page-header"><h2>BF 予約一覧</h2></div><div class="stats-row" id="bf-bk-stats" style="gap:6px;margin-bottom:8px"></div><div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;align-items:center"><button class="btn" id="bf-bk-progress" style="min-height:30px;padding:6px 12px;font-size:11px;background:#fff0f0;color:#b91c1c;border:2px solid #fecaca;font-weight:600;border-radius:20px">進捗</button><button class="btn" id="bf-bk-today" style="min-height:30px;padding:6px 12px;font-size:11px;background:#eff6ff;color:#1d4ed8;border:2px solid #bfdbfe;font-weight:600;border-radius:20px">今日予約</button><button class="btn btn-outline" id="bf-bk-reset" style="min-height:30px;padding:6px 10px;font-size:11px;border-radius:20px">全表示</button><input type="text" class="form-input" id="bf-bk-search" placeholder="名前検索" style="width:100px;padding:6px 8px;font-size:11px"><select class="form-select" id="bf-bk-facility" style="width:auto;padding:6px 8px;font-size:11px"><option value="">医院:全て</option></select><select class="form-select" id="bf-bk-status" style="width:auto;padding:6px 8px;font-size:11px"><option value="">状態:全て</option><option value="要対応">要対応</option><option value="未対応">未対応</option><option value="確認済">確認済</option><option value="来院済">来院済</option><option value="成約">成約</option><option value="キャンセル">キャンセル</option></select><select class="form-select" id="bf-bk-period" style="width:auto;padding:6px 8px;font-size:11px"><option value="">期間:全て</option><option value="today">今日</option><option value="thisMonth">今月</option><option value="lastMonth">先月</option></select><input type="month" class="form-input" id="bf-bk-month" style="width:auto;padding:6px 8px;font-size:11px"></div><div class="card" style="padding:8px"><div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">BF予約一覧 <span id="bf-count" style="font-weight:400;color:var(--text-muted)"></span></div><div class="data-table-wrap" style="max-height:calc(100vh - 350px);overflow-y:auto"><table class="data-table compact"><thead><tr><th>.</th><th>申込</th><th>予約</th><th style="text-align:left">名前</th><th>医院</th><th>電話</th><th style="text-align:left">メール</th><th>プロモ</th><th>ステータス</th><th>メモ</th><th>成約</th><th>売上</th><th>入金月</th><th>インセ月</th><th>インセ（税抜）</th></tr></thead><tbody id="bf-tbody"></tbody></table></div></div></div>
       </div>
-      <div id="sub-bk-analysis" hidden>
-        <div class="page-header"><h2>予約分析</h2></div>
+    </main>
+
+    <!-- ==================== 📊 分析ダッシュボード ==================== -->
+    <main id="view-dashboard" class="view view-wide" hidden>
+        <div class="page-header" style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+          <h2 style="margin:0">📊 分析ダッシュボード <span style="font-size:12px;font-weight:400;color:var(--text-muted)">/ KPI · 月別 · プロモ · 医院 · 治療</span></h2>
+          <span id="dash-last-updated" style="font-size:11px;color:var(--text-muted)"></span>
+        </div>
+
+        <!-- KPI strip (今月 vs 先月) -->
+        <div class="card" style="margin-bottom:14px;padding:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <span style="font-size:13px;font-weight:700;color:#1a1a1a">📈 今月のKPI <span id="dash-kpi-period" style="font-size:11px;color:var(--text-muted);font-weight:400;margin-left:6px"></span></span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <label style="font-size:11px;color:var(--text-muted)">医院:</label>
+              <select id="dash-kpi-fac" class="form-select" style="font-size:11px;padding:4px 6px;min-height:28px;min-width:120px"><option value="">全医院</option></select>
+            </div>
+          </div>
+          <div id="dash-kpi-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px"></div>
+        </div>
+
+        <!-- ジャンプリンク -->
+        <div class="card" style="margin-bottom:14px;padding:10px 14px;background:#f8f9fa">
+          <div style="font-size:11px;color:#6b7280;margin-bottom:6px;font-weight:600">他の分析へジャンプ →</div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap" id="dash-jump-links">
+            <button class="btn btn-outline" data-jump="sales" style="font-size:11px;padding:5px 10px;min-height:28px">💰 売上</button>
+            <button class="btn btn-outline" data-jump="kaiin" style="font-size:11px;padding:5px 10px;min-height:28px">🚶 来院</button>
+            <button class="btn btn-outline" data-jump="adbudget" style="font-size:11px;padding:5px 10px;min-height:28px">📣 広告ROAS</button>
+            <button class="btn btn-outline" data-jump="promo" style="font-size:11px;padding:5px 10px;min-height:28px">🎯 プロモ詳細</button>
+            <button class="btn btn-outline" data-jump="tc" style="font-size:11px;padding:5px 10px;min-height:28px">🎤 TC録音</button>
+            <button class="btn btn-outline" data-jump="monshin" style="font-size:11px;padding:5px 10px;min-height:28px">📋 問診票</button>
+            <button class="btn btn-outline" data-jump="followup" style="font-size:11px;padding:5px 10px;min-height:28px">🎯 追いかけ</button>
+          </div>
+        </div>
+
+        <div class="page-header" style="margin-top:18px;border-top:1px solid #e5e7eb;padding-top:14px"><h2 style="font-size:15px;margin:0">📋 詳細分析 (フィルタ可)</h2></div>
         <div class="card" style="margin-bottom:16px;padding:12px">
           <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
             <div class="form-group" style="min-width:120px"><label class="form-label">医院</label><select class="form-select" id="an-facility" style="font-size:12px;padding:6px 8px"><option value="">全て</option></select></div>
@@ -997,7 +1035,6 @@
           </div>
           <div style="overflow-x:auto"><div id="an-monthly-summary"></div></div>
         </div>
-      </div>
     </main>
 
     <!-- ==================== 来院 ==================== -->
@@ -1563,7 +1600,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=463"></script>
+  <script src="app.js?v=464"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
