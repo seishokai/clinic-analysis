@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v469';
+const APP_VERSION = 'v470';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11139,6 +11139,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
             <th style="width:130px">ステータス</th>
             <th style="width:75px">次回予定</th>
             ${treatment === 'BF' ? '<th style="width:75px">セット医院</th>' : ''}
+            <th style="width:80px" title="売上(成約)月。バーチャート集計や月別分析に反映">成約月</th>
             <th style="width:85px">売上</th>
             ${treatment === 'インプラント' ? '<th style="width:90px" title="まだ成約していないが見込みとして把握したい金額">売り上げ見込み</th>' : ''}
             ${treatment === 'BF' ? '<th style="width:70px">交通費</th>' : ''}
@@ -11577,12 +11578,13 @@ function drawKaiinRows(treatment, rows, container) {
       ${treatment === 'BF' ? `<td><select class="kaiin-setfac-sel kaiin-plain-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:none;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center;color:${setFac?'var(--text)':'var(--text-muted)'}">
         ${['','BF銀座','ルミナス','中日'].map(f => `<option ${setFac===f?'selected':''} value="${f}">${f||'—'}</option>`).join('')}
       </select></td>` : ''}
+      <td style="text-align:center"><input type="month" class="kaiin-contract-date" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc((info.contract_date || '').substring(0,7))}" title="成約月" style="font-size:10px;padding:2px 4px;width:100%;border:1px solid var(--border);border-radius:4px;background:${info.contract_date?'#dcfce7':'#fff'};box-sizing:border-box"></td>
       <td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="contract_amount" value="${(d.contractAmount||info.contract_amount)?Number(d.contractAmount||info.contract_amount).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>
       ${treatment === 'インプラント' ? `<td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="expected_amount" value="${info.expected_amount?Number(info.expected_amount).toLocaleString():''}" placeholder="0" title="まだ成約していないが見込みとして把握したい金額" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid #fbbf24;background:#fffbeb;border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>` : ''}
       ${treatment === 'BF' ? `<td><input type="text" inputmode="numeric" class="kaiin-money" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-field="bf_travel_cost" value="${info.bf_travel_cost?Number(info.bf_travel_cost).toLocaleString():''}" placeholder="0" style="font-size:10px;padding:2px 6px;width:100%;text-align:right;border:1px solid var(--border);border-radius:4px;font-variant-numeric:tabular-nums;box-sizing:border-box"></td>` : ''}
       <td class="kaiin-memo-cell" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="cursor:pointer;padding:4px 8px;font-size:11px;text-align:left;max-width:360px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;background:${memo?'#fff8e1':'transparent'};border:1px dashed ${memo?'#f9a825':'var(--border)'};border-radius:4px" title="${esc(memo)}">${memo ? esc(_flattenMemoForDisplay(memo, 60)) : '<span style="color:var(--text-muted)">+ メモ</span>'}</td>
     </tr>`;
-  }).join('') || `<tr><td colspan="${treatment==='BF'?11:9}" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>`;
+  }).join('') || `<tr><td colspan="${treatment==='BF'?12:10}" style="color:var(--text-muted);text-align:center;padding:20px">データなし</td></tr>`;
 
   // 次回予定: カレンダー (button + hidden date picker)
   container.querySelectorAll('.kaiin-next-date-mmdd').forEach(btn => {
@@ -11750,6 +11752,22 @@ function drawKaiinRows(treatment, rows, container) {
       if (ok) {
         inp.style.borderColor = '#0a0';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+      }
+    });
+    inp.addEventListener('click', e => e.stopPropagation());
+  });
+
+  // v470: 成約月 (contract_date) 保存 — 来院→全体 と同じ仕様で来院→各治療タブにも追加
+  container.querySelectorAll('.kaiin-contract-date').forEach(inp => {
+    inp.addEventListener('change', async () => {
+      const ym = inp.value || '';
+      const v = ym ? `${ym}-01` : null;
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'contract_date', v);
+      if (ok) {
+        inp.style.borderColor = '#16a34a';
+        inp.style.background = v ? '#dcfce7' : '#fff';
+        setTimeout(() => { inp.style.borderColor = ''; }, 1000);
+        if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
       }
     });
     inp.addEventListener('click', e => e.stopPropagation());
