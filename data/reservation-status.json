@@ -1,5 +1,5 @@
 {
-  "lastUpdated": "2026-06-29T22:48:53.805Z",
+  "lastUpdated": "2026-06-30T03:02:47.689Z",
   "checkRangeFrom": "2026-07-14",
   "checkRangeTo": "2026-07-30",
   "treatment": "矯正無料相談",
@@ -47,7 +47,7 @@
       "name": "エスカ",
       "available": true,
       "availableDays": 15,
-      "totalSlots": 191,
+      "totalSlots": 187,
       "earliestDate": "2026-07-15",
       "latestDate": "2026-07-30",
       "slotsByDate": {
@@ -65,14 +65,14 @@
         "2026-07-27": 13,
         "2026-07-28": 13,
         "2026-07-29": 13,
-        "2026-07-30": 14
+        "2026-07-30": 10
       }
     },
     {
       "name": "アール",
       "available": true,
       "availableDays": 14,
-      "totalSlots": 173,
+      "totalSlots": 172,
       "earliestDate": "2026-07-15",
       "latestDate": "2026-07-30",
       "slotsByDate": {
@@ -89,14 +89,14 @@
         "2026-07-27": 13,
         "2026-07-28": 13,
         "2026-07-29": 13,
-        "2026-07-30": 10
+        "2026-07-30": 9
       }
     },
     {
       "name": "ウィズ",
       "available": true,
       "availableDays": 14,
-      "totalSlots": 140,
+      "totalSlots": 135,
       "earliestDate": "2026-07-15",
       "latestDate": "2026-07-30",
       "slotsByDate": {
@@ -114,14 +114,14 @@
         "2026-07-27": 9,
         "2026-07-28": 11,
         "2026-07-29": 11,
-        "2026-07-30": 10
+        "2026-07-30": 5
       }
     },
     {
       "name": "ルミナス",
       "available": true,
       "availableDays": 14,
-      "totalSlots": 162,
+      "totalSlots": 158,
       "earliestDate": "2026-07-15",
       "latestDate": "2026-07-30",
       "slotsByDate": {
@@ -138,7 +138,7 @@
         "2026-07-27": 12,
         "2026-07-28": 12,
         "2026-07-29": 12,
-        "2026-07-30": 12
+        "2026-07-30": 8
       }
     },
     {
@@ -203,7 +203,7 @@
       "name": "八事",
       "available": true,
       "availableDays": 14,
-      "totalSlots": 141,
+      "totalSlots": 140,
       "earliestDate": "2026-07-14",
       "latestDate": "2026-07-30",
       "slotsByDate": {
@@ -221,7 +221,7 @@
         "2026-07-27": 11,
         "2026-07-28": 11,
         "2026-07-29": 10,
-        "2026-07-30": 2
+        "2026-07-30": 1
       }
     },
     {
