@@ -1496,33 +1496,10 @@
             <span style="font-size:16px;font-weight:700;color:#9d174d">📝 新規 修正依頼を送信</span>
           </div>
           <div style="display:grid;gap:10px">
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
               <div>
                 <label class="form-label" style="font-size:11px">送信者名</label>
                 <input type="text" class="form-input" id="bug-reporter-name" placeholder="例: 足立TC" style="font-size:13px;padding:8px 10px">
-              </div>
-              <div>
-                <label class="form-label" style="font-size:11px">該当画面</label>
-                <select class="form-select" id="bug-screen" style="font-size:13px;padding:8px 10px">
-                  <option value="">選択…</option>
-                  <option>ホーム</option>
-                  <option>予約</option>
-                  <option>予約→医院別</option>
-                  <option>来院</option>
-                  <option>来院→BF</option>
-                  <option>来院→矯正</option>
-                  <option>来院→インプラント</option>
-                  <option>来院→他</option>
-                  <option>問診票</option>
-                  <option>広告</option>
-                  <option>プロモ</option>
-                  <option>分析ダッシュボード</option>
-                  <option>TC</option>
-                  <option>売上</option>
-                  <option>追いかけ</option>
-                  <option>管理</option>
-                  <option>その他</option>
-                </select>
               </div>
               <div>
                 <label class="form-label" style="font-size:11px">優先度</label>
@@ -1532,6 +1509,11 @@
                   <option value="低">💤 低</option>
                 </select>
               </div>
+            </div>
+            <!-- v473: 該当画面ドロップダウン廃止 → currentView から自動検出 + スクショで判別 -->
+            <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:11px;color:#1e40af">
+              <span>📍 現在画面: <b id="bug-current-screen">自動検出中…</b></span>
+              <span style="color:#6b7280">(送信時に記録)</span>
             </div>
             <div>
               <label class="form-label" style="font-size:11px">タイトル <span style="color:#dc2626">*</span></label>
@@ -1723,7 +1705,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=472"></script>
+  <script src="app.js?v=473"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

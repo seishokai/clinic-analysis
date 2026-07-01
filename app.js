@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v472';
+const APP_VERSION = 'v473';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13100,7 +13100,26 @@ async function initBugReports() {
     _wireBugReportForm();
     _bugInitOnce = true;
   }
+  _updateBugCurrentScreen();
   await renderBugReportList();
+}
+
+// v473: 現在画面を自動検出 (view + active sub-tab)
+function _detectCurrentScreen() {
+  const viewLabels = {
+    home:'ホーム', bookings:'予約', kaiin:'来院', monshin:'問診票',
+    adbudget:'広告', promo:'プロモ', dashboard:'📊 分析', tc:'TC',
+    sales:'売上', followup:'追いかけ', admin:'管理'
+  };
+  const view = (typeof currentView !== 'undefined' && currentView) || 'unknown';
+  const label = viewLabels[view] || view;
+  const activeSub = document.querySelector(`#view-${view} .sub-nav-btn.active`)?.textContent?.trim() || '';
+  return activeSub ? `${label} → ${activeSub}` : label;
+}
+
+function _updateBugCurrentScreen() {
+  const el = document.getElementById('bug-current-screen');
+  if (el) el.textContent = _detectCurrentScreen();
 }
 
 function _wireBugReportForm() {
@@ -13187,7 +13206,7 @@ async function _uploadScreenshotToStorage(file) {
 async function submitBugReport() {
   const title = document.getElementById('bug-title').value.trim();
   const description = document.getElementById('bug-description').value.trim();
-  const screen = document.getElementById('bug-screen').value;
+  const screen = _detectCurrentScreen();  // v473: dropdown 廃止、自動検出
   const priority = document.getElementById('bug-priority').value;
   const reporter = document.getElementById('bug-reporter-name').value.trim();
   const statusEl = document.getElementById('bug-submit-status');
@@ -13250,12 +13269,12 @@ async function submitBugReport() {
 function resetBugForm() {
   document.getElementById('bug-title').value = '';
   document.getElementById('bug-description').value = '';
-  document.getElementById('bug-screen').value = '';
   document.getElementById('bug-priority').value = '通常';
   _bugScreenshots = [];
   _renderScreenshotsPreview();
   const s = document.getElementById('bug-submit-status');
   if (s) s.textContent = '';
+  _updateBugCurrentScreen();  // v473: 画面表示を最新化
 }
 
 async function renderBugReportList() {
