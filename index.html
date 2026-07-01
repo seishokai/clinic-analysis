@@ -1423,6 +1423,7 @@
         <button class="sub-nav-btn" data-sub="adm-pbm">📝 PBM申請</button>
         <button class="sub-nav-btn" data-sub="adm-rates">プロモ別インセ率</button>
         <button class="sub-nav-btn" data-sub="adm-sms">📱 SMS定型文</button>
+        <button class="sub-nav-btn" data-sub="adm-bug-reports" style="background:linear-gradient(135deg,#fce7f3 0%,#fbcfe8 100%);color:#9d174d;font-weight:700;border:1px solid #ec4899">🐛 修正依頼</button>
         <button class="sub-nav-btn" data-sub="adm-history">変更履歴・復元</button>
         <button class="sub-nav-btn" data-sub="para-manage">パラ管理</button>
         <button class="sub-nav-btn" data-sub="adm-account" hidden>アカウント発行(旧)</button>
@@ -1481,6 +1482,103 @@
       <div id="sub-adm-sms" hidden>
         <div id="adm-sms-content"><div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div></div>
       </div>
+
+      <!-- v472: 🐛 修正依頼 (バグレポート) -->
+      <div id="sub-adm-bug-reports" hidden>
+        <div class="page-header">
+          <h2>🐛 修正依頼</h2>
+          <p class="page-desc">Aladdin の不具合・要望を送信 → 自動で GitHub Issue 作成 → 開発対応。<strong>スクショ貼付可 (Ctrl+V)</strong></p>
+        </div>
+
+        <!-- 投稿フォーム -->
+        <div class="card" style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,#fdf2f8 0%,#fff 100%);border:2px solid #ec4899;border-radius:12px">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
+            <span style="font-size:16px;font-weight:700;color:#9d174d">📝 新規 修正依頼を送信</span>
+          </div>
+          <div style="display:grid;gap:10px">
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px">
+              <div>
+                <label class="form-label" style="font-size:11px">送信者名</label>
+                <input type="text" class="form-input" id="bug-reporter-name" placeholder="例: 足立TC" style="font-size:13px;padding:8px 10px">
+              </div>
+              <div>
+                <label class="form-label" style="font-size:11px">該当画面</label>
+                <select class="form-select" id="bug-screen" style="font-size:13px;padding:8px 10px">
+                  <option value="">選択…</option>
+                  <option>ホーム</option>
+                  <option>予約</option>
+                  <option>予約→医院別</option>
+                  <option>来院</option>
+                  <option>来院→BF</option>
+                  <option>来院→矯正</option>
+                  <option>来院→インプラント</option>
+                  <option>来院→他</option>
+                  <option>問診票</option>
+                  <option>広告</option>
+                  <option>プロモ</option>
+                  <option>分析ダッシュボード</option>
+                  <option>TC</option>
+                  <option>売上</option>
+                  <option>追いかけ</option>
+                  <option>管理</option>
+                  <option>その他</option>
+                </select>
+              </div>
+              <div>
+                <label class="form-label" style="font-size:11px">優先度</label>
+                <select class="form-select" id="bug-priority" style="font-size:13px;padding:8px 10px">
+                  <option value="通常" selected>🐛 通常</option>
+                  <option value="至急">🚨 至急</option>
+                  <option value="低">💤 低</option>
+                </select>
+              </div>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">タイトル <span style="color:#dc2626">*</span></label>
+              <input type="text" class="form-input" id="bug-title" placeholder="例: 来院→BFタブで渡邉マキさん消えてる" maxlength="200" style="font-size:13px;padding:8px 10px;width:100%">
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">詳細 <span style="color:#dc2626">*</span></label>
+              <textarea class="form-input" id="bug-description" rows="4" placeholder="どこで/何をした時に/どうなったか。エラーメッセージがあれば貼付&#10;例: 来院タブ→ルミナス→BFで絞ると渡邉マキさんの行が出てこない。医院別だと出る。" style="font-size:13px;padding:10px;width:100%;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+            </div>
+            <div>
+              <label class="form-label" style="font-size:11px">📷 スクリーンショット (任意・複数可)</label>
+              <div id="bug-paste-zone" style="border:2px dashed #ec4899;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#fdf2f8;transition:all .2s">
+                <div style="font-size:12px;color:#9d174d;font-weight:600;margin-bottom:4px">📋 ここをクリックしてファイル選択 / このエリアで <kbd style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #f472b6;font-size:10px">Ctrl</kbd>+<kbd style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #f472b6;font-size:10px">V</kbd> で貼付</div>
+                <div style="font-size:10px;color:#9ca3af">画像ファイル (PNG/JPG) 最大 5MB</div>
+              </div>
+              <input type="file" id="bug-file-input" accept="image/*" hidden multiple>
+              <div id="bug-screenshots-preview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+            </div>
+            <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+              <button class="btn btn-dark" id="bug-submit-btn" style="padding:10px 24px;font-size:14px;font-weight:700;background:#ec4899;border-color:#ec4899;color:#fff">送信する</button>
+              <button class="btn btn-outline" id="bug-cancel-btn" style="padding:10px 16px;font-size:12px">クリア</button>
+              <span id="bug-submit-status" style="font-size:12px;color:#6b7280"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 一覧 -->
+        <div class="card" style="padding:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
+            <span style="font-size:14px;font-weight:700;color:#1a1a1a">📋 修正依頼リスト</span>
+            <div style="display:flex;gap:6px;align-items:center">
+              <label style="font-size:11px;color:var(--text-sub)">状態:</label>
+              <select id="bug-filter-status" class="form-select" style="font-size:12px;padding:5px 8px;min-height:28px">
+                <option value="open" selected>未解決のみ</option>
+                <option value="all">全て</option>
+                <option value="未対応">未対応</option>
+                <option value="対応中">対応中</option>
+                <option value="解決">解決済み</option>
+                <option value="保留">保留</option>
+              </select>
+              <button class="btn btn-outline" id="bug-list-refresh" style="font-size:11px;padding:4px 10px;min-height:28px">🔄</button>
+            </div>
+          </div>
+          <div id="bug-list-container"><div style="padding:20px;text-align:center;color:var(--text-sub)">読み込み中...</div></div>
+        </div>
+      </div>
+
       <div id="sub-adm-history" hidden>
         <div class="page-header"><h2>変更履歴・復元</h2><p class="page-desc">全テーブルの変更を自動記録。誤編集・誤削除はここから復元可能</p></div>
         <div class="card" style="margin-bottom:12px;padding:12px;background:#f0f9ff;border:1px solid #0284c7">
@@ -1625,7 +1723,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=471"></script>
+  <script src="app.js?v=472"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>

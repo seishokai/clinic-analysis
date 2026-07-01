@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v471';
+const APP_VERSION = 'v472';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2193,6 +2193,7 @@ function setupEventListeners() {
       if (sub === 'adm-pbm') { if (typeof renderPBMApplications === 'function') renderPBMApplications(); }
       if (sub === 'para-manage') { if (typeof renderPara === 'function') renderPara(); }
       if (sub === 'adm-auth-migration') { if (typeof renderAuthMigration === 'function') renderAuthMigration(); }
+      if (sub === 'adm-bug-reports') { if (typeof initBugReports === 'function') initBugReports(); }
       // 来院タブのサブ
       if (sub && sub.startsWith('kaiin-')) {
         if (sub === 'kaiin-all') {
@@ -13084,6 +13085,280 @@ function renderAnalysis() {
 }
 
 function renderPromoDash() { renderAnalysis(); }
+
+// ============================================================
+// v472: 🐛 修正依頼 (バグレポート) — 管理タブ サブビュー
+// ============================================================
+// Aladdin 内から直接エラー報告 → Supabase 保存 + スクショ Storage 保存
+//   → Cloudflare Worker が GitHub Issue 自動作成 → 私が対応
+const BUG_WORKER_URL = 'https://aladdin-bug-reporter.tkm-koike.workers.dev/';
+let _bugScreenshots = []; // { file, dataUrl, uploadedUrl? }
+let _bugInitOnce = false;
+
+async function initBugReports() {
+  if (!_bugInitOnce) {
+    _wireBugReportForm();
+    _bugInitOnce = true;
+  }
+  await renderBugReportList();
+}
+
+function _wireBugReportForm() {
+  const pasteZone = document.getElementById('bug-paste-zone');
+  const fileInput = document.getElementById('bug-file-input');
+  const preview = document.getElementById('bug-screenshots-preview');
+  const submitBtn = document.getElementById('bug-submit-btn');
+  const cancelBtn = document.getElementById('bug-cancel-btn');
+  const statusEl = document.getElementById('bug-submit-status');
+  const filterSel = document.getElementById('bug-filter-status');
+  const refreshBtn = document.getElementById('bug-list-refresh');
+
+  const addFile = (file) => {
+    if (!file || !file.type || !file.type.startsWith('image/')) return;
+    if (file.size > 5 * 1024 * 1024) { showToast('画像は 5MB 以下にしてください', true); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      _bugScreenshots.push({ file, dataUrl: e.target.result });
+      _renderScreenshotsPreview();
+    };
+    reader.readAsDataURL(file);
+  };
+
+  pasteZone?.addEventListener('click', () => fileInput?.click());
+  pasteZone?.addEventListener('dragover', (e) => { e.preventDefault(); pasteZone.style.background = '#fce7f3'; });
+  pasteZone?.addEventListener('dragleave', () => { pasteZone.style.background = '#fdf2f8'; });
+  pasteZone?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    pasteZone.style.background = '#fdf2f8';
+    [...e.dataTransfer.files].forEach(addFile);
+  });
+  fileInput?.addEventListener('change', (e) => { [...e.target.files].forEach(addFile); fileInput.value = ''; });
+
+  // Ctrl+V 貼付 (ページ全体で受ける、が bug-reports サブが表示中のみ有効)
+  document.addEventListener('paste', (e) => {
+    const sub = document.getElementById('sub-adm-bug-reports');
+    if (!sub || sub.hidden) return;
+    const items = e.clipboardData?.items || [];
+    for (const item of items) {
+      if (item.type && item.type.startsWith('image/')) {
+        const file = item.getAsFile();
+        if (file) addFile(file);
+      }
+    }
+  });
+
+  submitBtn?.addEventListener('click', () => submitBugReport());
+  cancelBtn?.addEventListener('click', () => resetBugForm());
+  filterSel?.addEventListener('change', () => renderBugReportList());
+  refreshBtn?.addEventListener('click', () => renderBugReportList());
+}
+
+function _renderScreenshotsPreview() {
+  const preview = document.getElementById('bug-screenshots-preview');
+  if (!preview) return;
+  preview.innerHTML = _bugScreenshots.map((s, i) => `
+    <div style="position:relative;width:100px;height:80px;border:2px solid #ec4899;border-radius:6px;overflow:hidden;background:#fdf2f8">
+      <img src="${s.dataUrl}" style="width:100%;height:100%;object-fit:cover">
+      <button data-idx="${i}" class="bug-remove-ss" style="position:absolute;top:2px;right:2px;background:rgba(220,38,38,.9);color:#fff;border:none;border-radius:50%;width:20px;height:20px;cursor:pointer;font-size:11px;line-height:1">×</button>
+    </div>
+  `).join('');
+  preview.querySelectorAll('.bug-remove-ss').forEach(btn => {
+    btn.addEventListener('click', () => {
+      _bugScreenshots.splice(Number(btn.dataset.idx), 1);
+      _renderScreenshotsPreview();
+    });
+  });
+}
+
+async function _uploadScreenshotToStorage(file) {
+  const ts = Date.now();
+  const rand = Math.random().toString(36).slice(2, 8);
+  const ext = (file.name.match(/\.(\w+)$/) || [,'png'])[1];
+  const path = `${ts}_${rand}.${ext}`;
+  const { data, error } = await sb.storage.from('bug-reports').upload(path, file, {
+    contentType: file.type || 'image/png',
+    upsert: false,
+  });
+  if (error) throw error;
+  const { data: urlData } = sb.storage.from('bug-reports').getPublicUrl(data.path);
+  return urlData.publicUrl;
+}
+
+async function submitBugReport() {
+  const title = document.getElementById('bug-title').value.trim();
+  const description = document.getElementById('bug-description').value.trim();
+  const screen = document.getElementById('bug-screen').value;
+  const priority = document.getElementById('bug-priority').value;
+  const reporter = document.getElementById('bug-reporter-name').value.trim();
+  const statusEl = document.getElementById('bug-submit-status');
+  const btn = document.getElementById('bug-submit-btn');
+
+  if (!title || !description) { showToast('タイトルと詳細は必須です', true); return; }
+  btn.disabled = true;
+  const setStatus = (t) => { if (statusEl) statusEl.textContent = t; };
+
+  try {
+    setStatus('スクショをアップロード中…');
+    let screenshotUrl = null;
+    if (_bugScreenshots.length > 0) {
+      // 複数あれば1枚目のみ (Issue で表示するため)。今後拡張可
+      const urls = [];
+      for (const s of _bugScreenshots) {
+        try { urls.push(await _uploadScreenshotToStorage(s.file)); }
+        catch (e) { console.warn('screenshot upload failed', e); }
+      }
+      screenshotUrl = urls.join('\n');
+    }
+
+    setStatus('Supabase に登録中…');
+    const { data: row, error } = await sb.from('admin_bug_reports').insert({
+      title, description, screen, priority,
+      reporter_name: reporter || null,
+      screenshot_url: screenshotUrl,
+      status: '未対応',
+    }).select().single();
+    if (error) throw error;
+
+    setStatus('GitHub Issue を作成中…');
+    let issueUrl = null;
+    try {
+      const res = await fetch(BUG_WORKER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report_id: row.id }),
+      });
+      const j = await res.json();
+      if (j.ok && j.issue_url) issueUrl = j.issue_url;
+      else console.warn('worker returned', j);
+    } catch (e) {
+      console.warn('worker call failed (report saved anyway)', e);
+    }
+
+    showToast(issueUrl ? '✅ 送信完了。GitHub Issue 作成済' : '✅ 送信完了 (Worker 未応答: 手動で処理予定)');
+    setStatus('');
+    resetBugForm();
+    await renderBugReportList();
+  } catch (e) {
+    console.error('submit failed', e);
+    showToast('送信失敗: ' + (e.message || e), true);
+    setStatus('❌ 失敗: ' + (e.message || ''));
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function resetBugForm() {
+  document.getElementById('bug-title').value = '';
+  document.getElementById('bug-description').value = '';
+  document.getElementById('bug-screen').value = '';
+  document.getElementById('bug-priority').value = '通常';
+  _bugScreenshots = [];
+  _renderScreenshotsPreview();
+  const s = document.getElementById('bug-submit-status');
+  if (s) s.textContent = '';
+}
+
+async function renderBugReportList() {
+  const container = document.getElementById('bug-list-container');
+  if (!container) return;
+  const filter = document.getElementById('bug-filter-status')?.value || 'open';
+  container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-sub)">読み込み中…</div>';
+  try {
+    let q = sb.from('admin_bug_reports').select('*').order('created_at', { ascending: false }).limit(100);
+    if (filter === 'open') q = q.in('status', ['未対応','対応中','保留']);
+    else if (filter !== 'all') q = q.eq('status', filter);
+    const { data, error } = await q;
+    if (error) throw error;
+    if (!data || data.length === 0) {
+      container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">該当なし ✨</div>';
+      return;
+    }
+    container.innerHTML = data.map(r => _bugRowHtml(r)).join('');
+    container.querySelectorAll('.bug-status-sel').forEach(sel => {
+      sel.addEventListener('change', async () => {
+        const id = sel.dataset.id;
+        const newStatus = sel.value;
+        try {
+          const { error } = await sb.from('admin_bug_reports').update({ status: newStatus }).eq('id', id);
+          if (error) throw error;
+          showToast('状態を「' + newStatus + '」に変更');
+          renderBugReportList();
+        } catch (e) { showToast('更新失敗', true); }
+      });
+    });
+    container.querySelectorAll('.bug-view-detail').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.id;
+        const r = data.find(x => x.id === id);
+        if (r) _openBugDetailModal(r);
+      });
+    });
+  } catch (e) {
+    console.error('list load failed', e);
+    container.innerHTML = `<div style="padding:20px;color:#dc2626">読み込み失敗: ${escapeHtml(String(e.message||e))}<br><small>admin_bug_reports テーブルが未作成の可能性。migrations/admin_bug_reports.sql を実行してください。</small></div>`;
+  }
+}
+
+function _bugRowHtml(r) {
+  const prioMap = { '至急': { bg:'#fee2e2', color:'#b91c1c', icon:'🚨' }, '通常': { bg:'#fef3c7', color:'#92400e', icon:'🐛' }, '低': { bg:'#f3f4f6', color:'#6b7280', icon:'💤' } };
+  const statMap = { '未対応': '#dc2626', '対応中': '#d97706', '解決': '#059669', '保留': '#6b7280', '却下': '#9ca3af' };
+  const p = prioMap[r.priority] || prioMap['通常'];
+  const sColor = statMap[r.status] || '#6b7280';
+  const dt = new Date(r.created_at);
+  const dateStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
+  const stOpts = ['未対応','対応中','解決','保留','却下'].map(s => `<option ${s===r.status?'selected':''}>${s}</option>`).join('');
+  return `
+    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:8px;background:#fff">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
+        <div style="flex:1;min-width:250px">
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
+            <span style="background:${p.bg};color:${p.color};font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">${p.icon} ${escapeHtml(r.priority)}</span>
+            ${r.screen ? `<span style="background:#e0e7ff;color:#3730a3;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px">${escapeHtml(r.screen)}</span>` : ''}
+            <span style="font-size:10px;color:#9ca3af">${escapeHtml(dateStr)}</span>
+            ${r.reporter_name ? `<span style="font-size:10px;color:#6b7280">by ${escapeHtml(r.reporter_name)}</span>` : ''}
+          </div>
+          <div style="font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:4px">${escapeHtml(r.title)}</div>
+          <div style="font-size:12px;color:#6b7280;line-height:1.5;max-height:60px;overflow:hidden">${escapeHtml((r.description||'').slice(0,200))}${r.description && r.description.length>200?'…':''}</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:140px">
+          <select class="form-select bug-status-sel" data-id="${r.id}" style="font-size:11px;padding:4px 8px;min-height:28px;color:${sColor};font-weight:700">${stOpts}</select>
+          <div style="display:flex;gap:6px">
+            <button class="btn btn-outline bug-view-detail" data-id="${r.id}" style="font-size:11px;padding:4px 10px;min-height:26px">詳細</button>
+            ${r.github_issue_url ? `<a href="${escapeHtml(r.github_issue_url)}" target="_blank" class="btn btn-outline" style="font-size:11px;padding:4px 10px;min-height:26px;text-decoration:none">🔗 Issue</a>` : `<span style="font-size:10px;color:#9ca3af;align-self:center">Issue未作成</span>`}
+          </div>
+          ${r.screenshot_url ? '<span style="font-size:10px;color:#ec4899">📷 スクショあり</span>' : ''}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function _openBugDetailModal(r) {
+  const urls = (r.screenshot_url || '').split('\n').filter(Boolean);
+  const shotsHtml = urls.map(u => `<a href="${escapeHtml(u)}" target="_blank"><img src="${escapeHtml(u)}" style="max-width:100%;border:1px solid #e5e7eb;border-radius:6px;margin-top:8px"></a>`).join('');
+  const modal = document.createElement('div');
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;z-index:10000;padding:16px';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:12px;max-width:720px;width:100%;max-height:90vh;overflow-y:auto;padding:24px;box-shadow:0 20px 60px rgba(0,0,0,.4)">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;margin-bottom:16px">
+        <div>
+          <div style="font-size:16px;font-weight:800;color:#1a1a1a;margin-bottom:4px">${escapeHtml(r.title)}</div>
+          <div style="font-size:11px;color:#6b7280">${escapeHtml(r.priority)} · ${escapeHtml(r.screen||'-')} · ${escapeHtml(r.reporter_name||'匿名')} · ${escapeHtml(new Date(r.created_at).toLocaleString('ja-JP'))}</div>
+        </div>
+        <button id="bug-modal-close" style="background:transparent;border:none;font-size:22px;cursor:pointer;color:#6b7280">×</button>
+      </div>
+      <div style="background:#f9fafb;padding:14px;border-radius:8px;font-size:13px;line-height:1.7;color:#1a1a1a;white-space:pre-wrap">${escapeHtml(r.description)}</div>
+      ${r.resolution_note ? `<div style="margin-top:12px;background:#f0fdf4;padding:12px;border-radius:8px;border-left:4px solid #059669"><b style="font-size:12px;color:#059669">対応メモ</b><div style="font-size:12px;color:#1a1a1a;line-height:1.6;margin-top:4px;white-space:pre-wrap">${escapeHtml(r.resolution_note)}</div></div>` : ''}
+      ${shotsHtml ? `<div style="margin-top:16px"><b style="font-size:12px;color:#6b7280">スクリーンショット</b>${shotsHtml}</div>` : ''}
+      ${r.github_issue_url ? `<div style="margin-top:16px"><a href="${escapeHtml(r.github_issue_url)}" target="_blank" class="btn btn-dark" style="text-decoration:none;padding:8px 16px;font-size:12px">🔗 GitHub Issue を開く</a></div>` : ''}
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;font-size:10px;color:#9ca3af">report_id: <code>${escapeHtml(r.id)}</code></div>
+    </div>
+  `;
+  document.body.appendChild(modal);
+  const close = () => modal.remove();
+  modal.addEventListener('click', (e) => { if (e.target === modal) close(); });
+  modal.querySelector('#bug-modal-close').addEventListener('click', close);
+}
 
 // === v464: 📊 分析ダッシュボード ===
 // 旧 予約→分析 を最上位タブに昇格、KPI strip と他分析へのジャンプを追加

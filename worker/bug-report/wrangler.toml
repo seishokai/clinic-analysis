@@ -1,0 +1,14 @@
+name = "aladdin-bug-reporter"
+main = "worker.js"
+compatibility_date = "2025-06-21"
+
+# デプロイ:
+#   cd worker/bug-report
+#   npx wrangler deploy --config wrangler.toml --name aladdin-bug-reporter
+#
+# Secret 設定:
+#   npx wrangler secret put GITHUB_PAT              -- repo scope の PAT
+#   npx wrangler secret put GITHUB_REPO             -- seishokai/clinic-analysis
+#   npx wrangler secret put SUPABASE_URL            -- https://ndlfqrvoejwgqfdtghmg.supabase.co
+#   npx wrangler secret put SUPABASE_SERVICE_KEY    -- service_role キー (Supabase Dashboard → Settings → API)
+#   npx wrangler secret put ALLOWED_ORIGIN          -- https://seishokai.github.io
