@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v470';
+const APP_VERSION = 'v471';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9327,23 +9327,27 @@ async function loadBFLifecycleData() {
         data = r3.data;
       }
     }
-    bfLifecycleCache = {};
+    // v471: BEFORE→wipe→populate だと途中の CSV エクスポートや render が空 cache を読んで
+    //       データ吹っ飛び (CSV に contract_date, bf_status 等が空で出力) が発生する。
+    //       AFTER→ローカルに新 cache を組み立ててから最後にアトミック swap すれば
+    //       ロード中も旧 cache が生きたままで、読み手は常に一貫したデータを見る。
+    const nextCache = {};
     (data || []).forEach(r => {
       // 両方のキー (生の name+date と 正規化 name+date) にマップ → ルックアップ時にスペース差を吸収
       // ※ key / normKey は同一オブジェクト r への参照を共有するため、どちらを更新しても整合する。
       //   名前変更 (editPatientName) 時は両キーを明示的に掃除する必要がある (#11)
       const key = r.name + '|' + r.apply_date;
       const normKey = normName(r.name) + '|' + (r.apply_date||'').substring(0,10);
-      bfLifecycleCache[key] = r;
+      nextCache[key] = r;
       // 正規化キーでも引ける (空白有無どちらでもヒット) - 同一参照 r を共有
-      if (!bfLifecycleCache[normKey]) bfLifecycleCache[normKey] = r;
+      if (!nextCache[normKey]) nextCache[normKey] = r;
       // v455: edited_name でも引けるようにする。loadBookings が d.name を edited_name
       //   に上書きするため、後段の bfLifecycleCache[d.name|apply] が edited 側で検索される
       if (r.edited_name) {
         const editedKey = r.edited_name + '|' + r.apply_date;
         const editedNormKey = normName(r.edited_name) + '|' + (r.apply_date||'').substring(0,10);
-        if (!bfLifecycleCache[editedKey]) bfLifecycleCache[editedKey] = r;
-        if (!bfLifecycleCache[editedNormKey]) bfLifecycleCache[editedNormKey] = r;
+        if (!nextCache[editedKey]) nextCache[editedKey] = r;
+        if (!nextCache[editedNormKey]) nextCache[editedNormKey] = r;
       }
       if (r.updated_at) setVersion('booking_status', key, r.updated_at);
       // edited_* がDB側にあれば bk-extra にマージ (DB優先、ローカルを更新)
@@ -9358,6 +9362,14 @@ async function loadBFLifecycleData() {
         }
       } catch(_){}
     });
+    // v471: 最後に一括入れ替え (旧 cache は上書きまで生存)。ロード失敗時は旧 cache 維持。
+    // ただし優先: DB に該当行あり → 全上書き。DB 応答が空配列でも上書きしてしまうと
+    // 「一時的にゼロ件返した DB」で消える恐れがあるので data が null/undefined でない場合のみ swap。
+    if (data) {
+      bfLifecycleCache = nextCache;
+    } else {
+      console.warn('BF lifecycle load: DB returned nothing, keeping previous cache');
+    }
   } catch(e) { console.warn('BF lifecycle load', e); }
 }
 
@@ -9372,12 +9384,14 @@ function getBFInfo(name, applyDate) {
 async function loadBFHistory(names) {
   try {
     const { data } = await sb.from('bf_history').select('*').in('booking_name', names).order('created_at', { ascending: false });
-    bfHistoryCache = {};
+    // v471: atomic swap — 空 cache ウィンドウで CSV/render がデータ吹っ飛びしないよう対策
+    const nextCache = {};
     (data || []).forEach(h => {
       const key = h.booking_name + '|' + h.booking_apply_date;
-      if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
-      bfHistoryCache[key].push(h);
+      if (!nextCache[key]) nextCache[key] = [];
+      nextCache[key].push(h);
     });
+    if (data) bfHistoryCache = nextCache;
   } catch(e) { console.warn('BF history load', e); }
 }
 
@@ -15631,8 +15645,10 @@ let promoRatesCache = {}; // { promoCode: rate }
 async function loadPromoRates() {
   try {
     const { data } = await sb.from('promo_rates').select('*');
-    promoRatesCache = {};
-    (data || []).forEach(r => { promoRatesCache[r.promo_code] = Number(r.rate) || 0; });
+    // v471: atomic swap — 空 cache でインセ計算 0円になる瞬間を排除
+    const nextCache = {};
+    (data || []).forEach(r => { nextCache[r.promo_code] = Number(r.rate) || 0; });
+    if (data) promoRatesCache = nextCache;
   } catch(e) { console.warn('promo rates load', e); }
   return promoRatesCache;
 }
