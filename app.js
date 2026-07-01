@@ -13091,7 +13091,7 @@ function renderPromoDash() { renderAnalysis(); }
 // ============================================================
 // Aladdin 内から直接エラー報告 → Supabase 保存 + スクショ Storage 保存
 //   → Cloudflare Worker が GitHub Issue 自動作成 → 私が対応
-const BUG_WORKER_URL = 'https://aladdin-bug-reporter.tkm-koike.workers.dev/';
+const BUG_WORKER_URL = 'https://aladdin-bug-reporter.seishokai.workers.dev/';
 let _bugScreenshots = []; // { file, dataUrl, uploadedUrl? }
 let _bugInitOnce = false;
 
