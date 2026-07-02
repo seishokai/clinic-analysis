@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v476';
+const APP_VERSION = 'v477';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6793,7 +6793,16 @@ async function createAccount() {
   const role = document.getElementById('adm-role').value;
   const agency = document.getElementById('adm-agency') ? document.getElementById('adm-agency').value.trim() : '';
   const pw = generatePassword();
-  await sb.from('accounts').insert({ name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities, agency });
+  // v477: 以前は {error} 未チェックで INSERT 失敗 (RLS/UNIQUE 違反) しても
+  //   「アカウントを発行しました: PW」トースト → 管理者はパートナーに PW 伝達
+  //   → パートナーが「そんなアカウントない」でログイン不可、を永久ループ。
+  //   {error} を明示チェック + トーストで通知。
+  const { error } = await sb.from('accounts').insert({ name, password: pw, role, permissions: perms, promos: selectedPromos, services: selectedServices, facilities: selectedFacilities, agency });
+  if (error) {
+    console.error('createAccount failed', error);
+    showToast('❌ 発行失敗: ' + error.message, true);
+    return;
+  }
   document.getElementById('adm-name').value = '';
   if (document.getElementById('adm-agency')) document.getElementById('adm-agency').value = '';
   showToast('アカウントを発行しました: ' + pw);
@@ -6802,7 +6811,14 @@ async function createAccount() {
 
 async function deleteAccount(id) {
   if (!confirm('このアカウントを削除しますか？')) return;
-  await sb.from('accounts').delete().eq('id', id);
+  // v477: 同上。RLS ブロックで DELETE 失敗しても「削除しました」トーストが
+  //   出て UI からは消えるが DB には残る → 廃棄したはずのアカウントでログイン可能。
+  const { error } = await sb.from('accounts').delete().eq('id', id);
+  if (error) {
+    console.error('deleteAccount failed', error);
+    showToast('❌ 削除失敗: ' + error.message, true);
+    return;
+  }
   showToast('アカウントを削除しました');
   renderAccounts();
 }
@@ -8454,7 +8470,7 @@ function closeRowEditModal() {
   document.body.style.overflow = '';
   _rowEditTarget = null;
 }
-function saveRowEdit() {
+async function saveRowEdit() {
   if (!_rowEditTarget) return;
   const d = _rowEditTarget;
   const oldName = d.name;
@@ -8487,20 +8503,37 @@ function saveRowEdit() {
   bkEx[key].editedStatus = d.status;
   saveData('bk-extra', bkEx);
 
-  // DB保存（バックグラウンド：ステータス・予約日のみ。他編集項目はlocalStorage）
-  (async () => {
-    const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: oldName, apply_date: oldApply, status: d.status, book_date: d.bookDate }, options: { onConflict:'name,apply_date' } });
-    if (res && res.ok === false) showToast('⚠ 行編集の保存に失敗。再送信します', true);
-  })();
+  // v477: DB 保存を await + safeSave 経由に統一 (以前は fire-and-forget で
+  //       manual_bookings の phone/email/facility/service/source が失敗しても
+  //       黙って消えていた。トーストも保存完了前に出て、タブ即閉じで消失リスクあり)
+  const saves = [
+    safeSave({
+      type: 'upsert', table: 'booking_status',
+      payload: { name: oldName, apply_date: oldApply, status: d.status, book_date: d.bookDate },
+      options: { onConflict: 'name,apply_date' }
+    })
+  ];
   if (d.tool === '手動') {
-    sb.from('manual_bookings').update({ name: d.name, book_date: d.bookDate, service: d.service, facility: d.facility, phone: d.phone, email: d.email, source: d.source, status: d.status }).eq('name', oldName).eq('apply_date', oldApply).then(() => {});
+    saves.push(safeSave({
+      type: 'update', table: 'manual_bookings',
+      match: { name: oldName, apply_date: oldApply },
+      payload: { name: d.name, book_date: d.bookDate, service: d.service, facility: d.facility, phone: d.phone, email: d.email, source: d.source, status: d.status }
+    }));
   }
+  const results = await Promise.all(saves);
+  const failed = results.filter(r => r && r.ok === false);
+
+  // GAS はミラーなので fire-and-forget のまま (エラー無視)
   fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: oldName, applyDate: oldApply, status: d.status }) }).catch(() => {});
 
-  showToast(d.name + ' を更新しました');
+  if (failed.length) {
+    showToast('⚠ 保存失敗 — 再送信キューに登録しました (' + failed.length + '件)', true);
+  } else {
+    showToast(d.name + ' を更新しました');
+  }
   closeRowEditModal();
   renderBookings();
-  // BUG#6 修正: 医院タブが開いていれば再描画 (旧式の重複ハンドラ削除分の代替)
+  // BUG#6 修正: 医院タブが開いていれば再描画
   try {
     const facView = document.getElementById('fac-tbody');
     if (facView && typeof renderFacTab === 'function' && typeof currentFacTab !== 'undefined' && currentFacTab) {
@@ -9712,15 +9745,20 @@ const BF_SET_FACS = ['','BF銀座','ルミナス','中日'];
 // → 予約一覧にも表示されなくなる
 async function deleteBFRow(name, applyDate) {
   try {
-    // manual_bookings 削除 (手動登録されたもの)
-    try {
-      await sb.from('manual_bookings').delete().eq('name', name).eq('apply_date', applyDate);
-    } catch(e) { console.warn('manual_bookings delete skip', e); }
-    // booking_status を除外に
-    try {
-      await sb.from('booking_status').upsert({ name, apply_date: applyDate, status: '除外' }, { onConflict: 'name,apply_date' });
-    } catch(e) { console.warn('booking_status upsert skip', e); }
-    // bk-extra にも
+    // v477: 以前は各 sub-try が error を握りつぶし、DB 失敗しても
+    //       「削除しました」トーストが出て「消えた」と誤認 → 次回ロードで復活
+    //       していた。safeSave 経由でエラー時は retry queue へ、
+    //       かつ結果を集計してユーザーに正確に通知する。
+    const [mbRes, bsRes] = await Promise.all([
+      // manual_bookings 削除 (手動登録されたもののみ影響)
+      safeSave({ type:'delete', table:'manual_bookings', match:{ name, apply_date: applyDate } }),
+      // booking_status を除外に
+      safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: applyDate, status:'除外' }, options:{ onConflict:'name,apply_date' } })
+    ]);
+    // manual_bookings は「元々存在しない (DXHUB 由来)」でも失敗ではないので
+    // booking_status 側の成否だけで判断
+    const bsFailed = bsRes && bsRes.ok === false;
+    // bk-extra にも保存 (DB 失敗時もローカルは保存しておく → 再送で復帰)
     const bkEx = loadData('bk-extra', {});
     const key = name + '|' + applyDate;
     if (!bkEx[key]) bkEx[key] = {};
@@ -9729,7 +9767,11 @@ async function deleteBFRow(name, applyDate) {
     // キャッシュ反映
     const idx = bookingsData.findIndex(b => b.name === name && b.applyDate === applyDate);
     if (idx >= 0) bookingsData[idx].status = '除外';
-    showToast(name + ' を削除しました');
+    if (bsFailed) {
+      showToast('⚠ 削除失敗 — 再送信キューに登録', true);
+    } else {
+      showToast(name + ' を削除しました');
+    }
     if (document.getElementById('bf-lifecycle') && !document.getElementById('bf-lifecycle').hidden) {
       renderBFLifecycle();
     }
@@ -14270,14 +14312,34 @@ async function saveAdBudget() {
   const headerId = hdr[0].id;
 
   // 店舗別詳細保存
+  // v477: 以前は for-await で各行 insert し、途中で失敗しても loop 継続 →
+  //   ヘッダー行のみ DB に残り店舗別が半分欠損する「部分保存」状態が発生。
+  //   トーストは「登録しました」なので運用者は気付かず、集計が狂う。
+  //   → Promise.allSettled で並列保存 + 失敗数を集計、失敗があれば
+  //     ヘッダーごとロールバック (削除) して整合性を維持。
   const facRows = document.querySelectorAll('[id^="ad-fac-"]');
-  for (const row of facRows) {
+  const detailPayloads = [];
+  facRows.forEach(row => {
     const facility = row.querySelector('.ad-fac-name').value;
     const detail = { header_id: headerId, facility };
     AD_MEDIA.forEach(m => { detail[m] = Number(row.querySelector('.ad-media-'+m)?.value) || 0; });
     detail.other_name = row.querySelector('.ad-media-other-name')?.value || '';
     detail.other_amount = Number(row.querySelector('.ad-media-other-amount')?.value) || 0;
-    await sb.from('ad_budget_details').insert(detail);
+    detailPayloads.push(detail);
+  });
+  const detailResults = await Promise.all(detailPayloads.map(p =>
+    sb.from('ad_budget_details').insert(p)
+  ));
+  const detailFailed = detailResults.filter(r => r && r.error);
+  if (detailFailed.length) {
+    // ロールバック: ヘッダーと保存済み詳細を削除
+    console.error('ad_budget_details partial failure', detailFailed);
+    try {
+      await sb.from('ad_budget_details').delete().eq('header_id', headerId);
+      await sb.from('ad_budget_headers').delete().eq('id', headerId);
+    } catch(_){}
+    showToast(`❌ 保存失敗 (${detailFailed.length}/${detailPayloads.length}件エラー) — ロールバック済`, true);
+    return;
   }
 
   // フォームリセット
@@ -14290,7 +14352,13 @@ async function saveAdBudget() {
 
 async function deleteAdBudget(id) {
   if (!confirm('この広告予算を削除しますか？')) return;
-  await sb.from('ad_budget_headers').delete().eq('id', id);
+  // v477: {error} 未チェック → RLS ブロックで DB に残ったまま UI からのみ消える
+  const { error } = await sb.from('ad_budget_headers').delete().eq('id', id);
+  if (error) {
+    console.error('deleteAdBudget failed', error);
+    showToast('❌ 削除失敗: ' + error.message, true);
+    return;
+  }
   showToast('削除しました');
   renderAdBudgets();
 }
