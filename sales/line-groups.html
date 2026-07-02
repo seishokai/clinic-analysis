@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#06C755">
+<title>LINE グループ / Aladdin 営業ポータル</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
+<style>
+  :root{
+    --line-green:#06C755;
+    --line-green-dark:#05a848;
+    --line-green-light:#e6f9ef;
+    --bg:#f5f5f5;
+    --card:#fff;
+    --border:#e5e7eb;
+    --text:#1a1a1a;
+    --text-sub:#6b7280;
+    --text-muted:#9ca3af;
+    --accent:#1a1a1a;
+    --gray:#e5e7eb;
+    --danger:#dc2626;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{
+    font-family:'Noto Sans JP','Hiragino Sans','Meiryo',sans-serif;
+    background:var(--bg); color:var(--text);
+    line-height:1.5; -webkit-font-smoothing:antialiased;
+    padding-bottom:80px;
+  }
+  [hidden]{display:none !important}
+  .wrap{max-width:640px; margin:0 auto; padding:0 12px 20px}
+
+  /* ヘッダー */
+  header.head{
+    position:sticky; top:0; z-index:10;
+    background:var(--line-green);
+    color:#fff; padding:14px 16px;
+    display:flex; align-items:center; gap:10px;
+    box-shadow:0 2px 6px rgba(0,0,0,.08);
+    margin-bottom:14px;
+  }
+  .head .back{
+    color:rgba(255,255,255,.85); text-decoration:none;
+    font-size:14px; padding:6px 10px;
+    border:1px solid rgba(255,255,255,.35); border-radius:20px;
+  }
+  .head .back:hover{background:rgba(255,255,255,.12)}
+  .head h1{
+    margin:0; font-size:17px; font-weight:800; letter-spacing:.5px;
+    flex:1; text-align:center;
+  }
+  .head .badge{
+    padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700;
+    background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.35);
+  }
+
+  /* セクション */
+  section.groups{
+    background:var(--card);
+    border-radius:12px;
+    box-shadow:0 1px 3px rgba(0,0,0,.04);
+    padding:14px 12px 6px;
+    margin-bottom:16px;
+  }
+  .section-head{
+    display:flex; align-items:center; gap:8px;
+    font-size:13px; font-weight:700; color:#1a1a1a;
+    margin-bottom:10px; padding:0 4px;
+  }
+  .section-head .count{
+    font-size:11px; color:var(--text-sub); font-weight:500;
+    margin-left:auto;
+  }
+  .section-head .icon{
+    width:22px; height:22px; border-radius:50%;
+    background:var(--line-green-light); color:var(--line-green);
+    display:inline-flex; align-items:center; justify-content:center;
+    font-size:12px; font-weight:800;
+  }
+
+  /* 各行 */
+  .row{
+    display:flex; align-items:center; gap:8px;
+    padding:10px 4px; border-bottom:1px solid #f3f4f6;
+  }
+  .row:last-child{border-bottom:none}
+  .row .name{
+    flex:1; font-size:14px; font-weight:600; color:#1a1a1a;
+    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .row.disabled .name{color:var(--text-muted); font-weight:500}
+
+  .open-btn{
+    padding:8px 18px; border-radius:22px; border:none;
+    font-size:13px; font-weight:700; letter-spacing:.5px;
+    cursor:pointer; text-decoration:none;
+    display:inline-flex; align-items:center; gap:6px;
+    background:var(--line-green); color:#fff;
+    box-shadow:0 2px 4px rgba(6,199,85,.25);
+    transition:transform .1s;
+    min-width:82px; justify-content:center;
+  }
+  .open-btn:hover{background:var(--line-green-dark)}
+  .open-btn:active{transform:scale(.96)}
+  .open-btn.disabled{
+    background:var(--gray); color:var(--text-muted);
+    cursor:not-allowed; box-shadow:none;
+    pointer-events:none;
+  }
+
+  /* Admin 操作 */
+  .admin-actions{
+    display:flex; gap:4px; margin-left:6px;
+  }
+  .icon-btn{
+    background:transparent; border:none; cursor:pointer;
+    font-size:14px; padding:6px 8px; border-radius:6px;
+    color:var(--text-sub);
+  }
+  .icon-btn:hover{background:var(--bg); color:var(--text)}
+  .icon-btn.danger:hover{color:var(--danger); background:#fef2f2}
+
+  /* Admin ゾーン */
+  .admin-zone{
+    background:#fffbea; border:1px dashed #d4a010;
+    border-radius:12px; padding:14px; margin-bottom:16px;
+  }
+  .admin-zone h3{
+    margin:0 0 10px; font-size:13px; font-weight:700; color:#92400e;
+  }
+  .admin-zone p{
+    font-size:11px; color:#92400e; margin:0 0 12px;
+  }
+  .admin-btn{
+    padding:6px 14px; font-size:12px; font-weight:700;
+    background:#fff; color:#92400e; border:1px solid #d4a010;
+    border-radius:6px; cursor:pointer; font-family:inherit;
+  }
+  .admin-btn:hover{background:#fef3c7}
+  .admin-btn.primary{background:#92400e; color:#fff; border-color:#92400e}
+  .admin-btn.primary:hover{background:#78350f}
+
+  /* Auth 表示 */
+  .auth-bar{
+    display:flex; align-items:center; justify-content:space-between;
+    gap:8px; padding:8px 12px; margin-bottom:10px;
+    background:#fff; border-radius:8px;
+    box-shadow:0 1px 2px rgba(0,0,0,.03);
+    font-size:12px;
+  }
+  .auth-bar .status{color:var(--text-sub); display:inline-flex; align-items:center; gap:6px}
+  .auth-bar .status .dot{
+    width:8px; height:8px; border-radius:50%; background:var(--text-muted);
+  }
+  .auth-bar.is-admin .dot{background:var(--line-green)}
+  .auth-btn{
+    font-size:11px; padding:5px 12px; border-radius:6px;
+    border:1px solid var(--border); background:#fff;
+    color:var(--text-sub); cursor:pointer; font-family:inherit;
+  }
+  .auth-btn:hover{background:var(--bg); color:var(--text)}
+
+  /* 追加ボタン群 */
+  .add-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+
+  /* Modal */
+  .modal-backdrop{
+    position:fixed; inset:0; background:rgba(0,0,0,.5);
+    display:flex; align-items:center; justify-content:center;
+    padding:16px; z-index:100;
+  }
+  .modal{
+    background:#fff; border-radius:14px; padding:20px;
+    max-width:460px; width:100%; max-height:90vh; overflow-y:auto;
+    box-shadow:0 20px 60px rgba(0,0,0,.4);
+  }
+  .modal h3{margin:0 0 14px; font-size:15px; font-weight:800; color:#1a1a1a}
+  .field{margin-bottom:12px}
+  .field label{display:block; font-size:11px; font-weight:600; color:var(--text-sub); margin-bottom:4px}
+  .field input, .field select, .field textarea{
+    width:100%; padding:9px 11px;
+    border:1px solid var(--border); border-radius:6px;
+    font-size:13px; font-family:inherit; box-sizing:border-box;
+    background:#fff;
+  }
+  .field textarea{resize:vertical; min-height:120px; line-height:1.55; font-family:'SF Mono',Consolas,monospace; font-size:12px}
+  .field input:focus, .field select:focus, .field textarea:focus{
+    outline:none; border-color:var(--line-green);
+    box-shadow:0 0 0 3px rgba(6,199,85,.15);
+  }
+  .modal-actions{
+    display:flex; gap:8px; justify-content:flex-end;
+    margin-top:14px; flex-wrap:wrap;
+  }
+  .btn{
+    padding:9px 18px; font-size:13px; font-weight:700;
+    border-radius:6px; cursor:pointer; font-family:inherit;
+    border:1px solid var(--border); background:#fff; color:var(--text);
+  }
+  .btn:hover{background:var(--bg)}
+  .btn.primary{background:var(--line-green); color:#fff; border-color:var(--line-green)}
+  .btn.primary:hover{background:var(--line-green-dark); border-color:var(--line-green-dark)}
+  .btn.danger{color:var(--danger); border-color:#fecaca}
+  .btn.danger:hover{background:#fef2f2}
+  .btn:disabled{opacity:.5; cursor:not-allowed}
+
+  .hint{
+    font-size:11px; color:var(--text-sub);
+    background:var(--bg); border-radius:6px; padding:8px 10px;
+    margin-top:6px; line-height:1.6;
+  }
+  .hint code{background:#fff; padding:1px 4px; border-radius:3px; font-family:'SF Mono',monospace; font-size:11px}
+
+  .loading{padding:30px; text-align:center; color:var(--text-sub); font-size:13px}
+  .empty{padding:20px 10px; text-align:center; color:var(--text-muted); font-size:12px}
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:#1a1a1a; color:#fff; padding:10px 18px; border-radius:24px;
+    font-size:13px; z-index:1000; box-shadow:0 8px 24px rgba(0,0,0,.3);
+    animation:slideup .25s;
+  }
+  .toast.error{background:var(--danger)}
+  @keyframes slideup{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+
+  /* Inline URL edit */
+  .row .url-edit{
+    padding:5px 8px; font-size:12px;
+    border:1px solid var(--border); border-radius:6px;
+    max-width:200px; flex:1;
+  }
+
+  @media (max-width: 420px){
+    .head h1{font-size:15px}
+    .row .name{font-size:13px}
+    .open-btn{padding:7px 14px; font-size:12px; min-width:70px}
+  }
+</style>
+</head>
+<body>
+
+<header class="head">
+  <a class="back" href="/clinic-analysis/sales/">← 戻る</a>
+  <h1>💬 LINE グループ</h1>
+  <span class="badge">14+可変</span>
+</header>
+
+<div class="wrap">
+
+  <!-- 認証バー -->
+  <div class="auth-bar" id="auth-bar">
+    <span class="status"><span class="dot"></span><span id="auth-label">ゲスト表示</span></span>
+    <button class="auth-btn" id="auth-btn">管理者ログイン</button>
+  </div>
+
+  <!-- Admin ゾーン (ログイン時のみ表示) -->
+  <div class="admin-zone" id="admin-zone" hidden>
+    <h3>🔧 管理者メニュー</h3>
+    <p>グループを追加/編集/削除できます。追加した URL は全員に即時反映されます。</p>
+    <div class="add-actions">
+      <button class="admin-btn primary" id="add-single-btn">＋ 1つ追加</button>
+      <button class="admin-btn" id="add-bulk-btn">📋 複数一括追加</button>
+    </div>
+  </div>
+
+  <!-- 店舗グループ -->
+  <section class="groups" id="section-store">
+    <div class="section-head">
+      <span class="icon">店</span>
+      <span>店舗グループ</span>
+      <span class="count" id="count-store"></span>
+    </div>
+    <div id="list-store"><div class="loading">読み込み中…</div></div>
+  </section>
+
+  <!-- 単独グループ -->
+  <section class="groups" id="section-solo">
+    <div class="section-head">
+      <span class="icon">単</span>
+      <span>単独グループ</span>
+      <span class="count" id="count-solo"></span>
+    </div>
+    <div id="list-solo"><div class="loading">読み込み中…</div></div>
+  </section>
+
+</div>
+
+<!-- Modal placeholder -->
+<div id="modal-root"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+(function(){
+  'use strict';
+  const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzMTMxNjEsImV4cCI6MjA1ODg4OTE2MX0.Kf3XLoM26zpvKk4iuIiKb4jTNGb4d4tFHXWfmbGKvKw';
+  const ADMIN_PASSWORD = 'Edoyadepon1';    // 営業ポータルと共通の管理者パスワード
+  const ADMIN_TOKEN_KEY = 'sales-admin-token';
+
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  let isAdmin = false;
+  let allGroups = [];
+
+  // ---- ヘルパー ----
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  const toast = (msg, err=false) => {
+    const el = document.createElement('div');
+    el.className = 'toast' + (err ? ' error' : '');
+    el.textContent = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el.remove(), 2400);
+  };
+
+  // ---- Auth ----
+  function checkAuth(){
+    isAdmin = localStorage.getItem(ADMIN_TOKEN_KEY) === 'true';
+    const bar = $('auth-bar');
+    const lbl = $('auth-label');
+    const btn = $('auth-btn');
+    const zone = $('admin-zone');
+    if (isAdmin) {
+      bar.classList.add('is-admin');
+      lbl.textContent = '管理者';
+      btn.textContent = 'ログアウト';
+      zone.hidden = false;
+    } else {
+      bar.classList.remove('is-admin');
+      lbl.textContent = 'ゲスト表示';
+      btn.textContent = '管理者ログイン';
+      zone.hidden = true;
+    }
+    render();
+  }
+  $('auth-btn').addEventListener('click', () => {
+    if (isAdmin) {
+      localStorage.removeItem(ADMIN_TOKEN_KEY);
+      toast('ログアウトしました');
+      checkAuth();
+    } else {
+      const pw = prompt('管理者パスワードを入力してください');
+      if (pw == null) return;
+      if (pw === ADMIN_PASSWORD) {
+        localStorage.setItem(ADMIN_TOKEN_KEY, 'true');
+        toast('管理者としてログインしました');
+        checkAuth();
+      } else {
+        toast('パスワードが違います', true);
+      }
+    }
+  });
+
+  // ---- データ取得 ----
+  async function load(){
+    try {
+      const { data, error } = await sb.from('line_groups')
+        .select('*')
+        .eq('is_active', true)
+        .order('category', { ascending: true })
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true });
+      if (error) throw error;
+      allGroups = data || [];
+    } catch(e){
+      console.error('load failed', e);
+      $('list-store').innerHTML = `<div class="empty">読み込み失敗: ${esc(e.message||e)}<br><small>line_groups テーブル未作成の可能性あり</small></div>`;
+      $('list-solo').innerHTML = '';
+      return;
+    }
+    render();
+  }
+
+  function render(){
+    const stores = allGroups.filter(g => g.category === 'store');
+    const solos = allGroups.filter(g => g.category === 'solo');
+    $('count-store').textContent = `${stores.length}件`;
+    $('count-solo').textContent = `${solos.length}件`;
+    $('list-store').innerHTML = renderList(stores);
+    $('list-solo').innerHTML = renderList(solos);
+    wireRowActions();
+  }
+
+  function renderList(rows){
+    if (!rows.length) return '<div class="empty">まだ登録がありません</div>';
+    return rows.map(g => {
+      const hasUrl = !!(g.url && g.url.trim());
+      const cls = hasUrl ? '' : 'disabled';
+      const btn = hasUrl
+        ? `<a class="open-btn" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">開く →</a>`
+        : `<span class="open-btn disabled">未設定</span>`;
+      const adminActs = isAdmin ? `
+        <div class="admin-actions">
+          <button class="icon-btn" data-act="edit" data-id="${g.id}" title="URL 編集">✏️</button>
+          <button class="icon-btn danger" data-act="delete" data-id="${g.id}" title="削除">🗑</button>
+        </div>` : '';
+      return `<div class="row ${cls}">
+        <span class="name" title="${esc(g.name)}">${esc(g.name)}</span>
+        ${btn}
+        ${adminActs}
+      </div>`;
+    }).join('');
+  }
+
+  function wireRowActions(){
+    document.querySelectorAll('.icon-btn').forEach(b => {
+      b.addEventListener('click', (e) => {
+        e.stopPropagation();
+        const id = b.dataset.id;
+        const g = allGroups.find(x => x.id === id);
+        if (!g) return;
+        if (b.dataset.act === 'edit') openEditModal(g);
+        else if (b.dataset.act === 'delete') deleteGroup(g);
+      });
+    });
+  }
+
+  // ---- 追加 (1件) ----
+  $('add-single-btn').addEventListener('click', () => {
+    openEditModal(null);
+  });
+
+  // ---- 一括追加 ----
+  $('add-bulk-btn').addEventListener('click', () => {
+    openBulkModal();
+  });
+
+  function openEditModal(g){
+    const isNew = !g;
+    const html = `
+      <div class="modal-backdrop">
+        <div class="modal">
+          <h3>${isNew ? '＋ 新規追加' : '✏️ URL 編集'}</h3>
+          <div class="field">
+            <label>カテゴリ</label>
+            <select id="m-cat" ${isNew ? '' : 'disabled'}>
+              <option value="store"${(g?.category==='store'||isNew)?' selected':''}>店舗グループ</option>
+              <option value="solo"${g?.category==='solo'?' selected':''}>単独グループ</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>グループ名 <span style="color:#dc2626">*</span></label>
+            <input type="text" id="m-name" value="${esc(g?.name||'')}" placeholder="例: エスカ" ${isNew ? '' : 'disabled'}>
+          </div>
+          <div class="field">
+            <label>LINE URL (任意)</label>
+            <input type="url" id="m-url" value="${esc(g?.url||'')}" placeholder="https://line.me/ti/g/xxxxxxxx">
+            <div class="hint">
+              LINE アプリで対象グループを開く → 右上「≡」→ 招待 → リンクをコピー<br>
+              空欄で保存すれば「未設定」として登録できます (後から追加可)。
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn" data-act="cancel">キャンセル</button>
+            <button class="btn primary" data-act="save">保存</button>
+          </div>
+        </div>
+      </div>`;
+    $('modal-root').innerHTML = html;
+    const root = $('modal-root').firstElementChild;
+    root.querySelector('[data-act="cancel"]').onclick = () => root.remove();
+    root.addEventListener('click', (e) => { if (e.target === root) root.remove(); });
+    root.querySelector('[data-act="save"]').onclick = async () => {
+      const cat = $('m-cat').value;
+      const name = $('m-name').value.trim();
+      const url = $('m-url').value.trim();
+      if (!name) { toast('グループ名は必須です', true); return; }
+      if (url && !/^https?:\/\//.test(url)) { toast('URL は http(s):// で始めてください', true); return; }
+      try {
+        if (isNew) {
+          // 新規: sort_order = 最後尾+10
+          const maxSort = Math.max(0, ...allGroups.filter(x=>x.category===cat).map(x=>x.sort_order||0));
+          const { error } = await sb.from('line_groups').insert({
+            category: cat, name, url: url || null, sort_order: maxSort + 10, is_active: true
+          });
+          if (error) throw error;
+          toast('追加しました');
+        } else {
+          const { error } = await sb.from('line_groups').update({ url: url || null }).eq('id', g.id);
+          if (error) throw error;
+          toast('保存しました');
+        }
+        root.remove();
+        await load();
+      } catch(e){
+        toast('保存失敗: ' + (e.message||e), true);
+      }
+    };
+    setTimeout(() => (isNew ? $('m-name') : $('m-url')).focus(), 50);
+  }
+
+  function openBulkModal(){
+    const html = `
+      <div class="modal-backdrop">
+        <div class="modal">
+          <h3>📋 複数一括追加</h3>
+          <div class="field">
+            <label>ペースト (1行=1グループ)</label>
+            <textarea id="m-bulk" placeholder="店舗&#9;にじいろ&#9;https://line.me/ti/g/xxx&#10;店舗&#9;新規店&#10;単独&#9;会議室&#9;https://line.me/ti/g/yyy"></textarea>
+            <div class="hint">
+              形式: <code>カテゴリ ⇥ 名前 ⇥ URL(任意)</code> (タブ または <code>|</code> 区切り)<br>
+              カテゴリ = <code>店舗</code> または <code>単独</code>。<br>
+              Excel/スプレッドシートからコピペ可 (3列選択 → コピー → ここに貼付)。
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button class="btn" data-act="cancel">キャンセル</button>
+            <button class="btn primary" data-act="save">一括追加</button>
+          </div>
+        </div>
+      </div>`;
+    $('modal-root').innerHTML = html;
+    const root = $('modal-root').firstElementChild;
+    root.querySelector('[data-act="cancel"]').onclick = () => root.remove();
+    root.addEventListener('click', (e) => { if (e.target === root) root.remove(); });
+    root.querySelector('[data-act="save"]').onclick = async () => {
+      const raw = $('m-bulk').value;
+      const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      if (!lines.length) { toast('内容を入力してください', true); return; }
+      const parsed = [];
+      const errors = [];
+      lines.forEach((line, i) => {
+        const parts = line.split(/[\t|]/).map(s => s.trim());
+        if (parts.length < 2) { errors.push(`行${i+1}: 区切り不足`); return; }
+        const [catRaw, name, urlRaw] = parts;
+        const cat = /^(店舗|store)$/i.test(catRaw) ? 'store' : (/^(単独|solo)$/i.test(catRaw) ? 'solo' : null);
+        if (!cat) { errors.push(`行${i+1}: カテゴリ不正 (${catRaw})`); return; }
+        if (!name) { errors.push(`行${i+1}: 名前が空`); return; }
+        const url = (urlRaw||'').trim();
+        if (url && !/^https?:\/\//.test(url)) { errors.push(`行${i+1}: URL が http(s):// で始まらない`); return; }
+        parsed.push({ category: cat, name, url: url || null });
+      });
+      if (errors.length) { toast('入力エラー: ' + errors[0], true); return; }
+      if (!parsed.length) { toast('有効な行がありません', true); return; }
+      // sort_order を採番
+      const maxs = { store: 0, solo: 0 };
+      allGroups.forEach(g => { if ((g.sort_order||0) > maxs[g.category]) maxs[g.category] = g.sort_order||0; });
+      const payload = parsed.map(p => ({
+        ...p,
+        sort_order: (maxs[p.category] += 10),
+        is_active: true
+      }));
+      try {
+        const { error } = await sb.from('line_groups').insert(payload);
+        if (error) throw error;
+        toast(`${payload.length}件 追加しました`);
+        root.remove();
+        await load();
+      } catch(e){
+        toast('一括追加失敗: ' + (e.message||e), true);
+      }
+    };
+    setTimeout(() => $('m-bulk').focus(), 50);
+  }
+
+  async function deleteGroup(g){
+    if (!confirm(`「${g.name}」を削除しますか？\n(復元不可)`)) return;
+    try {
+      const { error } = await sb.from('line_groups').delete().eq('id', g.id);
+      if (error) throw error;
+      toast('削除しました');
+      await load();
+    } catch(e){
+      toast('削除失敗: ' + (e.message||e), true);
+    }
+  }
+
+  // ---- 起動 ----
+  checkAuth();
+  load();
+
+})();
+</script>
+
+</body>
+</html>
