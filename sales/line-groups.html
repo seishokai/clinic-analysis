@@ -15,28 +15,30 @@
     --bg:#f5f5f5; --card:#fff; --border:#e5e7eb;
     --text:#1a1a1a; --text-sub:#6b7280; --text-muted:#9ca3af;
     --gray:#e5e7eb; --danger:#dc2626;
-    --sel:#eff6ff; --sel-border:#3b82f6;
+    --sel:#eff6ff; --sel-b:#3b82f6;
+    --store:#93c5fd; --solo:#fcd34d;
   }
-  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
-  html,body{margin:0; padding:0}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0}
+  html,body{background:var(--bg)}
   body{
     font-family:'Noto Sans JP','Hiragino Sans','Meiryo',sans-serif;
-    background:var(--bg); color:var(--text); line-height:1.4;
+    color:var(--text); line-height:1.4;
     -webkit-font-smoothing:antialiased;
-    padding-bottom:80px;
+    padding-bottom:70px;
   }
   [hidden]{display:none !important}
+  button{font-family:inherit}
 
   /* ヘッダー */
   header.head{
     position:sticky; top:0; z-index:20;
     background:linear-gradient(135deg,#06C755 0%,#05a848 100%);
-    color:#fff; padding:10px 14px;
+    color:#fff; padding:9px 14px;
     display:flex; align-items:center; gap:10px;
     box-shadow:0 2px 8px rgba(6,199,85,.25);
   }
   .head .back{
-    color:#fff; text-decoration:none; font-size:13px;
+    color:#fff; text-decoration:none; font-size:12px;
     padding:5px 10px; border:1px solid rgba(255,255,255,.4);
     border-radius:14px; white-space:nowrap; opacity:.95;
   }
@@ -45,20 +47,20 @@
   .head .sub{font-size:10px; opacity:.85; margin-top:1px}
   .head .spacer{width:52px}
 
-  .container{max-width:720px; margin:0 auto; padding:0}
+  .container{max-width:1100px; margin:0 auto; padding:0}
 
-  /* アクションバー (検索 + 追加 + 一括) */
+  /* アクションバー */
   .action-bar{
-    background:#fff; padding:10px 12px;
+    background:#fff; padding:8px 12px;
     border-bottom:1px solid var(--border);
-    display:flex; gap:8px; align-items:center;
-    position:sticky; top:48px; z-index:15;
+    display:flex; gap:6px; align-items:center;
+    position:sticky; top:44px; z-index:15;
     flex-wrap:wrap;
   }
-  .search-box{flex:1; min-width:180px; position:relative}
+  .search-box{flex:1; min-width:160px; position:relative}
   .search-box input{
-    width:100%; padding:8px 12px 8px 30px;
-    border:1px solid var(--border); border-radius:20px;
+    width:100%; padding:7px 10px 7px 28px;
+    border:1px solid var(--border); border-radius:18px;
     font-size:13px; font-family:inherit; background:var(--bg);
   }
   .search-box input:focus{
@@ -66,115 +68,116 @@
     box-shadow:0 0 0 3px rgba(6,199,85,.1);
   }
   .search-box::before{
-    content:'🔍'; position:absolute; left:9px; top:50%;
+    content:'🔍'; position:absolute; left:8px; top:50%;
     transform:translateY(-50%); font-size:11px; opacity:.5;
   }
   .action-btn{
-    padding:8px 12px; border-radius:20px; font-size:12px;
-    font-weight:700; cursor:pointer; font-family:inherit;
-    white-space:nowrap; border:none;
+    padding:7px 11px; border-radius:18px; font-size:12px;
+    font-weight:700; cursor:pointer; white-space:nowrap; border:none;
   }
   .action-btn.primary{background:var(--line); color:#fff}
   .action-btn.primary:active{background:var(--line-d)}
   .action-btn.outline{background:#fff; color:var(--line-d); border:1px solid var(--line)}
   .action-btn.gray{background:#fff; color:var(--text-sub); border:1px solid var(--border)}
 
-  /* リスト */
-  .list{background:#fff; margin-bottom:12px}
-  .list-row{
-    display:flex; align-items:center; gap:10px;
-    padding:12px 14px;
+  /* 2列グリッド (デスクトップ) / 1列 (モバイル) */
+  .list{
+    background:#fff; margin:0;
+    display:grid;
+    grid-template-columns:1fr;
+  }
+  @media (min-width:720px){
+    .list{grid-template-columns:1fr 1fr}
+    .list > .row:nth-child(2n){border-left:1px solid #f3f4f6}
+  }
+
+  /* 各行 */
+  .row{
+    display:flex; align-items:center; gap:8px;
+    padding:9px 12px 9px 9px;
     border-bottom:1px solid #f3f4f6;
     cursor:pointer; user-select:none;
+    background:#fff;
+    border-left:3px solid transparent;
     transition:background .1s;
+    min-height:52px;
   }
-  .list-row:last-child{border-bottom:none}
-  .list-row:hover{background:#fafafa}
-  .list-row.selected{background:var(--sel); border-left:3px solid var(--sel-border)}
-  .list-row.disabled{background:#fbfbfb}
-  .list-row.disabled.selected{background:var(--sel)}
+  .row:hover{background:#fafafa}
+  .row.store{border-left-color:var(--store)}
+  .row.solo{border-left-color:var(--solo)}
+  .row.selected{background:var(--sel); border-left-color:var(--sel-b)}
+  .row.disabled{background:#fbfbfb}
 
   /* チェックボックス */
-  .list-row .check{
-    width:22px; height:22px; border-radius:6px;
+  .row .check{
+    width:20px; height:20px; border-radius:5px;
     border:2px solid var(--border);
     display:flex; align-items:center; justify-content:center;
-    flex-shrink:0; font-size:14px; color:#fff;
-    background:#fff; transition:all .15s;
+    flex-shrink:0; font-size:12px; color:#fff;
+    background:#fff; transition:all .12s;
   }
-  .list-row.selected .check{
-    background:var(--sel-border); border-color:var(--sel-border);
+  .row.selected .check{
+    background:var(--sel-b); border-color:var(--sel-b);
   }
-  .list-row.selected .check::after{content:'✓'; font-weight:700}
+  .row.selected .check::after{content:'✓'; font-weight:800}
 
-  /* カテゴリバッジ */
-  .cat-badge{
-    font-size:9px; font-weight:700; padding:2px 6px;
-    border-radius:8px; letter-spacing:.3px;
-    background:var(--bg); color:var(--text-sub);
-    flex-shrink:0;
-  }
-  .cat-badge.store{background:#dbeafe; color:#1e40af}
-  .cat-badge.solo{background:#fef3c7; color:#92400e}
-
-  .list-row .name{
+  .row .name{
     flex:1; font-size:14px; font-weight:600; color:var(--text);
     min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  .list-row.disabled .name{color:var(--text-sub); font-weight:500}
+  .row.disabled .name{color:var(--text-sub); font-weight:500}
 
-  .list-row .open-btn{
+  .row .open-btn{
     background:var(--line); color:#fff; text-decoration:none;
-    padding:7px 16px; border-radius:18px;
-    font-size:12px; font-weight:700; letter-spacing:.5px;
-    box-shadow:0 2px 4px rgba(6,199,85,.25);
+    padding:6px 12px; border-radius:15px;
+    font-size:11px; font-weight:700; letter-spacing:.3px;
+    box-shadow:0 1px 3px rgba(6,199,85,.3);
     white-space:nowrap; flex-shrink:0;
-    display:inline-flex; align-items:center; gap:4px;
+    display:inline-flex; align-items:center; gap:3px;
   }
-  .list-row .open-btn:active{background:var(--line-d); transform:scale(.97)}
-  .list-row .not-set{
-    color:var(--text-muted); font-size:11px; font-weight:600;
-    padding:7px 14px; background:#f3f4f6; border-radius:18px;
+  .row .open-btn:active{background:var(--line-d); transform:scale(.96)}
+  .row .not-set{
+    color:var(--text-muted); font-size:10px; font-weight:600;
+    padding:5px 10px; background:#f3f4f6; border-radius:15px;
     border:1px dashed var(--gray); white-space:nowrap; flex-shrink:0;
   }
 
-  .list-row .actions{display:flex; gap:2px; margin-left:2px}
-  .list-row .actions button{
-    width:30px; height:30px; border-radius:6px;
+  .row .icon-btn{
+    width:26px; height:26px; border-radius:5px;
     border:none; background:transparent; cursor:pointer;
-    font-size:13px; padding:0;
+    font-size:12px; padding:0; opacity:.55;
     display:flex; align-items:center; justify-content:center;
-    color:var(--text-sub);
+    color:var(--text-sub); flex-shrink:0;
   }
-  .list-row .actions button:hover{background:var(--bg); color:var(--text)}
-  .list-row .actions button.danger:hover{background:#fef2f2; color:var(--danger)}
+  .row .icon-btn:hover{background:var(--bg); opacity:1}
+  .row .icon-btn.danger:hover{background:#fef2f2; color:var(--danger)}
 
   /* Fixed bottom selection bar */
   .sel-bar{
     position:fixed; bottom:0; left:0; right:0;
     background:#1a1a1a; color:#fff;
-    padding:12px 16px; z-index:30;
+    padding:10px 14px; z-index:30;
     box-shadow:0 -4px 14px rgba(0,0,0,.25);
-    display:flex; align-items:center; gap:10px;
+    display:flex; align-items:center; gap:8px;
     animation:slideupbar .2s;
   }
   @keyframes slideupbar{from{transform:translateY(100%)}to{transform:translateY(0)}}
-  .sel-bar .cnt{flex:1; font-size:14px; font-weight:700}
+  .sel-bar .cnt{flex:1; font-size:13px; font-weight:700}
   .sel-bar .cnt .num{
-    display:inline-block; background:var(--sel-border); color:#fff;
-    padding:2px 10px; border-radius:12px; margin-right:8px;
-    font-size:13px;
+    display:inline-block; background:var(--sel-b); color:#fff;
+    padding:2px 9px; border-radius:11px; margin-right:6px;
+    font-size:12px;
   }
   .sel-bar button{
-    padding:8px 16px; border-radius:20px; font-size:12px;
-    font-weight:700; cursor:pointer; font-family:inherit;
-    border:none;
+    padding:7px 14px; border-radius:18px; font-size:12px;
+    font-weight:700; cursor:pointer; border:none;
   }
   .sel-bar .btn-clear{background:transparent; color:#fff; border:1px solid rgba(255,255,255,.35)}
   .sel-bar .btn-issue{background:var(--line); color:#fff}
 
   /* Loading / empty */
   .loading, .empty, .error{
+    grid-column:1/-1;
     padding:40px 20px; text-align:center;
     color:var(--text-sub); font-size:13px;
   }
@@ -220,13 +223,12 @@
   .m-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap}
   .btn{
     padding:10px 20px; font-size:14px; font-weight:700;
-    border-radius:8px; cursor:pointer; font-family:inherit;
+    border-radius:8px; cursor:pointer;
     border:1px solid var(--border); background:#fff; color:var(--text);
   }
   .btn:active{transform:scale(.97)}
   .btn.primary{background:var(--line); color:#fff; border-color:var(--line)}
   .btn.primary:active{background:var(--line-d)}
-  .btn:disabled{opacity:.5; cursor:not-allowed}
 
   .hint{
     font-size:11px; color:var(--text-sub);
@@ -235,7 +237,6 @@
   }
   .hint code{background:#fff; padding:1px 5px; border-radius:3px; font-family:'SF Mono',monospace; font-size:11px}
 
-  /* 発行モーダル用 format タブ */
   .fmt-tabs{
     display:flex; gap:4px; margin-bottom:10px;
     border-bottom:1px solid var(--border); padding-bottom:4px;
@@ -243,7 +244,7 @@
   .fmt-tab{
     flex:1; padding:7px 6px; background:transparent; border:none;
     font-size:12px; font-weight:600; color:var(--text-sub);
-    border-radius:6px 6px 0 0; cursor:pointer; font-family:inherit;
+    border-radius:6px 6px 0 0; cursor:pointer;
     border-bottom:2px solid transparent;
   }
   .fmt-tab.active{color:var(--line-d); border-bottom-color:var(--line)}
@@ -265,15 +266,26 @@
   .toast.error{background:var(--danger)}
   @keyframes slideuptoast{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 
+  /* 凡例 (色分けの説明) */
+  .legend{
+    display:flex; gap:14px; padding:6px 14px 8px;
+    font-size:10px; color:var(--text-sub);
+    background:#fff; border-bottom:1px solid var(--border);
+  }
+  .legend .dot{
+    display:inline-block; width:10px; height:10px;
+    border-radius:2px; margin-right:5px; vertical-align:middle;
+  }
+  .legend .dot.store{background:var(--store)}
+  .legend .dot.solo{background:var(--solo)}
+
   @media (max-width:420px){
     .head h1{font-size:14px}
-    .action-bar{padding:8px 10px; gap:6px}
-    .action-btn{padding:7px 10px; font-size:11px}
-    .list-row{padding:11px 10px; gap:8px}
-    .list-row .check{width:20px; height:20px}
-    .cat-badge{display:none}
-    .list-row .name{font-size:13px}
-    .list-row .open-btn, .list-row .not-set{padding:6px 12px; font-size:11px}
+    .action-bar{padding:7px 10px; gap:5px}
+    .action-btn{padding:6px 9px; font-size:11px}
+    .row{padding:8px 10px 8px 7px; min-height:48px}
+    .row .name{font-size:13px}
+    .row .open-btn, .row .not-set{padding:5px 10px; font-size:10px}
   }
 </style>
 </head>
@@ -298,12 +310,17 @@
     <button class="action-btn outline" id="bulk-btn">📋 一括</button>
   </div>
 
+  <div class="legend">
+    <span><span class="dot store"></span>店舗</span>
+    <span><span class="dot solo"></span>単独</span>
+    <span style="margin-left:auto">🖱 行クリックで選択</span>
+  </div>
+
   <div class="list" id="list">
     <div class="loading">読み込み中…</div>
   </div>
 </div>
 
-<!-- 選択中の底バー -->
 <div class="sel-bar" id="sel-bar" hidden>
   <div class="cnt"><span class="num" id="sel-num">0</span>件選択中</div>
   <button class="btn-clear" id="clear-sel">解除</button>
@@ -322,7 +339,7 @@
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let allGroups = [];
   let searchQ = '';
-  const selected = new Set();  // group ids
+  const selected = new Set();
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -333,28 +350,21 @@
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2200);
   };
-  const catLabel = (c) => c === 'store' ? '店舗' : '単独';
 
-  // 検索
   $('search').addEventListener('input', (e) => {
     searchQ = e.target.value.trim().toLowerCase();
     render();
   });
 
-  // 全選択
   $('select-all-btn').addEventListener('click', () => {
     const visible = filteredGroups();
     const allSelected = visible.length > 0 && visible.every(g => selected.has(g.id));
-    if (allSelected) {
-      visible.forEach(g => selected.delete(g.id));
-    } else {
-      visible.forEach(g => selected.add(g.id));
-    }
+    if (allSelected) visible.forEach(g => selected.delete(g.id));
+    else visible.forEach(g => selected.add(g.id));
     updateSelBar();
     render();
   });
 
-  // データ取得
   async function load(){
     try {
       const { data, error } = await sb.from('line_groups')
@@ -393,33 +403,28 @@
     list.innerHTML = rows.map(g => {
       const hasUrl = !!(g.url && g.url.trim());
       const isSel = selected.has(g.id);
-      const rowCls = 'list-row' + (hasUrl ? '' : ' disabled') + (isSel ? ' selected' : '');
+      const rowCls = 'row ' + g.category + (hasUrl ? '' : ' disabled') + (isSel ? ' selected' : '');
       const actionHtml = hasUrl
         ? `<a class="open-btn" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">開く →</a>`
         : `<span class="not-set">未設定</span>`;
       return `<div class="${rowCls}" data-id="${g.id}">
         <div class="check"></div>
-        <span class="cat-badge ${g.category}">${catLabel(g.category)}</span>
         <div class="name" title="${esc(g.name)}">${esc(g.name)}</div>
         ${actionHtml}
-        <div class="actions">
-          <button data-act="edit" data-id="${g.id}" title="URL 編集">✏️</button>
-          <button class="danger" data-act="delete" data-id="${g.id}" title="削除">🗑</button>
-        </div>
+        <button class="icon-btn" data-act="edit" data-id="${g.id}" title="URL 編集">✏️</button>
+        <button class="icon-btn danger" data-act="delete" data-id="${g.id}" title="削除">🗑</button>
       </div>`;
     }).join('');
-    // Row click → toggle selection (except on link/buttons)
-    list.querySelectorAll('.list-row').forEach(row => {
+    list.querySelectorAll('.row').forEach(row => {
       row.addEventListener('click', (e) => {
-        if (e.target.closest('.open-btn') || e.target.closest('.actions')) return;
+        if (e.target.closest('.open-btn') || e.target.closest('.icon-btn')) return;
         const id = row.dataset.id;
         if (selected.has(id)) selected.delete(id); else selected.add(id);
         row.classList.toggle('selected');
         updateSelBar();
       });
     });
-    // Edit/delete actions
-    list.querySelectorAll('.actions button').forEach(b => {
+    list.querySelectorAll('.icon-btn').forEach(b => {
       b.addEventListener('click', (e) => {
         e.stopPropagation();
         e.preventDefault();
@@ -447,21 +452,15 @@
 
   $('issue-btn').addEventListener('click', () => openIssueModal());
 
-  // ---- 発行モーダル ----
   function openIssueModal(){
     const picked = allGroups.filter(g => selected.has(g.id));
     if (!picked.length) { toast('選択なし', true); return; }
-
     const formats = {
-      line: (list) => list.map(g => {
-        if (g.url) return `${g.name}\n${g.url}`;
-        return `${g.name}\n(URL未設定)`;
-      }).join('\n\n'),
+      line: (list) => list.map(g => g.url ? `${g.name}\n${g.url}` : `${g.name}\n(URL未設定)`).join('\n\n'),
       plain: (list) => list.map(g => g.url ? `${g.name}: ${g.url}` : `${g.name}: (未設定)`).join('\n'),
       urlonly: (list) => list.filter(g => g.url).map(g => g.url).join('\n'),
       markdown: (list) => list.map(g => g.url ? `- [${g.name}](${g.url})` : `- ${g.name} _(未設定)_`).join('\n'),
     };
-
     let curFmt = 'line';
     const html = `
       <div class="backdrop">
@@ -473,7 +472,7 @@
             <button class="fmt-tab" data-fmt="urlonly">URL のみ</button>
             <button class="fmt-tab" data-fmt="markdown">Markdown</button>
           </div>
-          <div class="fmt-info" id="fmt-info">LINE トークにそのまま貼付できる形式 (名前+URL 改行区切り)</div>
+          <div class="fmt-info" id="fmt-info">LINE トークにそのまま貼付できる形式</div>
           <textarea class="issue-out" id="issue-out" readonly></textarea>
           <div class="m-actions">
             <button class="btn" data-act="cancel">閉じる</button>
@@ -486,7 +485,6 @@
     const close = () => root.remove();
     root.querySelector('[data-act="cancel"]').onclick = close;
     root.addEventListener('click', (e) => { if (e.target === root) close(); });
-
     const outEl = $('issue-out');
     const infoEl = $('fmt-info');
     const fmtInfos = {
@@ -500,7 +498,6 @@
       infoEl.textContent = fmtInfos[curFmt];
     };
     renderOut();
-
     root.querySelectorAll('.fmt-tab').forEach(t => {
       t.onclick = () => {
         root.querySelectorAll('.fmt-tab').forEach(x => x.classList.remove('active'));
@@ -509,7 +506,6 @@
         renderOut();
       };
     });
-
     root.querySelector('[data-act="copy"]').onclick = async () => {
       try {
         await navigator.clipboard.writeText(outEl.value);
@@ -517,12 +513,11 @@
       } catch(e) {
         outEl.select();
         try { document.execCommand('copy'); toast('コピーしました'); }
-        catch(_) { toast('コピー失敗。手動で選択してください', true); }
+        catch(_) { toast('コピー失敗', true); }
       }
     };
   }
 
-  // ---- 追加/編集/一括 ----
   $('add-btn').addEventListener('click', () => openEditModal(null));
   $('bulk-btn').addEventListener('click', () => openBulkModal());
 
@@ -583,9 +578,7 @@
         }
         close();
         await load();
-      } catch(e){
-        toast('保存失敗: ' + (e.message||e), true);
-      }
+      } catch(e){ toast('保存失敗: ' + (e.message||e), true); }
     };
     setTimeout(() => (isNew ? $('m-name') : $('m-url')).focus(), 60);
   }
@@ -649,9 +642,7 @@
         toast(`${payload.length}件 追加しました`);
         close();
         await load();
-      } catch(e){
-        toast('一括追加失敗: ' + (e.message||e), true);
-      }
+      } catch(e){ toast('一括追加失敗: ' + (e.message||e), true); }
     };
     setTimeout(() => $('m-bulk').focus(), 60);
   }
@@ -664,9 +655,7 @@
       selected.delete(g.id);
       toast('削除しました');
       await load();
-    } catch(e){
-      toast('削除失敗: ' + (e.message||e), true);
-    }
+    } catch(e){ toast('削除失敗: ' + (e.message||e), true); }
   }
 
   load();
