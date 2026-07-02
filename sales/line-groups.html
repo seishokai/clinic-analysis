@@ -11,202 +11,234 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
 <style>
   :root{
-    --line-green:#06C755;
-    --line-green-dark:#05a848;
-    --line-green-light:#e6f9ef;
+    --line:#06C755;
+    --line-d:#05a848;
+    --line-l:#e6f9ef;
     --bg:#f5f5f5;
     --card:#fff;
     --border:#e5e7eb;
     --text:#1a1a1a;
     --text-sub:#6b7280;
     --text-muted:#9ca3af;
-    --accent:#1a1a1a;
     --gray:#e5e7eb;
     --danger:#dc2626;
   }
-  *{box-sizing:border-box}
-  html,body{margin:0;padding:0}
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+  html,body{margin:0; padding:0}
   body{
     font-family:'Noto Sans JP','Hiragino Sans','Meiryo',sans-serif;
     background:var(--bg); color:var(--text);
-    line-height:1.5; -webkit-font-smoothing:antialiased;
-    padding-bottom:80px;
+    line-height:1.4; -webkit-font-smoothing:antialiased;
+    padding-bottom:60px;
   }
   [hidden]{display:none !important}
-  .wrap{max-width:640px; margin:0 auto; padding:0 12px 20px}
 
   /* ヘッダー */
   header.head{
-    position:sticky; top:0; z-index:10;
-    background:var(--line-green);
-    color:#fff; padding:14px 16px;
+    position:sticky; top:0; z-index:20;
+    background:linear-gradient(135deg,#06C755 0%,#05a848 100%);
+    color:#fff; padding:12px 14px;
     display:flex; align-items:center; gap:10px;
-    box-shadow:0 2px 6px rgba(0,0,0,.08);
-    margin-bottom:14px;
+    box-shadow:0 2px 8px rgba(6,199,85,.25);
   }
   .head .back{
-    color:rgba(255,255,255,.85); text-decoration:none;
-    font-size:14px; padding:6px 10px;
-    border:1px solid rgba(255,255,255,.35); border-radius:20px;
+    color:rgba(255,255,255,.9); text-decoration:none;
+    font-size:13px; padding:5px 10px;
+    border:1px solid rgba(255,255,255,.4); border-radius:16px;
+    white-space:nowrap;
   }
-  .head .back:hover{background:rgba(255,255,255,.12)}
+  .head .back:active{background:rgba(255,255,255,.15)}
+  .head .title-wrap{flex:1; text-align:center; min-width:0}
   .head h1{
-    margin:0; font-size:17px; font-weight:800; letter-spacing:.5px;
-    flex:1; text-align:center;
+    margin:0; font-size:16px; font-weight:800; letter-spacing:.5px;
+    line-height:1.1;
   }
-  .head .badge{
-    padding:3px 8px; border-radius:12px; font-size:11px; font-weight:700;
-    background:rgba(255,255,255,.2); border:1px solid rgba(255,255,255,.35);
+  .head .sub{font-size:10px; opacity:.85; margin-top:2px}
+  .head .auth-btn{
+    color:#fff; background:rgba(255,255,255,.15);
+    border:1px solid rgba(255,255,255,.4); border-radius:16px;
+    padding:5px 10px; font-size:12px; cursor:pointer; font-family:inherit;
+    font-weight:600; white-space:nowrap;
   }
+  .head .auth-btn:active{background:rgba(255,255,255,.25)}
+  .head .auth-btn.is-admin{background:#fff; color:var(--line-d); font-weight:700}
 
-  /* セクション */
-  section.groups{
-    background:var(--card);
-    border-radius:12px;
-    box-shadow:0 1px 3px rgba(0,0,0,.04);
-    padding:14px 12px 6px;
-    margin-bottom:16px;
+  /* タブ切替 */
+  .tabs{
+    display:flex; gap:0; background:#fff; padding:0;
+    position:sticky; top:52px; z-index:10;
+    border-bottom:1px solid var(--border);
+    box-shadow:0 1px 3px rgba(0,0,0,.03);
   }
-  .section-head{
-    display:flex; align-items:center; gap:8px;
-    font-size:13px; font-weight:700; color:#1a1a1a;
-    margin-bottom:10px; padding:0 4px;
+  .tab{
+    flex:1; padding:14px 8px; text-align:center;
+    background:transparent; border:none; border-bottom:3px solid transparent;
+    font-size:14px; font-weight:700; color:var(--text-sub);
+    cursor:pointer; font-family:inherit;
+    transition:color .15s, border-color .15s;
   }
-  .section-head .count{
-    font-size:11px; color:var(--text-sub); font-weight:500;
-    margin-left:auto;
+  .tab.active{color:var(--line); border-bottom-color:var(--line)}
+  .tab .cnt{
+    display:inline-block; background:var(--bg); color:var(--text-sub);
+    font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px;
+    margin-left:6px;
   }
-  .section-head .icon{
-    width:22px; height:22px; border-radius:50%;
-    background:var(--line-green-light); color:var(--line-green);
+  .tab.active .cnt{background:var(--line-l); color:var(--line-d)}
+
+  /* 検索バー */
+  .filter-bar{
+    background:#fff; padding:10px 12px;
+    border-bottom:1px solid var(--border);
+    display:flex; gap:8px; align-items:center;
+    position:sticky; top:104px; z-index:9;
+  }
+  .search-box{
+    flex:1; position:relative;
+  }
+  .search-box input{
+    width:100%; padding:8px 12px 8px 32px;
+    border:1px solid var(--border); border-radius:20px;
+    font-size:13px; font-family:inherit;
+    background:var(--bg);
+  }
+  .search-box input:focus{
+    outline:none; border-color:var(--line); background:#fff;
+    box-shadow:0 0 0 3px rgba(6,199,85,.1);
+  }
+  .search-box::before{
+    content:'🔍'; position:absolute; left:10px; top:50%;
+    transform:translateY(-50%); font-size:12px; opacity:.5;
+  }
+  .filter-bar .add-btn{
+    background:var(--line); color:#fff; border:none;
+    padding:8px 12px; border-radius:20px;
+    font-size:12px; font-weight:700; cursor:pointer; font-family:inherit;
+    white-space:nowrap;
+  }
+  .filter-bar .add-btn:active{background:var(--line-d)}
+  .filter-bar .add-btn.bulk{background:#fff; color:var(--line-d); border:1px solid var(--line)}
+
+  /* コンテンツ */
+  .wrap{max-width:900px; margin:0 auto; padding:12px}
+
+  /* カードグリッド */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(2, 1fr);
+    gap:10px;
+  }
+  @media (min-width:640px){ .grid{grid-template-columns:repeat(3, 1fr); gap:12px} }
+  @media (min-width:900px){ .grid{grid-template-columns:repeat(4, 1fr)} }
+
+  .card{
+    background:#fff; border-radius:14px;
+    padding:14px 12px; text-align:center;
+    text-decoration:none; color:inherit;
+    box-shadow:0 1px 3px rgba(0,0,0,.06);
+    border:1.5px solid transparent;
+    position:relative; overflow:hidden;
+    display:flex; flex-direction:column; gap:10px;
+    min-height:120px;
+    transition:transform .1s, box-shadow .15s, border-color .15s;
+  }
+  .card.active{
+    border-color:var(--line);
+  }
+  .card.active:active{
+    transform:scale(.97);
+    box-shadow:0 4px 12px rgba(6,199,85,.2);
+  }
+  .card.inactive{background:#fafafa; border-color:var(--gray)}
+  .card::before{
+    content:''; position:absolute; top:0; left:0; right:0; height:4px;
+    background:linear-gradient(90deg,var(--line) 0%,var(--line-d) 100%);
+    opacity:0;
+  }
+  .card.active::before{opacity:1}
+
+  .card .name{
+    font-size:14px; font-weight:700; color:var(--text);
+    line-height:1.3; margin-top:4px;
+    word-break:break-word;
+  }
+  .card.inactive .name{color:var(--text-sub); font-weight:500}
+
+  .card .status{
+    margin-top:auto; font-size:11px; font-weight:700;
+    letter-spacing:.5px;
+  }
+  .card.active .status{color:var(--line-d)}
+  .card.inactive .status{color:var(--text-muted)}
+
+  .card .status .arrow{margin-left:3px; font-size:12px}
+
+  /* 管理者用 - カード右上 */
+  .card-menu{
+    position:absolute; top:6px; right:6px;
+    display:none; gap:2px;
+  }
+  .card.is-admin-view .card-menu{display:flex}
+  .card-menu button{
+    background:rgba(255,255,255,.9); border:1px solid var(--border);
+    width:26px; height:26px; border-radius:50%;
+    font-size:12px; cursor:pointer; padding:0;
     display:inline-flex; align-items:center; justify-content:center;
-    font-size:12px; font-weight:800;
-  }
-
-  /* 各行 */
-  .row{
-    display:flex; align-items:center; gap:8px;
-    padding:10px 4px; border-bottom:1px solid #f3f4f6;
-  }
-  .row:last-child{border-bottom:none}
-  .row .name{
-    flex:1; font-size:14px; font-weight:600; color:#1a1a1a;
-    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
-  }
-  .row.disabled .name{color:var(--text-muted); font-weight:500}
-
-  .open-btn{
-    padding:8px 18px; border-radius:22px; border:none;
-    font-size:13px; font-weight:700; letter-spacing:.5px;
-    cursor:pointer; text-decoration:none;
-    display:inline-flex; align-items:center; gap:6px;
-    background:var(--line-green); color:#fff;
-    box-shadow:0 2px 4px rgba(6,199,85,.25);
-    transition:transform .1s;
-    min-width:82px; justify-content:center;
-  }
-  .open-btn:hover{background:var(--line-green-dark)}
-  .open-btn:active{transform:scale(.96)}
-  .open-btn.disabled{
-    background:var(--gray); color:var(--text-muted);
-    cursor:not-allowed; box-shadow:none;
-    pointer-events:none;
-  }
-
-  /* Admin 操作 */
-  .admin-actions{
-    display:flex; gap:4px; margin-left:6px;
-  }
-  .icon-btn{
-    background:transparent; border:none; cursor:pointer;
-    font-size:14px; padding:6px 8px; border-radius:6px;
     color:var(--text-sub);
   }
-  .icon-btn:hover{background:var(--bg); color:var(--text)}
-  .icon-btn.danger:hover{color:var(--danger); background:#fef2f2}
+  .card-menu button:active{background:var(--bg)}
+  .card-menu button.danger:active{background:#fef2f2; color:var(--danger)}
 
-  /* Admin ゾーン */
-  .admin-zone{
-    background:#fffbea; border:1px dashed #d4a010;
-    border-radius:12px; padding:14px; margin-bottom:16px;
+  /* ローディング/空 */
+  .loading, .empty, .error{
+    grid-column:1/-1; padding:36px 20px;
+    text-align:center; color:var(--text-sub); font-size:13px;
   }
-  .admin-zone h3{
-    margin:0 0 10px; font-size:13px; font-weight:700; color:#92400e;
-  }
-  .admin-zone p{
-    font-size:11px; color:#92400e; margin:0 0 12px;
-  }
-  .admin-btn{
-    padding:6px 14px; font-size:12px; font-weight:700;
-    background:#fff; color:#92400e; border:1px solid #d4a010;
-    border-radius:6px; cursor:pointer; font-family:inherit;
-  }
-  .admin-btn:hover{background:#fef3c7}
-  .admin-btn.primary{background:#92400e; color:#fff; border-color:#92400e}
-  .admin-btn.primary:hover{background:#78350f}
-
-  /* Auth 表示 */
-  .auth-bar{
-    display:flex; align-items:center; justify-content:space-between;
-    gap:8px; padding:8px 12px; margin-bottom:10px;
-    background:#fff; border-radius:8px;
-    box-shadow:0 1px 2px rgba(0,0,0,.03);
-    font-size:12px;
-  }
-  .auth-bar .status{color:var(--text-sub); display:inline-flex; align-items:center; gap:6px}
-  .auth-bar .status .dot{
-    width:8px; height:8px; border-radius:50%; background:var(--text-muted);
-  }
-  .auth-bar.is-admin .dot{background:var(--line-green)}
-  .auth-btn{
-    font-size:11px; padding:5px 12px; border-radius:6px;
-    border:1px solid var(--border); background:#fff;
-    color:var(--text-sub); cursor:pointer; font-family:inherit;
-  }
-  .auth-btn:hover{background:var(--bg); color:var(--text)}
-
-  /* 追加ボタン群 */
-  .add-actions{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px}
+  .error{color:var(--danger); background:#fef2f2; border-radius:12px}
+  .empty{background:#fff; border-radius:12px}
+  .empty-hint{margin-top:8px; font-size:11px; color:var(--text-muted)}
 
   /* Modal */
-  .modal-backdrop{
+  .backdrop{
     position:fixed; inset:0; background:rgba(0,0,0,.5);
     display:flex; align-items:center; justify-content:center;
-    padding:16px; z-index:100;
+    padding:16px; z-index:200;
+    animation:fadein .15s;
   }
+  @keyframes fadein{from{opacity:0}to{opacity:1}}
   .modal{
     background:#fff; border-radius:14px; padding:20px;
     max-width:460px; width:100%; max-height:90vh; overflow-y:auto;
     box-shadow:0 20px 60px rgba(0,0,0,.4);
+    animation:slideup .2s;
   }
-  .modal h3{margin:0 0 14px; font-size:15px; font-weight:800; color:#1a1a1a}
+  @keyframes slideup{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .modal h3{margin:0 0 14px; font-size:16px; font-weight:800; color:#1a1a1a}
   .field{margin-bottom:12px}
-  .field label{display:block; font-size:11px; font-weight:600; color:var(--text-sub); margin-bottom:4px}
+  .field label{display:block; font-size:11px; font-weight:600; color:var(--text-sub); margin-bottom:5px}
   .field input, .field select, .field textarea{
-    width:100%; padding:9px 11px;
-    border:1px solid var(--border); border-radius:6px;
-    font-size:13px; font-family:inherit; box-sizing:border-box;
+    width:100%; padding:10px 12px;
+    border:1px solid var(--border); border-radius:8px;
+    font-size:14px; font-family:inherit; box-sizing:border-box;
     background:#fff;
   }
-  .field textarea{resize:vertical; min-height:120px; line-height:1.55; font-family:'SF Mono',Consolas,monospace; font-size:12px}
+  .field textarea{
+    resize:vertical; min-height:130px; line-height:1.5;
+    font-family:'SF Mono','Consolas',monospace; font-size:12px;
+  }
   .field input:focus, .field select:focus, .field textarea:focus{
-    outline:none; border-color:var(--line-green);
+    outline:none; border-color:var(--line);
     box-shadow:0 0 0 3px rgba(6,199,85,.15);
   }
-  .modal-actions{
-    display:flex; gap:8px; justify-content:flex-end;
-    margin-top:14px; flex-wrap:wrap;
-  }
+  .field input:disabled, .field select:disabled{background:#fafafa; color:var(--text-sub)}
+  .m-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap}
   .btn{
-    padding:9px 18px; font-size:13px; font-weight:700;
-    border-radius:6px; cursor:pointer; font-family:inherit;
+    padding:10px 20px; font-size:14px; font-weight:700;
+    border-radius:8px; cursor:pointer; font-family:inherit;
     border:1px solid var(--border); background:#fff; color:var(--text);
   }
-  .btn:hover{background:var(--bg)}
-  .btn.primary{background:var(--line-green); color:#fff; border-color:var(--line-green)}
-  .btn.primary:hover{background:var(--line-green-dark); border-color:var(--line-green-dark)}
-  .btn.danger{color:var(--danger); border-color:#fecaca}
-  .btn.danger:hover{background:#fef2f2}
+  .btn:active{transform:scale(.97)}
+  .btn.primary{background:var(--line); color:#fff; border-color:var(--line)}
+  .btn.primary:active{background:var(--line-d)}
   .btn:disabled{opacity:.5; cursor:not-allowed}
 
   .hint{
@@ -214,30 +246,24 @@
     background:var(--bg); border-radius:6px; padding:8px 10px;
     margin-top:6px; line-height:1.6;
   }
-  .hint code{background:#fff; padding:1px 4px; border-radius:3px; font-family:'SF Mono',monospace; font-size:11px}
+  .hint code{background:#fff; padding:1px 5px; border-radius:3px; font-family:'SF Mono',monospace; font-size:11px}
 
-  .loading{padding:30px; text-align:center; color:var(--text-sub); font-size:13px}
-  .empty{padding:20px 10px; text-align:center; color:var(--text-muted); font-size:12px}
   .toast{
-    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
-    background:#1a1a1a; color:#fff; padding:10px 18px; border-radius:24px;
-    font-size:13px; z-index:1000; box-shadow:0 8px 24px rgba(0,0,0,.3);
-    animation:slideup .25s;
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:#1a1a1a; color:#fff; padding:12px 20px; border-radius:24px;
+    font-size:13px; font-weight:700; z-index:1000;
+    box-shadow:0 8px 24px rgba(0,0,0,.3);
+    animation:slideuptoast .25s; max-width:90vw; text-align:center;
   }
   .toast.error{background:var(--danger)}
-  @keyframes slideup{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+  @keyframes slideuptoast{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 
-  /* Inline URL edit */
-  .row .url-edit{
-    padding:5px 8px; font-size:12px;
-    border:1px solid var(--border); border-radius:6px;
-    max-width:200px; flex:1;
-  }
-
-  @media (max-width: 420px){
-    .head h1{font-size:15px}
-    .row .name{font-size:13px}
-    .open-btn{padding:7px 14px; font-size:12px; min-width:70px}
+  @media (max-width:400px){
+    .head h1{font-size:14px}
+    .head .back, .head .auth-btn{font-size:11px; padding:4px 8px}
+    .filter-bar{padding:8px 10px}
+    .card{padding:12px 8px; min-height:100px}
+    .card .name{font-size:13px}
   }
 </style>
 </head>
@@ -245,51 +271,32 @@
 
 <header class="head">
   <a class="back" href="/clinic-analysis/sales/">← 戻る</a>
-  <h1>💬 LINE グループ</h1>
-  <span class="badge">14+可変</span>
+  <div class="title-wrap">
+    <h1>💬 LINE グループ</h1>
+    <div class="sub" id="head-sub">読み込み中…</div>
+  </div>
+  <button class="auth-btn" id="auth-btn">ログイン</button>
 </header>
 
-<div class="wrap">
-
-  <!-- 認証バー -->
-  <div class="auth-bar" id="auth-bar">
-    <span class="status"><span class="dot"></span><span id="auth-label">ゲスト表示</span></span>
-    <button class="auth-btn" id="auth-btn">管理者ログイン</button>
-  </div>
-
-  <!-- Admin ゾーン (ログイン時のみ表示) -->
-  <div class="admin-zone" id="admin-zone" hidden>
-    <h3>🔧 管理者メニュー</h3>
-    <p>グループを追加/編集/削除できます。追加した URL は全員に即時反映されます。</p>
-    <div class="add-actions">
-      <button class="admin-btn primary" id="add-single-btn">＋ 1つ追加</button>
-      <button class="admin-btn" id="add-bulk-btn">📋 複数一括追加</button>
-    </div>
-  </div>
-
-  <!-- 店舗グループ -->
-  <section class="groups" id="section-store">
-    <div class="section-head">
-      <span class="icon">店</span>
-      <span>店舗グループ</span>
-      <span class="count" id="count-store"></span>
-    </div>
-    <div id="list-store"><div class="loading">読み込み中…</div></div>
-  </section>
-
-  <!-- 単独グループ -->
-  <section class="groups" id="section-solo">
-    <div class="section-head">
-      <span class="icon">単</span>
-      <span>単独グループ</span>
-      <span class="count" id="count-solo"></span>
-    </div>
-    <div id="list-solo"><div class="loading">読み込み中…</div></div>
-  </section>
-
+<div class="tabs">
+  <button class="tab active" data-cat="store">🏥 店舗<span class="cnt" id="cnt-store">0</span></button>
+  <button class="tab" data-cat="solo">🎯 単独<span class="cnt" id="cnt-solo">0</span></button>
 </div>
 
-<!-- Modal placeholder -->
+<div class="filter-bar">
+  <div class="search-box">
+    <input type="text" id="search" placeholder="グループ名で検索…">
+  </div>
+  <button class="add-btn" id="add-btn" hidden>＋ 追加</button>
+  <button class="add-btn bulk" id="bulk-btn" hidden>📋 一括</button>
+</div>
+
+<div class="wrap">
+  <div class="grid" id="grid">
+    <div class="loading">読み込み中…</div>
+  </div>
+</div>
+
 <div id="modal-root"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -297,15 +304,16 @@
 (function(){
   'use strict';
   const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
-  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDMzMTMxNjEsImV4cCI6MjA1ODg4OTE2MX0.Kf3XLoM26zpvKk4iuIiKb4jTNGb4d4tFHXWfmbGKvKw';
-  const ADMIN_PASSWORD = 'Edoyadepon1';    // 営業ポータルと共通の管理者パスワード
+  const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+  const ADMIN_PASSWORD = 'Edoyadepon1';
   const ADMIN_TOKEN_KEY = 'sales-admin-token';
 
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let isAdmin = false;
   let allGroups = [];
+  let currentCat = 'store';
+  let searchQ = '';
 
-  // ---- ヘルパー ----
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const toast = (msg, err=false) => {
@@ -313,31 +321,29 @@
     el.className = 'toast' + (err ? ' error' : '');
     el.textContent = msg;
     document.body.appendChild(el);
-    setTimeout(() => el.remove(), 2400);
+    setTimeout(() => el.remove(), 2200);
   };
 
   // ---- Auth ----
   function checkAuth(){
     isAdmin = localStorage.getItem(ADMIN_TOKEN_KEY) === 'true';
-    const bar = $('auth-bar');
-    const lbl = $('auth-label');
     const btn = $('auth-btn');
-    const zone = $('admin-zone');
     if (isAdmin) {
-      bar.classList.add('is-admin');
-      lbl.textContent = '管理者';
-      btn.textContent = 'ログアウト';
-      zone.hidden = false;
+      btn.textContent = '👤 管理者';
+      btn.classList.add('is-admin');
+      $('add-btn').hidden = false;
+      $('bulk-btn').hidden = false;
     } else {
-      bar.classList.remove('is-admin');
-      lbl.textContent = 'ゲスト表示';
-      btn.textContent = '管理者ログイン';
-      zone.hidden = true;
+      btn.textContent = 'ログイン';
+      btn.classList.remove('is-admin');
+      $('add-btn').hidden = true;
+      $('bulk-btn').hidden = true;
     }
     render();
   }
   $('auth-btn').addEventListener('click', () => {
     if (isAdmin) {
+      if (!confirm('管理者からログアウトしますか？')) return;
       localStorage.removeItem(ADMIN_TOKEN_KEY);
       toast('ログアウトしました');
       checkAuth();
@@ -346,7 +352,7 @@
       if (pw == null) return;
       if (pw === ADMIN_PASSWORD) {
         localStorage.setItem(ADMIN_TOKEN_KEY, 'true');
-        toast('管理者としてログインしました');
+        toast('管理者ログイン');
         checkAuth();
       } else {
         toast('パスワードが違います', true);
@@ -354,7 +360,23 @@
     }
   });
 
-  // ---- データ取得 ----
+  // ---- タブ ----
+  document.querySelectorAll('.tab').forEach(t => {
+    t.addEventListener('click', () => {
+      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+      t.classList.add('active');
+      currentCat = t.dataset.cat;
+      render();
+    });
+  });
+
+  // ---- 検索 ----
+  $('search').addEventListener('input', (e) => {
+    searchQ = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  // ---- データ ----
   async function load(){
     try {
       const { data, error } = await sb.from('line_groups')
@@ -365,50 +387,58 @@
         .order('created_at', { ascending: true });
       if (error) throw error;
       allGroups = data || [];
+      const storeCount = allGroups.filter(g => g.category === 'store').length;
+      const soloCount = allGroups.filter(g => g.category === 'solo').length;
+      $('cnt-store').textContent = storeCount;
+      $('cnt-solo').textContent = soloCount;
+      $('head-sub').textContent = `店舗 ${storeCount} + 単独 ${soloCount}`;
     } catch(e){
       console.error('load failed', e);
-      $('list-store').innerHTML = `<div class="empty">読み込み失敗: ${esc(e.message||e)}<br><small>line_groups テーブル未作成の可能性あり</small></div>`;
-      $('list-solo').innerHTML = '';
+      $('grid').innerHTML = `<div class="error">読み込み失敗: ${esc(e.message||e)}<br><small style="opacity:.7">line_groups テーブル未作成の可能性</small></div>`;
+      $('head-sub').textContent = 'エラー';
       return;
     }
     render();
   }
 
   function render(){
-    const stores = allGroups.filter(g => g.category === 'store');
-    const solos = allGroups.filter(g => g.category === 'solo');
-    $('count-store').textContent = `${stores.length}件`;
-    $('count-solo').textContent = `${solos.length}件`;
-    $('list-store').innerHTML = renderList(stores);
-    $('list-solo').innerHTML = renderList(solos);
-    wireRowActions();
-  }
-
-  function renderList(rows){
-    if (!rows.length) return '<div class="empty">まだ登録がありません</div>';
-    return rows.map(g => {
-      const hasUrl = !!(g.url && g.url.trim());
-      const cls = hasUrl ? '' : 'disabled';
-      const btn = hasUrl
-        ? `<a class="open-btn" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">開く →</a>`
-        : `<span class="open-btn disabled">未設定</span>`;
-      const adminActs = isAdmin ? `
-        <div class="admin-actions">
-          <button class="icon-btn" data-act="edit" data-id="${g.id}" title="URL 編集">✏️</button>
-          <button class="icon-btn danger" data-act="delete" data-id="${g.id}" title="削除">🗑</button>
-        </div>` : '';
-      return `<div class="row ${cls}">
-        <span class="name" title="${esc(g.name)}">${esc(g.name)}</span>
-        ${btn}
-        ${adminActs}
+    const rows = allGroups.filter(g => g.category === currentCat)
+      .filter(g => !searchQ || g.name.toLowerCase().includes(searchQ));
+    const grid = $('grid');
+    if (!rows.length) {
+      const isSearch = !!searchQ;
+      grid.innerHTML = `<div class="empty">
+        ${isSearch ? '「'+esc(searchQ)+'」に一致するグループがありません' : 'まだ登録がありません'}
+        ${isAdmin && !isSearch ? '<div class="empty-hint">右上「＋ 追加」または「📋 一括」から登録できます</div>' : ''}
       </div>`;
+      return;
+    }
+    grid.innerHTML = rows.map(g => {
+      const hasUrl = !!(g.url && g.url.trim());
+      const cls = 'card ' + (hasUrl ? 'active' : 'inactive') + (isAdmin ? ' is-admin-view' : '');
+      const tag = hasUrl ? 'a' : 'div';
+      const attrs = hasUrl
+        ? `href="${esc(g.url)}" target="_blank" rel="noopener noreferrer"`
+        : '';
+      const status = hasUrl
+        ? `<span class="status">開く<span class="arrow">→</span></span>`
+        : `<span class="status">未設定</span>`;
+      const menu = isAdmin ? `
+        <div class="card-menu">
+          <button data-act="edit" data-id="${g.id}" title="URL 編集">✏️</button>
+          <button class="danger" data-act="delete" data-id="${g.id}" title="削除">🗑</button>
+        </div>` : '';
+      return `<${tag} class="${cls}" ${attrs}>
+        ${menu}
+        <div class="name">${esc(g.name)}</div>
+        ${status}
+      </${tag}>`;
     }).join('');
-  }
-
-  function wireRowActions(){
-    document.querySelectorAll('.icon-btn').forEach(b => {
+    // Admin actions
+    grid.querySelectorAll('.card-menu button').forEach(b => {
       b.addEventListener('click', (e) => {
         e.stopPropagation();
+        e.preventDefault();
         const id = b.dataset.id;
         const g = allGroups.find(x => x.id === id);
         if (!g) return;
@@ -418,27 +448,21 @@
     });
   }
 
-  // ---- 追加 (1件) ----
-  $('add-single-btn').addEventListener('click', () => {
-    openEditModal(null);
-  });
-
-  // ---- 一括追加 ----
-  $('add-bulk-btn').addEventListener('click', () => {
-    openBulkModal();
-  });
+  // ---- 追加 ----
+  $('add-btn').addEventListener('click', () => openEditModal(null));
+  $('bulk-btn').addEventListener('click', () => openBulkModal());
 
   function openEditModal(g){
     const isNew = !g;
     const html = `
-      <div class="modal-backdrop">
+      <div class="backdrop">
         <div class="modal">
           <h3>${isNew ? '＋ 新規追加' : '✏️ URL 編集'}</h3>
           <div class="field">
             <label>カテゴリ</label>
             <select id="m-cat" ${isNew ? '' : 'disabled'}>
-              <option value="store"${(g?.category==='store'||isNew)?' selected':''}>店舗グループ</option>
-              <option value="solo"${g?.category==='solo'?' selected':''}>単独グループ</option>
+              <option value="store"${(g?.category==='store'||(isNew&&currentCat==='store'))?' selected':''}>🏥 店舗グループ</option>
+              <option value="solo"${(g?.category==='solo'||(isNew&&currentCat==='solo'))?' selected':''}>🎯 単独グループ</option>
             </select>
           </div>
           <div class="field">
@@ -446,14 +470,14 @@
             <input type="text" id="m-name" value="${esc(g?.name||'')}" placeholder="例: エスカ" ${isNew ? '' : 'disabled'}>
           </div>
           <div class="field">
-            <label>LINE URL (任意)</label>
+            <label>LINE URL <span style="color:var(--text-muted); font-weight:400">(任意)</span></label>
             <input type="url" id="m-url" value="${esc(g?.url||'')}" placeholder="https://line.me/ti/g/xxxxxxxx">
             <div class="hint">
-              LINE アプリで対象グループを開く → 右上「≡」→ 招待 → リンクをコピー<br>
-              空欄で保存すれば「未設定」として登録できます (後から追加可)。
+              LINE アプリ → 対象グループ → 右上「≡」→ 招待 → リンクをコピー<br>
+              空欄なら「未設定」で保存 (後から追加可)
             </div>
           </div>
-          <div class="modal-actions">
+          <div class="m-actions">
             <button class="btn" data-act="cancel">キャンセル</button>
             <button class="btn primary" data-act="save">保存</button>
           </div>
@@ -461,8 +485,9 @@
       </div>`;
     $('modal-root').innerHTML = html;
     const root = $('modal-root').firstElementChild;
-    root.querySelector('[data-act="cancel"]').onclick = () => root.remove();
-    root.addEventListener('click', (e) => { if (e.target === root) root.remove(); });
+    const close = () => root.remove();
+    root.querySelector('[data-act="cancel"]').onclick = close;
+    root.addEventListener('click', (e) => { if (e.target === root) close(); });
     root.querySelector('[data-act="save"]').onclick = async () => {
       const cat = $('m-cat').value;
       const name = $('m-name').value.trim();
@@ -471,7 +496,6 @@
       if (url && !/^https?:\/\//.test(url)) { toast('URL は http(s):// で始めてください', true); return; }
       try {
         if (isNew) {
-          // 新規: sort_order = 最後尾+10
           const maxSort = Math.max(0, ...allGroups.filter(x=>x.category===cat).map(x=>x.sort_order||0));
           const { error } = await sb.from('line_groups').insert({
             category: cat, name, url: url || null, sort_order: maxSort + 10, is_active: true
@@ -483,30 +507,31 @@
           if (error) throw error;
           toast('保存しました');
         }
-        root.remove();
+        close();
         await load();
       } catch(e){
         toast('保存失敗: ' + (e.message||e), true);
       }
     };
-    setTimeout(() => (isNew ? $('m-name') : $('m-url')).focus(), 50);
+    setTimeout(() => (isNew ? $('m-name') : $('m-url')).focus(), 60);
   }
 
   function openBulkModal(){
+    const sample = '店舗\tにじいろ\thttps://line.me/ti/g/xxx\n店舗\t新店\n単独\t会議室\thttps://line.me/ti/g/yyy';
     const html = `
-      <div class="modal-backdrop">
+      <div class="backdrop">
         <div class="modal">
           <h3>📋 複数一括追加</h3>
           <div class="field">
-            <label>ペースト (1行=1グループ)</label>
-            <textarea id="m-bulk" placeholder="店舗&#9;にじいろ&#9;https://line.me/ti/g/xxx&#10;店舗&#9;新規店&#10;単独&#9;会議室&#9;https://line.me/ti/g/yyy"></textarea>
+            <label>1行 = 1グループ (タブ or | 区切り)</label>
+            <textarea id="m-bulk" placeholder="${esc(sample)}"></textarea>
             <div class="hint">
-              形式: <code>カテゴリ ⇥ 名前 ⇥ URL(任意)</code> (タブ または <code>|</code> 区切り)<br>
-              カテゴリ = <code>店舗</code> または <code>単独</code>。<br>
-              Excel/スプレッドシートからコピペ可 (3列選択 → コピー → ここに貼付)。
+              形式: <code>カテゴリ ⇥ 名前 ⇥ URL(任意)</code><br>
+              カテゴリ = <code>店舗</code> or <code>単独</code><br>
+              Excel/スプレッドシートから 3列コピペ可
             </div>
           </div>
-          <div class="modal-actions">
+          <div class="m-actions">
             <button class="btn" data-act="cancel">キャンセル</button>
             <button class="btn primary" data-act="save">一括追加</button>
           </div>
@@ -514,8 +539,9 @@
       </div>`;
     $('modal-root').innerHTML = html;
     const root = $('modal-root').firstElementChild;
-    root.querySelector('[data-act="cancel"]').onclick = () => root.remove();
-    root.addEventListener('click', (e) => { if (e.target === root) root.remove(); });
+    const close = () => root.remove();
+    root.querySelector('[data-act="cancel"]').onclick = close;
+    root.addEventListener('click', (e) => { if (e.target === root) close(); });
     root.querySelector('[data-act="save"]').onclick = async () => {
       const raw = $('m-bulk').value;
       const lines = raw.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
@@ -526,16 +552,16 @@
         const parts = line.split(/[\t|]/).map(s => s.trim());
         if (parts.length < 2) { errors.push(`行${i+1}: 区切り不足`); return; }
         const [catRaw, name, urlRaw] = parts;
-        const cat = /^(店舗|store)$/i.test(catRaw) ? 'store' : (/^(単独|solo)$/i.test(catRaw) ? 'solo' : null);
+        const cat = /^(店舗|store)$/i.test(catRaw) ? 'store'
+                  : /^(単独|solo)$/i.test(catRaw) ? 'solo' : null;
         if (!cat) { errors.push(`行${i+1}: カテゴリ不正 (${catRaw})`); return; }
         if (!name) { errors.push(`行${i+1}: 名前が空`); return; }
         const url = (urlRaw||'').trim();
-        if (url && !/^https?:\/\//.test(url)) { errors.push(`行${i+1}: URL が http(s):// で始まらない`); return; }
+        if (url && !/^https?:\/\//.test(url)) { errors.push(`行${i+1}: URL 形式不正`); return; }
         parsed.push({ category: cat, name, url: url || null });
       });
       if (errors.length) { toast('入力エラー: ' + errors[0], true); return; }
       if (!parsed.length) { toast('有効な行がありません', true); return; }
-      // sort_order を採番
       const maxs = { store: 0, solo: 0 };
       allGroups.forEach(g => { if ((g.sort_order||0) > maxs[g.category]) maxs[g.category] = g.sort_order||0; });
       const payload = parsed.map(p => ({
@@ -547,17 +573,17 @@
         const { error } = await sb.from('line_groups').insert(payload);
         if (error) throw error;
         toast(`${payload.length}件 追加しました`);
-        root.remove();
+        close();
         await load();
       } catch(e){
         toast('一括追加失敗: ' + (e.message||e), true);
       }
     };
-    setTimeout(() => $('m-bulk').focus(), 50);
+    setTimeout(() => $('m-bulk').focus(), 60);
   }
 
   async function deleteGroup(g){
-    if (!confirm(`「${g.name}」を削除しますか？\n(復元不可)`)) return;
+    if (!confirm(`「${g.name}」を削除しますか？\n(この操作は取り消せません)`)) return;
     try {
       const { error } = await sb.from('line_groups').delete().eq('id', g.id);
       if (error) throw error;
@@ -568,10 +594,8 @@
     }
   }
 
-  // ---- 起動 ----
   checkAuth();
   load();
-
 })();
 </script>
 
