@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v477';
+const APP_VERSION = 'v478';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8326,10 +8326,16 @@ function renderBookings() {
           if (newDate === d.bookDate) { cancel(); return; }
           d.bookDate = newDate;
           td.innerHTML = fmtBookDate(newDate);
-          showToast('予約日を変更しました');
+          // v478: 以前は showToast が await 前に実行 → タブ即閉じで
+          //   safeSave が enqueueSave にも到達せず完全消失リスク。
+          //   async IIFE に await + トーストを await 後に移動。
           (async () => {
             const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, book_date: newDate }, options: { onConflict:'name,apply_date' } });
-            if (res && res.ok === false) showToast('⚠ 予約日保存に失敗。再送信します', true);
+            if (res && res.ok === false) {
+              showToast('⚠ 予約日保存に失敗 — 再送信キューに登録', true);
+            } else {
+              showToast('予約日を変更しました');
+            }
           })();
         };
         okBtn.addEventListener('click', (e) => { e.stopPropagation(); save(); });
@@ -9108,7 +9114,17 @@ function searchPatients() {
           if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: apply };
           bfLifecycleCache[key].bf_status = targetBF;
         }
-        await safeSave({ type:'upsert', table:'booking_status', payload, options:{ onConflict:'name,apply_date' } });
+        // v478: safeSave は throw せず {ok:false, error} を返す。
+        //   try/catch は RLS/ネットワーク失敗を検知できず「変更完了」トースト
+        //   が出るが実際は DB に保存されていない典型パターン。
+        //   res.ok を明示チェックする。
+        const res = await safeSave({ type:'upsert', table:'booking_status', payload, options:{ onConflict:'name,apply_date' } });
+        if (res && res.ok === false) {
+          showToast('⚠ 状態保存失敗 — 再送信キューに登録', true);
+          sel.style.outline = '2px solid #dc2626';
+          setTimeout(() => { sel.style.outline = ''; }, 1500);
+          return;  // 楽観的 UI 更新はキャンセル
+        }
         if (match) match.status = newStatus;
         // bk-extra にも反映 (予約一覧との整合)
         const bkEx = loadData('bk-extra', {});
@@ -17281,10 +17297,35 @@ async function saveParaCell(clinic, ym, patch) {
   }
 }
 
+// v478: 以前は最新の patch オブジェクトだけを保持する実装だったため、
+//   grams 入力 → 500ms 以内に collected_date 入力 とすると
+//   前の patch (grams) が clearTimeout で捨てられ、後の patch (date) だけ
+//   DB に送信され、grams が保存されず realtime refresh で入力欄が消える。
+//   → pending patch を key 単位で MERGE 保持するよう修正。
+const _paraPendingPatches = {};  // clinic|ym → { grams, collected_date, ... }
 function scheduleParaSave(clinic, ym, patch) {
   const key = clinic + '|' + ym;
+  // 既存の pending patch に今回の変更を merge (両方のフィールドを保持)
+  _paraPendingPatches[key] = { ...(_paraPendingPatches[key] || {}), ...patch };
   clearTimeout(paraSaveTimers[key]);
-  paraSaveTimers[key] = setTimeout(() => { saveParaCell(clinic, ym, patch); }, 500);
+  paraSaveTimers[key] = setTimeout(() => {
+    const finalPatch = _paraPendingPatches[key];
+    delete _paraPendingPatches[key];
+    delete paraSaveTimers[key];
+    if (finalPatch) saveParaCell(clinic, ym, finalPatch);
+  }, 500);
+}
+
+// v478: pending 保存を強制 flush (タブ閉じ/画面遷移前用、beforeunload から呼ばれる)
+function _flushParaSaveTimers() {
+  Object.keys(paraSaveTimers).forEach(key => {
+    clearTimeout(paraSaveTimers[key]);
+    const [clinic, ym] = key.split('|');
+    const patch = _paraPendingPatches[key];
+    delete _paraPendingPatches[key];
+    delete paraSaveTimers[key];
+    if (patch) saveParaCell(clinic, ym, patch);
+  });
 }
 
 function updateParaTotals() {
