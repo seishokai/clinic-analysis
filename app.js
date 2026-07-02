@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v474';
+const APP_VERSION = 'v475';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8146,8 +8146,10 @@ function renderBookings() {
       // v386: 月フィールドの空文字は null に変換 (空文字保存だと「未設定」と「明示クリア」が区別できない #7)
       const isMonth = (field === 'paymentMonth' || field === 'incentiveMonth');
       const isAmount = (field === 'contractAmount' || field === 'incentiveAmount');
+      // v475: 空欄入力での「金額0上書き」問題を修正。空文字/null は null 保存にして
+      //       既存金額を消さないよう。以前は `|| 0` により空欄 blur で 500000 → 0 になっていた。
       update[dbField] = isAmount
-        ? (Number(String(value).replace(/,/g,'')) || 0)
+        ? (String(value).trim() === '' || value == null ? null : (Number(String(value).replace(/,/g,'')) || 0))
         : (isMonth && (value === '' || value == null) ? null : value);
       // A2+A3
       const bkKey = name + '|' + apply;
@@ -10800,8 +10802,10 @@ async function renderKaiinAll(containerId) {
     inp.addEventListener('focus', () => { inp.value = inp.value.replace(/,/g,''); });
     inp.addEventListener('blur', () => { const n = Number(inp.value.replace(/,/g,'')); inp.value = n ? n.toLocaleString() : ''; });
     inp.addEventListener('change', async () => {
-      const n = Number(inp.value.replace(/,/g,'')) || 0;
-      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'contract_amount', n);
+      // v475: 空欄は null で保存 (既存金額を保護)。以前は空欄blurで500000→0上書きが発生。
+      const raw = String(inp.value || '').replace(/,/g,'').trim();
+      const val = raw === '' ? null : (Number(raw) || 0);
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, 'contract_amount', val);
       if (ok) {
         inp.style.borderColor = '#16a34a';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
@@ -11830,8 +11834,10 @@ function drawKaiinRows(treatment, rows, container) {
     inp.addEventListener('focus', () => { inp.value = inp.value.replace(/,/g,''); });
     inp.addEventListener('blur', () => { const n = Number(inp.value.replace(/,/g,'')); inp.value = n ? n.toLocaleString() : ''; });
     inp.addEventListener('change', async () => {
-      const n = Number(inp.value.replace(/,/g,'')) || 0;
-      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, inp.dataset.field, n);
+      // v475: 空欄→null で既存金額を保護 (以前は空欄blurで0上書き)
+      const raw = String(inp.value || '').replace(/,/g,'').trim();
+      const val = raw === '' ? null : (Number(raw) || 0);
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, inp.dataset.field, val);
       if (ok) {
         inp.style.borderColor = '#0a0';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
@@ -12141,9 +12147,11 @@ function drawBFLifecycleTable(bfRows) {
     inp.addEventListener('focus', () => { inp.value = inp.value.replace(/,/g,''); });
     inp.addEventListener('blur', () => { const n = Number(inp.value.replace(/,/g,'')); inp.value = n ? n.toLocaleString() : ''; });
     inp.addEventListener('change', async () => {
-      const n = Number(inp.value.replace(/,/g,'')) || 0;
+      // v475: 空欄→null で既存金額を保護
+      const raw = String(inp.value || '').replace(/,/g,'').trim();
+      const val = raw === '' ? null : (Number(raw) || 0);
       const field = inp.dataset.field;
-      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, field, n);
+      const ok = await saveBFLifecycleField(inp.dataset.name, inp.dataset.apply, field, val);
       if (ok) {
         inp.style.borderColor = '#0a0';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
@@ -12435,7 +12443,12 @@ function renderBFBookings(allBFData) {
       bkExtraLocal[key][field] = value;
       const dbField = field==='contractService'?'contract_service':field==='contractAmount'?'contract_amount':field==='paymentMonth'?'payment_month':field==='incentiveAmount'?'incentive_amount':'incentive_month';
       const update = { name, apply_date: apply };
-      update[dbField] = field==='contractAmount'||field==='incentiveAmount' ? Number(value)||0 : value;
+      // v475: 空欄→null で既存金額を保護 (以前は空欄blurで0上書きが発生)
+      const isAmount = (field==='contractAmount' || field==='incentiveAmount');
+      const isMonth = (field==='paymentMonth' || field==='incentiveMonth');
+      update[dbField] = isAmount
+        ? (String(value).trim() === '' || value == null ? null : (Number(String(value).replace(/,/g,'')) || 0))
+        : (isMonth && (value === '' || value == null) ? null : value);
       (async () => {
         const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
         if (res && res.ok === false) showToast('⚠ 保存に失敗。再送信します', true);
