@@ -15,6 +15,7 @@
     --bg:#f5f5f5; --card:#fff; --border:#e5e7eb;
     --text:#1a1a1a; --text-sub:#6b7280; --text-muted:#9ca3af;
     --gray:#e5e7eb; --danger:#dc2626;
+    --sel:#eff6ff; --sel-border:#3b82f6;
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
   html,body{margin:0; padding:0}
@@ -22,6 +23,7 @@
     font-family:'Noto Sans JP','Hiragino Sans','Meiryo',sans-serif;
     background:var(--bg); color:var(--text); line-height:1.4;
     -webkit-font-smoothing:antialiased;
+    padding-bottom:80px;
   }
   [hidden]{display:none !important}
 
@@ -43,40 +45,17 @@
   .head .sub{font-size:10px; opacity:.85; margin-top:1px}
   .head .spacer{width:52px}
 
-  /* メインコンテナ */
-  .container{
-    max-width:720px; margin:0 auto; padding:0;
-  }
+  .container{max-width:720px; margin:0 auto; padding:0}
 
-  /* タブ */
-  .tabs{
-    display:flex; background:#fff;
-    position:sticky; top:48px; z-index:15;
-    border-bottom:1px solid var(--border);
-  }
-  .tab{
-    flex:1; padding:12px 8px; text-align:center;
-    background:transparent; border:none;
-    border-bottom:3px solid transparent;
-    font-size:13px; font-weight:700; color:var(--text-sub);
-    cursor:pointer; font-family:inherit;
-  }
-  .tab.active{color:var(--line); border-bottom-color:var(--line)}
-  .tab .cnt{
-    display:inline-block; background:var(--bg); color:var(--text-sub);
-    font-size:10px; font-weight:700; padding:1px 7px; border-radius:9px;
-    margin-left:5px; min-width:22px;
-  }
-  .tab.active .cnt{background:var(--line-l); color:var(--line-d)}
-
-  /* 検索+アクションバー */
+  /* アクションバー (検索 + 追加 + 一括) */
   .action-bar{
-    background:#fff; padding:8px 12px;
+    background:#fff; padding:10px 12px;
     border-bottom:1px solid var(--border);
     display:flex; gap:8px; align-items:center;
-    position:sticky; top:93px; z-index:14;
+    position:sticky; top:48px; z-index:15;
+    flex-wrap:wrap;
   }
-  .search-box{flex:1; position:relative}
+  .search-box{flex:1; min-width:180px; position:relative}
   .search-box input{
     width:100%; padding:8px 12px 8px 30px;
     border:1px solid var(--border); border-radius:20px;
@@ -98,26 +77,45 @@
   .action-btn.primary{background:var(--line); color:#fff}
   .action-btn.primary:active{background:var(--line-d)}
   .action-btn.outline{background:#fff; color:var(--line-d); border:1px solid var(--line)}
+  .action-btn.gray{background:#fff; color:var(--text-sub); border:1px solid var(--border)}
 
   /* リスト */
-  .list{background:#fff}
+  .list{background:#fff; margin-bottom:12px}
   .list-row{
     display:flex; align-items:center; gap:10px;
     padding:12px 14px;
     border-bottom:1px solid #f3f4f6;
+    cursor:pointer; user-select:none;
     transition:background .1s;
   }
   .list-row:last-child{border-bottom:none}
   .list-row:hover{background:#fafafa}
+  .list-row.selected{background:var(--sel); border-left:3px solid var(--sel-border)}
   .list-row.disabled{background:#fbfbfb}
+  .list-row.disabled.selected{background:var(--sel)}
 
-  .list-row .icon{
-    width:36px; height:36px; border-radius:50%;
-    background:var(--line-l); color:var(--line-d);
+  /* チェックボックス */
+  .list-row .check{
+    width:22px; height:22px; border-radius:6px;
+    border:2px solid var(--border);
     display:flex; align-items:center; justify-content:center;
-    font-size:14px; font-weight:800; flex-shrink:0;
+    flex-shrink:0; font-size:14px; color:#fff;
+    background:#fff; transition:all .15s;
   }
-  .list-row.disabled .icon{background:#f3f4f6; color:var(--text-muted)}
+  .list-row.selected .check{
+    background:var(--sel-border); border-color:var(--sel-border);
+  }
+  .list-row.selected .check::after{content:'✓'; font-weight:700}
+
+  /* カテゴリバッジ */
+  .cat-badge{
+    font-size:9px; font-weight:700; padding:2px 6px;
+    border-radius:8px; letter-spacing:.3px;
+    background:var(--bg); color:var(--text-sub);
+    flex-shrink:0;
+  }
+  .cat-badge.store{background:#dbeafe; color:#1e40af}
+  .cat-badge.solo{background:#fef3c7; color:#92400e}
 
   .list-row .name{
     flex:1; font-size:14px; font-weight:600; color:var(--text);
@@ -140,18 +138,42 @@
     border:1px dashed var(--gray); white-space:nowrap; flex-shrink:0;
   }
 
-  .list-row .actions{display:flex; gap:2px; margin-left:4px}
+  .list-row .actions{display:flex; gap:2px; margin-left:2px}
   .list-row .actions button{
-    width:32px; height:32px; border-radius:8px;
+    width:30px; height:30px; border-radius:6px;
     border:none; background:transparent; cursor:pointer;
-    font-size:14px; padding:0;
+    font-size:13px; padding:0;
     display:flex; align-items:center; justify-content:center;
     color:var(--text-sub);
   }
   .list-row .actions button:hover{background:var(--bg); color:var(--text)}
   .list-row .actions button.danger:hover{background:#fef2f2; color:var(--danger)}
 
-  /* ローディング/空 */
+  /* Fixed bottom selection bar */
+  .sel-bar{
+    position:fixed; bottom:0; left:0; right:0;
+    background:#1a1a1a; color:#fff;
+    padding:12px 16px; z-index:30;
+    box-shadow:0 -4px 14px rgba(0,0,0,.25);
+    display:flex; align-items:center; gap:10px;
+    animation:slideupbar .2s;
+  }
+  @keyframes slideupbar{from{transform:translateY(100%)}to{transform:translateY(0)}}
+  .sel-bar .cnt{flex:1; font-size:14px; font-weight:700}
+  .sel-bar .cnt .num{
+    display:inline-block; background:var(--sel-border); color:#fff;
+    padding:2px 10px; border-radius:12px; margin-right:8px;
+    font-size:13px;
+  }
+  .sel-bar button{
+    padding:8px 16px; border-radius:20px; font-size:12px;
+    font-weight:700; cursor:pointer; font-family:inherit;
+    border:none;
+  }
+  .sel-bar .btn-clear{background:transparent; color:#fff; border:1px solid rgba(255,255,255,.35)}
+  .sel-bar .btn-issue{background:var(--line); color:#fff}
+
+  /* Loading / empty */
   .loading, .empty, .error{
     padding:40px 20px; text-align:center;
     color:var(--text-sub); font-size:13px;
@@ -169,7 +191,7 @@
   @keyframes fadein{from{opacity:0}to{opacity:1}}
   .modal{
     background:#fff; border-radius:14px; padding:20px;
-    max-width:440px; width:100%; max-height:90vh; overflow-y:auto;
+    max-width:520px; width:100%; max-height:90vh; overflow-y:auto;
     box-shadow:0 20px 60px rgba(0,0,0,.4);
     animation:slideup .2s;
   }
@@ -187,7 +209,7 @@
     background:#fff;
   }
   .field textarea{
-    resize:vertical; min-height:130px; line-height:1.5;
+    resize:vertical; min-height:120px; line-height:1.55;
     font-family:'SF Mono','Consolas',monospace; font-size:12px;
   }
   .field input:focus, .field select:focus, .field textarea:focus{
@@ -213,8 +235,28 @@
   }
   .hint code{background:#fff; padding:1px 5px; border-radius:3px; font-family:'SF Mono',monospace; font-size:11px}
 
+  /* 発行モーダル用 format タブ */
+  .fmt-tabs{
+    display:flex; gap:4px; margin-bottom:10px;
+    border-bottom:1px solid var(--border); padding-bottom:4px;
+  }
+  .fmt-tab{
+    flex:1; padding:7px 6px; background:transparent; border:none;
+    font-size:12px; font-weight:600; color:var(--text-sub);
+    border-radius:6px 6px 0 0; cursor:pointer; font-family:inherit;
+    border-bottom:2px solid transparent;
+  }
+  .fmt-tab.active{color:var(--line-d); border-bottom-color:var(--line)}
+  .issue-out{
+    width:100%; min-height:180px; padding:12px;
+    border:1px solid var(--border); border-radius:8px;
+    background:#fafafa; font-size:12px; font-family:'SF Mono','Consolas',monospace;
+    line-height:1.7; resize:vertical; box-sizing:border-box;
+  }
+  .fmt-info{font-size:11px; color:var(--text-sub); margin:6px 0 10px}
+
   .toast{
-    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
     background:#1a1a1a; color:#fff; padding:11px 20px; border-radius:24px;
     font-size:13px; font-weight:700; z-index:1000;
     box-shadow:0 8px 24px rgba(0,0,0,.3);
@@ -223,11 +265,13 @@
   .toast.error{background:var(--danger)}
   @keyframes slideuptoast{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 
-  @media (max-width:400px){
+  @media (max-width:420px){
     .head h1{font-size:14px}
-    .action-bar{padding:7px 10px; gap:6px}
-    .list-row{padding:11px 12px; gap:8px}
-    .list-row .icon{width:32px; height:32px; font-size:12px}
+    .action-bar{padding:8px 10px; gap:6px}
+    .action-btn{padding:7px 10px; font-size:11px}
+    .list-row{padding:11px 10px; gap:8px}
+    .list-row .check{width:20px; height:20px}
+    .cat-badge{display:none}
     .list-row .name{font-size:13px}
     .list-row .open-btn, .list-row .not-set{padding:6px 12px; font-size:11px}
   }
@@ -245,15 +289,11 @@
 </header>
 
 <div class="container">
-  <div class="tabs">
-    <button class="tab active" data-cat="store">🏥 店舗<span class="cnt" id="cnt-store">0</span></button>
-    <button class="tab" data-cat="solo">🎯 単独<span class="cnt" id="cnt-solo">0</span></button>
-  </div>
-
   <div class="action-bar">
     <div class="search-box">
       <input type="text" id="search" placeholder="グループ名で検索…">
     </div>
+    <button class="action-btn gray" id="select-all-btn">☑ 全選択</button>
     <button class="action-btn primary" id="add-btn">＋ 追加</button>
     <button class="action-btn outline" id="bulk-btn">📋 一括</button>
   </div>
@@ -261,6 +301,13 @@
   <div class="list" id="list">
     <div class="loading">読み込み中…</div>
   </div>
+</div>
+
+<!-- 選択中の底バー -->
+<div class="sel-bar" id="sel-bar" hidden>
+  <div class="cnt"><span class="num" id="sel-num">0</span>件選択中</div>
+  <button class="btn-clear" id="clear-sel">解除</button>
+  <button class="btn-issue" id="issue-btn">📤 URL 発行</button>
 </div>
 
 <div id="modal-root"></div>
@@ -274,8 +321,8 @@
 
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
   let allGroups = [];
-  let currentCat = 'store';
   let searchQ = '';
+  const selected = new Set();  // group ids
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -286,20 +333,24 @@
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2200);
   };
-
-  // タブ
-  document.querySelectorAll('.tab').forEach(t => {
-    t.addEventListener('click', () => {
-      document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
-      t.classList.add('active');
-      currentCat = t.dataset.cat;
-      render();
-    });
-  });
+  const catLabel = (c) => c === 'store' ? '店舗' : '単独';
 
   // 検索
   $('search').addEventListener('input', (e) => {
     searchQ = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  // 全選択
+  $('select-all-btn').addEventListener('click', () => {
+    const visible = filteredGroups();
+    const allSelected = visible.length > 0 && visible.every(g => selected.has(g.id));
+    if (allSelected) {
+      visible.forEach(g => selected.delete(g.id));
+    } else {
+      visible.forEach(g => selected.add(g.id));
+    }
+    updateSelBar();
     render();
   });
 
@@ -314,11 +365,7 @@
         .order('created_at', { ascending: true });
       if (error) throw error;
       allGroups = data || [];
-      const s = allGroups.filter(g => g.category === 'store').length;
-      const so = allGroups.filter(g => g.category === 'solo').length;
-      $('cnt-store').textContent = s;
-      $('cnt-solo').textContent = so;
-      $('head-sub').textContent = `店舗 ${s} + 単独 ${so}`;
+      $('head-sub').textContent = `${allGroups.length}件`;
     } catch(e){
       console.error('load failed', e);
       $('list').innerHTML = `<div class="error">読み込み失敗: ${esc(e.message||e)}<br><small style="opacity:.7">line_groups テーブル未作成の可能性</small></div>`;
@@ -328,16 +375,12 @@
     render();
   }
 
-  // アイコン (名前1文字目)
-  function iconText(name){
-    const s = String(name||'').trim();
-    return s.charAt(0) || '?';
+  function filteredGroups(){
+    return allGroups.filter(g => !searchQ || g.name.toLowerCase().includes(searchQ));
   }
 
   function render(){
-    const rows = allGroups
-      .filter(g => g.category === currentCat)
-      .filter(g => !searchQ || g.name.toLowerCase().includes(searchQ));
+    const rows = filteredGroups();
     const list = $('list');
     if (!rows.length) {
       const isSearch = !!searchQ;
@@ -349,12 +392,14 @@
     }
     list.innerHTML = rows.map(g => {
       const hasUrl = !!(g.url && g.url.trim());
-      const rowCls = 'list-row' + (hasUrl ? '' : ' disabled');
+      const isSel = selected.has(g.id);
+      const rowCls = 'list-row' + (hasUrl ? '' : ' disabled') + (isSel ? ' selected' : '');
       const actionHtml = hasUrl
         ? `<a class="open-btn" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">開く →</a>`
         : `<span class="not-set">未設定</span>`;
-      return `<div class="${rowCls}">
-        <div class="icon">${esc(iconText(g.name))}</div>
+      return `<div class="${rowCls}" data-id="${g.id}">
+        <div class="check"></div>
+        <span class="cat-badge ${g.category}">${catLabel(g.category)}</span>
         <div class="name" title="${esc(g.name)}">${esc(g.name)}</div>
         ${actionHtml}
         <div class="actions">
@@ -363,7 +408,17 @@
         </div>
       </div>`;
     }).join('');
-    // Actions
+    // Row click → toggle selection (except on link/buttons)
+    list.querySelectorAll('.list-row').forEach(row => {
+      row.addEventListener('click', (e) => {
+        if (e.target.closest('.open-btn') || e.target.closest('.actions')) return;
+        const id = row.dataset.id;
+        if (selected.has(id)) selected.delete(id); else selected.add(id);
+        row.classList.toggle('selected');
+        updateSelBar();
+      });
+    });
+    // Edit/delete actions
     list.querySelectorAll('.actions button').forEach(b => {
       b.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -375,9 +430,99 @@
         else if (b.dataset.act === 'delete') deleteGroup(g);
       });
     });
+    updateSelBar();
   }
 
-  // 追加/編集
+  function updateSelBar(){
+    const bar = $('sel-bar');
+    $('sel-num').textContent = selected.size;
+    bar.hidden = selected.size === 0;
+  }
+
+  $('clear-sel').addEventListener('click', () => {
+    selected.clear();
+    updateSelBar();
+    render();
+  });
+
+  $('issue-btn').addEventListener('click', () => openIssueModal());
+
+  // ---- 発行モーダル ----
+  function openIssueModal(){
+    const picked = allGroups.filter(g => selected.has(g.id));
+    if (!picked.length) { toast('選択なし', true); return; }
+
+    const formats = {
+      line: (list) => list.map(g => {
+        if (g.url) return `${g.name}\n${g.url}`;
+        return `${g.name}\n(URL未設定)`;
+      }).join('\n\n'),
+      plain: (list) => list.map(g => g.url ? `${g.name}: ${g.url}` : `${g.name}: (未設定)`).join('\n'),
+      urlonly: (list) => list.filter(g => g.url).map(g => g.url).join('\n'),
+      markdown: (list) => list.map(g => g.url ? `- [${g.name}](${g.url})` : `- ${g.name} _(未設定)_`).join('\n'),
+    };
+
+    let curFmt = 'line';
+    const html = `
+      <div class="backdrop">
+        <div class="modal">
+          <h3>📤 URL 発行 <span style="font-weight:500;color:var(--text-sub);font-size:13px">(${picked.length}件)</span></h3>
+          <div class="fmt-tabs">
+            <button class="fmt-tab active" data-fmt="line">LINE 用</button>
+            <button class="fmt-tab" data-fmt="plain">プレーン</button>
+            <button class="fmt-tab" data-fmt="urlonly">URL のみ</button>
+            <button class="fmt-tab" data-fmt="markdown">Markdown</button>
+          </div>
+          <div class="fmt-info" id="fmt-info">LINE トークにそのまま貼付できる形式 (名前+URL 改行区切り)</div>
+          <textarea class="issue-out" id="issue-out" readonly></textarea>
+          <div class="m-actions">
+            <button class="btn" data-act="cancel">閉じる</button>
+            <button class="btn primary" data-act="copy">📋 コピー</button>
+          </div>
+        </div>
+      </div>`;
+    $('modal-root').innerHTML = html;
+    const root = $('modal-root').firstElementChild;
+    const close = () => root.remove();
+    root.querySelector('[data-act="cancel"]').onclick = close;
+    root.addEventListener('click', (e) => { if (e.target === root) close(); });
+
+    const outEl = $('issue-out');
+    const infoEl = $('fmt-info');
+    const fmtInfos = {
+      line: 'LINE トークにそのまま貼付できる形式 (名前 → URL 改行 → 空行)',
+      plain: '『名前: URL』の1行形式。メール/メモに便利',
+      urlonly: 'URL のみ 1行1URL (未設定は除外)',
+      markdown: 'Markdown リンク形式 (Slack/Notion 等)',
+    };
+    const renderOut = () => {
+      outEl.value = formats[curFmt](picked);
+      infoEl.textContent = fmtInfos[curFmt];
+    };
+    renderOut();
+
+    root.querySelectorAll('.fmt-tab').forEach(t => {
+      t.onclick = () => {
+        root.querySelectorAll('.fmt-tab').forEach(x => x.classList.remove('active'));
+        t.classList.add('active');
+        curFmt = t.dataset.fmt;
+        renderOut();
+      };
+    });
+
+    root.querySelector('[data-act="copy"]').onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(outEl.value);
+        toast('コピーしました');
+      } catch(e) {
+        outEl.select();
+        try { document.execCommand('copy'); toast('コピーしました'); }
+        catch(_) { toast('コピー失敗。手動で選択してください', true); }
+      }
+    };
+  }
+
+  // ---- 追加/編集/一括 ----
   $('add-btn').addEventListener('click', () => openEditModal(null));
   $('bulk-btn').addEventListener('click', () => openBulkModal());
 
@@ -390,8 +535,8 @@
           <div class="field">
             <label>カテゴリ</label>
             <select id="m-cat" ${isNew ? '' : 'disabled'}>
-              <option value="store"${(g?.category==='store'||(isNew&&currentCat==='store'))?' selected':''}>🏥 店舗グループ</option>
-              <option value="solo"${(g?.category==='solo'||(isNew&&currentCat==='solo'))?' selected':''}>🎯 単独グループ</option>
+              <option value="store"${(g?.category==='store'||isNew)?' selected':''}>🏥 店舗グループ</option>
+              <option value="solo"${g?.category==='solo'?' selected':''}>🎯 単独グループ</option>
             </select>
           </div>
           <div class="field">
@@ -516,6 +661,7 @@
     try {
       const { error } = await sb.from('line_groups').delete().eq('id', g.id);
       if (error) throw error;
+      selected.delete(g.id);
       toast('削除しました');
       await load();
     } catch(e){
