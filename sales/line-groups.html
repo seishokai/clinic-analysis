@@ -4,19 +4,21 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#06C755">
+<meta name="theme-color" content="#1a1a1a">
 <title>LINE グループ / Aladdin 営業ポータル</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
 <style>
   :root{
-    --line:#06C755; --line-d:#05a848; --line-l:#e6f9ef;
-    --bg:#f5f5f5; --card:#fff; --border:#e5e7eb;
+    --primary:#1a1a1a; --primary-l:#2d3436;
+    --accent:#4a5568;
+    --bg:#f7f7f8; --card:#fff; --border:#e5e7eb;
     --text:#1a1a1a; --text-sub:#6b7280; --text-muted:#9ca3af;
     --gray:#e5e7eb; --danger:#dc2626;
     --sel:#eff6ff; --sel-b:#3b82f6;
     --store:#93c5fd; --solo:#fcd34d;
+    --line-accent:#059669;  /* 落ち着いたエメラルド (LINE識別用の控えめ緑) */
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0}
   html,body{background:var(--bg)}
@@ -29,22 +31,28 @@
   [hidden]{display:none !important}
   button{font-family:inherit}
 
-  /* ヘッダー */
+  /* ヘッダー: 黒基調のシック */
   header.head{
     position:sticky; top:0; z-index:20;
-    background:linear-gradient(135deg,#06C755 0%,#05a848 100%);
+    background:linear-gradient(135deg,#1a1a1a 0%,#2d3436 100%);
     color:#fff; padding:9px 14px;
     display:flex; align-items:center; gap:10px;
-    box-shadow:0 2px 8px rgba(6,199,85,.25);
+    box-shadow:0 2px 8px rgba(0,0,0,.15);
   }
   .head .back{
     color:#fff; text-decoration:none; font-size:12px;
-    padding:5px 10px; border:1px solid rgba(255,255,255,.4);
-    border-radius:14px; white-space:nowrap; opacity:.95;
+    padding:5px 10px; border:1px solid rgba(255,255,255,.25);
+    border-radius:14px; white-space:nowrap; opacity:.9;
   }
+  .head .back:hover{background:rgba(255,255,255,.08)}
   .head .title-wrap{flex:1; text-align:center; min-width:0}
   .head h1{margin:0; font-size:15px; font-weight:800; letter-spacing:.5px}
-  .head .sub{font-size:10px; opacity:.85; margin-top:1px}
+  .head h1 .line-tag{
+    display:inline-block; padding:1px 6px; border-radius:6px;
+    background:var(--line-accent); color:#fff; font-size:10px;
+    font-weight:700; margin-right:4px; vertical-align:middle;
+  }
+  .head .sub{font-size:10px; opacity:.7; margin-top:1px}
   .head .spacer{width:52px}
 
   .container{max-width:1100px; margin:0 auto; padding:0}
@@ -64,8 +72,8 @@
     font-size:13px; font-family:inherit; background:var(--bg);
   }
   .search-box input:focus{
-    outline:none; border-color:var(--line); background:#fff;
-    box-shadow:0 0 0 3px rgba(6,199,85,.1);
+    outline:none; border-color:var(--accent); background:#fff;
+    box-shadow:0 0 0 3px rgba(74,85,104,.1);
   }
   .search-box::before{
     content:'🔍'; position:absolute; left:8px; top:50%;
@@ -75,14 +83,21 @@
     padding:7px 11px; border-radius:18px; font-size:12px;
     font-weight:700; cursor:pointer; white-space:nowrap; border:none;
   }
-  .action-btn.primary{background:var(--line); color:#fff}
-  .action-btn.primary:active{background:var(--line-d)}
-  .action-btn.outline{background:#fff; color:var(--line-d); border:1px solid var(--line)}
+  .action-btn.primary{background:var(--primary); color:#fff}
+  .action-btn.primary:active{background:var(--primary-l)}
+  .action-btn.outline{background:#fff; color:var(--text); border:1px solid var(--border)}
   .action-btn.gray{background:#fff; color:var(--text-sub); border:1px solid var(--border)}
+  .action-btn.reorder{
+    background:#fff; color:var(--accent); border:1px solid var(--border);
+    display:inline-flex; align-items:center; gap:4px;
+  }
+  .action-btn.reorder.active{
+    background:var(--sel); color:var(--sel-b); border-color:var(--sel-b);
+  }
 
-  /* 2列グリッド (デスクトップ) / 1列 (モバイル) */
+  /* リスト: 2 列 (デスクトップ) */
   .list{
-    background:#fff; margin:0;
+    background:#fff;
     display:grid;
     grid-template-columns:1fr;
   }
@@ -91,7 +106,7 @@
     .list > .row:nth-child(2n){border-left:1px solid #f3f4f6}
   }
 
-  /* 各行 */
+  /* 行 */
   .row{
     display:flex; align-items:center; gap:8px;
     padding:9px 12px 9px 9px;
@@ -107,6 +122,23 @@
   .row.solo{border-left-color:var(--solo)}
   .row.selected{background:var(--sel); border-left-color:var(--sel-b)}
   .row.disabled{background:#fbfbfb}
+  .row.sortable-ghost{opacity:.4; background:#e0e7ff !important}
+  .row.sortable-chosen{background:#fef3c7}
+
+  /* ドラッグハンドル */
+  .drag-handle{
+    width:22px; height:24px; border-radius:4px;
+    display:none; align-items:center; justify-content:center;
+    color:var(--text-muted); font-size:14px;
+    cursor:grab; flex-shrink:0;
+    background:transparent; border:none; padding:0;
+    letter-spacing:-1px;
+  }
+  .drag-handle:active{cursor:grabbing}
+  body.reorder-mode .drag-handle{display:inline-flex; color:var(--sel-b)}
+  body.reorder-mode .row{cursor:grab}
+  body.reorder-mode .row:active{cursor:grabbing}
+  body.reorder-mode .check, body.reorder-mode .icon-btn{display:none}
 
   /* チェックボックス */
   .row .check{
@@ -127,15 +159,20 @@
   }
   .row.disabled .name{color:var(--text-sub); font-weight:500}
 
+  /* 「開く」ボタン: 落ち着いた黒基調 + 緑テキスト */
   .row .open-btn{
-    background:var(--line); color:#fff; text-decoration:none;
+    background:var(--primary); color:#fff; text-decoration:none;
     padding:6px 12px; border-radius:15px;
     font-size:11px; font-weight:700; letter-spacing:.3px;
-    box-shadow:0 1px 3px rgba(6,199,85,.3);
+    box-shadow:0 1px 3px rgba(0,0,0,.15);
     white-space:nowrap; flex-shrink:0;
-    display:inline-flex; align-items:center; gap:3px;
+    display:inline-flex; align-items:center; gap:4px;
   }
-  .row .open-btn:active{background:var(--line-d); transform:scale(.96)}
+  .row .open-btn::before{
+    content:''; width:6px; height:6px; border-radius:50%;
+    background:var(--line-accent); flex-shrink:0;
+  }
+  .row .open-btn:active{background:var(--primary-l); transform:scale(.96)}
   .row .not-set{
     color:var(--text-muted); font-size:10px; font-weight:600;
     padding:5px 10px; background:#f3f4f6; border-radius:15px;
@@ -155,7 +192,7 @@
   /* Fixed bottom selection bar */
   .sel-bar{
     position:fixed; bottom:0; left:0; right:0;
-    background:#1a1a1a; color:#fff;
+    background:var(--primary); color:#fff;
     padding:10px 14px; z-index:30;
     box-shadow:0 -4px 14px rgba(0,0,0,.25);
     display:flex; align-items:center; gap:8px;
@@ -173,7 +210,24 @@
     font-weight:700; cursor:pointer; border:none;
   }
   .sel-bar .btn-clear{background:transparent; color:#fff; border:1px solid rgba(255,255,255,.35)}
-  .sel-bar .btn-issue{background:var(--line); color:#fff}
+  .sel-bar .btn-issue{background:var(--line-accent); color:#fff}
+
+  /* 並び替えモード表示バー */
+  .reorder-bar{
+    position:fixed; bottom:0; left:0; right:0;
+    background:var(--sel-b); color:#fff;
+    padding:10px 14px; z-index:30;
+    display:none; align-items:center; gap:8px;
+    box-shadow:0 -4px 14px rgba(0,0,0,.25);
+  }
+  body.reorder-mode .reorder-bar{display:flex}
+  body.reorder-mode .sel-bar{display:none !important}
+  .reorder-bar .msg{flex:1; font-size:13px; font-weight:700}
+  .reorder-bar button{
+    padding:7px 14px; border-radius:18px; font-size:12px;
+    font-weight:700; cursor:pointer; border:none;
+    background:#fff; color:var(--sel-b);
+  }
 
   /* Loading / empty */
   .loading, .empty, .error{
@@ -216,8 +270,8 @@
     font-family:'SF Mono','Consolas',monospace; font-size:12px;
   }
   .field input:focus, .field select:focus, .field textarea:focus{
-    outline:none; border-color:var(--line);
-    box-shadow:0 0 0 3px rgba(6,199,85,.15);
+    outline:none; border-color:var(--accent);
+    box-shadow:0 0 0 3px rgba(74,85,104,.12);
   }
   .field input:disabled, .field select:disabled{background:#fafafa; color:var(--text-sub)}
   .m-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap}
@@ -227,8 +281,8 @@
     border:1px solid var(--border); background:#fff; color:var(--text);
   }
   .btn:active{transform:scale(.97)}
-  .btn.primary{background:var(--line); color:#fff; border-color:var(--line)}
-  .btn.primary:active{background:var(--line-d)}
+  .btn.primary{background:var(--primary); color:#fff; border-color:var(--primary)}
+  .btn.primary:active{background:var(--primary-l)}
 
   .hint{
     font-size:11px; color:var(--text-sub);
@@ -247,7 +301,7 @@
     border-radius:6px 6px 0 0; cursor:pointer;
     border-bottom:2px solid transparent;
   }
-  .fmt-tab.active{color:var(--line-d); border-bottom-color:var(--line)}
+  .fmt-tab.active{color:var(--primary); border-bottom-color:var(--primary)}
   .issue-out{
     width:100%; min-height:180px; padding:12px;
     border:1px solid var(--border); border-radius:8px;
@@ -266,7 +320,6 @@
   .toast.error{background:var(--danger)}
   @keyframes slideuptoast{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 
-  /* 凡例 (色分けの説明) */
   .legend{
     display:flex; gap:14px; padding:6px 14px 8px;
     font-size:10px; color:var(--text-sub);
@@ -294,7 +347,7 @@
 <header class="head">
   <a class="back" href="/clinic-analysis/sales/">← 戻る</a>
   <div class="title-wrap">
-    <h1>💬 LINE グループ</h1>
+    <h1><span class="line-tag">LINE</span> グループ</h1>
     <div class="sub" id="head-sub">読み込み中…</div>
   </div>
   <span class="spacer"></span>
@@ -305,6 +358,7 @@
     <div class="search-box">
       <input type="text" id="search" placeholder="グループ名で検索…">
     </div>
+    <button class="action-btn reorder" id="reorder-btn" title="並び替えモード">↕ 並替</button>
     <button class="action-btn gray" id="select-all-btn">☑ 全選択</button>
     <button class="action-btn primary" id="add-btn">＋ 追加</button>
     <button class="action-btn outline" id="bulk-btn">📋 一括</button>
@@ -313,7 +367,7 @@
   <div class="legend">
     <span><span class="dot store"></span>店舗</span>
     <span><span class="dot solo"></span>単独</span>
-    <span style="margin-left:auto">🖱 行クリックで選択</span>
+    <span style="margin-left:auto">🖱 行クリックで選択・↕で並替</span>
   </div>
 
   <div class="list" id="list">
@@ -327,9 +381,15 @@
   <button class="btn-issue" id="issue-btn">📤 URL 発行</button>
 </div>
 
+<div class="reorder-bar" id="reorder-bar">
+  <div class="msg">↕ 行をドラッグして並び順を変更</div>
+  <button id="reorder-done">完了</button>
+</div>
+
 <div id="modal-root"></div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
 <script>
 (function(){
   'use strict';
@@ -340,6 +400,7 @@
   let allGroups = [];
   let searchQ = '';
   const selected = new Set();
+  let sortableInstance = null;
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -358,24 +419,82 @@
 
   $('select-all-btn').addEventListener('click', () => {
     const visible = filteredGroups();
-    const allSelected = visible.length > 0 && visible.every(g => selected.has(g.id));
-    if (allSelected) visible.forEach(g => selected.delete(g.id));
+    const allSel = visible.length > 0 && visible.every(g => selected.has(g.id));
+    if (allSel) visible.forEach(g => selected.delete(g.id));
     else visible.forEach(g => selected.add(g.id));
     updateSelBar();
     render();
   });
+
+  // 並替モード切替
+  $('reorder-btn').addEventListener('click', () => toggleReorderMode(true));
+  $('reorder-done').addEventListener('click', () => toggleReorderMode(false));
+
+  function toggleReorderMode(on){
+    document.body.classList.toggle('reorder-mode', on);
+    $('reorder-btn').classList.toggle('active', on);
+    if (on) {
+      // 検索・選択をクリアして全表示に
+      searchQ = '';
+      $('search').value = '';
+      selected.clear();
+      updateSelBar();
+      render();
+      // Sortable を初期化
+      const list = $('list');
+      sortableInstance = Sortable.create(list, {
+        animation: 150,
+        ghostClass: 'sortable-ghost',
+        chosenClass: 'sortable-chosen',
+        onEnd: onReorderEnd,
+      });
+    } else {
+      if (sortableInstance) { sortableInstance.destroy(); sortableInstance = null; }
+      render();
+    }
+  }
+
+  async function onReorderEnd(evt){
+    // 現在の DOM 順から新しい sort_order を計算 (1-indexed × 10)
+    const list = $('list');
+    const rowEls = [...list.querySelectorAll('.row')];
+    const updates = rowEls.map((row, i) => ({
+      id: row.dataset.id,
+      sort_order: (i + 1) * 10,
+    }));
+    try {
+      // 並列 UPDATE で高速化
+      const results = await Promise.all(updates.map(u =>
+        sb.from('line_groups').update({ sort_order: u.sort_order }).eq('id', u.id)
+      ));
+      const errors = results.filter(r => r.error);
+      if (errors.length) throw errors[0].error;
+      // ローカル allGroups も更新
+      updates.forEach(u => {
+        const g = allGroups.find(x => x.id === u.id);
+        if (g) g.sort_order = u.sort_order;
+      });
+      toast('順番を保存しました');
+    } catch(e){
+      toast('並替保存失敗: ' + (e.message||e), true);
+      console.error(e);
+      await load();  // 失敗時は再取得で戻す
+    }
+  }
 
   async function load(){
     try {
       const { data, error } = await sb.from('line_groups')
         .select('*')
         .eq('is_active', true)
-        .order('category', { ascending: true })
         .order('sort_order', { ascending: true })
         .order('created_at', { ascending: true });
       if (error) throw error;
       allGroups = data || [];
       $('head-sub').textContent = `${allGroups.length}件`;
+      // 初期 seed の sort_order が category ごとに 10-140 で重複してるので、
+      // 一意な連番になるよう自動で振り直す (1度だけ)
+      await autoRenumberIfNeeded();
     } catch(e){
       console.error('load failed', e);
       $('list').innerHTML = `<div class="error">読み込み失敗: ${esc(e.message||e)}<br><small style="opacity:.7">line_groups テーブル未作成の可能性</small></div>`;
@@ -383,6 +502,37 @@
       return;
     }
     render();
+  }
+
+  async function autoRenumberIfNeeded(){
+    // sort_order が重複してるか調べる (店舗と単独で同じ値があると混在で表示崩れる)
+    const seen = new Set();
+    let hasDup = false;
+    for (const g of allGroups) {
+      if (seen.has(g.sort_order)) { hasDup = true; break; }
+      seen.add(g.sort_order);
+    }
+    if (!hasDup) return;
+    // 店舗 → 単独 の順で並べて 10, 20, 30… と振り直す
+    const stores = allGroups.filter(g => g.category === 'store')
+      .sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+    const solos = allGroups.filter(g => g.category === 'solo')
+      .sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+    const combined = [...stores, ...solos];
+    const updates = combined.map((g, i) => ({ id: g.id, sort_order: (i+1)*10 }));
+    try {
+      await Promise.all(updates.map(u =>
+        sb.from('line_groups').update({ sort_order: u.sort_order }).eq('id', u.id)
+      ));
+      updates.forEach(u => {
+        const g = allGroups.find(x => x.id === u.id);
+        if (g) g.sort_order = u.sort_order;
+      });
+      // 並び順を反映
+      allGroups.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
+    } catch(e){
+      console.warn('auto-renumber failed', e);
+    }
   }
 
   function filteredGroups(){
@@ -408,6 +558,7 @@
         ? `<a class="open-btn" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">開く →</a>`
         : `<span class="not-set">未設定</span>`;
       return `<div class="${rowCls}" data-id="${g.id}">
+        <button class="drag-handle" title="ドラッグで並替">≡</button>
         <div class="check"></div>
         <div class="name" title="${esc(g.name)}">${esc(g.name)}</div>
         ${actionHtml}
@@ -417,6 +568,7 @@
     }).join('');
     list.querySelectorAll('.row').forEach(row => {
       row.addEventListener('click', (e) => {
+        if (document.body.classList.contains('reorder-mode')) return;
         if (e.target.closest('.open-btn') || e.target.closest('.icon-btn')) return;
         const id = row.dataset.id;
         if (selected.has(id)) selected.delete(id); else selected.add(id);
@@ -565,7 +717,7 @@
       if (url && !/^https?:\/\//.test(url)) { toast('URL は http(s):// で始めてください', true); return; }
       try {
         if (isNew) {
-          const maxSort = Math.max(0, ...allGroups.filter(x=>x.category===cat).map(x=>x.sort_order||0));
+          const maxSort = Math.max(0, ...allGroups.map(x => x.sort_order || 0));
           const { error } = await sb.from('line_groups').insert({
             category: cat, name, url: url || null, sort_order: maxSort + 10, is_active: true
           });
@@ -629,11 +781,10 @@
       });
       if (errors.length) { toast('入力エラー: ' + errors[0], true); return; }
       if (!parsed.length) { toast('有効な行がありません', true); return; }
-      const maxs = { store: 0, solo: 0 };
-      allGroups.forEach(g => { if ((g.sort_order||0) > maxs[g.category]) maxs[g.category] = g.sort_order||0; });
+      let base = Math.max(0, ...allGroups.map(g => g.sort_order || 0));
       const payload = parsed.map(p => ({
         ...p,
-        sort_order: (maxs[p.category] += 10),
+        sort_order: (base += 10),
         is_active: true
       }));
       try {
