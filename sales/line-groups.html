@@ -275,7 +275,7 @@
     <h1>💬 LINE グループ</h1>
     <div class="sub" id="head-sub">読み込み中…</div>
   </div>
-  <button class="auth-btn" id="auth-btn">ログイン</button>
+  <span style="width:52px"></span>
 </header>
 
 <div class="tabs">
@@ -287,8 +287,8 @@
   <div class="search-box">
     <input type="text" id="search" placeholder="グループ名で検索…">
   </div>
-  <button class="add-btn" id="add-btn" hidden>＋ 追加</button>
-  <button class="add-btn bulk" id="bulk-btn" hidden>📋 一括</button>
+  <button class="add-btn" id="add-btn">＋ 追加</button>
+  <button class="add-btn bulk" id="bulk-btn">📋 一括</button>
 </div>
 
 <div class="wrap">
@@ -305,11 +305,8 @@
   'use strict';
   const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
   const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
-  const ADMIN_PASSWORD = 'Edoyadepon1';
-  const ADMIN_TOKEN_KEY = 'sales-admin-token';
 
   const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-  let isAdmin = false;
   let allGroups = [];
   let currentCat = 'store';
   let searchQ = '';
@@ -323,42 +320,6 @@
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2200);
   };
-
-  // ---- Auth ----
-  function checkAuth(){
-    isAdmin = localStorage.getItem(ADMIN_TOKEN_KEY) === 'true';
-    const btn = $('auth-btn');
-    if (isAdmin) {
-      btn.textContent = '👤 管理者';
-      btn.classList.add('is-admin');
-      $('add-btn').hidden = false;
-      $('bulk-btn').hidden = false;
-    } else {
-      btn.textContent = 'ログイン';
-      btn.classList.remove('is-admin');
-      $('add-btn').hidden = true;
-      $('bulk-btn').hidden = true;
-    }
-    render();
-  }
-  $('auth-btn').addEventListener('click', () => {
-    if (isAdmin) {
-      if (!confirm('管理者からログアウトしますか？')) return;
-      localStorage.removeItem(ADMIN_TOKEN_KEY);
-      toast('ログアウトしました');
-      checkAuth();
-    } else {
-      const pw = prompt('管理者パスワードを入力してください');
-      if (pw == null) return;
-      if (pw === ADMIN_PASSWORD) {
-        localStorage.setItem(ADMIN_TOKEN_KEY, 'true');
-        toast('管理者ログイン');
-        checkAuth();
-      } else {
-        toast('パスワードが違います', true);
-      }
-    }
-  });
 
   // ---- タブ ----
   document.querySelectorAll('.tab').forEach(t => {
@@ -409,13 +370,13 @@
       const isSearch = !!searchQ;
       grid.innerHTML = `<div class="empty">
         ${isSearch ? '「'+esc(searchQ)+'」に一致するグループがありません' : 'まだ登録がありません'}
-        ${isAdmin && !isSearch ? '<div class="empty-hint">右上「＋ 追加」または「📋 一括」から登録できます</div>' : ''}
+        ${!isSearch ? '<div class="empty-hint">上の「＋ 追加」または「📋 一括」から登録できます</div>' : ''}
       </div>`;
       return;
     }
     grid.innerHTML = rows.map(g => {
       const hasUrl = !!(g.url && g.url.trim());
-      const cls = 'card ' + (hasUrl ? 'active' : 'inactive') + (isAdmin ? ' is-admin-view' : '');
+      const cls = 'card ' + (hasUrl ? 'active' : 'inactive') + ' is-admin-view';
       const tag = hasUrl ? 'a' : 'div';
       const attrs = hasUrl
         ? `href="${esc(g.url)}" target="_blank" rel="noopener noreferrer"`
@@ -423,11 +384,11 @@
       const status = hasUrl
         ? `<span class="status">開く<span class="arrow">→</span></span>`
         : `<span class="status">未設定</span>`;
-      const menu = isAdmin ? `
+      const menu = `
         <div class="card-menu">
           <button data-act="edit" data-id="${g.id}" title="URL 編集">✏️</button>
           <button class="danger" data-act="delete" data-id="${g.id}" title="削除">🗑</button>
-        </div>` : '';
+        </div>`;
       return `<${tag} class="${cls}" ${attrs}>
         ${menu}
         <div class="name">${esc(g.name)}</div>
@@ -594,7 +555,6 @@
     }
   }
 
-  checkAuth();
   load();
 })();
 </script>
