@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v478';
+const APP_VERSION = 'v479';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -5444,6 +5444,12 @@ function setupPullRefresh() {
 }
 
 function switchView(view) {
+  // v479: view 切替前に pending saves を強制 flush する。
+  //   例: パラ管理で grams 入力 → 500ms 以内に管理タブへ切替 → タブが消えて
+  //   タイマーは残るが対象 DOM が非表示になり、また bookingsData 再ロード等で
+  //   古い値上書きの race を招く。先に flush して確定させる。
+  try { if (typeof _flushParaSaveTimers === 'function') _flushParaSaveTimers(); } catch(_){}
+  try { if (typeof flushFollowupMetaSync === 'function') flushFollowupMetaSync(); } catch(_){}
   currentView = view;
   document.querySelectorAll('.desktop-nav .nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
   document.querySelectorAll('.bottom-nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
@@ -6944,10 +6950,18 @@ async function saveDocument() {
   const name = document.getElementById('doc-name').value.trim();
   const url = document.getElementById('doc-url').value.trim();
   if (!name || !url) return;
-  await sb.from('documents').insert({
+  // v479: {error} 未チェック → RLS ブロックで INSERT 失敗しても
+  //   「資料を登録しました」トースト → UI からのみキャッシュで見え、
+  //   次回リロードで消える誤誘導
+  const { error } = await sb.from('documents').insert({
     name, type: document.getElementById('doc-type').value,
     clinic: document.getElementById('doc-clinic').value.trim(), url
   });
+  if (error) {
+    console.error('saveDocument failed', error);
+    showToast('❌ 資料登録失敗: ' + error.message, true);
+    return;
+  }
   document.getElementById('doc-modal').hidden = true;
   showToast('資料を登録しました');
   renderDocuments();
@@ -6956,7 +6970,13 @@ async function saveDocument() {
 
 async function deleteDocument(id) {
   if (!confirm('この資料を削除しますか？')) return;
-  await sb.from('documents').delete().eq('id', id);
+  // v479: {error} 未チェック → RLS ブロックで DB に残ったまま UI からのみ消える
+  const { error } = await sb.from('documents').delete().eq('id', id);
+  if (error) {
+    console.error('deleteDocument failed', error);
+    showToast('❌ 削除失敗: ' + error.message, true);
+    return;
+  }
   showToast('資料を削除しました');
   renderDocuments();
   renderClinicDocs();
@@ -16377,12 +16397,21 @@ async function saveRecording() {
 async function deleteRecording(id) {
   if (!confirm('この録音記録を削除しますか？')) return;
   const rec = recordingsCache.find(r => r.id === id);
-  await sb.from('self_recordings').delete().eq('id', id);
+  // v479: {error} 未チェック → RLS ブロックで self_recordings.delete 失敗しても
+  //   「削除しました」トーストが出て UI から消えるが DB に残る
+  //   ＋ Storage ファイルもオーファンで残り続けストレージ課金増
+  const { error: dbErr } = await sb.from('self_recordings').delete().eq('id', id);
+  if (dbErr) {
+    console.error('deleteRecording DB failed', dbErr);
+    showToast('❌ 削除失敗: ' + dbErr.message, true);
+    return;  // Storage 削除もスキップ (DB が失敗した以上、ファイル削除は保留)
+  }
   // Storageからも削除 (URLに /recordings/ が含まれる場合)
   if (rec && rec.url && rec.url.includes('/recordings/')) {
     try {
       const fileName = rec.url.split('/recordings/')[1].split('?')[0];
-      await sb.storage.from('recordings').remove([fileName]);
+      const { error: stErr } = await sb.storage.from('recordings').remove([fileName]);
+      if (stErr) console.warn('storage delete failed (DB record already gone)', stErr);
     } catch(e) { console.warn('storage delete skipped', e); }
   }
   showToast('削除しました');
