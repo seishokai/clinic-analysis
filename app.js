@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v473';
+const APP_VERSION = 'v474';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -914,10 +914,36 @@ let patientsFacility = '全体';
 let reviewsFacility = '全体';
 
 // === Storage helpers ===
-function loadData(key, fallback) { try { return JSON.parse(localStorage.getItem(key)) || fallback; } catch { return fallback; } }
+// v474: loadData の `|| fallback` は 0 / false / '' / null など「正当な falsy 値」も
+//       fallback に置換してしまいデータ消失の原因になっていた。null チェックに修正。
+function loadData(key, fallback) {
+  try {
+    const v = localStorage.getItem(key);
+    return v == null ? fallback : JSON.parse(v);
+  } catch {
+    return fallback;
+  }
+}
+// v474: saveData に try/catch + Quota 対策。以前は QuotaExceededError で
+//       静かにクラッシュし、書き込みが `/dev/null` に消えていた。
 function saveData(key, data) {
-  localStorage.setItem(key, JSON.stringify(data));
-  if (key === 'bk-memos') invalidateMemoIndex();
+  const write = () => {
+    localStorage.setItem(key, JSON.stringify(data));
+    if (key === 'bk-memos') invalidateMemoIndex();
+  };
+  try { write(); }
+  catch (e) {
+    if (e && (e.name === 'QuotaExceededError' || e.code === 22 || e.code === 1014)) {
+      // 容量超過: 巨大な低優先キャッシュを削除して再試行
+      const evictable = ['self-recordings-backup','last-backup-file','bk-quick-promo-hidden-cache'];
+      for (const k of evictable) { try { localStorage.removeItem(k); } catch(_){} }
+      try { write(); console.warn('saveData: recovered by evicting caches for', key); return; } catch(_){}
+    }
+    console.error('saveData failed', key, e);
+    try {
+      if (typeof showToast === 'function') showToast('保存に失敗しました (容量不足の可能性): ' + (e && e.message || e), true);
+    } catch(_){}
+  }
 }
 
 // 速度対策: 行ごとのメモ全探索/日付parseを避けるための軽量キャッシュ
@@ -926,6 +952,21 @@ function invalidateMemoIndex() { _memoIndexCache = null; }
 try {
   window.addEventListener('storage', (e) => {
     if (e.key === 'bk-memos') invalidateMemoIndex();
+    // v474: 他タブから bk-extra が変更されたら再描画で反映
+    if (e.key === 'bk-extra' && typeof syncCrossTabRender === 'function') {
+      try { syncCrossTabRender(); } catch(_){}
+    }
+  });
+  // v474: タブ閉じ / モバイル bfcache 遷移 前に pending debounce を強制 flush
+  const _flushAllPending = () => {
+    try { if (typeof flushFollowupMetaSync === 'function') flushFollowupMetaSync(); } catch(_){}
+    // scheduleParaSave のタイマー強制発火 (存在する場合)
+    try { if (typeof _flushParaSaveTimers === 'function') _flushParaSaveTimers(); } catch(_){}
+  };
+  window.addEventListener('beforeunload', _flushAllPending);
+  window.addEventListener('pagehide', _flushAllPending);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') _flushAllPending();
   });
 } catch(_) {}
 function _putMemoIndex(byName, byKey, name, apply, memo) {
@@ -1176,6 +1217,25 @@ async function logout() {
   // v267 セッションタイムアウト解除
   _clearSessionTimeout();
   try { localStorage.removeItem(ACTIVITY_KEY); } catch(_){}
+  // v474: 次ユーザーが前ユーザーの契約金額・メモ・録音メタを見えないようクリア (プライバシー保護)
+  //       同じブラウザで別アカウントログイン時、bk-extra 等が残っていて別人のデータが混ざる事故を防ぐ。
+  try {
+    const KEYS_TO_CLEAR = [
+      'bk-extra', 'bk-memos', 'bk-pins',
+      'bk-quick-promo-hidden', 'bk-quick-promo-custom', 'bk-quick-promo-hidden-cache',
+      'strategy-notes', 'save-queue-v1',
+      'self-recordings-backup', 'last-backup-at', 'last-backup-file',
+      'customPromos', 'customServices', 'customFacilities',
+    ];
+    KEYS_TO_CLEAR.forEach(k => { try { localStorage.removeItem(k); } catch(_){} });
+    // メモリキャッシュもクリアして次ユーザーに残らないよう
+    try { if (typeof bookingsData !== 'undefined') bookingsData.length = 0; } catch(_){}
+    try { if (typeof bfLifecycleCache !== 'undefined') bfLifecycleCache = {}; } catch(_){}
+    try { if (typeof bfHistoryCache !== 'undefined') bfHistoryCache = {}; } catch(_){}
+    try { if (typeof promoRatesCache !== 'undefined') promoRatesCache = {}; } catch(_){}
+    try { if (typeof recordingsCache !== 'undefined') recordingsCache.length = 0; } catch(_){}
+    if (typeof invalidateMemoIndex === 'function') invalidateMemoIndex();
+  } catch(_){}
   sessionStorage.clear();
   userRole = 'admin';
   promoFilter = '';
@@ -8068,10 +8128,18 @@ function renderBookings() {
     // 追加フィールド（成約施術・金額・入金月・インセ月）のイベント
     const bkExtra = _bkExtra;
     const saveExtra = (name, apply, field, value) => {
+      // v474: closure snapshot clobber 対策 — 常に localStorage から最新を読み込み、
+      //       他タブ/他ハンドラの変更を保持したまま自分の変更だけ追加。
+      //       以前は renderBookings 時点の _bkExtra を書き戻していて、
+      //       レンダ後に別ハンドラ (quickSetBookingStatus 等) が書いた変更が消えていた。
+      const fresh = loadData('bk-extra', {});
       const key = name + '|' + apply;
+      if (!fresh[key]) fresh[key] = {};
+      fresh[key][field] = value;
+      saveData('bk-extra', fresh);
+      // クロージャの表示用スナップショットも同期して、後続の select 表示等でズレないよう
       if (!bkExtra[key]) bkExtra[key] = {};
       bkExtra[key][field] = value;
-      saveData('bk-extra', bkExtra);
       // DBにも保存
       const dbField = field === 'contractService' ? 'contract_service' : field === 'contractAmount' ? 'contract_amount' : field === 'paymentMonth' ? 'payment_month' : field === 'incentiveAmount' ? 'incentive_amount' : 'incentive_month';
       const update = { name, apply_date: apply };
@@ -12355,10 +12423,16 @@ function renderBFBookings(allBFData) {
     // 追加フィールド
     const bkExtraLocal = loadData('bk-extra', {});
     const saveExtraBF = (name, apply, field, value) => {
+      // v474: BF タブも closure snapshot による他タブ書き込み消失を修正
+      //       毎回 localStorage から最新を読んで自分の変更だけ追加する
+      const fresh = loadData('bk-extra', {});
       const key = name+'|'+apply;
+      if (!fresh[key]) fresh[key] = {};
+      fresh[key][field] = value;
+      saveData('bk-extra', fresh);
+      // 表示用スナップショットも同期
       if (!bkExtraLocal[key]) bkExtraLocal[key] = {};
       bkExtraLocal[key][field] = value;
-      saveData('bk-extra', bkExtraLocal);
       const dbField = field==='contractService'?'contract_service':field==='contractAmount'?'contract_amount':field==='paymentMonth'?'payment_month':field==='incentiveAmount'?'incentive_amount':'incentive_month';
       const update = { name, apply_date: apply };
       update[dbField] = field==='contractAmount'||field==='incentiveAmount' ? Number(value)||0 : value;
