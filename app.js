@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v475';
+const APP_VERSION = 'v476';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8595,7 +8595,17 @@ function closeMemoModal() {
 }
 async function saveMemoModal() {
   if (!_memoTarget) return;
+  // v476: 二重保存ガード — 保存ボタン連打で 2 回 upsert が走るのを防ぐ。
+  //   in-flight 中はボタンを disabled にし、await 完了後に解除。
+  //   Enter キーの重複押下もこれで防げる。
+  const saveBtn = document.getElementById('memo-modal-save') || document.querySelector('.memo-modal-save-btn');
+  if (saveBtn) {
+    if (saveBtn.disabled) return; // 既に処理中
+    saveBtn.disabled = true;
+  }
   const val = document.getElementById('memo-modal-text').value.trim();
+  // v476: bk-memos は cross-tab で並行編集される可能性があるため、
+  //   毎回 localStorage から最新を再読込 (旧: closure snapshot で他タブ更新を消していた)
   const memos = loadData('bk-memos', {});
   if (val) {
     memos[_memoTarget.key] = val;
@@ -8633,6 +8643,8 @@ async function saveMemoModal() {
   // メモ索引キャッシュを無効化 (findMemoForBooking が次回最新を返すように)
   if (typeof invalidateMemoIndex === 'function') invalidateMemoIndex();
   showToast(val ? 'メモを保存しました' : 'メモを削除しました');
+  // v476: 保存ボタンの disabled 解除
+  if (saveBtn) saveBtn.disabled = false;
   closeMemoModal();
   // v454: 予約・来院・電話前確認・追いかけ等、現在表示中のサブタブを再描画
   //   ← これがないとメモ編集が他タブに即座に反映されない
@@ -9761,7 +9773,29 @@ async function editPatientName(oldName, applyDate, newName, bfRows) {
       options: { onConflict:'name,apply_date' }
     });
     // manual_bookings は手動登録(DXHUB起源ではない)なので従来どおり name 直接更新でOK
-    await sb.from('manual_bookings').update({ name: newName }).eq('name', oldName).eq('apply_date', applyDate).catch(()=>{});
+    // v476: 以前は .catch(()=>{}) でエラー握り潰し → RLS/ネットワーク失敗で
+    //   DB 側の名前が変わらず、次回 loadBookings で旧名復活 → 何度直しても戻る。
+    //   supabase-js v2 は失敗時に error プロパティを返すだけで throw しないので
+    //   {error} を明示的に確認し、失敗時は safeSave キューに乗せて後で再送する。
+    try {
+      const { error: mbErr } = await sb.from('manual_bookings')
+        .update({ name: newName })
+        .eq('name', oldName)
+        .eq('apply_date', applyDate);
+      if (mbErr) {
+        console.warn('manual_bookings name update failed, enqueuing retry', mbErr);
+        // safeSave 経由でオフラインキューに載せる
+        try {
+          await safeSave({
+            type:'update', table:'manual_bookings',
+            payload: { name: newName },
+            match: { name: oldName, apply_date: applyDate }
+          });
+        } catch(_){}
+      }
+    } catch(e) {
+      console.warn('manual_bookings name update threw', e);
+    }
 
     // bfLifecycleCache は oldName キーのままで表示用 name のみ更新
     //   (cache の key=oldName で DB と一貫し、d.name=newName で表示)
@@ -11943,16 +11977,37 @@ function drawKaiinRows(treatment, rows, container) {
     inp.addEventListener('change', async () => {
       const name = inp.dataset.name; const apply = inp.dataset.apply;
       const v = inp.value.trim();
-      // manual_bookings を更新
+      // v476: supabase-js v2 は失敗時 throw せず {error} を返す。
+      //   try/catch は RLS/バリデーション失敗を検知できず「保存しました」toast が出て
+      //   実際は DB に保存されていない → 次回リロードで元の source に戻る典型パターン。
+      //   {error} を明示チェック + safeSave フォールバック。
       try {
-        await sb.from('manual_bookings').update({ source: v || null }).eq('name', name).eq('apply_date', apply);
-        // bookingsDataにも反映
+        const { error } = await sb.from('manual_bookings')
+          .update({ source: v || null })
+          .eq('name', name)
+          .eq('apply_date', apply);
+        if (error) throw error;
+        // bookingsData にも反映
         const d = bookingsData.find(b => b.name === name && b.applyDate === apply);
         if (d) d.source = v;
         inp.style.borderColor = '#0a0';
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
         showToast('プロモを保存しました');
-      } catch(e) { showToast('保存エラー: ' + e.message, true); }
+      } catch(e) {
+        console.warn('manual_bookings source update failed, enqueuing retry', e);
+        // 失敗時はキュー再送 + ユーザに明示
+        try {
+          await safeSave({
+            type:'update', table:'manual_bookings',
+            payload: { source: v || null },
+            match: { name, apply_date: apply }
+          });
+          showToast('プロモを保存 (通信不安定のため再送予定)', true);
+        } catch(_){
+          showToast('保存失敗: ' + (e?.message || e), true);
+          inp.style.borderColor = 'var(--red)';
+        }
+      }
     });
     inp.addEventListener('click', e => e.stopPropagation());
   });
