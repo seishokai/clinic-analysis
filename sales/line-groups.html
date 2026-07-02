@@ -474,6 +474,8 @@
         const g = allGroups.find(x => x.id === u.id);
         if (g) g.sort_order = u.sort_order;
       });
+      // v6.1 バグ修正: ローカル配列も並び替えないと render() で元の順に戻る
+      allGroups.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
       toast('順番を保存しました');
     } catch(e){
       toast('並替保存失敗: ' + (e.message||e), true);
