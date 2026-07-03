@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v481';
+const APP_VERSION = 'v482';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -13538,7 +13538,9 @@ async function renderBugReportList() {
   const filter = document.getElementById('bug-filter-status')?.value || 'open';
   container.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text-sub)">読み込み中…</div>';
   try {
-    let q = sb.from('admin_bug_reports').select('*').order('created_at', { ascending: false }).limit(100);
+    // v482: 解決履歴は resolved_at DESC でソートして「最近直したもの順」に
+    const sortCol = filter === '解決' ? 'resolved_at' : 'created_at';
+    let q = sb.from('admin_bug_reports').select('*').order(sortCol, { ascending: false, nullsFirst: false }).limit(200);
     if (filter === 'open') q = q.in('status', ['未対応','対応中','保留']);
     else if (filter !== 'all') q = q.eq('status', filter);
     const { data, error } = await q;
@@ -13547,17 +13549,43 @@ async function renderBugReportList() {
       container.innerHTML = '<div style="padding:24px;text-align:center;color:var(--text-muted)">該当なし ✨</div>';
       return;
     }
-    container.innerHTML = data.map(r => _bugRowHtml(r)).join('');
+    // 履歴カウンター (解決履歴ビュー時のみ)
+    const headerHtml = filter === '解決'
+      ? `<div style="padding:8px 12px;margin-bottom:8px;background:#dcfce7;border:1px solid #86efac;border-radius:6px;font-size:12px;color:#15803d;font-weight:600">✅ 解決済み ${data.length}件 (直近の修正順)</div>`
+      : '';
+    container.innerHTML = headerHtml + data.map(r => _bugRowHtml(r)).join('');
     container.querySelectorAll('.bug-status-sel').forEach(sel => {
+      const originalStatus = sel.value;
       sel.addEventListener('change', async () => {
         const id = sel.dataset.id;
         const newStatus = sel.value;
+        // v482: 解決 に変更する時は修正内容メモを prompt (後で履歴で見返せる)
+        //   キャンセルされたら元の状態に戻す。
+        let resolutionNote = null;
+        if (newStatus === '解決' && originalStatus !== '解決') {
+          const existing = data.find(x => x.id === id)?.resolution_note || '';
+          resolutionNote = prompt(
+            '✅ 修正内容メモ (履歴で表示されます)\n例: v481 で debounce 追加、原因は毎キー入力で全件再描画',
+            existing
+          );
+          if (resolutionNote === null) {
+            sel.value = originalStatus;  // キャンセル → 変更しない
+            return;
+          }
+        }
         try {
-          const { error } = await sb.from('admin_bug_reports').update({ status: newStatus }).eq('id', id);
+          const patch = { status: newStatus };
+          if (resolutionNote !== null) patch.resolution_note = resolutionNote.trim() || null;
+          // 解決 → 別状態 に戻す場合は resolution_note は保持 (履歴として残す)
+          const { error } = await sb.from('admin_bug_reports').update(patch).eq('id', id);
           if (error) throw error;
           showToast('状態を「' + newStatus + '」に変更');
           renderBugReportList();
-        } catch (e) { showToast('更新失敗', true); }
+        } catch (e) {
+          console.error(e);
+          showToast('更新失敗: ' + (e?.message||e), true);
+          sel.value = originalStatus;
+        }
       });
     });
     container.querySelectorAll('.bug-view-detail').forEach(btn => {
@@ -13581,18 +13609,29 @@ function _bugRowHtml(r) {
   const dt = new Date(r.created_at);
   const dateStr = `${dt.getMonth()+1}/${dt.getDate()} ${String(dt.getHours()).padStart(2,'0')}:${String(dt.getMinutes()).padStart(2,'0')}`;
   const stOpts = ['未対応','対応中','解決','保留','却下'].map(s => `<option ${s===r.status?'selected':''}>${s}</option>`).join('');
+  // v482: 解決済みなら緑基調 + 解決日 + 修正メモ preview で「履歴」感を強化
+  const isResolved = r.status === '解決';
+  const rowBg = isResolved ? '#f0fdf4' : '#fff';
+  const rowBorder = isResolved ? '#86efac' : '#e5e7eb';
+  let resolvedStr = '';
+  if (isResolved && r.resolved_at) {
+    const rd = new Date(r.resolved_at);
+    resolvedStr = `${rd.getFullYear()}/${String(rd.getMonth()+1).padStart(2,'0')}/${String(rd.getDate()).padStart(2,'0')} ${String(rd.getHours()).padStart(2,'0')}:${String(rd.getMinutes()).padStart(2,'0')}`;
+  }
   return `
-    <div style="border:1px solid #e5e7eb;border-radius:8px;padding:12px;margin-bottom:8px;background:#fff">
+    <div style="border:1px solid ${rowBorder};border-radius:8px;padding:12px;margin-bottom:8px;background:${rowBg}">
       <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap">
         <div style="flex:1;min-width:250px">
           <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:4px">
             <span style="background:${p.bg};color:${p.color};font-size:10px;font-weight:700;padding:2px 8px;border-radius:10px">${p.icon} ${escapeHtml(r.priority)}</span>
             ${r.screen ? `<span style="background:#e0e7ff;color:#3730a3;font-size:10px;font-weight:600;padding:2px 8px;border-radius:10px">${escapeHtml(r.screen)}</span>` : ''}
-            <span style="font-size:10px;color:#9ca3af">${escapeHtml(dateStr)}</span>
+            <span style="font-size:10px;color:#9ca3af">📝 ${escapeHtml(dateStr)}</span>
+            ${isResolved && resolvedStr ? `<span style="font-size:10px;color:#059669;font-weight:700">✓ ${escapeHtml(resolvedStr)}</span>` : ''}
             ${r.reporter_name ? `<span style="font-size:10px;color:#6b7280">by ${escapeHtml(r.reporter_name)}</span>` : ''}
           </div>
-          <div style="font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:4px">${escapeHtml(r.title)}</div>
+          <div style="font-size:14px;font-weight:700;color:#1a1a1a;margin-bottom:4px">${isResolved ? '<span style="color:#059669;margin-right:4px">✅</span>' : ''}${escapeHtml(r.title)}</div>
           <div style="font-size:12px;color:#6b7280;line-height:1.5;max-height:60px;overflow:hidden">${escapeHtml((r.description||'').slice(0,200))}${r.description && r.description.length>200?'…':''}</div>
+          ${isResolved && r.resolution_note ? `<div style="margin-top:6px;padding:6px 10px;background:#dcfce7;border-left:3px solid #059669;border-radius:4px;font-size:11px;color:#14532d;line-height:1.5"><b style="color:#059669">🔧 修正内容:</b> ${escapeHtml(r.resolution_note.slice(0,200))}${r.resolution_note.length>200?'…':''}</div>` : ''}
         </div>
         <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;min-width:140px">
           <select class="form-select bug-status-sel" data-id="${r.id}" style="font-size:11px;padding:4px 8px;min-height:28px;color:${sColor};font-weight:700">${stOpts}</select>
