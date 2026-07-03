@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v479';
+const APP_VERSION = 'v480';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2777,10 +2777,20 @@ function setupEventListeners() {
   document.getElementById('save-notes').addEventListener('click', async () => {
     const val = document.getElementById('strategy-notes').value;
     localStorage.setItem('strategy-notes', val);
-    await sb.from('reviews').upsert({ id: 99999, facility: '_notes_', month: 'strategy', count: 0, rating: 0 }, { onConflict: 'id' }).catch(() => {});
-    // reviewsテーブルのmemo的な使い方は避け、booking_statusに保存
-    await sb.from('booking_status').upsert({ name: '__strategy_notes__', apply_date: '__notes__', memo: val }, { onConflict: 'name,apply_date' }).catch(() => {});
-    showToast('戦略ノートを保存しました');
+    // v480: 以前は .catch(()=>{}) で silent 失敗 → localStorage には残るが
+    //   Supabase には無く、他管理者は永久に古いまま。
+    //   reviews テーブルへの dummy upsert は不要 (レガシー) なので削除、
+    //   booking_status へ safeSave 経由に統一して失敗時 retry キューへ。
+    const res = await safeSave({
+      type: 'upsert', table: 'booking_status',
+      payload: { name: '__strategy_notes__', apply_date: '__notes__', memo: val },
+      options: { onConflict: 'name,apply_date' }
+    });
+    if (res && res.ok === false) {
+      showToast('⚠ 戦略ノート保存失敗 — 再送信キューに登録', true);
+    } else {
+      showToast('戦略ノートを保存しました');
+    }
   });
   // ノート読み込み（DB優先）
   sb.from('booking_status').select('memo').eq('name', '__strategy_notes__').eq('apply_date', '__notes__').then(({ data }) => {
@@ -4689,29 +4699,46 @@ function renderPhoneCheck() {
   }
   // 一括処理ボタン
   el.querySelectorAll('.phone-bulk-btn').forEach(btn => {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       const newStatus = btn.dataset.st;
       const keys = Array.from(_phoneSelected);
       if (keys.length === 0) return;
       btn.disabled = true; const orig = btn.textContent; btn.textContent = '処理中…';
-      let ok = 0;
-      const saves = [];
-      for (const key of keys) {
-        const [name, apply] = key.split('|');
-        try {
-          const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
-          if (match) match.status = newStatus;
-          saves.push(safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } }));
-          ok++;
-        } catch(_){}
-      }
-      Promise.all(saves).then(results => {
-        if (results.some(r => r && r.ok === false)) showToast('⚠ 一部保存を再送信キューに入れました', true);
+      // v480: 以前は save 完了前に「N件を一括更新」トーストが出て、部分失敗の
+      //   警告が後追いで来て見逃されがち。また failed 行の楽観 UI 更新
+      //   (match.status = newStatus) がロールバックされず、DB は元の値のまま
+      //   UI だけ変わるという乖離状態が持続。
+      //   → async 化して await 完了、失敗した key は match.status を元に戻す。
+      const targets = keys.map(k => {
+        const [name, apply] = k.split('|');
+        const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
+        return { key: k, name, apply, match, prevStatus: match ? match.status : null };
+      }).filter(t => t.match);
+      // 楽観 UI 更新
+      targets.forEach(t => { t.match.status = newStatus; });
+      // 並列保存 + 結果集計
+      const results = await Promise.all(targets.map(t => safeSave({
+        type: 'upsert', table: 'booking_status',
+        payload: { name: t.name, apply_date: t.apply, status: newStatus },
+        options: { onConflict: 'name,apply_date' }
+      })));
+      // 失敗行は楽観 UI 更新をロールバック
+      let failedCount = 0;
+      results.forEach((r, i) => {
+        if (r && r.ok === false) {
+          targets[i].match.status = targets[i].prevStatus;
+          failedCount++;
+        }
       });
       btn.textContent = orig;
       btn.disabled = false;
       _phoneSelected.clear();
-      showToast(`✅ ${ok}件を「${newStatus}」に一括更新`);
+      const successCount = targets.length - failedCount;
+      if (failedCount) {
+        showToast(`⚠ ${successCount}件更新 / ${failedCount}件失敗 (キュー登録)`, true);
+      } else {
+        showToast(`✅ ${successCount}件を「${newStatus}」に一括更新`);
+      }
       renderPhoneCheck();
       updateHeaderBadge();
     });
@@ -16205,6 +16232,11 @@ async function savePromoRate() {
   await loadPromoRates();
   if (typeof bookingsData !== 'undefined' && bookingsData.length) {
     const bkEx = loadData('bk-extra', {});
+    // v480: 以前は forEach 内で unawaited IIFE を大量に飛ばしてブラウザ側の
+    //   並列 fetch 上限で drop したり、ネットワーク失敗時に何件失敗したか
+    //   分からず「N件のインセを再計算」と表示だけ出ていた。
+    //   Promise.allSettled で並列制御 + 失敗数を集計してユーザに正確に通知。
+    const savePromises = [];
     let recalc = 0;
     bookingsData.forEach(d => {
       if ((d.source||'').trim() !== code) return;
@@ -16217,17 +16249,25 @@ async function savePromoRate() {
           if (!bkEx[key]) bkEx[key] = {};
           bkEx[key].incentiveAmount = inc;
           d.incentiveAmount = inc;
-          (async () => {
-            const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
-            if (res && res.ok === false) console.warn('promo incentive queued', d.name);
-          })();
+          savePromises.push(safeSave({
+            type: 'upsert', table: 'booking_status',
+            payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc },
+            options: { onConflict: 'name,apply_date' }
+          }));
           recalc++;
         }
       }
     });
     if (recalc) saveData('bk-extra', bkEx);
+    // 全 upsert 完了待ち + 失敗集計
+    const results = await Promise.all(savePromises);
+    const failed = results.filter(r => r && r.ok === false).length;
     if (typeof renderBookings === 'function') renderBookings();
-    showToast(`プロモ率を保存しました (${recalc}件のインセを再計算)`);
+    if (failed) {
+      showToast(`⚠ プロモ率保存: ${recalc}件のうち ${failed}件が再送信キュー`, true);
+    } else {
+      showToast(`プロモ率を保存しました (${recalc}件のインセを再計算)`);
+    }
   } else {
     showToast('プロモ率を保存しました');
   }
@@ -16236,7 +16276,13 @@ async function savePromoRate() {
 
 async function deletePromoRate(code) {
   if (!confirm(code + ' のインセ率を削除しますか？')) return;
-  await sb.from('promo_rates').delete().eq('promo_code', code);
+  // v480: {error} 未チェック
+  const { error } = await sb.from('promo_rates').delete().eq('promo_code', code);
+  if (error) {
+    console.error('deletePromoRate failed', error);
+    showToast('❌ 削除失敗: ' + error.message, true);
+    return;
+  }
   showToast('削除しました');
   renderPromoRates();
 }
