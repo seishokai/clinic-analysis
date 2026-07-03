@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v480';
+const APP_VERSION = 'v481';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11460,7 +11460,15 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
   // フィルターイベント (topbar は page-header に移動済み → 親 sub-kaiin-* から取る)
   const filterScope = el.closest('[id^="sub-kaiin-"]') || el;
   filterScope.querySelector('.kaiin-filter-fac')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
-  filterScope.querySelector('.kaiin-filter-search')?.addEventListener('input', () => drawKaiinRows(treatment, rows, el));
+  // v481: 修正依頼 (足立TC): 「来院タブ→名前検索する際に入力が途中で打てなくなる」
+  //   数百件を innerHTML 再生成する drawKaiinRows を毎キーストロークで同期実行 →
+  //   ブラウザが input イベント処理を間に合わせられず後続キーが drop される
+  //   (特にスマホ/遅いマシンで顕著)。300ms debounce で連続入力を確定してから
+  //   1 回だけ再描画するよう修正。
+  filterScope.querySelector('.kaiin-filter-search')?.addEventListener('input', () => {
+    clearTimeout(el._searchTimer);
+    el._searchTimer = setTimeout(() => drawKaiinRows(treatment, rows, el), 300);
+  });
   filterScope.querySelector('.kaiin-filter-period')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   filterScope.querySelector('.kaiin-sort')?.addEventListener('change', () => drawKaiinRows(treatment, rows, el));
   // v422: 売上ありトグル
