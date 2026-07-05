@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v494';
+const APP_VERSION = 'v495';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9167,7 +9167,8 @@ function searchPatients() {
     return;
   }
 
-  let results = bookingsData;
+  // v495: agency (プロモ制限) 対応。他プロモの患者を検索結果に混ぜない。
+  let results = (typeof getFilteredBookingsData === 'function') ? getFilteredBookingsData() : bookingsData;
   if (sName) results = results.filter(d => d.name && d.name.toLowerCase().includes(sName));
   if (sPhone) results = results.filter(d => d.phone && String(d.phone).replace(/[-\s]/g, '').includes(sPhone));
   if (sEmail) results = results.filter(d => d.email && d.email.toLowerCase().includes(sEmail));
@@ -12710,7 +12711,9 @@ function renderApplyAnalysis(period) {
   const svcOf = (d) => (typeof getTreatmentCategory === 'function' ? getTreatmentCategory(d) : 'その他');
   const facOf = (d) => (typeof normFac === 'function' ? (normFac(d.facility) || '未設定') : (d.facility || '未設定'));
 
-  let data = bookingsData.filter(d => d.status !== '除外');
+  // v495: agency (プロモ制限) 対応。他プロモの申込を集計に混ぜない。
+  const _baseBk = (typeof getFilteredBookingsData === 'function') ? getFilteredBookingsData() : bookingsData;
+  let data = (_baseBk || []).filter(d => d.status !== '除外');
 
   // 期間フィルター（申込日ベース）
   const now = new Date();
