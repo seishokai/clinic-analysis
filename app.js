@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v491';
+const APP_VERSION = 'v492';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1948,8 +1948,10 @@ function getFilteredBookingsData() {
 }
 function _hasPromoRestriction() {
   if (currentRole === 'admin') return false;
-  // v273: agency ロールも全予約・来店を表示 (PIIマスクは継続)
-  if (currentRole === 'agency') return false;
+  // v491: agency は allowed_promos による厳格フィルタを常に適用
+  //       (v273 で「PIIマスクすれば全件OK」としていたが、NinNin_afi 代理店の
+  //        要求により漏洩防止のため撤回。他プロモの予約は絶対に見せない)
+  if (currentRole === 'agency') return true;
   if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
     return !currentAllowedPromos.includes('%');
   }
