@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v492';
+const APP_VERSION = 'v493';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1989,21 +1989,33 @@ function applyRoleUI() {
   // admin は visible_tabs を無視して全タブ表示 (絶対条件)
   if (admin) return;
 
-  // visible_tabs が取れていない場合はロール既定にフォールバック (既存互換)
-  // v292: agency にも analytics を見せる (デフォルト)
+  // v493: agency はホワイトリスト方式に強制切替
+  //   従来は promo/dashboard/followup タブが visible_tabs 未定義のまま
+  //   デフォルト表示されていて集計値経由でデータが漏れていた。
+  //   以後 agency は home / bookings / kaiin のみ、しかも vt で明示 true が必要。
   const vt = (currentVisibleTabs && typeof currentVisibleTabs === 'object')
     ? currentVisibleTabs
     : (isAgencyRole()
-        ? { bookings: true, kaiin: true,  analytics: true,  tc: false, sales: false, adbudget: false, admin: false }
-        : { bookings: true, kaiin: true,  analytics: true,  tc: false, sales: false, adbudget: false, admin: false });
+        ? { home: true, bookings: true, kaiin: true }
+        : { home: true, bookings: true, kaiin: true, monshin: true });
+
+  const agencyAllowlist = new Set(['home', 'bookings', 'kaiin']);
 
   document.querySelectorAll('.desktop-nav .nav-btn, .bottom-nav-btn').forEach(b => {
     const v = b.dataset.view;
     if (!v) return;
-    // visible_tabs に明示的に false がある場合は確実に非表示
+
+    // agency: ホワイトリスト外は必ず非表示
+    if (isAgencyRole()) {
+      if (!agencyAllowlist.has(v) || vt[v] !== true) {
+        b.style.display = 'none';
+      }
+      return;
+    }
+
+    // staff_promo など: 既存挙動を維持
     if (vt[v] === false) { b.style.display = 'none'; return; }
-    // true でも false でもないキー (未定義) は、危険タブを安全側で非表示
-    if (vt[v] !== true && ['tc','sales','adbudget','admin'].includes(v)) {
+    if (vt[v] !== true && ['tc','sales','adbudget','admin','dashboard','promo','followup'].includes(v)) {
       b.style.display = 'none';
     }
   });
