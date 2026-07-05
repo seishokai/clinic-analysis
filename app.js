@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v496';
+const APP_VERSION = 'v497';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2020,19 +2020,22 @@ function applyRoleUI() {
     }
   });
 
-  // v496: 予約タブ内サブナビも agency 向けに厳選
-  //   代理店は自分のプロモ経由の患者だけ見たいので、以下は非表示:
-  //   - 📅 予約枠確認 (医院運用の空き枠情報。代理店には無関係)
-  //   - 医院別タブ (BF銀座/エスカ/… 全 11 個)。プロモ経由患者だけ見せたい
-  //   後日 visible_sub_tabs のような仕組みを入れるまでの暫定措置。
+  // v497: agency は予約タブのサブナビ全部隠して 予約一覧 直行に固定
+  //   代理店は「自分のプロモ経由の患者一覧」だけ見たいので、
+  //   電話前確認 / 予約枠確認 / 患者検索 / 申込分析 / 医院別 全て非表示。
+  //   予約タブ = 予約一覧 (bk-list) のみの単純表示にする。
   if (isAgencyRole()) {
-    const availBtn = document.querySelector('#bk-sub-nav [data-sub="bk-availability"]');
-    if (availBtn) availBtn.style.display = 'none';
-    document.querySelectorAll('#bk-sub-nav .bk-fac-tab').forEach(b => { b.style.display = 'none'; });
-    const bfBtn = document.getElementById('bf-tab-btn');
-    if (bfBtn) bfBtn.style.display = 'none';
-    // 区切り線も隠す
-    document.querySelectorAll('#bk-sub-nav .sub-divider').forEach(d => { d.style.display = 'none'; });
+    const subNav = document.getElementById('bk-sub-nav');
+    if (subNav) subNav.style.display = 'none';
+    // active 状態と表示中サブビューを bk-list に強制
+    document.querySelectorAll('#bk-sub-nav .sub-nav-btn').forEach(s => s.classList.remove('active'));
+    const listBtn = document.querySelector('#bk-sub-nav [data-sub="bk-list"]');
+    if (listBtn) listBtn.classList.add('active');
+    const bkView = document.getElementById('view-bookings');
+    if (bkView) {
+      bkView.querySelectorAll('[id^="sub-"]').forEach(s => { s.hidden = s.id !== 'sub-bk-list'; });
+    }
+    try { sessionStorage.setItem('lastSub:view-bookings', 'bk-list'); } catch(_){}
   }
 }
 // === v483: 管理シート (経営陣専用リンク) ===
