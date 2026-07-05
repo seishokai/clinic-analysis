@@ -325,10 +325,10 @@
           <button id="portal-sales-btn" hidden>営業</button>
         </div>
 
-        <!-- 管理系: 1ボタンで展開、ログイン後は権限別画面へ -->
+        <!-- v486: 「管理」ボタン廃止、ログインフォームを初期表示に -->
         <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
-          <button id="portal-manage-btn" onclick="var s=document.getElementById('login-section');s.style.display=(s.style.display==='block'?'none':'block');if(s.style.display==='block'){setTimeout(function(){document.getElementById('login-email').focus()},50)}" style="width:100%;padding:18px;border:2px solid #1a1a1a;background:#1a1a1a;color:white;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#000'" onmouseout="this.style.background='#1a1a1a'">管理</button>
-          <div id="login-section" style="display:none;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
+          <button id="portal-manage-btn" hidden style="display:none">管理</button>
+          <div id="login-section" style="display:block;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
             <div id="login-form">
               <div class="input-group">
                 <label for="login-email">Email</label>
@@ -359,23 +359,14 @@
           👤 ユーザー管理
         </a>
       </div>
-      <!-- v271: /users/ から戻ってきた場合は自動でログインフォーム展開 -->
+      <!-- v486: ページ表示時に自動でメール入力欄へフォーカス (すぐログインできるように) -->
       <script>
         (function(){
           try {
-            if (sessionStorage.getItem('after-login-url')) {
-              setTimeout(function(){
-                var ls = document.getElementById('login-section');
-                if (ls && ls.style.display !== 'block') {
-                  var b = document.getElementById('portal-manage-btn');
-                  if (b) b.click();
-                }
-                setTimeout(function(){
-                  var em = document.getElementById('login-email');
-                  if (em) em.focus();
-                }, 100);
-              }, 50);
-            }
+            setTimeout(function(){
+              var em = document.getElementById('login-email');
+              if (em && !em.disabled) em.focus();
+            }, 80);
           } catch(_){}
         })();
       </script>
@@ -1707,7 +1698,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=485"></script>
+  <script src="app.js?v=486"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
