@@ -362,9 +362,41 @@
         </a>
       </div>
       <!-- v486: ページ表示時に自動でメール入力欄へフォーカス (すぐログインできるように) -->
+      <!-- v489: URL パラメータで営業ボタンを表示するモード -->
       <script>
         (function(){
           try {
+            var q = location.search || '';
+            var wantSales = /(^|[?&])(sales|営業|%E5%96%B6%E6%A5%AD)(=|&|$)/i.test(q);
+            if (wantSales) {
+              // 営業ボタン復活
+              var salesBtn = document.getElementById('portal-sales-btn');
+              if (salesBtn) {
+                salesBtn.hidden = false;
+                salesBtn.style.width = '100%';
+                salesBtn.style.padding = '18px';
+                salesBtn.style.border = '2px solid #1a1a1a';
+                salesBtn.style.background = 'white';
+                salesBtn.style.color = '#1a1a1a';
+                salesBtn.style.borderRadius = '10px';
+                salesBtn.style.fontSize = '17px';
+                salesBtn.style.fontWeight = '700';
+                salesBtn.style.cursor = 'pointer';
+                salesBtn.style.letterSpacing = '2px';
+                salesBtn.onclick = function(){ location.href = 'sales/'; };
+                if (salesBtn.parentElement) salesBtn.parentElement.style.display = 'flex';
+              }
+              // ポータルを 2列に戻す
+              var menu = document.getElementById('portal-menu');
+              if (menu) {
+                menu.style.gridTemplateColumns = '1fr 1fr';
+                menu.style.maxWidth = '';
+                menu.style.marginLeft = '';
+                menu.style.marginRight = '';
+                menu.style.justifyItems = '';
+              }
+            }
+            // どちらのモードでもメール欄にフォーカス
             setTimeout(function(){
               var em = document.getElementById('login-email');
               if (em && !em.disabled) em.focus();
@@ -1700,7 +1732,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=488"></script>
+  <script src="app.js?v=489"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
