@@ -145,7 +145,19 @@ export default {
             'Authorization': `Bearer ${env.SUPABASE_SERVICE_ROLE_KEY}`,
           },
         });
-        return json({ ok: false, error: linkJson?.error || 'link failed' }, 500);
+        // v2: エラー詳細を含めて返す (RPC が Postgres 例外を投げた場合の
+        // {code, message, hint, details} 形式にも対応)
+        const errMsg = linkJson?.error
+          || linkJson?.message
+          || linkJson?.hint
+          || linkJson?.details
+          || 'link failed';
+        return json({
+          ok: false,
+          error: errMsg,
+          rpc_status: linkRes.status,
+          rpc_response: linkJson,
+        }, 500);
       }
 
       return json({ ok: true, user_id: newUid, email, password });

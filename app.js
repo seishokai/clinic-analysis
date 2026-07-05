@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v490';
+const APP_VERSION = 'v491';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1272,24 +1272,38 @@ function canEditAmount()     { return currentRole === 'admin'; }
 function canDeleteRecord()   { return currentRole === 'admin'; }
 
 // 権限フィルタ: プロモ source が現在のユーザーに見えるか判定
-// admin: 全部OK / staff_promo & agency: allowed_promos 配列とマッチ
+// admin: 全部OK
+// agency: allowed_promos に含まれる source のみ (source未設定は非表示・厳格)
+// staff_promo: allowed_promos とマッチ (source未設定は表示・共有優先)
 // 旧 promo (account_type='promo') は promoFilter を単体比較
 function _matchesAllowedPromo(source) {
   if (currentRole === 'admin') return true;
-  if (!source) return true; // 流入元未設定は全員表示 (運用上共有が必要なため)
-  // 新方式: currentAllowedPromos 配列
-  if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
-    // ワイルドカード '%' = 全許可
+
+  // agency は流入元指定必須・完全一致のみ (代理店は自分経由の記録のみ)
+  if (currentRole === 'agency') {
+    if (!source) return false; // source 未設定は非表示
+    if (!Array.isArray(currentAllowedPromos) || !currentAllowedPromos.length) return false;
     if (currentAllowedPromos.includes('%')) return true;
-    // prefix_% パターン (例: hikaru_%) と完全一致を両対応
     const s = String(source).trim().toLowerCase();
     return currentAllowedPromos.some(p => {
       if (!p) return false;
       const pat = String(p).trim().toLowerCase();
-      if (pat === '%' ) return true;
-      if (pat.endsWith('_%')) {
-        return s.startsWith(pat.slice(0, -1)); // "hikaru_" で始まるか
-      }
+      if (pat === '%') return true;
+      if (pat.endsWith('_%')) return s.startsWith(pat.slice(0, -1));
+      return s === pat;
+    });
+  }
+
+  // staff_promo 以下: 未設定は共有 (既存動作維持)
+  if (!source) return true;
+  if (Array.isArray(currentAllowedPromos) && currentAllowedPromos.length) {
+    if (currentAllowedPromos.includes('%')) return true;
+    const s = String(source).trim().toLowerCase();
+    return currentAllowedPromos.some(p => {
+      if (!p) return false;
+      const pat = String(p).trim().toLowerCase();
+      if (pat === '%') return true;
+      if (pat.endsWith('_%')) return s.startsWith(pat.slice(0, -1));
       return s === pat;
     });
   }
