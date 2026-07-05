@@ -342,10 +342,12 @@
               <button type="button" class="btn-primary" id="login-btn">ログイン</button>
               <p id="login-error" class="error-msg" role="alert" aria-live="assertive" hidden>メールまたはパスワードが正しくありません</p>
               <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center">権限に応じた画面が表示されます</p>
-              <div style="margin-top:14px;padding-top:14px;border-top:1px dashed var(--border);display:flex;flex-direction:column;gap:6px">
-                <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank" style="padding:9px 12px;border:1px solid var(--border);background:white;color:var(--text-sub);border-radius:6px;font-size:12px;text-decoration:none;text-align:center;display:block">労務管理（ピノキオ）↗</a>
-                <a href="?view=para" style="padding:9px 12px;border:1px solid var(--border);background:white;color:var(--text-sub);border-radius:6px;font-size:12px;text-decoration:none;text-align:center;display:block">パラ管理 (外注用)</a>
-              </div>
+              <!-- v487: 労務管理 (ピノキオ) / パラ管理 (外注用) リンクは削除 -->
+              <!-- 元コード保持コメント:
+                <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank">労務管理（ピノキオ）</a>
+                <a href="?view=para">パラ管理 (外注用)</a>
+              -->
+
             </div>
           </div>
         </div>
@@ -1698,7 +1700,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=486"></script>
+  <script src="app.js?v=487"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
