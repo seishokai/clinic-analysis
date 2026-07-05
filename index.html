@@ -319,9 +319,10 @@
             } catch(_){}
           })();
         </script>
-        <!-- 営業系: クリックで /sales/ へ遷移 (Supabase 動的タブ管理) -->
-        <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
-          <button id="portal-sales-btn" onclick="location.href='sales/'" style="width:100%;padding:18px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">営業</button>
+        <!-- v485: 「営業」ボタンは非表示 (ログイン前にポータルからアクセスさせない方針) -->
+        <!-- 元コード保持: onclick="location.href='sales/'" -->
+        <div class="portal-col" style="display:none">
+          <button id="portal-sales-btn" hidden>営業</button>
         </div>
 
         <!-- 管理系: 1ボタンで展開、ログイン後は権限別画面へ -->
@@ -1706,7 +1707,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=484"></script>
+  <script src="app.js?v=485"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
