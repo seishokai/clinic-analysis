@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v495';
+const APP_VERSION = 'v496';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -2019,6 +2019,21 @@ function applyRoleUI() {
       b.style.display = 'none';
     }
   });
+
+  // v496: 予約タブ内サブナビも agency 向けに厳選
+  //   代理店は自分のプロモ経由の患者だけ見たいので、以下は非表示:
+  //   - 📅 予約枠確認 (医院運用の空き枠情報。代理店には無関係)
+  //   - 医院別タブ (BF銀座/エスカ/… 全 11 個)。プロモ経由患者だけ見せたい
+  //   後日 visible_sub_tabs のような仕組みを入れるまでの暫定措置。
+  if (isAgencyRole()) {
+    const availBtn = document.querySelector('#bk-sub-nav [data-sub="bk-availability"]');
+    if (availBtn) availBtn.style.display = 'none';
+    document.querySelectorAll('#bk-sub-nav .bk-fac-tab').forEach(b => { b.style.display = 'none'; });
+    const bfBtn = document.getElementById('bf-tab-btn');
+    if (bfBtn) bfBtn.style.display = 'none';
+    // 区切り線も隠す
+    document.querySelectorAll('#bk-sub-nav .sub-divider').forEach(d => { d.style.display = 'none'; });
+  }
 }
 // === v483: 管理シート (経営陣専用リンク) ===
 // tkm.koike / seishokai.saiyo / seishokai チーム のみに表示。
