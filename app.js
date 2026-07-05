@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v482';
+const APP_VERSION = 'v483';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -1992,6 +1992,39 @@ function applyRoleUI() {
     }
   });
 }
+// === v483: 管理シート (経営陣専用リンク) ===
+// tkm.koike / seishokai.saiyo / seishokai チーム のみに表示。
+// Google Sheets の URL を新タブで開く。閲覧権限は Google 側の共有設定で管理。
+const MGMT_SHEET_URL = 'https://docs.google.com/spreadsheets/d/10misKpAtMitwIagGDUoMvQS7U9pfEQ0ODxG8A7DLzaQ/edit?usp=sharing';
+function _canSeeManagementSheet() {
+  // 判定条件: admin ロール OR アカウント名に特定キーワードを含む
+  //   キーワード: 小池 / 拓未 / tkm / koike / saiyo / seishokai
+  //   (email 由来のプレフィクスや氏名で照合)
+  const name = (sessionStorage.getItem('currentAccountName') || '').toLowerCase();
+  if (currentRole === 'admin') return true;
+  if (!name) return false;
+  return /小池|拓未|tkm|koike|saiyo|seishokai/i.test(name);
+}
+function setupManagementSheetButton() {
+  const btn = document.getElementById('mgmt-sheet-btn');
+  if (!btn) return;
+  if (_canSeeManagementSheet()) {
+    btn.hidden = false;
+    // 二重登録防止
+    if (!btn._bound) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        // 念のため権限チェック (何かの拍子でボタンが露出したケースを塞ぐ)
+        if (!_canSeeManagementSheet()) return;
+        window.open(MGMT_SHEET_URL, '_blank', 'noopener,noreferrer');
+      });
+      btn._bound = true;
+    }
+  } else {
+    btn.hidden = true;
+  }
+}
+
 // === Supabase Auth ログイン (Phase 6: 一本化済み) ===
 // (並走期間は終了し旧ログインは撤去済み。migrations/auth_phase1.sql 参照)
 function _applyAccountProfileToSession(profile) {
@@ -2003,6 +2036,8 @@ function _applyAccountProfileToSession(profile) {
   sessionStorage.setItem('currentRole', currentRole);
   sessionStorage.setItem('currentAllowedPromos', JSON.stringify(currentAllowedPromos));
   sessionStorage.setItem('currentVisibleTabs', JSON.stringify(currentVisibleTabs));
+  // v483: 管理シート (経営陣専用リンク) の可否判定用にアカウント名を保持
+  sessionStorage.setItem('currentAccountName', profile.name || '');
   // PII閲覧許可フラグ (電話追跡担当など)
   window.currentCanViewPII = (profile.can_view_pii === true);
   sessionStorage.setItem('currentCanViewPII', window.currentCanViewPII ? '1' : '0');
@@ -3167,6 +3202,8 @@ function showApp() {
 
   // Phase 6: ロール別 UI ガード (ナビ非表示 + 編集禁止ビット)
   try { applyRoleUI(); } catch(e) { console.warn('applyRoleUI failed', e); }
+  // v483: 管理シート (経営陣専用リンク) の表示制御 + クリックハンドラ
+  try { setupManagementSheetButton(); } catch(e) { console.warn('setupManagementSheetButton failed', e); }
 
   // A1: リアルタイム同期を開始
   try { setupRealtime(); } catch(e) { console.warn('realtime setup failed', e); }

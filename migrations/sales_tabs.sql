@@ -115,7 +115,7 @@ SELECT
 FROM inserted_parents p
 CROSS JOIN LATERAL (
   VALUES
-    ('動画研修',       'https://owojchhi.gensparkspace.com/index.html', TRUE,  10),
+    ('動画研修',       'https://seishokai-kenshu.seishokai.workers.dev/', TRUE,  10),
     ('Q&A研修',        '/clinic-analysis/qa.html',                       FALSE, 20),
     ('矯正アドバンス', '/clinic-analysis/ortho.html',                    FALSE, 30),
     ('矯正アドバンス2','/clinic-analysis/ortho2.html',                   FALSE, 40)
