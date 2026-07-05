@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v483';
+const APP_VERSION = 'v484';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -18345,6 +18345,10 @@ async function renderAuthMigration() {
           <label class="form-label" style="font-size:11px">代理店名 (任意)</label>
           <input type="text" class="form-input" id="new-acct-agency" placeholder="例: ヒカル" style="font-size:13px;padding:6px 10px">
         </div>
+        <div>
+          <label class="form-label" style="font-size:11px">パスワード (任意、空なら自動生成 14桁)</label>
+          <input type="text" class="form-input" id="new-acct-password" placeholder="例: NinNin_afi_2026" style="font-size:13px;padding:6px 10px;font-family:'SF Mono',monospace">
+        </div>
         <div style="grid-column:1/-1">
           <label class="form-label" style="font-size:11px">担当プロモ
             <button type="button" id="new-acct-promos-all" class="btn btn-outline" style="font-size:10px;padding:1px 6px;margin-left:8px">全選択</button>
@@ -18406,6 +18410,10 @@ async function renderAuthMigration() {
         <div>
           <label class="form-label" style="font-size:11px">代理店名 (任意)</label>
           <input type="text" class="form-input" id="new-acct-agency" placeholder="例: ヒカル" style="font-size:13px;padding:6px 10px">
+        </div>
+        <div>
+          <label class="form-label" style="font-size:11px">パスワード (任意、空なら自動生成 14桁)</label>
+          <input type="text" class="form-input" id="new-acct-password" placeholder="例: NinNin_afi_2026" style="font-size:13px;padding:6px 10px;font-family:'SF Mono',monospace">
         </div>
         <div style="grid-column:1/-1">
           <label class="form-label" style="font-size:11px">担当プロモ
@@ -18624,7 +18632,14 @@ async function renderAuthMigration() {
       const ts = Date.now().toString(36);
       email = `partner-${slug}-${ts}@seishokai.local`;
     }
-    const password = genRandomPassword(14);
+    // v484: パスワード指定欄 (空なら自動生成)
+    const customPw = (container.querySelector('#new-acct-password')?.value || '').trim();
+    const password = customPw || genRandomPassword(14);
+    if (customPw && customPw.length < 6) {
+      msg.textContent = 'パスワードは 6文字以上にしてください';
+      msg.style.color = '#c00';
+      return;
+    }
 
     btn.disabled = true;
     const origText = btn.textContent;
