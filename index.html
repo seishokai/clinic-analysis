@@ -361,6 +361,30 @@
           👤 ユーザー管理
         </a>
       </div>
+      <!-- v494: 代理店・プロモ用ログイン URL への切替リンク (下部) -->
+      <div id="portal-mode-switch" style="text-align:center;margin-top:14px">
+        <a id="portal-affiliate-link" href="?a"
+          style="display:inline-block;background:none;border:1px dashed #cbd5e1;color:var(--text-sub);font-size:12px;font-family:inherit;cursor:pointer;padding:8px 16px;letter-spacing:1px;text-decoration:none;border-radius:20px;transition:all .2s"
+          onmouseover="this.style.borderColor='#1a1a1a';this.style.color='#1a1a1a';this.style.background='#f8fafc'"
+          onmouseout="this.style.borderColor='#cbd5e1';this.style.color='var(--text-sub)';this.style.background='transparent'">
+          🤝 代理店・プロモ用ログイン
+        </a>
+      </div>
+      <script>
+        // 代理店モード (?a) では「代理店用ログイン」リンクを隠し
+        // 代わりに「社内ログインへ戻る」リンクを表示
+        (function(){
+          try {
+            var q = location.search || '';
+            var isAffiliate = /(^|[?&])(a|affiliate|agency|代理店)(=|&|$)/i.test(q);
+            var link = document.getElementById('portal-affiliate-link');
+            if (link && isAffiliate) {
+              link.href = './';
+              link.textContent = '← 社内ログインへ戻る';
+            }
+          } catch(_){}
+        })();
+      </script>
       <!-- v490: デフォルトは営業ボタン表示 (社内向け)
                 URL に ?a / ?affiliate / ?agency があれば非表示 + 中央揃え (代理店向け) -->
       <script>
@@ -1718,7 +1742,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=493"></script>
+  <script src="app.js?v=494"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
