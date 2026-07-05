@@ -501,7 +501,7 @@
   // ===== Data =====
   function fetchTabs(){
     return sb.from('sales_tabs')
-      .select('id, parent_id, label, url, external, highlight, sort_order')
+      .select('id, parent_id, label, url, external, highlight, sort_order, password')
       .eq('is_active', true)
       .order('sort_order');
   }
@@ -677,13 +677,33 @@
       card.style.setProperty('--accent-color', style.fg);
       card.href = node.url;
       if (node.external) { card.target = '_blank'; card.rel = 'noopener noreferrer'; }
+      const isLocked = !!(node.password && node.password.trim());
+      const metaLabel = isLocked ? '🔒 パスワード必要' : (node.external ? '外部リンク ↗' : 'クリックで開く →');
       card.innerHTML = `
-        <div class="icon-square">${style.icon}</div>
+        <div class="icon-square">${isLocked ? '🔒' : style.icon}</div>
         <div class="body">
           <div class="lbl" data-len="${lblSize}">${esc(node.label)}</div>
-          <div class="meta">${node.external ? '外部リンク ↗' : 'クリックで開く →'}</div>
+          <div class="meta">${metaLabel}</div>
         </div>
       `;
+      // v2: password 保護。同一 URL は 1度パス通過したら sessionStorage に記録して再入力不要に
+      if (isLocked) {
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.card-actions')) return;
+          const key = 'salesTabPw:' + node.id;
+          if (sessionStorage.getItem(key) === '1') return;  // 既に通過済 → そのまま開く
+          e.preventDefault();
+          const pw = prompt('🔒 このリンクにはパスワードが設定されています');
+          if (pw == null) return;
+          if (pw === node.password) {
+            sessionStorage.setItem(key, '1');
+            const w = window.open(node.url, node.external ? '_blank' : '_self', node.external ? 'noopener,noreferrer' : '');
+            if (!w) location.href = node.url;
+          } else {
+            alert('パスワードが違います');
+          }
+        });
+      }
     }
 
     // Admin actions
@@ -741,9 +761,26 @@
       card.className = 'tab-card' + (child.highlight ? ' highlight' : '');
       card.style.setProperty('--accent-bg', cstyle.bg);
       card.style.setProperty('--accent-color', cstyle.fg);
+      const cIsLocked = isLink && !!(child.password && child.password.trim());
       if (isLink) {
         card.href = child.url;
         if (child.external) { card.target = '_blank'; card.rel = 'noopener noreferrer'; }
+        if (cIsLocked) {
+          card.addEventListener('click', (e) => {
+            const key = 'salesTabPw:' + child.id;
+            if (sessionStorage.getItem(key) === '1') return;
+            e.preventDefault();
+            const pw = prompt('🔒 このリンクにはパスワードが設定されています');
+            if (pw == null) return;
+            if (pw === child.password) {
+              sessionStorage.setItem(key, '1');
+              const w = window.open(child.url, child.external ? '_blank' : '_self', child.external ? 'noopener,noreferrer' : '');
+              if (!w) location.href = child.url;
+            } else {
+              alert('パスワードが違います');
+            }
+          });
+        }
       } else {
         card.type = 'button';
         // 子もグループなら、再度モーダル展開
@@ -751,11 +788,12 @@
       }
       const cLblLen = String(child.label || '').length;
       const cLblSize = cLblLen <= 6 ? 'short' : (cLblLen <= 9 ? 'normal' : 'long');
+      const cMeta = cIsLocked ? '🔒 パスワード必要' : (child.external ? '外部リンク ↗' : (child.url ? '開く →' : '一覧 →'));
       card.innerHTML = `
-        <div class="icon-square">${cstyle.icon}</div>
+        <div class="icon-square">${cIsLocked ? '🔒' : cstyle.icon}</div>
         <div class="body">
           <div class="lbl" data-len="${cLblSize}">${esc(child.label)}</div>
-          <div class="meta">${child.external ? '外部リンク ↗' : (child.url ? '開く →' : '一覧 →')}</div>
+          <div class="meta">${cMeta}</div>
         </div>
       `;
       grid.appendChild(card);
