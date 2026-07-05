@@ -405,6 +405,12 @@
                 menu.style.marginLeft = 'auto';
                 menu.style.marginRight = 'auto';
               }
+              // v498: 代理店モードではユーザー管理・社内ログイン切替リンクを非表示
+              //   代理店には無関係な導線なので隠す。
+              var usersBtn = document.getElementById('portal-users-btn');
+              if (usersBtn && usersBtn.parentElement) usersBtn.parentElement.style.display = 'none';
+              var modeSwitch = document.getElementById('portal-mode-switch');
+              if (modeSwitch) modeSwitch.style.display = 'none';
             }
             // どちらのモードでもメール欄にフォーカス
             setTimeout(function(){
@@ -1742,7 +1748,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=497"></script>
+  <script src="app.js?v=498"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
