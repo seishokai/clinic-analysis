@@ -244,50 +244,52 @@
     margin-top:6px; letter-spacing:.2px;
   }
 
-  /* ==== 選択フローティングバー (画面下固定) ==== */
+  /* ==== 選択フローティングバー (画面下固定・目立たせる) ==== */
   .sel-fab{
     position:fixed; z-index:40;
-    left:16px; right:16px; bottom:16px;
-    max-width:640px; margin:0 auto;
+    left:12px; right:12px; bottom:12px;
+    max-width:560px; margin:0 auto;
     background:#0f1e17; color:#fff;
-    border-radius:16px;
-    padding:10px 12px 10px 16px;
-    display:flex; align-items:center; gap:10px;
-    box-shadow:0 20px 50px -12px rgba(0,0,0,.4), 0 8px 20px -6px rgba(0,0,0,.2);
-    animation:fab-in .28s cubic-bezier(.2,.9,.25,1.1);
+    border-radius:18px;
+    padding:8px 8px 8px 16px;
+    display:flex; align-items:center; gap:8px;
+    box-shadow:0 24px 60px -14px rgba(0,0,0,.55), 0 10px 24px -8px rgba(15,30,23,.25);
+    animation:fab-in .3s cubic-bezier(.2,.9,.25,1.15);
   }
-  @keyframes fab-in{from{opacity:0; transform:translateY(24px) scale(.96)}to{opacity:1; transform:translateY(0) scale(1)}}
+  @keyframes fab-in{from{opacity:0}to{opacity:1}}
   .fab-badge{
     background:var(--line); color:#fff;
-    min-width:30px; height:30px; padding:0 10px; border-radius:15px;
+    min-width:32px; height:32px; padding:0 10px; border-radius:16px;
     display:inline-flex; align-items:center; justify-content:center;
     font-size:14px; font-weight:800; flex-shrink:0;
-    box-shadow:0 2px 6px rgba(6,199,85,.4);
+    box-shadow:0 3px 10px rgba(6,199,85,.45);
+    animation:badge-pop .3s cubic-bezier(.3,1.3,.6,1);
   }
+  @keyframes badge-pop{from{transform:scale(.4)}to{transform:scale(1)}}
   .fab-label{
-    font-size:13px; font-weight:700; color:#fff;
+    font-size:12px; font-weight:700; color:rgba(255,255,255,.85);
     white-space:nowrap;
   }
-  .fab-label .fab-sub{font-size:10px; opacity:.6; font-weight:600; margin-left:6px}
   .fab-spacer{flex:1}
   .fab-btn{
-    background:transparent; color:#fff; border:1px solid rgba(255,255,255,.2);
-    padding:8px 10px; border-radius:10px; font-size:12px; font-weight:700;
-    display:inline-flex; align-items:center; gap:5px;
-    transition:all .15s; white-space:nowrap;
+    background:rgba(255,255,255,.06); color:#fff; border:none;
+    width:36px; height:36px; border-radius:12px;
+    font-size:14px; font-weight:700;
+    display:inline-flex; align-items:center; justify-content:center;
+    transition:all .15s; flex-shrink:0;
   }
-  .fab-btn:hover{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.35)}
-  .fab-btn.danger:hover{color:#fff; background:var(--danger); border-color:var(--danger)}
+  .fab-btn:hover{background:rgba(255,255,255,.14)}
+  .fab-btn.danger:hover{background:var(--danger); color:#fff}
   .fab-primary{
     background:var(--line); color:#fff; border:none;
-    padding:10px 18px; border-radius:12px;
-    font-size:13px; font-weight:800; letter-spacing:.3px;
-    display:inline-flex; align-items:center; gap:6px;
-    box-shadow:0 4px 12px -2px var(--line-shadow);
-    transition:background .15s, transform .1s;
-    white-space:nowrap;
+    padding:11px 20px; border-radius:14px;
+    font-size:14px; font-weight:800; letter-spacing:.4px;
+    display:inline-flex; align-items:center; gap:7px;
+    box-shadow:0 6px 16px -2px rgba(6,199,85,.5);
+    transition:background .15s, transform .1s, box-shadow .15s;
+    white-space:nowrap; flex-shrink:0;
   }
-  .fab-primary:hover{background:var(--line-dark)}
+  .fab-primary:hover{background:var(--line-dark); box-shadow:0 8px 20px -2px rgba(6,199,85,.6)}
   .fab-primary:active{transform:scale(.97)}
 
   /* ==== フィルタバー ==== */
@@ -344,6 +346,8 @@
     position:relative;
     transition:border-color .18s, box-shadow .18s, transform .18s;
     box-shadow:var(--shadow-sm);
+    cursor:pointer;
+    overflow:hidden;
   }
   .card:hover{
     border-color:var(--border-strong);
@@ -355,6 +359,7 @@
     box-shadow:0 0 0 3px var(--focus), var(--shadow-md);
     background:var(--line-tint);
   }
+  .card.is-selected:hover{transform:translateY(-1px)}
   .card.is-unset{
     background:
       repeating-linear-gradient(135deg, #f3f6f5 0 6px, transparent 6px 12px),
@@ -370,11 +375,13 @@
     border:1.5px solid var(--border-strong); background:var(--surface);
     display:flex; align-items:center; justify-content:center;
     color:#fff; font-size:12px; font-weight:800;
-    cursor:pointer; transition:all .15s;
+    transition:all .15s;
     flex-shrink:0;
+    pointer-events:none; /* タップは親カードで受ける */
   }
   .card.is-selected .card-check{
     background:var(--line); border-color:var(--line);
+    transform:scale(1.05);
   }
   .card.is-selected .card-check::after{content:'✓'}
   .card-fav{
@@ -744,9 +751,12 @@
   <div class="fab-badge" id="sel-num">0</div>
   <div class="fab-label">件 選択中</div>
   <div class="fab-spacer"></div>
-  <button class="fab-btn" id="clear-sel" title="選択解除">✕</button>
-  <button class="fab-btn danger" id="bulk-del" title="削除">🗑</button>
-  <button class="fab-primary" id="issue-btn">📤 URL 発行</button>
+  <button class="fab-btn" id="clear-sel" title="選択解除" aria-label="選択解除">✕</button>
+  <button class="fab-btn danger" id="bulk-del" title="選択項目を削除" aria-label="削除">🗑</button>
+  <button class="fab-primary" id="issue-btn">
+    <span>📤</span>
+    <span>URL 発行</span>
+  </button>
 </div>
 
 <div id="modal-root"></div>
@@ -1026,8 +1036,8 @@
       return `
         <article class="card ${isSel?'is-selected':''} ${isFav?'is-fav':''} ${hasUrl?'':'is-unset'}" data-id="${g.id}">
           <div class="card-top">
-            <button class="card-check" data-act="toggle-sel" title="選択"></button>
-            <button class="card-fav" data-act="toggle-fav" title="お気に入り">${isFav ? '★' : '☆'}</button>
+            <div class="card-check" aria-hidden="true"></div>
+            <button class="card-fav" data-act="toggle-fav" title="お気に入り" aria-label="お気に入り">${isFav ? '★' : '☆'}</button>
           </div>
           <div class="card-body">
             <div class="mono" style="background:${c.bg}; color:${c.fg}" title="${isEditMode() ? 'ドラッグで並び替え' : ''}">${esc(initial)}</div>
@@ -1063,34 +1073,30 @@
   function wireCards(){
     document.querySelectorAll('.card[data-id]').forEach(card => {
       const id = card.dataset.id;
-      // Checkbox
-      card.querySelector('[data-act="toggle-sel"]')?.addEventListener('click', e => {
-        e.stopPropagation();
+      // タイル本体タップ = 選択切替 (URL は右下 → ボタンだけで開く)
+      card.addEventListener('click', e => {
+        // 内部の a / button 要素をタップしたときは選択トグルしない
+        if (e.target.closest('a[data-act="open"], .card-cta, [data-act="toggle-fav"], [data-act="edit-url"]')) return;
         toggleSel(id, card);
       });
-      // Favorite
+      // お気に入り
       card.querySelector('[data-act="toggle-fav"]')?.addEventListener('click', e => {
         e.stopPropagation();
         if (favs.has(id)) favs.delete(id); else favs.add(id);
         saveFavs();
         render();
       });
-      // Edit URL (unset only)
+      // 未設定 → + ボタンで URL 追加
       card.querySelector('[data-act="edit-url"]')?.addEventListener('click', e => {
         e.stopPropagation();
         const g = allGroups.find(x => x.id === id);
         if (g) openEditModal(g);
       });
-      // Card double-click → open edit modal
+      // ダブルクリック → 編集モーダル
       card.addEventListener('dblclick', e => {
         if (e.target.closest('a, button')) return;
         const g = allGroups.find(x => x.id === id);
         if (g) openEditModal(g);
-      });
-      // Context menu (right-click) → 選択切替 (便利ショートカット)
-      card.addEventListener('contextmenu', e => {
-        e.preventDefault();
-        toggleSel(id, card);
       });
     });
   }
