@@ -4,341 +4,476 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#1a1a1a">
+<meta name="theme-color" content="#0f172a">
 <title>LINE グループ / Aladdin 営業ポータル</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700;800&display=swap">
 <style>
   :root{
-    --primary:#1a1a1a; --primary-l:#2d3436;
-    --accent:#4a5568;
-    --bg:#f7f7f8; --card:#fff; --border:#e5e7eb;
-    --text:#1a1a1a; --text-sub:#6b7280; --text-muted:#9ca3af;
-    --gray:#e5e7eb; --danger:#dc2626;
-    --sel:#eff6ff; --sel-b:#3b82f6;
-    --store:#93c5fd; --solo:#fcd34d;
-    --line-accent:#059669;  /* 落ち着いたエメラルド (LINE識別用の控えめ緑) */
+    --bg:#f4f5f7;
+    --surface:#fff;
+    --line:#06C755;
+    --line-soft:#E6F9EE;
+    --line-shadow:rgba(6,199,85,.18);
+    --line-dark:#04A548;
+    --text:#0f172a;
+    --text-sub:#64748b;
+    --text-muted:#94a3b8;
+    --border:#e5e7eb;
+    --border-strong:#cbd5e1;
+    --dash:#c1c8d1;
+    --hatch:#eef1f5;
+    --danger:#dc2626;
+    --danger-soft:#fef2f2;
+    --focus:rgba(6,199,85,.28);
   }
   *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0}
   html,body{background:var(--bg)}
   body{
     font-family:'Noto Sans JP','Hiragino Sans','Meiryo',sans-serif;
-    color:var(--text); line-height:1.4;
+    color:var(--text); line-height:1.5;
     -webkit-font-smoothing:antialiased;
-    padding-bottom:70px;
+    padding-bottom:96px;
+    min-height:100vh;
   }
   [hidden]{display:none !important}
   button{font-family:inherit}
+  a{color:inherit}
 
-  /* ヘッダー: 黒基調のシック */
+  /* ヘッダー */
   header.head{
     position:sticky; top:0; z-index:20;
-    background:linear-gradient(135deg,#1a1a1a 0%,#2d3436 100%);
-    color:#fff; padding:9px 14px;
+    background:#0f172a;
+    color:#fff; padding:11px 14px;
     display:flex; align-items:center; gap:10px;
-    box-shadow:0 2px 8px rgba(0,0,0,.15);
+    box-shadow:0 4px 12px rgba(0,0,0,.18);
   }
   .head .back{
     color:#fff; text-decoration:none; font-size:12px;
-    padding:5px 10px; border:1px solid rgba(255,255,255,.25);
-    border-radius:14px; white-space:nowrap; opacity:.9;
+    padding:6px 12px; border:1px solid rgba(255,255,255,.18);
+    border-radius:999px; white-space:nowrap; opacity:.9;
+    transition:background .15s, border-color .15s;
   }
-  .head .back:hover{background:rgba(255,255,255,.08)}
+  .head .back:hover{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.32)}
   .head .title-wrap{flex:1; text-align:center; min-width:0}
-  .head h1{margin:0; font-size:15px; font-weight:800; letter-spacing:.5px}
+  .head h1{
+    margin:0; font-size:15px; font-weight:800; letter-spacing:.5px;
+    display:inline-flex; align-items:center; gap:6px; justify-content:center;
+  }
   .head h1 .line-tag{
-    display:inline-block; padding:1px 6px; border-radius:6px;
-    background:var(--line-accent); color:#fff; font-size:10px;
-    font-weight:700; margin-right:4px; vertical-align:middle;
+    display:inline-flex; align-items:center; justify-content:center;
+    padding:2px 8px; border-radius:6px;
+    background:var(--line); color:#fff; font-size:10px;
+    font-weight:800; letter-spacing:.5px;
   }
-  .head .sub{font-size:10px; opacity:.7; margin-top:1px}
-  .head .spacer{width:52px}
-
-  .container{max-width:1100px; margin:0 auto; padding:0}
-
-  /* アクションバー */
-  .action-bar{
-    background:#fff; padding:8px 12px;
-    border-bottom:1px solid var(--border);
-    display:flex; gap:6px; align-items:center;
-    position:sticky; top:44px; z-index:15;
-    flex-wrap:wrap;
+  .head .sub{font-size:10px; opacity:.6; margin-top:2px; letter-spacing:.4px}
+  .head .edit-toggle{
+    color:#fff; font-family:inherit;
+    background:transparent; border:1px solid rgba(255,255,255,.22);
+    padding:6px 12px; border-radius:999px; font-size:12px;
+    font-weight:700; cursor:pointer; white-space:nowrap;
+    transition:all .15s;
+    display:inline-flex; align-items:center; gap:4px;
   }
-  .search-box{flex:1; min-width:160px; position:relative}
+  .head .edit-toggle:hover{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.36)}
+  body.edit-mode .head .edit-toggle{background:var(--line); border-color:var(--line); color:#fff}
+  body.edit-mode .head .edit-toggle:hover{background:var(--line-dark); border-color:var(--line-dark)}
+
+  /* コンテナ */
+  .container{max-width:1100px; margin:0 auto; padding:18px 14px}
+
+  /* ツールバー */
+  .toolbar{
+    display:flex; gap:8px; align-items:center;
+    margin-bottom:14px;
+  }
+  .search-box{flex:1; min-width:0; position:relative}
   .search-box input{
-    width:100%; padding:7px 10px 7px 28px;
-    border:1px solid var(--border); border-radius:18px;
-    font-size:13px; font-family:inherit; background:var(--bg);
+    width:100%; padding:11px 14px 11px 38px;
+    border:1px solid var(--border); border-radius:999px;
+    font-size:14px; font-family:inherit; background:#fff;
+    transition:border-color .15s, box-shadow .15s;
   }
   .search-box input:focus{
-    outline:none; border-color:var(--accent); background:#fff;
-    box-shadow:0 0 0 3px rgba(74,85,104,.1);
+    outline:none; border-color:var(--line);
+    box-shadow:0 0 0 4px var(--focus);
   }
   .search-box::before{
-    content:'🔍'; position:absolute; left:8px; top:50%;
-    transform:translateY(-50%); font-size:11px; opacity:.5;
-  }
-  .action-btn{
-    padding:7px 11px; border-radius:18px; font-size:12px;
-    font-weight:700; cursor:pointer; white-space:nowrap; border:none;
-  }
-  .action-btn.primary{background:var(--primary); color:#fff}
-  .action-btn.primary:active{background:var(--primary-l)}
-  .action-btn.outline{background:#fff; color:var(--text); border:1px solid var(--border)}
-  .action-btn.gray{background:#fff; color:var(--text-sub); border:1px solid var(--border)}
-  .action-btn.reorder{
-    background:#fff; color:var(--accent); border:1px solid var(--border);
-    display:inline-flex; align-items:center; gap:4px;
-  }
-  .action-btn.reorder.active{
-    background:var(--sel); color:var(--sel-b); border-color:var(--sel-b);
+    content:'🔍'; position:absolute; left:14px; top:50%;
+    transform:translateY(-50%); font-size:13px; opacity:.5;
   }
 
-  /* リスト: 2 列 (デスクトップ) */
-  .list{
-    background:#fff;
-    display:grid;
-    grid-template-columns:1fr;
+  /* 編集モード時のみのツール */
+  .edit-tools{
+    display:none; gap:8px; flex-wrap:wrap;
+    margin-bottom:18px;
   }
-  @media (min-width:720px){
-    .list{grid-template-columns:1fr 1fr}
-    .list > .row:nth-child(2n){border-left:1px solid #f3f4f6}
+  body.edit-mode .edit-tools{display:flex}
+  .edit-tools .btn{
+    padding:9px 14px; border-radius:999px; font-size:12px;
+    font-weight:700; cursor:pointer; border:1px solid var(--border);
+    background:#fff; color:var(--text);
+    transition:all .15s;
+    display:inline-flex; align-items:center; gap:6px;
+  }
+  .edit-tools .btn:hover{border-color:var(--border-strong); background:#fafbfc}
+  .edit-tools .btn.primary{background:var(--line); color:#fff; border-color:var(--line)}
+  .edit-tools .btn.primary:hover{background:var(--line-dark); border-color:var(--line-dark)}
+
+  /* セクション */
+  .section{margin-bottom:26px}
+  .section-title{
+    display:flex; align-items:center; gap:10px;
+    font-size:11px; font-weight:800; letter-spacing:1.6px;
+    color:var(--text-sub); text-transform:uppercase;
+    margin:0 4px 12px;
+  }
+  .section-title .cnt{
+    color:var(--text-muted); font-size:10px; letter-spacing:1px;
+    background:var(--surface); padding:2px 8px; border-radius:999px;
+    border:1px solid var(--border);
+  }
+  .section-title .rule{
+    flex:1; height:1px; background:linear-gradient(90deg,var(--border),transparent);
   }
 
-  /* 行 */
-  .row{
-    display:flex; align-items:center; gap:8px;
-    padding:9px 12px 9px 9px;
-    border-bottom:1px solid #f3f4f6;
-    cursor:pointer; user-select:none;
-    background:#fff;
-    border-left:3px solid transparent;
-    transition:background .1s;
-    min-height:52px;
+  /* グリッド */
+  .grid{
+    display:grid; gap:10px;
+    grid-template-columns:1fr 1fr;
   }
-  .row:hover{background:#fafafa}
-  .row.store{border-left-color:var(--store)}
-  .row.solo{border-left-color:var(--solo)}
-  .row.selected{background:var(--sel); border-left-color:var(--sel-b)}
-  .row.disabled{background:#fbfbfb}
-  .row.sortable-ghost{opacity:.4; background:#e0e7ff !important}
-  .row.sortable-chosen{background:#fef3c7}
-
-  /* ドラッグハンドル */
-  .drag-handle{
-    width:22px; height:24px; border-radius:4px;
-    display:none; align-items:center; justify-content:center;
-    color:var(--text-muted); font-size:14px;
-    cursor:grab; flex-shrink:0;
-    background:transparent; border:none; padding:0;
-    letter-spacing:-1px;
+  @media (min-width:560px){
+    .grid{grid-template-columns:repeat(3, 1fr); gap:12px}
   }
-  .drag-handle:active{cursor:grabbing}
-  body.reorder-mode .drag-handle{display:inline-flex; color:var(--sel-b)}
-  body.reorder-mode .row{cursor:grab}
-  body.reorder-mode .row:active{cursor:grabbing}
-  body.reorder-mode .check, body.reorder-mode .icon-btn{display:none}
 
-  /* チェックボックス */
-  .row .check{
-    width:20px; height:20px; border-radius:5px;
-    border:2px solid var(--border);
+  /* タイル */
+  .tile{
+    position:relative;
+    background:var(--surface);
+    border:1px solid var(--border);
+    border-radius:14px;
+    padding:14px;
+    display:flex; align-items:center; gap:12px;
+    cursor:pointer;
+    text-decoration:none; color:inherit;
+    transition:transform .22s cubic-bezier(.2,.8,.2,1),
+               box-shadow .22s cubic-bezier(.2,.8,.2,1),
+               border-color .18s;
+    overflow:hidden;
+    min-height:74px;
+  }
+  .tile::before{
+    content:''; position:absolute; left:0; top:12px; bottom:12px;
+    width:3px; border-radius:2px; background:var(--line);
+    transform:scaleY(0); transform-origin:center;
+    transition:transform .28s cubic-bezier(.2,.8,.2,1);
+  }
+  .tile:hover:not(.unset):not(.editing){
+    transform:translateY(-3px);
+    box-shadow:0 12px 26px -14px var(--line-shadow),
+               0 2px 8px rgba(15,23,42,.05);
+    border-color:transparent;
+  }
+  .tile:hover:not(.unset):not(.editing)::before{transform:scaleY(1)}
+  .tile:active:not(.unset):not(.editing){transform:translateY(-1px)}
+
+  /* Monogram */
+  .mono{
+    width:44px; height:44px; flex-shrink:0;
+    border-radius:12px;
+    background:var(--line-soft);
+    color:var(--line-dark);
     display:flex; align-items:center; justify-content:center;
-    flex-shrink:0; font-size:12px; color:#fff;
-    background:#fff; transition:all .12s;
+    font-size:18px; font-weight:800; letter-spacing:.5px;
+    line-height:1;
+    transition:background .22s, color .22s;
   }
-  .row.selected .check{
-    background:var(--sel-b); border-color:var(--sel-b);
+  .tile:hover:not(.unset):not(.editing) .mono{
+    background:var(--line); color:#fff;
   }
-  .row.selected .check::after{content:'✓'; font-weight:800}
 
-  .row .name{
-    flex:1; font-size:14px; font-weight:600; color:var(--text);
-    min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  /* 本文 */
+  .body{flex:1; min-width:0; display:flex; flex-direction:column; gap:3px}
+  .name{
+    font-size:14px; font-weight:700; color:var(--text);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   }
-  .row.disabled .name{color:var(--text-sub); font-weight:500}
-
-  /* 「開く」ボタン: 落ち着いた黒基調 + 緑テキスト */
-  .row .open-btn{
-    background:var(--primary); color:#fff; text-decoration:none;
-    padding:6px 12px; border-radius:15px;
-    font-size:11px; font-weight:700; letter-spacing:.3px;
-    box-shadow:0 1px 3px rgba(0,0,0,.15);
-    white-space:nowrap; flex-shrink:0;
-    display:inline-flex; align-items:center; gap:4px;
+  .tap-label{
+    font-size:10px; font-weight:700; color:var(--text-sub);
+    letter-spacing:.6px; text-transform:uppercase;
+    display:inline-flex; align-items:center; gap:6px;
   }
-  .row .open-btn::before{
+  .tap-label::before{
     content:''; width:6px; height:6px; border-radius:50%;
-    background:var(--line-accent); flex-shrink:0;
-  }
-  .row .open-btn:active{background:var(--primary-l); transform:scale(.96)}
-  .row .not-set{
-    color:var(--text-muted); font-size:10px; font-weight:600;
-    padding:5px 10px; background:#f3f4f6; border-radius:15px;
-    border:1px dashed var(--gray); white-space:nowrap; flex-shrink:0;
+    background:var(--line);
+    box-shadow:0 0 0 3px var(--line-soft);
   }
 
-  .row .icon-btn{
-    width:26px; height:26px; border-radius:5px;
-    border:none; background:transparent; cursor:pointer;
-    font-size:12px; padding:0; opacity:.55;
-    display:flex; align-items:center; justify-content:center;
-    color:var(--text-sub); flex-shrink:0;
+  /* シェブロン */
+  .chev{
+    flex-shrink:0; color:var(--text-muted);
+    font-size:22px; line-height:1; opacity:.55;
+    font-weight:400;
+    transition:transform .2s, opacity .2s, color .2s;
   }
-  .row .icon-btn:hover{background:var(--bg); opacity:1}
-  .row .icon-btn.danger:hover{background:#fef2f2; color:var(--danger)}
+  .tile:hover:not(.unset):not(.editing) .chev{
+    opacity:1; color:var(--line); transform:translateX(3px);
+  }
+
+  /* 未設定 (view mode) */
+  .tile.unset{
+    cursor:default;
+    border-style:dashed; border-color:var(--dash);
+    background:
+      repeating-linear-gradient(135deg,
+        var(--hatch) 0 6px, transparent 6px 12px),
+      var(--surface);
+  }
+  .tile.unset .mono{
+    background:transparent; color:var(--text-muted);
+    border:1.5px dashed var(--dash);
+  }
+  .tile.unset .name{color:var(--text-sub); font-weight:600}
+  .tile.unset .tap-label{color:var(--text-muted)}
+  .tile.unset .tap-label::before{
+    background:transparent; border:1.5px dashed var(--text-muted);
+    width:8px; height:8px; box-shadow:none;
+  }
+  .tile.unset .chev{display:none}
+
+  /* 編集モード用タイル */
+  body.edit-mode .tile{
+    cursor:default;
+    padding:12px 14px;
+    align-items:flex-start;
+    min-height:0;
+  }
+  body.edit-mode .tile:hover{
+    transform:none; box-shadow:none; border-color:var(--border);
+  }
+  body.edit-mode .tile::before{display:none}
+  body.edit-mode .tile.selected{
+    border-color:var(--line);
+    box-shadow:0 0 0 3px var(--focus);
+  }
+  /* 編集モードでは未設定タイルもハッチング解除 */
+  body.edit-mode .tile.unset{
+    background:var(--surface);
+    border-style:solid; border-color:var(--border);
+  }
+  body.edit-mode .tile.unset .mono{
+    background:var(--line-soft); color:var(--line-dark);
+    border:none;
+  }
+  body.edit-mode .tile.unset .name{color:var(--text); font-weight:700}
+
+  body.edit-mode .tile .mono{
+    width:38px; height:38px; font-size:15px; border-radius:10px;
+  }
+
+  .edit-inner{
+    display:flex; flex-direction:column; gap:8px;
+    flex:1; min-width:0;
+  }
+  .edit-topline{
+    display:flex; align-items:center; gap:8px;
+  }
+  .edit-topline .name{
+    flex:1; min-width:0;
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .drag-handle{
+    width:26px; height:26px; border-radius:6px;
+    background:transparent; border:1px solid var(--border);
+    color:var(--text-muted); cursor:grab;
+    display:flex; align-items:center; justify-content:center;
+    font-size:13px; padding:0; flex-shrink:0;
+    letter-spacing:-2px;
+    transition:all .15s;
+  }
+  .drag-handle:hover{color:var(--text); border-color:var(--border-strong)}
+  .drag-handle:active{cursor:grabbing; background:var(--line-soft); color:var(--line); border-color:var(--line)}
+  .chkbox{
+    width:22px; height:22px; border-radius:6px;
+    border:1.5px solid var(--border-strong);
+    background:#fff; cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+    flex-shrink:0; font-size:13px; color:#fff; font-weight:800;
+    transition:all .15s;
+  }
+  .tile.selected .chkbox{
+    background:var(--line); border-color:var(--line);
+  }
+  .tile.selected .chkbox::after{content:'✓'}
+
+  .edit-url-row input{
+    width:100%; padding:8px 10px;
+    border:1px solid var(--border); border-radius:8px;
+    font-size:12px; font-family:'SF Mono','Consolas',monospace;
+    background:#fff; min-width:0;
+    transition:border-color .15s, box-shadow .15s;
+  }
+  .edit-url-row input:focus{
+    outline:none; border-color:var(--line);
+    box-shadow:0 0 0 3px var(--focus);
+  }
+  .edit-url-row input.dirty{
+    border-color:#f59e0b;
+    background:#fffbeb;
+  }
+  .edit-actions{
+    display:flex; gap:6px;
+    justify-content:flex-end;
+  }
+  .edit-actions button{
+    padding:6px 10px; border-radius:7px; font-size:11px; font-weight:700;
+    border:1px solid var(--border); background:#fff; color:var(--text);
+    cursor:pointer;
+    transition:all .15s;
+    display:inline-flex; align-items:center; gap:4px;
+  }
+  .edit-actions button.save{background:var(--line); color:#fff; border-color:var(--line)}
+  .edit-actions button.save:hover{background:var(--line-dark); border-color:var(--line-dark)}
+  .edit-actions button.delete{color:var(--danger); border-color:#fecaca; background:#fff}
+  .edit-actions button.delete:hover{background:var(--danger-soft)}
+
+  /* Sortable states */
+  .sortable-ghost{opacity:.35; background:var(--line-soft) !important}
+  .sortable-chosen{transform:scale(1.02)}
+  .sortable-drag{box-shadow:0 16px 32px rgba(15,23,42,.18) !important}
+
+  /* Loading / empty */
+  .status{
+    padding:60px 20px; text-align:center;
+    color:var(--text-sub); font-size:14px;
+    background:var(--surface); border-radius:14px;
+    border:1px solid var(--border);
+  }
+  .status.error{color:var(--danger); background:var(--danger-soft); border-color:#fecaca}
+  .status-hint{margin-top:10px; font-size:12px; color:var(--text-muted)}
 
   /* Fixed bottom selection bar */
   .sel-bar{
-    position:fixed; bottom:0; left:0; right:0;
-    background:var(--primary); color:#fff;
-    padding:10px 14px; z-index:30;
-    box-shadow:0 -4px 14px rgba(0,0,0,.25);
-    display:flex; align-items:center; gap:8px;
-    animation:slideupbar .2s;
+    position:fixed; bottom:14px; left:14px; right:14px;
+    max-width:560px; margin:0 auto;
+    background:#0f172a; color:#fff;
+    padding:11px 14px; z-index:30;
+    border-radius:999px;
+    box-shadow:0 20px 40px -10px rgba(0,0,0,.4);
+    display:flex; align-items:center; gap:10px;
+    animation:slideupbar .22s cubic-bezier(.2,.8,.2,1);
   }
-  @keyframes slideupbar{from{transform:translateY(100%)}to{transform:translateY(0)}}
-  .sel-bar .cnt{flex:1; font-size:13px; font-weight:700}
+  @keyframes slideupbar{from{transform:translateY(20px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .sel-bar .cnt{flex:1; font-size:13px; font-weight:700; display:inline-flex; align-items:center; gap:8px}
   .sel-bar .cnt .num{
-    display:inline-block; background:var(--sel-b); color:#fff;
-    padding:2px 9px; border-radius:11px; margin-right:6px;
-    font-size:12px;
+    display:inline-flex; align-items:center; justify-content:center;
+    background:var(--line); color:#fff;
+    min-width:26px; height:26px; padding:0 9px; border-radius:13px;
+    font-size:12px; font-weight:800;
   }
   .sel-bar button{
-    padding:7px 14px; border-radius:18px; font-size:12px;
-    font-weight:700; cursor:pointer; border:none;
+    padding:8px 14px; border-radius:999px; font-size:12px;
+    font-weight:800; cursor:pointer; border:none;
   }
-  .sel-bar .btn-clear{background:transparent; color:#fff; border:1px solid rgba(255,255,255,.35)}
-  .sel-bar .btn-issue{background:var(--line-accent); color:#fff}
-
-  /* 並び替えモード表示バー */
-  .reorder-bar{
-    position:fixed; bottom:0; left:0; right:0;
-    background:var(--sel-b); color:#fff;
-    padding:10px 14px; z-index:30;
-    display:none; align-items:center; gap:8px;
-    box-shadow:0 -4px 14px rgba(0,0,0,.25);
-  }
-  body.reorder-mode .reorder-bar{display:flex}
-  body.reorder-mode .sel-bar{display:none !important}
-  .reorder-bar .msg{flex:1; font-size:13px; font-weight:700}
-  .reorder-bar button{
-    padding:7px 14px; border-radius:18px; font-size:12px;
-    font-weight:700; cursor:pointer; border:none;
-    background:#fff; color:var(--sel-b);
-  }
-
-  /* Loading / empty */
-  .loading, .empty, .error{
-    grid-column:1/-1;
-    padding:40px 20px; text-align:center;
-    color:var(--text-sub); font-size:13px;
-  }
-  .empty{background:#fff}
-  .error{background:#fff2f2; color:var(--danger)}
-  .empty-hint{margin-top:8px; font-size:11px; color:var(--text-muted)}
+  .sel-bar .btn-clear{background:transparent; color:#fff; border:1px solid rgba(255,255,255,.28)}
+  .sel-bar .btn-clear:hover{background:rgba(255,255,255,.06); border-color:rgba(255,255,255,.4)}
+  .sel-bar .btn-issue{background:var(--line); color:#fff; letter-spacing:.4px}
+  .sel-bar .btn-issue:hover{background:var(--line-dark)}
 
   /* Modal */
   .backdrop{
-    position:fixed; inset:0; background:rgba(0,0,0,.55);
+    position:fixed; inset:0; background:rgba(15,23,42,.55);
     display:flex; align-items:center; justify-content:center;
     padding:16px; z-index:200; animation:fadein .15s;
+    backdrop-filter:blur(4px);
+    -webkit-backdrop-filter:blur(4px);
   }
   @keyframes fadein{from{opacity:0}to{opacity:1}}
   .modal{
-    background:#fff; border-radius:14px; padding:20px;
-    max-width:520px; width:100%; max-height:90vh; overflow-y:auto;
-    box-shadow:0 20px 60px rgba(0,0,0,.4);
-    animation:slideup .2s;
+    background:#fff; border-radius:16px; padding:22px;
+    max-width:540px; width:100%; max-height:90vh; overflow-y:auto;
+    box-shadow:0 24px 60px rgba(0,0,0,.35);
+    animation:slideup .22s cubic-bezier(.2,.8,.2,1);
   }
-  @keyframes slideup{from{transform:translateY(12px);opacity:0}to{transform:translateY(0);opacity:1}}
-  .modal h3{margin:0 0 14px; font-size:16px; font-weight:800}
-  .field{margin-bottom:12px}
+  @keyframes slideup{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
+  .modal h3{margin:0 0 16px; font-size:17px; font-weight:800}
+  .field{margin-bottom:14px}
   .field label{
-    display:block; font-size:11px; font-weight:600;
-    color:var(--text-sub); margin-bottom:5px;
+    display:block; font-size:11px; font-weight:700;
+    color:var(--text-sub); margin-bottom:6px; letter-spacing:.4px;
   }
   .field input, .field select, .field textarea{
-    width:100%; padding:10px 12px;
-    border:1px solid var(--border); border-radius:8px;
+    width:100%; padding:11px 13px;
+    border:1px solid var(--border); border-radius:10px;
     font-size:14px; font-family:inherit; box-sizing:border-box;
     background:#fff;
+    transition:border-color .15s, box-shadow .15s;
   }
   .field textarea{
     resize:vertical; min-height:120px; line-height:1.55;
     font-family:'SF Mono','Consolas',monospace; font-size:12px;
   }
   .field input:focus, .field select:focus, .field textarea:focus{
-    outline:none; border-color:var(--accent);
-    box-shadow:0 0 0 3px rgba(74,85,104,.12);
+    outline:none; border-color:var(--line);
+    box-shadow:0 0 0 3px var(--focus);
   }
   .field input:disabled, .field select:disabled{background:#fafafa; color:var(--text-sub)}
-  .m-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:16px; flex-wrap:wrap}
+  .m-actions{display:flex; gap:8px; justify-content:flex-end; margin-top:18px; flex-wrap:wrap}
   .btn{
     padding:10px 20px; font-size:14px; font-weight:700;
-    border-radius:8px; cursor:pointer;
+    border-radius:10px; cursor:pointer;
     border:1px solid var(--border); background:#fff; color:var(--text);
+    transition:all .15s;
   }
   .btn:active{transform:scale(.97)}
-  .btn.primary{background:var(--primary); color:#fff; border-color:var(--primary)}
-  .btn.primary:active{background:var(--primary-l)}
+  .btn.primary{background:var(--line); color:#fff; border-color:var(--line)}
+  .btn.primary:hover{background:var(--line-dark); border-color:var(--line-dark)}
 
   .hint{
     font-size:11px; color:var(--text-sub);
-    background:var(--bg); border-radius:6px; padding:8px 10px;
+    background:var(--bg); border-radius:8px; padding:9px 11px;
     margin-top:6px; line-height:1.6;
   }
-  .hint code{background:#fff; padding:1px 5px; border-radius:3px; font-family:'SF Mono',monospace; font-size:11px}
+  .hint code{background:#fff; padding:1px 5px; border-radius:4px; font-family:'SF Mono',monospace; font-size:11px}
 
   .fmt-tabs{
-    display:flex; gap:4px; margin-bottom:10px;
+    display:flex; gap:4px; margin-bottom:12px;
     border-bottom:1px solid var(--border); padding-bottom:4px;
   }
   .fmt-tab{
-    flex:1; padding:7px 6px; background:transparent; border:none;
-    font-size:12px; font-weight:600; color:var(--text-sub);
-    border-radius:6px 6px 0 0; cursor:pointer;
+    flex:1; padding:8px 6px; background:transparent; border:none;
+    font-size:12px; font-weight:700; color:var(--text-sub);
+    border-radius:8px 8px 0 0; cursor:pointer;
     border-bottom:2px solid transparent;
+    transition:color .15s, border-color .15s;
   }
-  .fmt-tab.active{color:var(--primary); border-bottom-color:var(--primary)}
+  .fmt-tab.active{color:var(--line); border-bottom-color:var(--line)}
   .issue-out{
     width:100%; min-height:180px; padding:12px;
-    border:1px solid var(--border); border-radius:8px;
+    border:1px solid var(--border); border-radius:10px;
     background:#fafafa; font-size:12px; font-family:'SF Mono','Consolas',monospace;
     line-height:1.7; resize:vertical; box-sizing:border-box;
   }
   .fmt-info{font-size:11px; color:var(--text-sub); margin:6px 0 10px}
 
   .toast{
-    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
-    background:#1a1a1a; color:#fff; padding:11px 20px; border-radius:24px;
+    position:fixed; bottom:82px; left:50%; transform:translateX(-50%);
+    background:#0f172a; color:#fff; padding:12px 22px; border-radius:999px;
     font-size:13px; font-weight:700; z-index:1000;
-    box-shadow:0 8px 24px rgba(0,0,0,.3);
+    box-shadow:0 12px 30px rgba(0,0,0,.3);
     animation:slideuptoast .25s; max-width:90vw; text-align:center;
   }
   .toast.error{background:var(--danger)}
   @keyframes slideuptoast{from{transform:translate(-50%,20px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
 
-  .legend{
-    display:flex; gap:14px; padding:6px 14px 8px;
-    font-size:10px; color:var(--text-sub);
-    background:#fff; border-bottom:1px solid var(--border);
-  }
-  .legend .dot{
-    display:inline-block; width:10px; height:10px;
-    border-radius:2px; margin-right:5px; vertical-align:middle;
-  }
-  .legend .dot.store{background:var(--store)}
-  .legend .dot.solo{background:var(--solo)}
-
   @media (max-width:420px){
+    .container{padding:14px 12px}
     .head h1{font-size:14px}
-    .action-bar{padding:7px 10px; gap:5px}
-    .action-btn{padding:6px 9px; font-size:11px}
-    .row{padding:8px 10px 8px 7px; min-height:48px}
-    .row .name{font-size:13px}
-    .row .open-btn, .row .not-set{padding:5px 10px; font-size:10px}
+    .tile{padding:12px; min-height:68px; gap:10px}
+    .mono{width:40px; height:40px; font-size:16px}
+    .name{font-size:13px}
+    .tap-label{font-size:9px}
   }
 </style>
 </head>
@@ -350,28 +485,24 @@
     <h1><span class="line-tag">LINE</span> グループ</h1>
     <div class="sub" id="head-sub">読み込み中…</div>
   </div>
-  <span class="spacer"></span>
+  <button class="edit-toggle" id="edit-toggle">✏️ 編集</button>
 </header>
 
 <div class="container">
-  <div class="action-bar">
+  <div class="toolbar">
     <div class="search-box">
       <input type="text" id="search" placeholder="グループ名で検索…">
     </div>
-    <button class="action-btn reorder" id="reorder-btn" title="並び替えモード">↕ 並替</button>
-    <button class="action-btn gray" id="select-all-btn">☑ 全選択</button>
-    <button class="action-btn primary" id="add-btn">＋ 追加</button>
-    <button class="action-btn outline" id="bulk-btn">📋 一括</button>
   </div>
 
-  <div class="legend">
-    <span><span class="dot store"></span>店舗</span>
-    <span><span class="dot solo"></span>単独</span>
-    <span style="margin-left:auto">🖱 行クリックで選択・↕で並替</span>
+  <div class="edit-tools" id="edit-tools">
+    <button class="btn primary" id="add-btn">＋ 追加</button>
+    <button class="btn" id="bulk-btn">📋 一括</button>
+    <button class="btn" id="select-all-btn">☑ 全選択</button>
   </div>
 
-  <div class="list" id="list">
-    <div class="loading">読み込み中…</div>
+  <div id="sections">
+    <div class="status">読み込み中…</div>
   </div>
 </div>
 
@@ -379,11 +510,6 @@
   <div class="cnt"><span class="num" id="sel-num">0</span>件選択中</div>
   <button class="btn-clear" id="clear-sel">解除</button>
   <button class="btn-issue" id="issue-btn">📤 URL 発行</button>
-</div>
-
-<div class="reorder-bar" id="reorder-bar">
-  <div class="msg">↕ 行をドラッグして並び順を変更</div>
-  <button id="reorder-done">完了</button>
 </div>
 
 <div id="modal-root"></div>
@@ -400,7 +526,7 @@
   let allGroups = [];
   let searchQ = '';
   const selected = new Set();
-  let sortableInstance = null;
+  let sortableInstances = [];
 
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -411,9 +537,24 @@
     document.body.appendChild(el);
     setTimeout(() => el.remove(), 2200);
   };
+  const isEditMode = () => document.body.classList.contains('edit-mode');
 
+  // 検索
   $('search').addEventListener('input', (e) => {
     searchQ = e.target.value.trim().toLowerCase();
+    render();
+  });
+
+  // 編集モードトグル
+  $('edit-toggle').addEventListener('click', () => {
+    const nextEdit = !isEditMode();
+    document.body.classList.toggle('edit-mode', nextEdit);
+    $('edit-toggle').innerHTML = nextEdit ? '✓ 完了' : '✏️ 編集';
+    if (!nextEdit) {
+      selected.clear();
+      updateSelBar();
+      destroySortable();
+    }
     render();
   });
 
@@ -426,64 +567,63 @@
     render();
   });
 
-  // 並替モード切替
-  $('reorder-btn').addEventListener('click', () => toggleReorderMode(true));
-  $('reorder-done').addEventListener('click', () => toggleReorderMode(false));
+  $('clear-sel').addEventListener('click', () => {
+    selected.clear();
+    updateSelBar();
+    render();
+  });
 
-  function toggleReorderMode(on){
-    document.body.classList.toggle('reorder-mode', on);
-    $('reorder-btn').classList.toggle('active', on);
-    if (on) {
-      // 検索・選択をクリアして全表示に
-      searchQ = '';
-      $('search').value = '';
-      selected.clear();
-      updateSelBar();
-      render();
-      // Sortable を初期化
-      const list = $('list');
-      sortableInstance = Sortable.create(list, {
-        animation: 150,
+  $('issue-btn').addEventListener('click', () => openIssueModal());
+  $('add-btn').addEventListener('click', () => openEditModal(null));
+  $('bulk-btn').addEventListener('click', () => openBulkModal());
+
+  // -------- 並び替え --------
+  function initSortable(){
+    destroySortable();
+    document.querySelectorAll('.grid').forEach(gridEl => {
+      const inst = Sortable.create(gridEl, {
+        animation: 160,
+        handle: '.drag-handle',
         ghostClass: 'sortable-ghost',
         chosenClass: 'sortable-chosen',
+        dragClass: 'sortable-drag',
         onEnd: onReorderEnd,
       });
-    } else {
-      if (sortableInstance) { sortableInstance.destroy(); sortableInstance = null; }
-      render();
-    }
+      sortableInstances.push(inst);
+    });
+  }
+  function destroySortable(){
+    sortableInstances.forEach(s => s.destroy());
+    sortableInstances = [];
   }
 
-  async function onReorderEnd(evt){
-    // 現在の DOM 順から新しい sort_order を計算 (1-indexed × 10)
-    const list = $('list');
-    const rowEls = [...list.querySelectorAll('.row')];
-    const updates = rowEls.map((row, i) => ({
-      id: row.dataset.id,
+  async function onReorderEnd(){
+    // DOM 順から新しい sort_order を計算 (セクション横断で通し番号)
+    const allTiles = [...document.querySelectorAll('.section .tile[data-id]')];
+    const updates = allTiles.map((t, i) => ({
+      id: t.dataset.id,
       sort_order: (i + 1) * 10,
     }));
     try {
-      // 並列 UPDATE で高速化
       const results = await Promise.all(updates.map(u =>
         sb.from('line_groups').update({ sort_order: u.sort_order }).eq('id', u.id)
       ));
       const errors = results.filter(r => r.error);
       if (errors.length) throw errors[0].error;
-      // ローカル allGroups も更新
       updates.forEach(u => {
         const g = allGroups.find(x => x.id === u.id);
         if (g) g.sort_order = u.sort_order;
       });
-      // v6.1 バグ修正: ローカル配列も並び替えないと render() で元の順に戻る
       allGroups.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
       toast('順番を保存しました');
     } catch(e){
       toast('並替保存失敗: ' + (e.message||e), true);
       console.error(e);
-      await load();  // 失敗時は再取得で戻す
+      await load();
     }
   }
 
+  // -------- ロード --------
   async function load(){
     try {
       const { data, error } = await sb.from('line_groups')
@@ -494,12 +634,10 @@
       if (error) throw error;
       allGroups = data || [];
       $('head-sub').textContent = `${allGroups.length}件`;
-      // 初期 seed の sort_order が category ごとに 10-140 で重複してるので、
-      // 一意な連番になるよう自動で振り直す (1度だけ)
       await autoRenumberIfNeeded();
     } catch(e){
       console.error('load failed', e);
-      $('list').innerHTML = `<div class="error">読み込み失敗: ${esc(e.message||e)}<br><small style="opacity:.7">line_groups テーブル未作成の可能性</small></div>`;
+      $('sections').innerHTML = `<div class="status error">読み込み失敗: ${esc(e.message||e)}<div class="status-hint">line_groups テーブル未作成の可能性</div></div>`;
       $('head-sub').textContent = 'エラー';
       return;
     }
@@ -507,7 +645,6 @@
   }
 
   async function autoRenumberIfNeeded(){
-    // sort_order が重複してるか調べる (店舗と単独で同じ値があると混在で表示崩れる)
     const seen = new Set();
     let hasDup = false;
     for (const g of allGroups) {
@@ -515,12 +652,11 @@
       seen.add(g.sort_order);
     }
     if (!hasDup) return;
-    // 店舗 → 単独 の順で並べて 10, 20, 30… と振り直す
     const stores = allGroups.filter(g => g.category === 'store')
       .sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
     const solos = allGroups.filter(g => g.category === 'solo')
       .sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
-    const combined = [...stores, ...solos];
+    const combined = [...solos, ...stores];
     const updates = combined.map((g, i) => ({ id: g.id, sort_order: (i+1)*10 }));
     try {
       await Promise.all(updates.map(u =>
@@ -530,7 +666,6 @@
         const g = allGroups.find(x => x.id === u.id);
         if (g) g.sort_order = u.sort_order;
       });
-      // 並び順を反映
       allGroups.sort((a,b) => (a.sort_order||0) - (b.sort_order||0));
     } catch(e){
       console.warn('auto-renumber failed', e);
@@ -541,54 +676,141 @@
     return allGroups.filter(g => !searchQ || g.name.toLowerCase().includes(searchQ));
   }
 
+  // -------- レンダリング --------
+  const CATS = [
+    { key: 'solo',  label: '全体・ドクター' },
+    { key: 'store', label: '医院' },
+  ];
+
   function render(){
-    const rows = filteredGroups();
-    const list = $('list');
-    if (!rows.length) {
+    const container = $('sections');
+    const visible = filteredGroups();
+
+    if (!visible.length) {
       const isSearch = !!searchQ;
-      list.innerHTML = `<div class="empty">
+      container.innerHTML = `<div class="status">
         ${isSearch ? '「'+esc(searchQ)+'」に一致するグループがありません' : 'まだ登録がありません'}
-        ${!isSearch ? '<div class="empty-hint">上の「＋ 追加」または「📋 一括」から登録できます</div>' : ''}
+        ${!isSearch ? '<div class="status-hint">右上の「編集」をタップして「＋ 追加」または「📋 一括」から登録できます</div>' : ''}
       </div>`;
       return;
     }
-    list.innerHTML = rows.map(g => {
-      const hasUrl = !!(g.url && g.url.trim());
-      const isSel = selected.has(g.id);
-      const rowCls = 'row ' + g.category + (hasUrl ? '' : ' disabled') + (isSel ? ' selected' : '');
-      const actionHtml = hasUrl
-        ? `<a class="open-btn" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">開く →</a>`
-        : `<span class="not-set">未設定</span>`;
-      return `<div class="${rowCls}" data-id="${g.id}">
-        <button class="drag-handle" title="ドラッグで並替">≡</button>
-        <div class="check"></div>
+
+    const edit = isEditMode();
+    const parts = [];
+    CATS.forEach(c => {
+      const items = visible.filter(g => g.category === c.key);
+      if (!items.length) return;
+      parts.push(`
+        <section class="section" data-cat="${c.key}">
+          <div class="section-title">
+            <span>${esc(c.label)}</span>
+            <span class="cnt">${items.length}</span>
+            <span class="rule"></span>
+          </div>
+          <div class="grid" data-cat="${c.key}">
+            ${items.map(g => renderTile(g, edit)).join('')}
+          </div>
+        </section>
+      `);
+    });
+    container.innerHTML = parts.join('');
+
+    wireTiles();
+    if (edit) initSortable();
+  }
+
+  function renderTile(g, edit){
+    const hasUrl = !!(g.url && g.url.trim());
+    const initial = ((g.name || '?').trim().charAt(0) || '?').toUpperCase();
+    const isSel = selected.has(g.id);
+
+    if (edit) {
+      return `
+        <div class="tile ${isSel ? 'selected' : ''} ${hasUrl ? '' : 'unset'} editing" data-id="${g.id}">
+          <div class="mono">${esc(initial)}</div>
+          <div class="edit-inner">
+            <div class="edit-topline">
+              <div class="name" title="${esc(g.name)}">${esc(g.name)}</div>
+              <div class="chkbox" data-act="toggle-sel" title="選択"></div>
+              <button class="drag-handle" title="ドラッグで並び替え" type="button">⋮⋮</button>
+            </div>
+            <div class="edit-url-row">
+              <input type="url" placeholder="https://line.me/ti/g/xxxxxxxx" value="${esc(g.url || '')}" data-act="url-input">
+            </div>
+            <div class="edit-actions">
+              <button class="save" data-act="save-url" type="button">💾 保存</button>
+              <button class="delete" data-act="delete" type="button">🗑 削除</button>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+
+    // ビューモード
+    const inner = `
+      <div class="mono">${esc(initial)}</div>
+      <div class="body">
         <div class="name" title="${esc(g.name)}">${esc(g.name)}</div>
-        ${actionHtml}
-        <button class="icon-btn" data-act="edit" data-id="${g.id}" title="URL 編集">✏️</button>
-        <button class="icon-btn danger" data-act="delete" data-id="${g.id}" title="削除">🗑</button>
-      </div>`;
-    }).join('');
-    list.querySelectorAll('.row').forEach(row => {
-      row.addEventListener('click', (e) => {
-        if (document.body.classList.contains('reorder-mode')) return;
-        if (e.target.closest('.open-btn') || e.target.closest('.icon-btn')) return;
-        const id = row.dataset.id;
-        if (selected.has(id)) selected.delete(id); else selected.add(id);
-        row.classList.toggle('selected');
-        updateSelBar();
-      });
+        <div class="tap-label">${hasUrl ? 'タップで開く' : '未設定'}</div>
+      </div>
+      ${hasUrl ? '<div class="chev">›</div>' : ''}
+    `;
+    if (hasUrl) {
+      return `<a class="tile" data-id="${g.id}" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+    }
+    return `<div class="tile unset" data-id="${g.id}">${inner}</div>`;
+  }
+
+  function wireTiles(){
+    document.querySelectorAll('.tile[data-id]').forEach(tile => {
+      const id = tile.dataset.id;
+      const urlInput = tile.querySelector('[data-act="url-input"]');
+      const saveBtn = tile.querySelector('[data-act="save-url"]');
+      const deleteBtn = tile.querySelector('[data-act="delete"]');
+      const chkbox = tile.querySelector('[data-act="toggle-sel"]');
+      const originalUrl = urlInput ? urlInput.value : '';
+
+      if (urlInput) {
+        urlInput.addEventListener('click', e => e.stopPropagation());
+        urlInput.addEventListener('input', () => {
+          urlInput.classList.toggle('dirty', urlInput.value.trim() !== originalUrl.trim());
+        });
+        urlInput.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') { e.preventDefault(); saveUrlEdit(id, urlInput.value); }
+        });
+      }
+      if (saveBtn) {
+        saveBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          saveUrlEdit(id, urlInput.value);
+        });
+      }
+      if (deleteBtn) {
+        deleteBtn.addEventListener('click', (e) => {
+          e.stopPropagation();
+          const g = allGroups.find(x => x.id === id);
+          if (g) deleteGroup(g);
+        });
+      }
+      if (chkbox) {
+        chkbox.addEventListener('click', (e) => {
+          e.stopPropagation();
+          toggleSel(id, tile);
+        });
+      }
+      // 編集モードではタイル本体クリックでも選択切替
+      if (isEditMode()) {
+        tile.addEventListener('click', (e) => {
+          if (e.target.closest('button, input, .drag-handle, .chkbox')) return;
+          toggleSel(id, tile);
+        });
+      }
     });
-    list.querySelectorAll('.icon-btn').forEach(b => {
-      b.addEventListener('click', (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const id = b.dataset.id;
-        const g = allGroups.find(x => x.id === id);
-        if (!g) return;
-        if (b.dataset.act === 'edit') openEditModal(g);
-        else if (b.dataset.act === 'delete') deleteGroup(g);
-      });
-    });
+  }
+
+  function toggleSel(id, tile){
+    if (selected.has(id)) selected.delete(id); else selected.add(id);
+    tile.classList.toggle('selected');
     updateSelBar();
   }
 
@@ -598,14 +820,35 @@
     bar.hidden = selected.size === 0;
   }
 
-  $('clear-sel').addEventListener('click', () => {
-    selected.clear();
-    updateSelBar();
-    render();
-  });
+  // -------- 保存系 --------
+  async function saveUrlEdit(id, rawUrl){
+    const url = rawUrl.trim();
+    if (url && !/^https?:\/\//.test(url)) {
+      toast('URL は http(s):// で始めてください', true);
+      return;
+    }
+    try {
+      const { error } = await sb.from('line_groups').update({ url: url || null }).eq('id', id);
+      if (error) throw error;
+      const g = allGroups.find(x => x.id === id);
+      if (g) g.url = url || null;
+      toast('保存しました');
+      render();
+    } catch(e){ toast('保存失敗: ' + (e.message||e), true); }
+  }
 
-  $('issue-btn').addEventListener('click', () => openIssueModal());
+  async function deleteGroup(g){
+    if (!confirm(`「${g.name}」を削除しますか？\n(この操作は取り消せません)`)) return;
+    try {
+      const { error } = await sb.from('line_groups').delete().eq('id', g.id);
+      if (error) throw error;
+      selected.delete(g.id);
+      toast('削除しました');
+      await load();
+    } catch(e){ toast('削除失敗: ' + (e.message||e), true); }
+  }
 
+  // -------- モーダル: URL 発行 --------
   function openIssueModal(){
     const picked = allGroups.filter(g => selected.has(g.id));
     if (!picked.length) { toast('選択なし', true); return; }
@@ -672,9 +915,7 @@
     };
   }
 
-  $('add-btn').addEventListener('click', () => openEditModal(null));
-  $('bulk-btn').addEventListener('click', () => openBulkModal());
-
+  // -------- モーダル: 追加/編集 --------
   function openEditModal(g){
     const isNew = !g;
     const html = `
@@ -684,8 +925,8 @@
           <div class="field">
             <label>カテゴリ</label>
             <select id="m-cat" ${isNew ? '' : 'disabled'}>
-              <option value="store"${(g?.category==='store'||isNew)?' selected':''}>🏥 店舗グループ</option>
-              <option value="solo"${g?.category==='solo'?' selected':''}>🎯 単独グループ</option>
+              <option value="solo"${(g?.category==='solo'||isNew)?' selected':''}>🎯 全体・ドクター</option>
+              <option value="store"${g?.category==='store'?' selected':''}>🏥 医院</option>
             </select>
           </div>
           <div class="field">
@@ -737,8 +978,9 @@
     setTimeout(() => (isNew ? $('m-name') : $('m-url')).focus(), 60);
   }
 
+  // -------- モーダル: 一括追加 --------
   function openBulkModal(){
-    const sample = '店舗\tにじいろ\thttps://line.me/ti/g/xxx\n店舗\t新店\n単独\t会議室\thttps://line.me/ti/g/yyy';
+    const sample = '医院\tにじいろ\thttps://line.me/ti/g/xxx\n医院\t新店\n全体\t会議室\thttps://line.me/ti/g/yyy';
     const html = `
       <div class="backdrop">
         <div class="modal">
@@ -748,7 +990,7 @@
             <textarea id="m-bulk" placeholder="${esc(sample)}"></textarea>
             <div class="hint">
               形式: <code>カテゴリ ⇥ 名前 ⇥ URL(任意)</code><br>
-              カテゴリ = <code>店舗</code> or <code>単独</code><br>
+              カテゴリ = <code>医院</code>(=店舗) or <code>全体</code>(=単独/ドクター)<br>
               Excel/スプレッドシートから 3列コピペ可
             </div>
           </div>
@@ -773,8 +1015,8 @@
         const parts = line.split(/[\t|]/).map(s => s.trim());
         if (parts.length < 2) { errors.push(`行${i+1}: 区切り不足`); return; }
         const [catRaw, name, urlRaw] = parts;
-        const cat = /^(店舗|store)$/i.test(catRaw) ? 'store'
-                  : /^(単独|solo)$/i.test(catRaw) ? 'solo' : null;
+        const cat = /^(店舗|医院|store)$/i.test(catRaw) ? 'store'
+                  : /^(単独|全体|ドクター|solo)$/i.test(catRaw) ? 'solo' : null;
         if (!cat) { errors.push(`行${i+1}: カテゴリ不正 (${catRaw})`); return; }
         if (!name) { errors.push(`行${i+1}: 名前が空`); return; }
         const url = (urlRaw||'').trim();
@@ -798,17 +1040,6 @@
       } catch(e){ toast('一括追加失敗: ' + (e.message||e), true); }
     };
     setTimeout(() => $('m-bulk').focus(), 60);
-  }
-
-  async function deleteGroup(g){
-    if (!confirm(`「${g.name}」を削除しますか？\n(この操作は取り消せません)`)) return;
-    try {
-      const { error } = await sb.from('line_groups').delete().eq('id', g.id);
-      if (error) throw error;
-      selected.delete(g.id);
-      toast('削除しました');
-      await load();
-    } catch(e){ toast('削除失敗: ' + (e.message||e), true); }
   }
 
   load();
