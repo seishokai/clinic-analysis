@@ -34,7 +34,7 @@
     font-family:'Noto Sans JP','Hiragino Sans','Meiryo',sans-serif;
     color:var(--text); line-height:1.5;
     -webkit-font-smoothing:antialiased;
-    padding-bottom:96px;
+    padding-bottom:88px;
     min-height:100vh;
   }
   [hidden]{display:none !important}
@@ -77,16 +77,21 @@
     display:inline-flex; align-items:center; gap:4px;
   }
   .head .edit-toggle:hover{background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.36)}
-  body.edit-mode .head .edit-toggle{background:var(--line); border-color:var(--line); color:#fff}
-  body.edit-mode .head .edit-toggle:hover{background:var(--line-dark); border-color:var(--line-dark)}
+  body.edit-mode .head #edit-toggle,
+  body.select-mode .head #select-toggle{background:var(--line); border-color:var(--line); color:#fff}
+  body.edit-mode .head #edit-toggle:hover,
+  body.select-mode .head #select-toggle:hover{background:var(--line-dark); border-color:var(--line-dark)}
+  /* 選択モード中は編集ボタンは隠す (逆も同様) */
+  body.select-mode .head #edit-toggle,
+  body.edit-mode .head #select-toggle{display:none}
 
   /* コンテナ */
-  .container{max-width:1100px; margin:0 auto; padding:18px 14px}
+  .container{max-width:1100px; margin:0 auto; padding:12px 12px 20px}
 
   /* ツールバー */
   .toolbar{
     display:flex; gap:8px; align-items:center;
-    margin-bottom:14px;
+    margin-bottom:10px;
   }
   .search-box{flex:1; min-width:0; position:relative}
   .search-box input{
@@ -107,9 +112,11 @@
   /* 編集モード時のみのツール */
   .edit-tools{
     display:none; gap:8px; flex-wrap:wrap;
-    margin-bottom:18px;
+    margin-bottom:12px;
   }
-  body.edit-mode .edit-tools{display:flex}
+  body.edit-mode .edit-tools, body.select-mode .edit-tools{display:flex}
+  /* 選択モードでは「追加/一括」は不要、「全選択」だけ出す */
+  body.select-mode #add-btn, body.select-mode #bulk-btn{display:none}
   .edit-tools .btn{
     padding:9px 14px; border-radius:999px; font-size:12px;
     font-weight:700; cursor:pointer; border:1px solid var(--border);
@@ -122,12 +129,12 @@
   .edit-tools .btn.primary:hover{background:var(--line-dark); border-color:var(--line-dark)}
 
   /* セクション */
-  .section{margin-bottom:26px}
+  .section{margin-bottom:16px}
   .section-title{
     display:flex; align-items:center; gap:10px;
     font-size:11px; font-weight:800; letter-spacing:1.6px;
     color:var(--text-sub); text-transform:uppercase;
-    margin:0 4px 12px;
+    margin:0 2px 8px;
   }
   .section-title .cnt{
     color:var(--text-muted); font-size:10px; letter-spacing:1px;
@@ -140,11 +147,11 @@
 
   /* グリッド */
   .grid{
-    display:grid; gap:10px;
+    display:grid; gap:8px;
     grid-template-columns:1fr 1fr;
   }
   @media (min-width:560px){
-    .grid{grid-template-columns:repeat(3, 1fr); gap:12px}
+    .grid{grid-template-columns:repeat(3, 1fr); gap:10px}
   }
 
   /* タイル */
@@ -152,19 +159,19 @@
     position:relative;
     background:var(--surface);
     border:1px solid var(--border);
-    border-radius:14px;
-    padding:14px;
-    display:flex; align-items:center; gap:12px;
+    border-radius:12px;
+    padding:11px 12px;
+    display:flex; align-items:center; gap:11px;
     cursor:pointer;
     text-decoration:none; color:inherit;
     transition:transform .22s cubic-bezier(.2,.8,.2,1),
                box-shadow .22s cubic-bezier(.2,.8,.2,1),
                border-color .18s;
     overflow:hidden;
-    min-height:74px;
+    min-height:60px;
   }
   .tile::before{
-    content:''; position:absolute; left:0; top:12px; bottom:12px;
+    content:''; position:absolute; left:0; top:10px; bottom:10px;
     width:3px; border-radius:2px; background:var(--line);
     transform:scaleY(0); transform-origin:center;
     transition:transform .28s cubic-bezier(.2,.8,.2,1);
@@ -180,12 +187,12 @@
 
   /* Monogram */
   .mono{
-    width:44px; height:44px; flex-shrink:0;
-    border-radius:12px;
+    width:38px; height:38px; flex-shrink:0;
+    border-radius:10px;
     background:var(--line-soft);
     color:var(--line-dark);
     display:flex; align-items:center; justify-content:center;
-    font-size:18px; font-weight:800; letter-spacing:.5px;
+    font-size:16px; font-weight:800; letter-spacing:.5px;
     line-height:1;
     transition:background .22s, color .22s;
   }
@@ -241,6 +248,47 @@
     width:8px; height:8px; box-shadow:none;
   }
   .tile.unset .chev{display:none}
+
+  /* 選択モード: タイル全体タップで選択 (URL は開かない) */
+  body.select-mode .tile{
+    cursor:pointer;
+    padding-right:38px;
+  }
+  body.select-mode .tile:hover:not(.unset){
+    transform:translateY(-2px);
+    box-shadow:0 8px 20px -12px var(--line-shadow), 0 1px 4px rgba(15,23,42,.04);
+    border-color:var(--line-soft);
+  }
+  body.select-mode .tile.unset{
+    cursor:pointer;
+    border-style:solid; border-color:var(--border);
+    background:var(--surface);
+  }
+  body.select-mode .tile.unset .mono{
+    background:var(--line-soft); color:var(--line-dark);
+    border:none;
+  }
+  body.select-mode .tile.unset .name{color:var(--text); font-weight:700}
+  body.select-mode .tile .chev{display:none}
+  /* 右上のミニチェックボックス */
+  body.select-mode .tile .sel-mark{
+    position:absolute; top:9px; right:10px;
+    width:20px; height:20px; border-radius:6px;
+    border:1.5px solid var(--border-strong);
+    background:#fff;
+    display:flex; align-items:center; justify-content:center;
+    color:#fff; font-size:12px; font-weight:800; line-height:1;
+    transition:all .15s;
+    pointer-events:none;
+  }
+  body.select-mode .tile.selected{
+    border-color:var(--line);
+    box-shadow:0 0 0 3px var(--focus);
+  }
+  body.select-mode .tile.selected .sel-mark{
+    background:var(--line); border-color:var(--line);
+  }
+  body.select-mode .tile.selected .sel-mark::after{content:'✓'}
 
   /* 編集モード用タイル */
   body.edit-mode .tile{
@@ -485,6 +533,7 @@
     <h1><span class="line-tag">LINE</span> グループ</h1>
     <div class="sub" id="head-sub">読み込み中…</div>
   </div>
+  <button class="edit-toggle" id="select-toggle" title="複数選択して URL 発行">☑ 選択</button>
   <button class="edit-toggle" id="edit-toggle">✏️ 編集</button>
 </header>
 
@@ -538,6 +587,7 @@
     setTimeout(() => el.remove(), 2200);
   };
   const isEditMode = () => document.body.classList.contains('edit-mode');
+  const isSelectMode = () => document.body.classList.contains('select-mode');
 
   // 検索
   $('search').addEventListener('input', (e) => {
@@ -548,13 +598,29 @@
   // 編集モードトグル
   $('edit-toggle').addEventListener('click', () => {
     const nextEdit = !isEditMode();
+    // 他モードは解除
+    document.body.classList.remove('select-mode');
+    $('select-toggle').innerHTML = '☑ 選択';
     document.body.classList.toggle('edit-mode', nextEdit);
     $('edit-toggle').innerHTML = nextEdit ? '✓ 完了' : '✏️ 編集';
-    if (!nextEdit) {
+    selected.clear();
+    updateSelBar();
+    destroySortable();
+    render();
+  });
+
+  // 選択モードトグル
+  $('select-toggle').addEventListener('click', () => {
+    const nextSel = !isSelectMode();
+    document.body.classList.remove('edit-mode');
+    $('edit-toggle').innerHTML = '✏️ 編集';
+    document.body.classList.toggle('select-mode', nextSel);
+    $('select-toggle').innerHTML = nextSel ? '✓ 完了' : '☑ 選択';
+    if (!nextSel) {
       selected.clear();
       updateSelBar();
-      destroySortable();
     }
+    destroySortable();
     render();
   });
 
@@ -746,7 +812,8 @@
       `;
     }
 
-    // ビューモード
+    // ビューモード (+ 選択モードも同じ構造・sel-mark 付き)
+    const selCls = isSel ? ' selected' : '';
     const inner = `
       <div class="mono">${esc(initial)}</div>
       <div class="body">
@@ -754,11 +821,12 @@
         <div class="tap-label">${hasUrl ? 'タップで開く' : '未設定'}</div>
       </div>
       ${hasUrl ? '<div class="chev">›</div>' : ''}
+      <div class="sel-mark"></div>
     `;
     if (hasUrl) {
-      return `<a class="tile" data-id="${g.id}" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
+      return `<a class="tile${selCls}" data-id="${g.id}" href="${esc(g.url)}" target="_blank" rel="noopener noreferrer">${inner}</a>`;
     }
-    return `<div class="tile unset" data-id="${g.id}">${inner}</div>`;
+    return `<div class="tile unset${selCls}" data-id="${g.id}">${inner}</div>`;
   }
 
   function wireTiles(){
@@ -802,6 +870,14 @@
       if (isEditMode()) {
         tile.addEventListener('click', (e) => {
           if (e.target.closest('button, input, .drag-handle, .chkbox')) return;
+          toggleSel(id, tile);
+        });
+      }
+      // 選択モード: タイル/リンククリックを乗っ取って選択切替
+      if (isSelectMode()) {
+        tile.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
           toggleSel(id, tile);
         });
       }
