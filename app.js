@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v498';
+const APP_VERSION = 'v499';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -8129,6 +8129,61 @@ function renderBookings() {
           sel.value = match ? match.status || '未対応' : '未対応';
           return;
         }
+        // v499: 「成約 → 金額未入力」防止ガード
+        //   過去 booking_status に「成約なのに金額 0/null」が 20 件以上滞留していた事故 (2026-07 発覚) を受けて、
+        //   成約選択時に金額が空/0 のときは prompt で金額入力を促す。
+        //   キャンセル押下時は警告トーストを出しつつ状態変更は進める (運用ブロックはしない)。
+        if (newStatus === '成約') {
+          const curAmt = Number(match?.contractAmount || 0);
+          if (!curAmt) {
+            const raw = prompt(
+              '⚠ ' + name + ' を「成約」にします。\n\n' +
+              '契約金額 (円) を入力してください:\n' +
+              '(税抜/税込は運用に合わせて。数字のみ・カンマ可)\n\n' +
+              '※後で入力する場合は「キャンセル」を押してください',
+              ''
+            );
+            if (raw !== null) {
+              const amt = Number(String(raw).replace(/[^0-9]/g, ''));
+              if (amt > 0) {
+                if (match) match.contractAmount = amt;
+                const bkEx0 = loadData('bk-extra', {});
+                const k0 = name + '|' + applyDate;
+                if (!bkEx0[k0]) bkEx0[k0] = {};
+                bkEx0[k0].contractAmount = amt;
+                saveData('bk-extra', bkEx0);
+                // 直近の DOM に反映 (行内の金額 input)
+                try {
+                  const amtInp = tbody.querySelector(
+                    'input[data-field="contractAmount"][data-name="' + CSS.escape(name) + '"][data-apply="' + CSS.escape(applyDate) + '"]'
+                  );
+                  if (amtInp) {
+                    amtInp.value = amt.toLocaleString();
+                    amtInp.style.background = '#dcfce7';
+                    setTimeout(() => { amtInp.style.background = ''; }, 1500);
+                  }
+                } catch(_){}
+                // DB へも同時保存
+                (async () => {
+                  try {
+                    await safeSave({
+                      type: 'upsert', table: 'booking_status',
+                      payload: { name, apply_date: applyDate, contract_amount: amt },
+                      options: { onConflict: 'name,apply_date' }
+                    });
+                  } catch(_){}
+                })();
+                showToast('契約金額 ¥' + amt.toLocaleString() + ' を保存しました');
+              } else if (String(raw).trim() !== '') {
+                showToast('⚠ 金額の書式が不正です。あとで必ず入力してください', true);
+              } else {
+                showToast('⚠ 金額未入力のまま成約にしました。あとで必ず入力してください', true);
+              }
+            } else {
+              showToast('⚠ 金額未入力のまま成約にしました。あとで必ず入力してください', true);
+            }
+          }
+        }
         if (match) match.status = newStatus;
         // bk-extra にも永続化
         const bkEx = loadData('bk-extra', {});
@@ -8623,6 +8678,40 @@ async function saveRowEdit() {
   d.phone = document.getElementById('re-phone').value;
   d.email = document.getElementById('re-email').value;
   d.source = document.getElementById('re-source').value;
+
+  // v499: 「成約 → 金額未入力」防止ガード (モーダル編集ルート)
+  //   インラインの status select と同じチェックをモーダル保存ルートでも実施。
+  if (d.status === '成約' && !Number(d.contractAmount || 0)) {
+    const raw = prompt(
+      '⚠ ' + d.name + ' を「成約」で保存します。\n\n' +
+      '契約金額 (円) を入力してください:\n\n' +
+      '※後で入力する場合は「キャンセル」を押してください',
+      ''
+    );
+    if (raw !== null) {
+      const amt = Number(String(raw).replace(/[^0-9]/g, ''));
+      if (amt > 0) {
+        d.contractAmount = amt;
+        // DB へも同時保存 (下の saves に混ぜる)
+        (async () => {
+          try {
+            await safeSave({
+              type: 'upsert', table: 'booking_status',
+              payload: { name: oldName, apply_date: oldApply, contract_amount: amt },
+              options: { onConflict: 'name,apply_date' }
+            });
+          } catch(_){}
+        })();
+        showToast('契約金額 ¥' + amt.toLocaleString() + ' を保存しました');
+      } else if (String(raw).trim() !== '') {
+        showToast('⚠ 金額の書式が不正です。あとで必ず入力してください', true);
+      } else {
+        showToast('⚠ 金額未入力のまま成約にしました。あとで必ず入力してください', true);
+      }
+    } else {
+      showToast('⚠ 金額未入力のまま成約にしました。あとで必ず入力してください', true);
+    }
+  }
 
   // bk-extraにも保存（全編集項目をローカル永続化）
   const bkEx = loadData('bk-extra', {});
