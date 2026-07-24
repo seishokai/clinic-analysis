@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v500';
+const APP_VERSION = 'v501';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -3260,6 +3260,8 @@ function showApp() {
   // v261: ヘッダーバッジ + プルリフレッシュ 初期化 (1度だけ)
   try { setupHeaderBadge(); } catch(_){}
   try { setupPullRefresh(); } catch(_){}
+  // v501: 修正依頼バッジ + 初回アラートバナー (足立先生等の報告に気づく仕組み)
+  try { setupBugReportBadge(); } catch(_){}
   // v299: 予約枠確認サブタブのアラートバッジを起動時に更新
   try { loadAvailabilityBadgeOnInit(); } catch(_){}
   // v261: データ読込後にホームダッシュボード描画
@@ -5489,6 +5491,94 @@ function updateHeaderBadge() {
   badge.textContent = '⚠️ 要対応 ' + pending + '件';
   badge.classList.toggle('urgent', pending >= 20);
 }
+
+// v501: 修正依頼 未対応バッジ + セッション初回アラートバナー
+//   ┗ 足立先生等の bug report を拓未さんが気付かず溜まる問題への対策。
+//   ┗ Aladdin を開くたびに: (1) 常時ヘッダーバッジ、(2) セッション初回はアラートバナー。
+let _bugReportBadgeTimer = null;
+let _lastBugReportCount = -1;
+async function updateBugReportBadge(showBannerIfNew = false) {
+  const badge = document.getElementById('bug-report-badge');
+  if (!badge) return;
+  try {
+    const { count, error } = await sb
+      .from('admin_bug_reports')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', '未対応');
+    if (error) throw error;
+    const n = count || 0;
+    if (n <= 0) {
+      badge.style.display = 'none';
+      _lastBugReportCount = 0;
+      return;
+    }
+    badge.style.display = 'inline-flex';
+    badge.textContent = '🐛 未対応 ' + n + '件';
+    // 初回 & セッション未通知なら大きめバナーで通知
+    if (showBannerIfNew && _lastBugReportCount === -1) {
+      try {
+        const already = sessionStorage.getItem('bug-report-alert-shown') === '1';
+        if (!already) {
+          _showBugReportAlert(n);
+          sessionStorage.setItem('bug-report-alert-shown', '1');
+        }
+      } catch(_){}
+    }
+    _lastBugReportCount = n;
+  } catch(e) {
+    // RLS で見えない/未 admin の場合はサイレント (バッジは非表示のまま)
+    badge.style.display = 'none';
+  }
+}
+function _showBugReportAlert(n) {
+  // 既存バナーがあれば消す
+  document.querySelectorAll('.bug-report-alert-banner').forEach(el => el.remove());
+  const bar = document.createElement('div');
+  bar.className = 'bug-report-alert-banner';
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:10000;background:linear-gradient(90deg,#fef3c7,#fde68a);border-bottom:2px solid #f59e0b;padding:12px 16px;display:flex;align-items:center;gap:12px;box-shadow:0 4px 12px rgba(245,158,11,.25);font-family:inherit';
+  bar.innerHTML = `
+    <span style="font-size:22px;line-height:1">🐛</span>
+    <div style="flex:1;min-width:0">
+      <div style="font-weight:800;color:#92400e;font-size:14px;line-height:1.2">未対応の修正依頼が <span style="color:#b91c1c;font-size:16px">${n}件</span> あります</div>
+      <div style="color:#78350f;font-size:11px;margin-top:2px">足立先生等からの報告に対応してください</div>
+    </div>
+    <button type="button" data-act="view" style="background:#0f172a;color:#fff;border:none;padding:8px 16px;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer;white-space:nowrap">見る →</button>
+    <button type="button" data-act="close" title="閉じる" style="background:transparent;border:none;color:#92400e;font-size:22px;cursor:pointer;line-height:1;padding:4px 8px">×</button>
+  `;
+  bar.querySelector('[data-act="close"]').addEventListener('click', () => bar.remove());
+  bar.querySelector('[data-act="view"]').addEventListener('click', () => {
+    bar.remove();
+    try { switchView('admin'); } catch(_){}
+    // 修正依頼サブタブへ移動 (少し遅らせて DOM 描画を待つ)
+    setTimeout(() => {
+      const subBtn = document.querySelector('#view-admin [data-sub="adm-bug-report"], #view-admin [data-sub="bug-reports"], [data-sub^="adm-bug"]');
+      if (subBtn) subBtn.click();
+      else {
+        // 見つからない場合は 管理タブのバグレポートセクションへスクロール
+        const el = document.querySelector('#bug-report-list, #admin-bug-report-list, [id*="bug-report"]');
+        if (el) el.scrollIntoView({ behavior:'smooth', block:'start' });
+      }
+    }, 250);
+  });
+  document.body.appendChild(bar);
+}
+function setupBugReportBadge() {
+  const badge = document.getElementById('bug-report-badge');
+  if (!badge) return;
+  badge.addEventListener('click', () => {
+    try { switchView('admin'); } catch(_){}
+    setTimeout(() => {
+      const subBtn = document.querySelector('#view-admin [data-sub="adm-bug-report"], #view-admin [data-sub="bug-reports"], [data-sub^="adm-bug"]');
+      if (subBtn) subBtn.click();
+    }, 250);
+  });
+  // セッション初回はアラートバナーも出す
+  updateBugReportBadge(true);
+  clearInterval(_bugReportBadgeTimer);
+  // 30 秒毎に自動更新 (バッジのみ、バナーは初回のみ)
+  _bugReportBadgeTimer = setInterval(() => updateBugReportBadge(false), 30000);
+}
+
 
 // === v261 プルリフレッシュ (モバイルのみ) ===
 let _pullRefreshActive = false;
