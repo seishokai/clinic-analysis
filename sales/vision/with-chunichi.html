@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>ウィズ・中日 ビジョン & 合同組織図</title>
+<!-- 手書き風日本語フォント (Klee One = 手書き楷書風) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Kaisei+Decol:wght@400;500;700&display=swap">
 <style>
   :root{color-scheme:light}
   body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}
@@ -639,9 +643,14 @@
   }
 
   .vision .cl-main {
-    font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
-    font-size: clamp(26px, 7vw, 38px);
+    font-family: "Klee One", "Kaisei Decol", "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+    font-size: clamp(26px, 7vw, 40px);
     font-weight: 600;
+  }
+  /* 「想いを / かたちに」の間の控えめなスペース */
+  .cl-main .gap {
+    display: inline-block;
+    width: 0.35em;
   }
   .vision .cl-main::after {
     background: linear-gradient(to right, #D2A853, #96702A);
@@ -741,7 +750,7 @@
 
     <div class="v-close">
       <div class="cl-sub">スタッフさんも、患者さんも、みんなの</div>
-      <div class="cl-main">想いを、かたちに。</div>
+      <div class="cl-main">想いを<span class="gap"></span>かたちに。</div>
     </div>
 
     <div class="v-pillars">
