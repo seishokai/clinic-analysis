@@ -12,3 +12,8 @@ compatibility_date = "2025-06-21"
 #   npx wrangler secret put SUPABASE_URL            -- https://ndlfqrvoejwgqfdtghmg.supabase.co
 #   npx wrangler secret put SUPABASE_SERVICE_KEY    -- service_role キー (Supabase Dashboard → Settings → API)
 #   npx wrangler secret put ALLOWED_ORIGIN          -- https://seishokai.github.io
+#
+# v501 メール通知用 (新規報告時に GAS 経由で拓未さんへ送信):
+#   npx wrangler secret put GAS_WEBAPP_URL          -- kenshu-mailer と同じ GAS Web App URL
+#   npx wrangler secret put GAS_SECRET              -- GAS 側で照合する共有シークレット
+#   npx wrangler secret put NOTIFY_EMAIL_TO         -- tkm.koike@gmail.com (カンマ区切りで複数可)
