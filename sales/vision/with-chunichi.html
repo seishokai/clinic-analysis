@@ -469,10 +469,12 @@
     margin-bottom: 12px;
   }
   .v-close .cl-main {
-    font-size: 32px;
+    font-size: clamp(24px, 6vw, 32px);
     font-weight: 800;
-    letter-spacing: 0.14em;
-    text-wrap: balance;
+    letter-spacing: 0.08em;
+    line-height: 1.5;
+    white-space: nowrap;
+    display:inline-block;
   }
   .v-close .cl-main::after {
     content: "";
@@ -542,7 +544,7 @@
 
   .vision .cl-main {
     font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
-    font-size: 38px;
+    font-size: clamp(26px, 7vw, 38px);
     font-weight: 600;
   }
   .vision .cl-main::after {
