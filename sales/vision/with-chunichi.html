@@ -549,7 +549,9 @@
     /* 2 医院並び → 縦積み (横スクロール解消) */
     .branch { overflow-x: visible; }
     .branch-inner { min-width: 0; }
-    .split { width: 40%; margin-top: 18px; }
+    /* ⊓ 分岐アーチは縦積みだと意味を成さないので非表示。代わりに縦線 1 本 */
+    .split { width: 2px; height: 22px; border: none; border-radius: 0; background: var(--line); margin-top: 18px; }
+    .split::before { display: none; }
     .clinics { grid-template-columns: 1fr; gap: 18px; }
     .clinic-head { padding: 10px 12px; border-radius: 10px; }
     .clinic-head .clinic-name { font-size: 16px; letter-spacing: 0.12em; }
@@ -739,7 +741,7 @@
 
     <div class="v-close">
       <div class="cl-sub">スタッフさんも、患者さんも、みんなの</div>
-      <div class="cl-main">想いを　かたちに。</div>
+      <div class="cl-main">想いを、かたちに。</div>
     </div>
 
     <div class="v-pillars">
