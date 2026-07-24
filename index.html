@@ -1535,58 +1535,8 @@
           <p class="page-desc">Aladdin の不具合・要望を送信 → 自動で GitHub Issue 作成 → 開発対応。<strong>スクショ貼付可 (Ctrl+V)</strong></p>
         </div>
 
-        <!-- 投稿フォーム -->
-        <div class="card" style="margin-bottom:16px;padding:16px;background:linear-gradient(135deg,#fdf2f8 0%,#fff 100%);border:2px solid #ec4899;border-radius:12px">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:14px">
-            <span style="font-size:16px;font-weight:700;color:#9d174d">📝 新規 修正依頼を送信</span>
-          </div>
-          <div style="display:grid;gap:10px">
-            <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
-              <div>
-                <label class="form-label" style="font-size:11px">送信者名</label>
-                <input type="text" class="form-input" id="bug-reporter-name" placeholder="例: 足立TC" style="font-size:13px;padding:8px 10px">
-              </div>
-              <div>
-                <label class="form-label" style="font-size:11px">優先度</label>
-                <select class="form-select" id="bug-priority" style="font-size:13px;padding:8px 10px">
-                  <option value="通常" selected>🐛 通常</option>
-                  <option value="至急">🚨 至急</option>
-                  <option value="低">💤 低</option>
-                </select>
-              </div>
-            </div>
-            <!-- v473: 該当画面ドロップダウン廃止 → currentView から自動検出 + スクショで判別 -->
-            <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:11px;color:#1e40af">
-              <span>📍 現在画面: <b id="bug-current-screen">自動検出中…</b></span>
-              <span style="color:#6b7280">(送信時に記録)</span>
-            </div>
-            <div>
-              <label class="form-label" style="font-size:11px">タイトル <span style="color:#dc2626">*</span></label>
-              <input type="text" class="form-input" id="bug-title" placeholder="例: 来院→BFタブで渡邉マキさん消えてる" maxlength="200" style="font-size:13px;padding:8px 10px;width:100%">
-            </div>
-            <div>
-              <label class="form-label" style="font-size:11px">詳細 <span style="color:#dc2626">*</span></label>
-              <textarea class="form-input" id="bug-description" rows="4" placeholder="どこで/何をした時に/どうなったか。エラーメッセージがあれば貼付&#10;例: 来院タブ→ルミナス→BFで絞ると渡邉マキさんの行が出てこない。医院別だと出る。" style="font-size:13px;padding:10px;width:100%;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
-            </div>
-            <div>
-              <label class="form-label" style="font-size:11px">📷 スクリーンショット (任意・複数可)</label>
-              <div id="bug-paste-zone" style="border:2px dashed #ec4899;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#fdf2f8;transition:all .2s">
-                <div style="font-size:12px;color:#9d174d;font-weight:600;margin-bottom:4px">📋 ここをクリックしてファイル選択 / このエリアで <kbd style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #f472b6;font-size:10px">Ctrl</kbd>+<kbd style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #f472b6;font-size:10px">V</kbd> で貼付</div>
-                <div style="font-size:10px;color:#9ca3af">画像ファイル (PNG/JPG) 最大 5MB</div>
-              </div>
-              <input type="file" id="bug-file-input" accept="image/*" hidden multiple>
-              <div id="bug-screenshots-preview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
-            </div>
-            <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
-              <button class="btn btn-dark" id="bug-submit-btn" style="padding:10px 24px;font-size:14px;font-weight:700;background:#ec4899;border-color:#ec4899;color:#fff">送信する</button>
-              <button class="btn btn-outline" id="bug-cancel-btn" style="padding:10px 16px;font-size:12px">クリア</button>
-              <span id="bug-submit-status" style="font-size:12px;color:#6b7280"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 一覧 -->
-        <div class="card" style="padding:12px">
+        <!-- v502: 一覧を先に出す (管理者は既存報告の確認が主目的) -->
+        <div class="card" style="padding:12px;margin-bottom:16px">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;flex-wrap:wrap;gap:8px">
             <span style="font-size:14px;font-weight:700;color:#1a1a1a">📋 修正依頼リスト</span>
             <div style="display:flex;gap:6px;align-items:center">
@@ -1604,6 +1554,59 @@
           </div>
           <div id="bug-list-container"><div style="padding:20px;text-align:center;color:var(--text-sub)">読み込み中...</div></div>
         </div>
+
+        <!-- v502: 投稿フォームは折りたたみで下に配置 -->
+        <details style="margin-bottom:16px" open>
+          <summary style="cursor:pointer;padding:10px 14px;background:linear-gradient(135deg,#fdf2f8 0%,#fce7f3 100%);border:1px solid #ec4899;border-radius:10px;font-size:14px;font-weight:700;color:#9d174d;list-style:none;display:flex;align-items:center;gap:8px" onclick="setTimeout(() => { const s = document.getElementById('bug-current-screen-updater'); if (s && typeof updateBugCurrentScreen === 'function') updateBugCurrentScreen(); }, 50)">
+            <span>📝 新規 修正依頼を送信</span>
+            <span style="font-size:11px;color:#9d174d;font-weight:400;margin-left:auto">▼ クリックで開閉</span>
+          </summary>
+          <div class="card" style="margin-top:8px;padding:16px;background:linear-gradient(135deg,#fdf2f8 0%,#fff 100%);border:2px solid #ec4899;border-radius:12px">
+            <div style="display:grid;gap:10px">
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+                <div>
+                  <label class="form-label" style="font-size:11px">送信者名</label>
+                  <input type="text" class="form-input" id="bug-reporter-name" placeholder="例: 足立TC" style="font-size:13px;padding:8px 10px">
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:11px">優先度</label>
+                  <select class="form-select" id="bug-priority" style="font-size:13px;padding:8px 10px">
+                    <option value="通常" selected>🐛 通常</option>
+                    <option value="至急">🚨 至急</option>
+                    <option value="低">💤 低</option>
+                  </select>
+                </div>
+              </div>
+              <!-- v473: 該当画面ドロップダウン廃止 → currentView から自動検出 + スクショで判別 -->
+              <div style="display:flex;align-items:center;gap:8px;padding:8px 10px;background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;font-size:11px;color:#1e40af">
+                <span>📍 現在画面: <b id="bug-current-screen">自動検出中…</b></span>
+                <span style="color:#6b7280">(送信時に記録)</span>
+              </div>
+              <div>
+                <label class="form-label" style="font-size:11px">タイトル <span style="color:#dc2626">*</span></label>
+                <input type="text" class="form-input" id="bug-title" placeholder="例: 来院→BFタブで渡邉マキさん消えてる" maxlength="200" style="font-size:13px;padding:8px 10px;width:100%">
+              </div>
+              <div>
+                <label class="form-label" style="font-size:11px">詳細 <span style="color:#dc2626">*</span></label>
+                <textarea class="form-input" id="bug-description" rows="4" placeholder="どこで/何をした時に/どうなったか。エラーメッセージがあれば貼付&#10;例: 来院タブ→ルミナス→BFで絞ると渡邉マキさんの行が出てこない。医院別だと出る。" style="font-size:13px;padding:10px;width:100%;resize:vertical;font-family:inherit;line-height:1.5"></textarea>
+              </div>
+              <div>
+                <label class="form-label" style="font-size:11px">📷 スクリーンショット (任意・複数可)</label>
+                <div id="bug-paste-zone" style="border:2px dashed #ec4899;border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#fdf2f8;transition:all .2s">
+                  <div style="font-size:12px;color:#9d174d;font-weight:600;margin-bottom:4px">📋 ここをクリックしてファイル選択 / このエリアで <kbd style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #f472b6;font-size:10px">Ctrl</kbd>+<kbd style="background:#fff;padding:2px 6px;border-radius:4px;border:1px solid #f472b6;font-size:10px">V</kbd> で貼付</div>
+                  <div style="font-size:10px;color:#9ca3af">画像ファイル (PNG/JPG) 最大 5MB</div>
+                </div>
+                <input type="file" id="bug-file-input" accept="image/*" hidden multiple>
+                <div id="bug-screenshots-preview" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px"></div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:center;margin-top:6px">
+                <button class="btn btn-dark" id="bug-submit-btn" style="padding:10px 24px;font-size:14px;font-weight:700;background:#ec4899;border-color:#ec4899;color:#fff">送信する</button>
+                <button class="btn btn-outline" id="bug-cancel-btn" style="padding:10px 16px;font-size:12px">クリア</button>
+                <span id="bug-submit-status" style="font-size:12px;color:#6b7280"></span>
+              </div>
+            </div>
+          </div>
+        </details>
       </div>
 
       <div id="sub-adm-history" hidden>
@@ -1750,7 +1753,7 @@
   </div>
 
   <div class="toast" id="toast"></div>
-  <script src="app.js?v=501"></script>
+  <script src="app.js?v=502"></script>
 
   <!-- ══ Q&A研修スクリプト ══ -->
   <script>
