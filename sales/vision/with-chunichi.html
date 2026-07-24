@@ -10,7 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Klee+One:wght@400;600&family=Kaisei+Decol:wght@400;500;700&display=swap">
 <style>
-  :root{color-scheme:light}
+  :root{color-scheme:light only}
   body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}
   img{max-width:100%}
   :root {
@@ -29,40 +29,8 @@
     --gold-soft: #F6EEDD;
     --shadow: 0 1px 3px rgba(28, 43, 42, 0.08);
   }
-  :root[data-theme="dark"] {
-    --ground: #101717;
-    --card: #1A2323;
-    --ink: #E8EEED;
-    --sub: #93A5A3;
-    --line: #354745;
-    --with: #3FB3A8;
-    --with-soft: #16302D;
-    --with-border: #2A5A55;
-    --chunichi: #7C97D6;
-    --chunichi-soft: #1B2438;
-    --chunichi-border: #35476E;
-    --gold: #D2AC64;
-    --gold-soft: #2E2617;
-    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-  }
-  @media (prefers-color-scheme: dark) {
-    :root:not([data-theme="light"]) {
-      --ground: #101717;
-      --card: #1A2323;
-      --ink: #E8EEED;
-      --sub: #93A5A3;
-      --line: #354745;
-      --with: #3FB3A8;
-      --with-soft: #16302D;
-      --with-border: #2A5A55;
-      --chunichi: #7C97D6;
-      --chunichi-soft: #1B2438;
-      --chunichi-border: #35476E;
-      --gold: #D2AC64;
-      --gold-soft: #2E2617;
-      --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
-    }
-  }
+  /* v2: ダークモードは廃止。スタッフ配布時に暗く見える問題を回避し
+     常にライトカラーで表示 (color-scheme: light only と併用) */
 
   * { box-sizing: border-box; }
   body {
@@ -613,12 +581,21 @@
     font-size: 42px;
     font-weight: 600;
     letter-spacing: 0.1em;
+    /* 日本語の単語途中改行を防止 (「歯科医院」が「歯科」と「医院」で割れないように) */
+    word-break: keep-all;
+    line-break: strict;
+    overflow-wrap: normal;
   }
   .vision .v-title .gold-word {
     background: linear-gradient(120deg, #D2A853, #96702A);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
+  }
+  /* 「歯科医院へ。」を 1 塊として扱う (途中改行防止) */
+  .vision .v-title .clinic-word,
+  .vision .v-title .core {
+    display: inline-block;
   }
 
   .vision .vo-label {
@@ -723,7 +700,7 @@
   <section class="vision">
     <div class="v-head">
       <div class="eyebrow">Our Vision</div>
-      <h2 class="v-title"><span class="gold-word">日本一</span>の歯科医院へ。</h2>
+      <h2 class="v-title"><span class="core"><span class="gold-word">日本一</span>の</span><span class="clinic-word">歯科医院へ。</span></h2>
       <p class="v-lead">
         ウィズと中日が、医院の垣根を越えてひとつのチームになる。<br>
         それは、この場所から日本一の歯科医院をつくるためです。<br>
