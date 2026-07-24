@@ -490,6 +490,100 @@
     .v-pillars { grid-template-columns: 1fr; }
   }
 
+  /* ==== スマホ最適化 (≤ 640px) ==== */
+  @media (max-width: 640px) {
+    .page { padding: 24px 14px 40px; }
+    .vision { gap: 24px; }
+
+    /* Vision タイトル */
+    .vision .v-title { font-size: clamp(26px, 8vw, 34px); letter-spacing: 0.06em; }
+    .v-lead { font-size: 12.5px; line-height: 1.85; }
+    .v-lead br { display: none; }  /* PC 用の改行を潰して自然折返しに */
+
+    /* 想いの声バブル */
+    .v-voices .vo-label { font-size: 11px; margin-bottom: 12px; }
+    .v-voices .vo-list { gap: 8px 8px; }
+    .voice { padding: 7px 14px; font-size: 12px; }
+
+    /* 想いをカタチに */
+    .v-close { padding: 8px 0 4px; }
+    .v-close .cl-sub { font-size: 12px; letter-spacing: 0.1em; }
+    .vision .cl-main { font-size: clamp(22px, 8vw, 30px) !important; letter-spacing: 0.06em; }
+    .v-close .cl-main::after { width: 44px; height: 2px; margin-top: 14px; }
+
+    /* 3 本柱 */
+    .v-pillars { gap: 10px; }
+    .pillar { padding: 14px 14px; border-radius: 8px; }
+    .pillar .p-num { font-size: 14px; margin-bottom: 6px; }
+    .pillar p { font-size: 12px; line-height: 1.7; }
+
+    /* コミット (絶対に成し遂げたい) */
+    .v-commit { padding: 18px 18px; border-radius: 10px; }
+    .v-commit .c-label { font-size: 10px; letter-spacing: 0.15em; }
+    .vision .v-commit .c-text { font-size: 18px; letter-spacing: 0.03em; line-height: 1.6; }
+    .v-commit .c-note { font-size: 11px; line-height: 1.7; margin-top: 8px; }
+
+    /* マイルストーン (単月 1億 / 2億) */
+    .v-miles { gap: 10px; }
+    .mile { padding: 16px 10px; border-radius: 8px; }
+    .mile .m-tag { font-size: 10px; letter-spacing: 0.18em; margin-bottom: 8px; }
+    .mile .m-num { font-size: 17px; }
+    .mile .m-num b { font-size: 34px; }
+    .mile .m-sub { font-size: 11px; margin-top: 6px; }
+
+    /* ==== 組織図 ==== */
+    .chart-head { margin-top: 32px; padding-top: 28px; }
+    .chart-head h1 { font-size: 20px; letter-spacing: 0.04em; }
+    .chart-head .subtitle { font-size: 11px; }
+
+    /* 副理事長・マネージャー */
+    .person-card { padding: 12px 18px; }
+    .person-card .role { font-size: 10px; letter-spacing: 0.14em; }
+    .person-card .name { font-size: 17px; }
+    .person-card .note { font-size: 10px; }
+    .liaison { padding: 7px 16px; }
+    .liaison .l-role { font-size: 10px; }
+    .liaison .l-name { font-size: 13px; }
+    .liaison .l-note { font-size: 10px; width: 100%; text-align: center; }
+
+    /* 2 医院並び → 縦積み (横スクロール解消) */
+    .branch { overflow-x: visible; }
+    .branch-inner { min-width: 0; }
+    .split { width: 40%; margin-top: 18px; }
+    .clinics { grid-template-columns: 1fr; gap: 18px; }
+    .clinic-head { padding: 10px 12px; border-radius: 10px; }
+    .clinic-head .clinic-name { font-size: 16px; letter-spacing: 0.12em; }
+    .clinic-head .clinic-count { font-size: 10px; }
+    .director { padding: 8px 12px; }
+    .director .d-role { font-size: 10px; letter-spacing: 0.14em; }
+    .director .d-name { font-size: 15px; }
+    .director .d-note { font-size: 10px; }
+    .group { border-radius: 10px; }
+    .group-head { padding: 8px 12px 6px; }
+    .group-title { font-size: 12px; letter-spacing: 0.06em; }
+    .group-sub { font-size: 10px; }
+    .leader { padding: 8px 12px; gap: 8px; }
+    .leader .name { font-size: 14px; }
+    .members { padding: 8px 12px 10px; gap: 4px 10px; }
+    .members .m { font-size: 12px; }
+    .badge { font-size: 9px; padding: 2px 7px; }
+    .help-tag, .leave-tag { font-size: 9px; padding: 1px 6px; margin-left: 4px; }
+
+    footer { font-size: 10px; margin-top: 24px; }
+
+    /* 戻るリンク をコンパクト */
+    .back-link { top: 10px; left: 10px; padding: 5px 12px; font-size: 11px; }
+  }
+
+  /* 超狭い端末 (iPhone SE 相当) */
+  @media (max-width: 380px) {
+    .page { padding: 20px 10px 32px; }
+    .vision .v-title { font-size: clamp(22px, 9vw, 28px); }
+    .vision .cl-main { font-size: clamp(20px, 9vw, 26px) !important; }
+    .voice { padding: 6px 12px; font-size: 11.5px; }
+    .members { grid-template-columns: 1fr; }
+  }
+
   .vision .eyebrow {
     display: flex;
     align-items: center;
