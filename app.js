@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v499';
+const APP_VERSION = 'v500';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -7188,6 +7188,10 @@ async function loadBookings() {
             if (candidate) dbRow = candidate;
           }
           if (dbRow) {
+            // v500: bk-extra 上書きから DB 反映値を守るフラグ (足立先生 修正依頼 #1-#4)
+            //   ┗ 別端末での status/book_date 変更が、自端末の stale な localStorage で
+            //     覆い隠される「翌日消える」現象の対策。以下 bk-extra 反映ブロック側で参照。
+            d._hasDbRow = true;
             if (dbRow.status) d.status = dbRow.status;
             if (dbRow.contract_service) d.contractService = dbRow.contract_service;
             if (dbRow.contract_amount) d.contractAmount = dbRow.contract_amount;
@@ -7218,12 +7222,20 @@ async function loadBookings() {
     } catch(e) { console.warn('DB status load error:', e); }
 
     // localStorage bk-extra からユーザー編集を反映
+    // v500: DB (booking_status) に row があれば bk-extra を無視する
+    //   ┗ 別端末で status/book_date が更新されても、自端末の localStorage 古値で
+    //     覆い隠されて「翌日消える」ように見える事故を防止 (足立先生 修正依頼 #1-#4)。
+    //   ┗ bk-extra は「まだ DB に届いていないオフライン/未保存編集の一時バッファ」
+    //     として位置付けを明確化。
     try {
       const bkEx = loadData('bk-extra', {});
       bookingsData.forEach(d => {
         const key = d.name + '|' + d.applyDate;
         const ex = bkEx[key];
         if (!ex) return;
+        // DB row 有りなら bk-extra は全部無視 (stale 上書き防止)
+        if (d._hasDbRow) return;
+        // DB row 無し = まだ 1 度も保存されていない or 名前照合失敗 → bk-extra から復元
         if (ex.editedBookDate) d.bookDate = ex.editedBookDate;
         if (ex.editedApplyDate) d.applyDate = ex.editedApplyDate;
         if (ex.editedService) d.service = ex.editedService;
@@ -8035,6 +8047,20 @@ function renderBookings() {
         <option ${d.status==='セット'?'selected':''}>セット</option>
         <option ${d.status==='完了'?'selected':''}>完了</option>
       ` : ''}
+      ${/* v500: 予約一覧と来院タブのステータスを統一 (足立先生 修正依頼 #5)
+              治療カテゴリ別に来院タブと同じ拡張ステータスを追加。
+              電話系 (未対応/予約連絡待ち/留守電/…) と重複するものはスキップ。
+              BF booking は bk-bfstatus-select 側で BF_STATUSES を使うのでここでは対応不要。 */
+        (() => {
+          const _tr = (typeof getTreatmentCategory === 'function') ? getTreatmentCategory(d) : 'デフォルト';
+          if (_tr === 'インプラント' || isImplantBooking(d)) return ''; // 既に上で対応済み
+          const _tst = (typeof getStatusesForTreatment === 'function') ? getStatusesForTreatment(_tr) : [];
+          const _dup = new Set(['未対応','予約連絡待ち','留守電','折り返し','後追いLINE済み','確認済','予約変更','来院済','成約','キャンセル','除外']);
+          return _tst.filter(s => s && s.value && !_dup.has(s.value))
+            .map(s => `<option ${d.status===s.value?'selected':''}>${esc(s.value)}</option>`)
+            .join('');
+        })()
+      }
       <option ${d.status==='キャンセル'?'selected':''}>キャンセル</option>
       ${isImplantBooking(d) ? `<option ${d.status==='お断り'?'selected':''}>お断り</option>` : ''}
       <option value="除外" ${d.status==='除外'?'selected':''}>🗑 除外(削除)</option>
@@ -8044,14 +8070,27 @@ function renderBookings() {
       const info = bfLifecycleCache[key] || {};
       const iso = info.bf_next_date || '';
       const mmdd = iso ? iso.substring(5).replace('-','/') : '';
-      if (!isAdmin) return iso ? `<span style="font-size:10px">${mmdd}</span>` : '<span style="color:var(--text-muted)">-</span>';
-      const label = mmdd || '＋ 日付';
-      // 値あり: 緑バッジ / 値なし: 控えめなダッシュ枠 (メモのカブり解消)
+      // v500: 次回予定日が今日より前なら赤で強調 (足立先生 修正依頼 #6)
+      let overdue = false;
+      if (iso) {
+        const _t = new Date(); _t.setHours(0,0,0,0);
+        const _n = new Date(iso.replace(/-/g, '/'));
+        overdue = !isNaN(_n.getTime()) && _n < _t;
+      }
+      if (!isAdmin) {
+        if (!iso) return '<span style="color:var(--text-muted)">-</span>';
+        return `<span style="font-size:10px${overdue ? ';color:#dc2626;font-weight:700' : ''}">${overdue ? '⚠' : ''}${mmdd}</span>`;
+      }
+      const label = mmdd ? (overdue ? `⚠${mmdd}` : mmdd) : '＋ 日付';
+      // 値あり: 緑バッジ / 期限超過: 赤+パルス / 値なし: 控えめなダッシュ枠
       const style = iso
-        ? 'background:#dcfce7;border:1px solid #16a34a;color:#15803d;font-weight:700'
+        ? (overdue
+            ? 'background:#fee2e2;border:1.5px solid #dc2626;color:#b91c1c;font-weight:800;animation:pulse-red 2s ease-in-out infinite'
+            : 'background:#dcfce7;border:1px solid #16a34a;color:#15803d;font-weight:700')
         : 'background:transparent;border:1px dashed #d4d4d8;color:#a8a8a8;font-weight:400';
+      const title = overdue ? '⚠ 予定日を超過しています' : '';
       return `<span style="display:inline-flex;gap:2px;align-items:center;position:relative">
-        <button type="button" class="bk-next-date-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${esc(iso)}" style="font-size:10px;padding:3px 6px;width:70px;text-align:center;border-radius:4px;cursor:pointer;${style}">${esc(label)}</button>
+        <button type="button" class="bk-next-date-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${esc(iso)}" title="${title}" style="font-size:10px;padding:3px 6px;width:70px;text-align:center;border-radius:4px;cursor:pointer;${style}">${esc(label)}</button>
         <input type="date" class="bk-next-date-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(iso)}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">
       </span>`;
     })()}</td>
@@ -10762,10 +10801,20 @@ async function renderKaiinAll(containerId) {
                 const bookTitle = bookFromApply ? '申込日 (来院日未設定)' : '';
                 const bookChip = `<button type="button" class="kaiin-all-bookdate-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${bookFromApply ? '' : bookDateISO}" title="${bookTitle}" style="font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border-radius:4px;cursor:pointer;${bookBtnStyle}">${bookLabel}</button><input type="date" class="kaiin-all-bookdate-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${bookFromApply ? '' : bookDateISO}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none">`;
                 // 次回予定 (編集可能ボタン + 隠し date input)
+                // v500: 次回予定日が今日より前 (期限超過) の場合は赤+パルスで強調 (足立先生 修正依頼 #6)
+                let nextIsOverdue = false;
+                if (ndMatch) {
+                  const _today = new Date(); _today.setHours(0,0,0,0);
+                  const _nd = new Date(parseInt(ndMatch[1]), parseInt(ndMatch[2])-1, parseInt(ndMatch[3]));
+                  nextIsOverdue = _nd < _today;
+                }
                 const nextDateStyle = nextMMDD
-                  ? 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600'
+                  ? (nextIsOverdue
+                      ? 'background:#fee2e2;border:1.5px solid #dc2626;color:#b91c1c;font-weight:700;animation:pulse-red 2s ease-in-out infinite'
+                      : 'background:#dcfce7;border:1.5px solid #16a34a;color:#15803d;font-weight:600')
                   : 'background:#fef3c7;border:1.5px dashed #f59e0b;color:#92400e';
-                const nextChip = `<button type="button" class="kaiin-all-next-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${escapeHtml(nextDate)}" style="font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;${nextDateStyle}">${nextMMDD || '年/月/日'}</button><input type="date" class="kaiin-all-next-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(nextDate)}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">`;
+                const nextLabel = nextIsOverdue ? `⚠ ${nextMMDD}` : (nextMMDD || '年/月/日');
+                const nextChip = `<button type="button" class="kaiin-all-next-mmdd" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-iso="${escapeHtml(nextDate)}" title="${nextIsOverdue ? '⚠ 予定日を超過しています' : ''}" style="font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer;${nextDateStyle}">${nextLabel}</button><input type="date" class="kaiin-all-next-hidden" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" value="${escapeHtml(nextDate)}" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">`;
                 const memo = d._memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
                 // BFタブと同じ「+ メモ」プレースホルダースタイル
                 const memoStyle = memo
@@ -11373,6 +11422,57 @@ async function renderKaiinTab(treatment, containerId) {
   })();
 }
 
+// v500: 患者名クリック時のクイック情報ポップアップ (足立先生 修正依頼 #7)
+//   ┗ 来院タブ→BF 等の一覧で ℹ️ ボタンを押すと連絡先・予約日時をモーダル表示。
+window.showPatientQuickInfo = function(name, applyDate) {
+  try {
+    const d = (typeof bookingsData !== 'undefined' && Array.isArray(bookingsData))
+      ? bookingsData.find(b => b.name === name && b.applyDate === applyDate)
+      : null;
+    if (!d) { if (typeof showToast === 'function') showToast('データが見つかりません', true); return; }
+    const info = (typeof getBFInfo === 'function') ? (getBFInfo(name, applyDate) || {}) : {};
+    const _esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const _pii = (typeof _isPII_MaskNeeded === 'function') && _isPII_MaskNeeded();
+    const phoneVal = _pii ? '※※※※※' : (d.phone || '-');
+    const emailVal = _pii ? '※※※※※' : (d.email || '-');
+    const displayName = (typeof maskName === 'function' && _pii) ? maskName(d.name) : d.name;
+    const rows = [
+      ['📞 電話', d.phone ? `<a href="tel:${_esc(d.phone)}" style="color:#0284c7;text-decoration:none;font-weight:600">${_esc(phoneVal)}</a>` : '<span style="color:#94a3b8">-</span>'],
+      ['📧 メール', d.email ? `<a href="mailto:${_esc(d.email)}" style="color:#0284c7;text-decoration:none;font-weight:600">${_esc(emailVal)}</a>` : '<span style="color:#94a3b8">-</span>'],
+      ['📅 予約日時', d.bookDate ? _esc(d.bookDate) : '<span style="color:#94a3b8">未設定</span>'],
+      ['📝 申込日', d.applyDate ? _esc(d.applyDate) : '<span style="color:#94a3b8">-</span>'],
+      ['🏥 医院', d.facility ? _esc(d.facility) : '<span style="color:#94a3b8">-</span>'],
+      ['🎯 プロモ', d.source ? _esc(d.source) : '<span style="color:#94a3b8">-</span>'],
+      ['📊 状態', _esc(d.status || '未対応')],
+      ['🩺 治療', _esc(d.service || '-')],
+      ['⚡ ツール', _esc(d.tool || '-')],
+    ];
+    if (info.bf_next_date) rows.push(['➡️ 次回予定', _esc(info.bf_next_date)]);
+    if (info.contract_amount) rows.push(['💰 契約金額', '¥' + Number(info.contract_amount).toLocaleString()]);
+    const modal = document.createElement('div');
+    modal.setAttribute('data-patient-quick-info', '1');
+    modal.style.cssText = 'position:fixed;inset:0;background:rgba(15,23,42,.55);z-index:9999;display:flex;align-items:center;justify-content:center;padding:14px;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px)';
+    modal.innerHTML = `
+      <div style="background:#fff;border-radius:14px;padding:20px 22px;max-width:420px;width:100%;box-shadow:0 24px 60px rgba(0,0,0,.35)">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid #e5e7eb">
+          <h3 style="margin:0;font-size:16px;font-weight:800;color:#0f172a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${_esc(displayName)}</h3>
+          <button type="button" data-act="pqi-close" style="background:transparent;border:none;font-size:20px;color:#94a3b8;cursor:pointer;line-height:1;padding:4px 8px">×</button>
+        </div>
+        <table style="width:100%;font-size:13px;line-height:1.7;border-collapse:collapse">
+          ${rows.map(([label, val]) => `<tr><td style="color:#64748b;width:96px;padding:3px 8px 3px 0;vertical-align:top;font-weight:500">${label}</td><td style="color:#0f172a;padding:3px 0;word-break:break-all">${val}</td></tr>`).join('')}
+        </table>
+        <div style="text-align:right;margin-top:14px">
+          <button type="button" data-act="pqi-close" style="padding:8px 18px;border-radius:8px;background:#0f172a;color:#fff;border:none;font-weight:700;cursor:pointer;font-size:13px">閉じる</button>
+        </div>
+      </div>
+    `;
+    const close = () => modal.remove();
+    modal.addEventListener('click', (e) => { if (e.target === modal || e.target.getAttribute?.('data-act') === 'pqi-close') close(); });
+    document.addEventListener('keydown', function esc(ev){ if (ev.key === 'Escape') { close(); document.removeEventListener('keydown', esc); } });
+    document.body.appendChild(modal);
+  } catch(e) { console.warn('showPatientQuickInfo failed', e); }
+};
+
 function renderKaiinSimpleList(treatment, rows, containerId) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -11969,9 +12069,9 @@ function drawKaiinRows(treatment, rows, container) {
       : 'background:#fff;border:1px solid var(--border);color:var(--text-muted)';
     return `<tr>
       <td style="position:relative"><button type="button" class="kaiin-bookdate-mmdd" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" data-iso="${bookDateISO}" style="font-size:11px;padding:3px 4px;width:100%;box-sizing:border-box;border-radius:4px;text-align:center;cursor:pointer;${bookDateBtnStyle}">${bookMMDD||'年/月/日'}</button><input type="date" class="kaiin-bookdate-hidden" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${bookDateISO}" style="position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none"></td>
-      <td>${_isPII_MaskNeeded()
-        ? `<span style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;display:inline-block">${esc(maskName(d.name))}</span>`
-        : `<input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;width:100%;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'">`}</td>
+      <td><div style="display:flex;align-items:center;gap:2px">${_isPII_MaskNeeded()
+        ? `<span style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(maskName(d.name))}</span>`
+        : `<input type="text" class="kaiin-name" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" value="${esc(d.name)}" style="font-weight:500;text-align:left;font-size:11px;padding:3px 6px;flex:1;min-width:0;box-sizing:border-box;border:1px solid transparent;border-radius:4px;background:transparent" onfocus="this.style.border='1px solid var(--border)';this.style.background='#fff'" onblur="this.style.border='1px solid transparent';this.style.background='transparent'">`}<button type="button" class="kaiin-info-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" title="連絡先・予約日時" style="flex-shrink:0;background:transparent;border:none;cursor:pointer;padding:2px 4px;font-size:13px;line-height:1;color:var(--text-sub);opacity:.7" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.7'">ℹ️</button></div></td>
       <td style="text-align:left">${promoBadge}</td>
       <td><button type="button" class="kaiin-csfac-btn" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 6px;width:100%;text-align:center;background:transparent;border:none;cursor:pointer;color:var(--text)">${csFacDisplay}</button></td>
       <td><select class="kaiin-consult-sel kaiin-plain-sel" data-name="${esc(d.name)}" data-apply="${esc(d.applyDate)}" style="font-size:11px;padding:3px 4px;width:100%;background:transparent;border:none;cursor:pointer;appearance:none;-webkit-appearance:none;text-align:center;text-align-last:center">
@@ -12257,6 +12357,15 @@ function drawKaiinRows(treatment, rows, container) {
   // メモセル → 予約一覧のメモモーダルを再利用
   container.querySelectorAll('.kaiin-memo-cell').forEach(td => {
     td.addEventListener('click', () => openMemoModal(td.dataset.name, td.dataset.apply, td));
+  });
+  // v500: ℹ️ 患者クイック情報ポップアップ (足立先生 修正依頼 #7)
+  container.querySelectorAll('.kaiin-info-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (typeof window.showPatientQuickInfo === 'function') {
+        window.showPatientQuickInfo(btn.dataset.name, btn.dataset.apply);
+      }
+    });
   });
   // プロモ入力 (手動のみ)
   container.querySelectorAll('.kaiin-promo-input').forEach(inp => {
