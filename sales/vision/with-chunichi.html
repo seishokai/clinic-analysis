@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>ウィズ・中日 ビジョン & 合同組織図</title>
+<style>
+  :root{color-scheme:light}
+  body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}
+  img{max-width:100%}
+  :root {
+    --ground: #F6F9F8;
+    --card: #FFFFFF;
+    --ink: #1C2B2A;
+    --sub: #5C6E6C;
+    --line: #C6D4D1;
+    --with: #147D74;
+    --with-soft: #E3F1EF;
+    --with-border: #9CC9C4;
+    --chunichi: #3B5BA5;
+    --chunichi-soft: #E8EDF7;
+    --chunichi-border: #A9B9DC;
+    --gold: #B08A3E;
+    --gold-soft: #F6EEDD;
+    --shadow: 0 1px 3px rgba(28, 43, 42, 0.08);
+  }
+  :root[data-theme="dark"] {
+    --ground: #101717;
+    --card: #1A2323;
+    --ink: #E8EEED;
+    --sub: #93A5A3;
+    --line: #354745;
+    --with: #3FB3A8;
+    --with-soft: #16302D;
+    --with-border: #2A5A55;
+    --chunichi: #7C97D6;
+    --chunichi-soft: #1B2438;
+    --chunichi-border: #35476E;
+    --gold: #D2AC64;
+    --gold-soft: #2E2617;
+    --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #101717;
+      --card: #1A2323;
+      --ink: #E8EEED;
+      --sub: #93A5A3;
+      --line: #354745;
+      --with: #3FB3A8;
+      --with-soft: #16302D;
+      --with-border: #2A5A55;
+      --chunichi: #7C97D6;
+      --chunichi-soft: #1B2438;
+      --chunichi-border: #35476E;
+      --gold: #D2AC64;
+      --gold-soft: #2E2617;
+      --shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Yu Gothic UI", "Yu Gothic", "Hiragino Kaku Gothic ProN", "Hiragino Sans", Meiryo, sans-serif;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+  .page {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+  }
+
+  header { text-align: center; margin-bottom: 36px; }
+  .chart-head {
+    border-top: 2px solid var(--line);
+    margin-top: 56px;
+    padding-top: 48px;
+  }
+  .eyebrow {
+    font-size: 12px;
+    letter-spacing: 0.24em;
+    color: var(--sub);
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+  h1 {
+    font-size: 26px;
+    font-weight: 700;
+    margin: 0;
+    letter-spacing: 0.06em;
+    text-wrap: balance;
+  }
+  .subtitle {
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--sub);
+    letter-spacing: 0.08em;
+  }
+
+  .command { display: flex; flex-direction: column; align-items: center; }
+  .person-card {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 14px 36px;
+    text-align: center;
+    min-width: 240px;
+  }
+  .person-card .role {
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    color: var(--gold);
+    font-weight: 700;
+    margin-bottom: 2px;
+  }
+  .person-card .name { font-size: 19px; font-weight: 700; }
+  .person-card .note { font-size: 11px; color: var(--sub); margin-top: 2px; }
+  .person-card.top { border-top: 3px solid var(--gold); }
+  .person-card.mgr { border-top: 3px solid var(--gold); background: var(--gold-soft); }
+
+  .vline { width: 2px; height: 22px; background: var(--line); }
+
+  .liaison {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: center;
+    border: 1.5px dashed var(--gold);
+    background: var(--gold-soft);
+    border-radius: 999px;
+    padding: 8px 22px;
+  }
+  .liaison .l-role { font-size: 11px; font-weight: 700; color: var(--gold); letter-spacing: 0.14em; }
+  .liaison .l-name { font-size: 15px; font-weight: 700; }
+  .liaison .l-note { font-size: 11px; color: var(--sub); }
+
+  .mgr-band { display: flex; flex-direction: column; align-items: center; }
+  .scope-label {
+    font-size: 11px;
+    color: var(--sub);
+    letter-spacing: 0.12em;
+    margin-top: 6px;
+  }
+
+  .branch { width: 100%; overflow-x: auto; }
+  .branch-inner {
+    min-width: 640px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .split {
+    width: 60%;
+    height: 24px;
+    border-top: 2px solid var(--line);
+    border-left: 2px solid var(--line);
+    border-right: 2px solid var(--line);
+    border-radius: 6px 6px 0 0;
+    margin-top: 22px;
+    position: relative;
+  }
+  .split::before {
+    content: "";
+    position: absolute;
+    top: -24px;
+    left: 50%;
+    transform: translateX(-1px);
+    width: 2px;
+    height: 22px;
+    background: var(--line);
+  }
+
+  .clinics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+    width: 100%;
+  }
+  .clinic { display: flex; flex-direction: column; gap: 14px; }
+  .clinic-head {
+    border-radius: 10px;
+    padding: 12px 16px;
+    text-align: center;
+    color: #fff;
+    box-shadow: var(--shadow);
+  }
+  .clinic-head .clinic-name { font-size: 18px; font-weight: 700; letter-spacing: 0.14em; }
+  .clinic-head .clinic-count { font-size: 11px; opacity: 0.85; letter-spacing: 0.1em; margin-top: 2px; }
+  .clinic.with .clinic-head { background: var(--with); }
+  .clinic.chunichi .clinic-head { background: var(--chunichi); }
+
+  .director {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 10px 14px;
+    text-align: center;
+  }
+  .director .d-role {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+  }
+  .clinic.with .director { border-top: 3px solid var(--with); }
+  .clinic.with .d-role { color: var(--with); }
+  .clinic.chunichi .director { border-top: 3px solid var(--chunichi); }
+  .clinic.chunichi .d-role { color: var(--chunichi); }
+  .director .d-name { font-size: 17px; font-weight: 700; }
+  .director .d-note { font-size: 11px; color: var(--sub); margin-top: 2px; }
+
+  .group {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .group-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 10px 14px 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  .group-title { font-size: 13px; font-weight: 700; letter-spacing: 0.1em; }
+  .group-sub { font-size: 11px; color: var(--sub); }
+  .clinic.with .group-title { color: var(--with); }
+  .clinic.chunichi .group-title { color: var(--chunichi); }
+
+  .leader {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .badge {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .clinic.with .badge { background: var(--with-soft); color: var(--with); border: 1px solid var(--with-border); }
+  .clinic .badge.mgr-badge { background: var(--gold-soft); color: var(--gold); border: 1px solid var(--gold); }
+  .clinic.chunichi .badge { background: var(--chunichi-soft); color: var(--chunichi); border: 1px solid var(--chunichi-border); }
+  .leader .name { font-size: 15px; font-weight: 700; }
+  .group .leader:last-child { border-bottom: none; }
+  .help-tag {
+    font-size: 10px;
+    color: var(--with);
+    border: 1px solid var(--with-border);
+    background: var(--with-soft);
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+  .help-tag.chunichi-help {
+    color: var(--chunichi);
+    border-color: var(--chunichi-border);
+    background: var(--chunichi-soft);
+  }
+
+  .members {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px 12px;
+    padding: 10px 14px 12px;
+  }
+  .members .m { font-size: 13px; color: var(--ink); }
+  .members .m.on-leave { color: var(--sub); }
+  .leave-tag {
+    font-size: 10px;
+    color: var(--sub);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 1px 7px;
+    margin-left: 6px;
+    white-space: nowrap;
+  }
+
+  footer {
+    margin-top: 36px;
+    text-align: center;
+    font-size: 11px;
+    color: var(--sub);
+    letter-spacing: 0.08em;
+  }
+
+  @media (max-width: 640px) {
+    .person-card { min-width: 0; width: 100%; }
+  }
+
+  .vision {
+    display: flex;
+    flex-direction: column;
+    gap: 36px;
+  }
+  .v-head { text-align: center; }
+  .v-title {
+    font-size: 30px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin: 0 0 18px;
+    text-wrap: balance;
+  }
+  .v-lead {
+    font-size: 14px;
+    line-height: 2;
+    color: var(--sub);
+    margin: 0;
+  }
+  .v-miles {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+  .mile {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 24px 16px;
+    text-align: center;
+  }
+  .mile .m-tag {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.22em;
+    color: var(--sub);
+    margin-bottom: 10px;
+  }
+  .mile .m-num {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    font-variant-numeric: tabular-nums;
+  }
+  .mile .m-num b { font-size: 46px; font-weight: 800; }
+  .mile .m-sub { font-size: 12px; color: var(--sub); margin-top: 8px; letter-spacing: 0.08em; }
+  .mile.mission {
+    border: 1.5px solid var(--gold);
+    background: var(--gold-soft);
+  }
+  .mile.mission .m-tag { color: var(--gold); }
+  .mile.mission .m-num b { color: var(--gold); }
+
+  .v-pillars {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  .pillar {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 18px 16px;
+  }
+  .pillar .p-num {
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    margin-bottom: 8px;
+  }
+  .p-num.with-c { color: var(--with); }
+  .p-num.gold-c { color: var(--gold); }
+  .p-num.chunichi-c { color: var(--chunichi); }
+  .pillar p { margin: 0; font-size: 12.5px; line-height: 1.8; color: var(--sub); }
+
+  .v-goals {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: var(--shadow);
+    padding: 18px 22px;
+  }
+  .v-goals .g-title {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--gold);
+    margin-bottom: 10px;
+  }
+  .v-goals ul { margin: 0; padding-left: 20px; }
+  .v-goals li { font-size: 13.5px; line-height: 1.9; }
+
+  .v-commit {
+    background: var(--gold-soft);
+    border: 1.5px solid var(--gold);
+    border-radius: 10px;
+    padding: 22px 24px;
+    text-align: center;
+  }
+  .v-commit .c-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    color: var(--gold);
+    margin-bottom: 8px;
+  }
+  .v-commit .c-text {
+    font-size: 19px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    line-height: 1.7;
+    text-wrap: balance;
+  }
+  .v-commit .c-note {
+    font-size: 12px;
+    color: var(--sub);
+    margin-top: 10px;
+    letter-spacing: 0.06em;
+  }
+
+  .v-voices { text-align: center; }
+  .v-voices .vo-label {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.24em;
+    color: var(--sub);
+    margin-bottom: 16px;
+  }
+  .v-voices .vo-list {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px 12px;
+    max-width: 720px;
+    margin: 0 auto;
+  }
+  .voice {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 9px 20px;
+    font-size: 13.5px;
+    font-weight: 600;
+    box-shadow: var(--shadow);
+  }
+  .voice.c1 { border-color: var(--with-border); color: var(--with); }
+  .voice.c2 { border-color: var(--gold); color: var(--gold); }
+  .voice.c3 { border-color: var(--chunichi-border); color: var(--chunichi); }
+  .voice.strong {
+    background: var(--ink);
+    border-color: var(--ink);
+    color: var(--ground);
+    font-weight: 700;
+  }
+
+  .v-close {
+    text-align: center;
+    padding: 20px 0 8px;
+  }
+  .v-close .cl-sub {
+    font-size: 13px;
+    color: var(--sub);
+    letter-spacing: 0.16em;
+    margin-bottom: 12px;
+  }
+  .v-close .cl-main {
+    font-size: 32px;
+    font-weight: 800;
+    letter-spacing: 0.14em;
+    text-wrap: balance;
+  }
+  .v-close .cl-main::after {
+    content: "";
+    display: block;
+    width: 56px;
+    height: 3px;
+    background: var(--gold);
+    margin: 18px auto 0;
+    border-radius: 2px;
+  }
+
+  @media (max-width: 640px) {
+    .v-pillars { grid-template-columns: 1fr; }
+  }
+
+  .vision .eyebrow {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    color: var(--gold);
+  }
+  .vision .eyebrow::before,
+  .vision .eyebrow::after {
+    content: "";
+    width: 44px;
+    height: 1px;
+    background: linear-gradient(to right, transparent, var(--gold));
+  }
+  .vision .eyebrow::after {
+    background: linear-gradient(to left, transparent, var(--gold));
+  }
+
+  .vision .v-title {
+    font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+    font-size: 42px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+  }
+  .vision .v-title .gold-word {
+    background: linear-gradient(120deg, #D2A853, #96702A);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .vision .vo-label {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    color: var(--gold);
+  }
+  .vision .vo-label::before,
+  .vision .vo-label::after {
+    content: "";
+    width: 28px;
+    height: 1px;
+    background: var(--gold);
+    opacity: 0.55;
+  }
+  .vision .voice.strong {
+    background: linear-gradient(120deg, #CFA452, #A17A2E);
+    border-color: transparent;
+    color: #FFFDF6;
+  }
+
+  .vision .cl-main {
+    font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+    font-size: 38px;
+    font-weight: 600;
+  }
+  .vision .cl-main::after {
+    background: linear-gradient(to right, #D2A853, #96702A);
+  }
+
+  .vision .v-commit .c-text {
+    font-family: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", serif;
+    font-size: 22px;
+  }
+
+  .vision .mile.mission .m-num b {
+    background: linear-gradient(120deg, #C89B45, #96702A);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .clinic-head { border-radius: 12px; }
+  .clinic.with .clinic-head {
+    background: linear-gradient(135deg, #1B968B, #0E635B);
+  }
+  .clinic.chunichi .clinic-head {
+    background: linear-gradient(135deg, #4A6CBB, #2E4A8C);
+  }
+  .group { border-radius: 12px; }
+  .clinic.with .group-head {
+    background: linear-gradient(to right, var(--with-soft), transparent);
+  }
+  .clinic.chunichi .group-head {
+    background: linear-gradient(to right, var(--chunichi-soft), transparent);
+  }
+  .person-card.top {
+    border-top: none;
+    background: linear-gradient(var(--card), var(--card)) padding-box,
+                linear-gradient(120deg, #E8C97E, #B08A3E) border-box;
+    border: 1px solid transparent;
+    border-top-width: 3px;
+  }
+
+  @media print {
+    .chart-head {
+      break-before: page;
+      margin-top: 0;
+      padding-top: 24px;
+      border-top: none;
+    }
+    @page { size: 220mm 380mm; margin: 0; }
+    * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+    body { background: var(--ground); }
+    .page { padding: 24px 20px 32px; }
+    .group, .person-card, .director { box-shadow: none; }
+  }
+
+  /* 戻るリンク */
+  .back-link{
+    position:fixed;top:14px;left:14px;z-index:10;
+    background:rgba(255,255,255,.9);border:1px solid var(--line);
+    border-radius:999px;padding:6px 14px;
+    font-size:12px;color:var(--ink);text-decoration:none;font-weight:600;
+    box-shadow:var(--shadow);backdrop-filter:blur(6px);
+    -webkit-backdrop-filter:blur(6px);
+  }
+  .back-link:hover{background:#fff;border-color:var(--gold)}
+  @media print { .back-link{display:none} }
+</style>
+</head>
+<body>
+
+<a class="back-link" href="/clinic-analysis/sales/">← 戻る</a>
+
+<div class="page">
+  <section class="vision">
+    <div class="v-head">
+      <div class="eyebrow">Our Vision</div>
+      <h2 class="v-title"><span class="gold-word">日本一</span>の歯科医院へ。</h2>
+      <p class="v-lead">
+        ウィズと中日が、医院の垣根を越えてひとつのチームになる。<br>
+        それは、この場所から日本一の歯科医院をつくるためです。<br>
+        目指す場所は、はっきりしています。
+      </p>
+    </div>
+
+    <div class="v-voices">
+      <div class="vo-label">みんなの想い</div>
+      <div class="vo-list">
+        <div class="voice c1">いい治療がしたい。いい治療を受けたい。</div>
+        <div class="voice strong">日本一の治療を目指す。</div>
+        <div class="voice c2">稼ぎたい。</div>
+        <div class="voice c3">風通しのいい、気持ちのいい職場で働きたい。</div>
+        <div class="voice c1">仲良し。でも仕事には厳しく、メリハリのある職場。</div>
+        <div class="voice c3">他の医院ではできないことを。</div>
+        <div class="voice c1">新しいことに、挑戦し続けたい。</div>
+        <div class="voice c2">周りから「すごいね」って言われたい。</div>
+        <div class="voice c2">みんなの「こうしたい」を叶えられる職場に。</div>
+      </div>
+    </div>
+
+    <div class="v-close">
+      <div class="cl-sub">スタッフさんも、患者さんも、みんなの</div>
+      <div class="cl-main">想いを　かたちに。</div>
+    </div>
+
+    <div class="v-pillars">
+      <div class="pillar">
+        <div class="p-num with-c">口コミ 日本一</div>
+        <p>日本一口コミがいい歯科医院に。患者さんの「ここに来てよかった」を、何よりの評価として積み重ねる。</p>
+      </div>
+      <div class="pillar">
+        <div class="p-num gold-c">レベルの高い治療</div>
+        <p>根管治療・ベニア・矯正・インプラント — どれも一切妥協しない。どちらの医院でも、同じ最高水準の治療を提供する。</p>
+      </div>
+      <div class="pillar">
+        <div class="p-num chunichi-c">稼げる 日本一</div>
+        <p>成果は仲間に還元する。ここで働く全員が、日本一稼げて、日本一豊かになれる医院にする。</p>
+      </div>
+    </div>
+
+    <div class="v-commit">
+      <div class="c-label">絶対に成し遂げたいこと</div>
+      <div class="c-text">日本一の歯科医院になる。</div>
+      <div class="c-note">売上も、口コミも、治療レベルも、仲間の豊かさも — 全部で日本一を獲りにいく。</div>
+    </div>
+
+    <div class="v-miles">
+      <div class="mile">
+        <div class="m-tag">STEP 1</div>
+        <div class="m-num">単月 <b>1億</b>円</div>
+        <div class="m-sub">最短ルートで到達する</div>
+      </div>
+      <div class="mile mission">
+        <div class="m-tag">MISSION</div>
+        <div class="m-num">単月 <b>2億</b>円</div>
+        <div class="m-sub">私たちのミッション</div>
+      </div>
+    </div>
+  </section>
+
+  <header class="chart-head">
+    <div class="eyebrow">Organization Chart</div>
+    <h1>ウィズ歯科・中日歯科　合同組織図</h1>
+    <div class="subtitle">2医院を合同で運営する体制</div>
+  </header>
+
+  <div class="command">
+    <div class="person-card top">
+      <div class="role">副理事長</div>
+      <div class="name">原先生</div>
+      <div class="note">両医院を統括</div>
+    </div>
+    <div class="vline"></div>
+    <div class="liaison">
+      <span class="l-role">マネージャー</span>
+      <span class="l-name">黒岩 友里愛</span>
+      <span class="l-note">両医院の連携・調整（ウィズ歯科 DH）</span>
+    </div>
+
+    <div class="branch">
+    <div class="branch-inner">
+    <div class="split"></div>
+
+    <div class="clinics">
+      <div class="clinic with">
+        <div class="clinic-head">
+          <div class="clinic-name">ウィズ歯科</div>
+          <div class="clinic-count">スタッフ 17名</div>
+        </div>
+
+        <div class="director">
+          <div class="d-role">院長</div>
+          <div class="d-name">古田先生</div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">歯科衛生士（DH）</div>
+            <div class="group-sub">9名</div>
+          </div>
+          <div class="leader">
+            <span class="badge">チーフ</span>
+            <span class="name">郷原 望生</span>
+          </div>
+          <div class="members">
+            <div class="m">奥村 美結</div>
+            <div class="m">江崎 月菜</div>
+            <div class="m">山田 美結</div>
+            <div class="m">杉浦 光</div>
+            <div class="m">石田 涼音</div>
+            <div class="m">藤本 理子</div>
+            <div class="m">笹田 明音<span class="help-tag chunichi-help">中日ヘルプ</span></div>
+            <div class="m">日比 凜音<span class="help-tag chunichi-help">中日ヘルプ</span></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">TC（トリートメントコーディネーター）</div>
+            <div class="group-sub">1名</div>
+          </div>
+          <div class="leader">
+            <span class="badge">TC</span>
+            <span class="name">工藤 亜美</span>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">受付</div>
+            <div class="group-sub">2名</div>
+          </div>
+          <div class="members">
+            <div class="m">渡邉 梨子</div>
+            <div class="m">嶋﨑 由芽</div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">歯科助手（DA）</div>
+            <div class="group-sub">3名</div>
+          </div>
+          <div class="members">
+            <div class="m">吉村 奈穂</div>
+            <div class="m">小原 薫</div>
+            <div class="m">中原 瑠璃</div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">歯科技工士</div>
+            <div class="group-sub">1名</div>
+          </div>
+          <div class="members">
+            <div class="m">佐藤 剛</div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">クリーンスタッフ</div>
+            <div class="group-sub">1名</div>
+          </div>
+          <div class="members">
+            <div class="m">堀内 礼子</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="clinic chunichi">
+        <div class="clinic-head">
+          <div class="clinic-name">中日歯科</div>
+          <div class="clinic-count">スタッフ 11名</div>
+        </div>
+
+        <div class="director">
+          <div class="d-role">院長</div>
+          <div class="d-name">原先生</div>
+          <div class="d-note">副理事長 兼任</div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">歯科衛生士（DH）</div>
+            <div class="group-sub">6名</div>
+          </div>
+          <div class="leader">
+            <span class="badge">チーフ</span>
+            <span class="name">佐々木 美空</span>
+          </div>
+          <div class="members">
+            <div class="m">荻須 史織</div>
+            <div class="m">金子 朱羽</div>
+            <div class="m">山本 早希子</div>
+            <div class="m">仙田 朱里</div>
+            <div class="m on-leave">稲垣 華音<span class="leave-tag">休職中</span></div>
+          </div>
+        </div>
+
+        <div class="group">
+          <div class="group-head">
+            <div class="group-title">歯科助手（DA）</div>
+            <div class="group-sub">5名</div>
+          </div>
+          <div class="leader">
+            <span class="badge">チーフ</span>
+            <span class="name">蛯原 成美</span>
+          </div>
+          <div class="members">
+            <div class="m">葛西 綾美</div>
+            <div class="m">金子 結奈</div>
+            <div class="m">三島 ひな</div>
+            <div class="m">柱尾 美樹</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </div>
+    </div>
+  </div>
+
+  <footer>ウィズ歯科・中日歯科 ｜ 合同運営体制 ｜ 2026年7月現在</footer>
+</div>
+
+</body>
+</html>
