@@ -163,7 +163,7 @@
     color: #fff;
     box-shadow: var(--shadow);
   }
-  .clinic-head .clinic-name { font-size: 18px; font-weight: 700; letter-spacing: 0.14em; }
+  .clinic-head .clinic-name { font-size: clamp(14px, 3.4vw, 18px); font-weight: 700; letter-spacing: 0.04em; word-break: keep-all; line-break: strict; }
   .clinic-head .clinic-count { font-size: 11px; opacity: 0.85; letter-spacing: 0.1em; margin-top: 2px; }
   .clinic.with .clinic-head { background: var(--with); }
   .clinic.chunichi .clinic-head { background: var(--chunichi); }
@@ -539,7 +539,7 @@
     .split::before { display: none; }
     .clinics { grid-template-columns: 1fr; gap: 18px; }
     .clinic-head { padding: 10px 12px; border-radius: 10px; }
-    .clinic-head .clinic-name { font-size: 16px; letter-spacing: 0.12em; }
+    .clinic-head .clinic-name { font-size: clamp(13px, 4vw, 15px); letter-spacing: 0.02em; }
     .clinic-head .clinic-count { font-size: 10px; }
     .director { padding: 8px 12px; }
     .director .d-role { font-size: 10px; letter-spacing: 0.14em; }
@@ -802,7 +802,7 @@
     <div class="clinics">
       <div class="clinic with">
         <div class="clinic-head">
-          <div class="clinic-name">ウィズ歯科</div>
+          <div class="clinic-name">名古屋ウィズ歯科・矯正歯科</div>
           <div class="clinic-count">スタッフ 18名</div>
         </div>
 
@@ -891,7 +891,7 @@
 
       <div class="clinic chunichi">
         <div class="clinic-head">
-          <div class="clinic-name">中日歯科</div>
+          <div class="clinic-name">BF中日ビル歯科・矯正歯科</div>
           <div class="clinic-count">スタッフ 11名</div>
         </div>
 
