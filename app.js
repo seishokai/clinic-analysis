@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v502';
+const APP_VERSION = 'v503';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -7278,10 +7278,12 @@ async function loadBookings() {
             if (candidate) dbRow = candidate;
           }
           if (dbRow) {
-            // v500: bk-extra 上書きから DB 反映値を守るフラグ (足立先生 修正依頼 #1-#4)
+            // v500/v503: bk-extra 上書きから DB 反映値を守るため、DB row 全体を参照可能に。
             //   ┗ 別端末での status/book_date 変更が、自端末の stale な localStorage で
-            //     覆い隠される「翌日消える」現象の対策。以下 bk-extra 反映ブロック側で参照。
-            d._hasDbRow = true;
+            //     覆い隠される「翌日消える」現象の対策。
+            //   ┗ v503: v500 の一律無効化を廃し、「DB に値がある個別フィールド」だけ守る。
+            //     BF タブ経由で bf_status のみ書かれた行 (status 空) は bk-extra から復元。
+            d._db = dbRow;
             if (dbRow.status) d.status = dbRow.status;
             if (dbRow.contract_service) d.contractService = dbRow.contract_service;
             if (dbRow.contract_amount) d.contractAmount = dbRow.contract_amount;
@@ -7312,35 +7314,34 @@ async function loadBookings() {
     } catch(e) { console.warn('DB status load error:', e); }
 
     // localStorage bk-extra からユーザー編集を反映
-    // v500: DB (booking_status) に row があれば bk-extra を無視する
-    //   ┗ 別端末で status/book_date が更新されても、自端末の localStorage 古値で
-    //     覆い隠されて「翌日消える」ように見える事故を防止 (足立先生 修正依頼 #1-#4)。
-    //   ┗ bk-extra は「まだ DB に届いていないオフライン/未保存編集の一時バッファ」
-    //     として位置付けを明確化。
+    // v503: フィールド単位で DB 値を尊重 (v500 の一律無効化は BF タブ経由更新
+    //   〈bf_status のみ書かれ status は空〉のケースで既存編集を消してしまう
+    //   副作用があったため、フィールドごとに「DB に値が入っている場合のみ守る」に
+    //   細分化。DB に無いフィールドは bk-extra から復元して継続利用可能。
+    //   ┗ status/book_date/edited_name のみ DB 優先、他は bk-extra 優先。
     try {
       const bkEx = loadData('bk-extra', {});
       bookingsData.forEach(d => {
         const key = d.name + '|' + d.applyDate;
         const ex = bkEx[key];
         if (!ex) return;
-        // DB row 有りなら bk-extra は全部無視 (stale 上書き防止)
-        if (d._hasDbRow) return;
-        // DB row 無し = まだ 1 度も保存されていない or 名前照合失敗 → bk-extra から復元
-        if (ex.editedBookDate) d.bookDate = ex.editedBookDate;
+        const db = d._db || {};
+        // ▼ DB にフィールドがある場合はそちらを優先、無ければ bk-extra
+        if (ex.editedBookDate && !db.book_date) d.bookDate = ex.editedBookDate;
+        if (ex.editedStatus && !db.status) d.status = ex.editedStatus;
+        if (ex.editedName && !db.edited_name) d.name = ex.editedName;
+        // ▼ DB に無いフィールドは常に bk-extra 反映 (localStorage が正)
         if (ex.editedApplyDate) d.applyDate = ex.editedApplyDate;
         if (ex.editedService) d.service = ex.editedService;
         if (ex.editedFacility) d.facility = ex.editedFacility;
         if (ex.editedPhone) d.phone = ex.editedPhone;
         if (ex.editedEmail) d.email = ex.editedEmail;
         if (ex.editedSource) d.source = ex.editedSource;
-        if (ex.editedStatus) d.status = ex.editedStatus;
-        if (ex.editedIncentivePaid !== undefined) {
+        if (ex.editedIncentivePaid !== undefined && db.incentive_paid === undefined) {
           d.incentivePaid = ex.editedIncentivePaid;
           if (ex.editedPaidAt !== undefined) d.paidAt = ex.editedPaidAt;
           if (ex.editedPaidBy !== undefined) d.paidBy = ex.editedPaidBy;
         }
-        // 名前はキーになっているので最後に反映
-        if (ex.editedName) d.name = ex.editedName;
       });
     } catch(e) { console.warn('bk-extra apply error:', e); }
 
