@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v504';
+const APP_VERSION = 'v505';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -415,11 +415,57 @@ async function safeSave(op) {
       result = await q;
     }
     if (result && result.error) throw result.error;
+    // v505: 保存成功したら bk-extra から対応する編集値を削除 (stale 生成を止める)
+    //   これで別端末が最新値で保存 → 自端末リロード → localStorage が上書きする事故が
+    //   物理的に発生しなくなる。
+    try { _cleanBkExtraAfterSave(op); } catch(_){}
     return { ok: true, data: result?.data };
   } catch(e) {
     console.warn('safeSave failed, queueing', op, e);
     enqueueSave(op);
     return { ok: false, error: e };
+  }
+}
+// v505: booking_status/manual_bookings 保存成功時に、対応する
+//       localStorage.bk-extra の editedXxx キーを削除する。
+//       DB → bk-extra のマッピング表で拾う。
+const _DB_TO_BKEXTRA = {
+  status:          'editedStatus',
+  book_date:       'editedBookDate',
+  bf_status:       'editedBFStatus',
+  edited_name:     'editedName',
+  contract_amount: 'contractAmount',
+  incentive_paid:  'editedIncentivePaid',
+  paid_at:         'editedPaidAt',
+  paid_by:         'editedPaidBy',
+};
+function _cleanBkExtraAfterSave(op) {
+  if (!op || (op.table !== 'booking_status' && op.table !== 'manual_bookings')) return;
+  const payload = op.payload || op.match || {};
+  // upsert では payload に name+apply_date が入っている前提。update では match に。
+  const name = payload.name || op.match?.name;
+  const applyDate = payload.apply_date || op.match?.apply_date;
+  if (!name || !applyDate) return;
+  const key = name + '|' + applyDate;
+  let bkEx;
+  try { bkEx = loadData('bk-extra', {}); } catch(_) { return; }
+  const ex = bkEx[key];
+  if (!ex) return;
+  let touched = false;
+  Object.keys(_DB_TO_BKEXTRA).forEach(dbCol => {
+    if (payload[dbCol] === undefined) return;
+    const bkCol = _DB_TO_BKEXTRA[dbCol];
+    if (ex[bkCol] !== undefined) {
+      delete ex[bkCol];
+      touched = true;
+    }
+  });
+  if (touched) {
+    // 空になった key は key ごと削除 (localStorage 肥大化防止)
+    if (Object.keys(ex).length === 0) delete bkEx[key];
+    try { saveData('bk-extra', bkEx); } catch(_){}
+    // rescue キャッシュも即時無効化
+    try { _bkExRescueCache = null; } catch(_){}
   }
 }
 // #13 リトライ定期実行: キュー非空のときのみ起動する方式 (上の startQueueProcessor)
@@ -3262,6 +3308,8 @@ function showApp() {
   try { setupPullRefresh(); } catch(_){}
   // v501: 修正依頼バッジ + 初回アラートバナー (足立先生等の報告に気づく仕組み)
   try { setupBugReportBadge(); } catch(_){}
+  // v505: タブフォーカス復帰時 + 5分間隔の自動リロード (別端末変更を即取り込み)
+  try { setupAutoRefresh(); } catch(_){}
   // v299: 予約枠確認サブタブのアラートバッジを起動時に更新
   try { loadAvailabilityBadgeOnInit(); } catch(_){}
   // v261: データ読込後にホームダッシュボード描画
@@ -5577,6 +5625,44 @@ function setupBugReportBadge() {
   clearInterval(_bugReportBadgeTimer);
   // 30 秒毎に自動更新 (バッジのみ、バナーは初回のみ)
   _bugReportBadgeTimer = setInterval(() => updateBugReportBadge(false), 30000);
+}
+
+// v505: 自動リロード (別端末での変更を早期取り込む)
+//   1) タブがフォーカス復帰したとき (前回リロードから 60 秒以上経過なら) 静かに再取得
+//   2) 5 分ごとに バックグラウンドで silent 再取得
+//   これで「別端末で status 変更 → 自端末では見えない」を最短で解消。
+let _lastAutoRefreshAt = Date.now();
+let _autoRefreshInterval = null;
+async function _silentReloadBookings(reason) {
+  if (typeof loadBookings !== 'function') return;
+  // 未ログイン or 進行中入力があるときはスキップ
+  if (!sessionStorage.getItem('authenticated')) return;
+  const focused = document.activeElement;
+  if (focused && /^(INPUT|TEXTAREA|SELECT)$/.test(focused.tagName) && focused.value) {
+    // 入力中は割り込まない (フォーカス外れてから)
+    return;
+  }
+  try {
+    console.debug('[auto-refresh]', reason);
+    await loadBookings();
+    _lastAutoRefreshAt = Date.now();
+    // BF cache も再取得
+    if (typeof loadBFLifecycleData === 'function') { try { await loadBFLifecycleData(); } catch(_){} }
+  } catch(e) { console.warn('auto refresh failed', e); }
+}
+function setupAutoRefresh() {
+  // タブフォーカス復帰時
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      const since = Date.now() - _lastAutoRefreshAt;
+      if (since > 60_000) _silentReloadBookings('focus-return');
+    }
+  });
+  // 5 分間隔
+  clearInterval(_autoRefreshInterval);
+  _autoRefreshInterval = setInterval(() => {
+    if (document.visibilityState === 'visible') _silentReloadBookings('interval-5min');
+  }, 5 * 60_000);
 }
 
 
