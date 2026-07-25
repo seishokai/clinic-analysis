@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v503';
+const APP_VERSION = 'v504';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10499,14 +10499,38 @@ function getStatusesForTreatment(treatment) {
 //   それ以外(BF/矯正等) → mode='strict' なら bf_status のみ (per-treatment view)
 //                       mode='fallback' なら bf_status||d.status (overview view)
 // 旧コードで treatment === 'インプラント' / isBFBooking など似た式が分散していたものを一本化。
+// v504: bk-extra を軽くキャッシュ (毎行 loadData を回すと重い)
+let _bkExRescueCache = null;
+let _bkExRescueTime = 0;
+function _rescueStatusFromLocal(d) {
+  if (!d) return '';
+  const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now();
+  if (!_bkExRescueCache || now - _bkExRescueTime > 1000) {
+    try { _bkExRescueCache = loadData('bk-extra', {}); }
+    catch(_) { _bkExRescueCache = {}; }
+    _bkExRescueTime = now;
+  }
+  const ex = _bkExRescueCache[d.name + '|' + d.applyDate];
+  if (!ex) return '';
+  // BF 系は editedBFStatus 優先、なければ汎用 editedStatus
+  return ex.editedBFStatus || ex.editedStatus || '';
+}
+
 function getEffStatus(d, mode) {
   if (!d) return '';
   if (typeof getTreatmentCategory === 'function' && getTreatmentCategory(d) === 'インプラント') {
-    return d.status || '';
+    // v504: DB/bookingsData から拾えない場合の最終防衛線
+    return d.status || _rescueStatusFromLocal(d) || '';
   }
   const bf = (typeof getBFInfo === 'function' ? (getBFInfo(d.name, d.applyDate) || {}).bf_status : '') || '';
   if (bf) return bf;
-  return mode === 'strict' ? '' : (d.status || '');
+  if (d.status) return d.status;
+  // v504: 最終防衛線 — bfLifecycleCache も d.status も空でも localStorage に
+  //   editedBFStatus / editedStatus が残っていれば復元する。
+  //   足立先生から「消えて未設定になる」が再発するのを、表示直前の 1 段で堰き止める。
+  const rescued = _rescueStatusFromLocal(d);
+  if (rescued) return rescued;
+  return mode === 'strict' ? '' : '';
 }
 
 // 来院タブ「一覧」レンダラー (全治療タイプまとめて表示)
