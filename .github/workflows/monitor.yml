@@ -1,4 +1,4 @@
-name: 予約枠監視 (shareconnect)
+name: 予約枠監視 (shareconnect + apotool)
 
 on:
   schedule:
@@ -37,16 +37,22 @@ jobs:
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
 
-      - name: Run slot check
+      - name: Run slot check (shareconnect)
         run: npm run check
         env:
           TZ: Asia/Tokyo
+
+      - name: Run slot check (apotool)
+        run: npm run check:apotool
+        env:
+          TZ: Asia/Tokyo
+        continue-on-error: true  # apotool 側で失敗しても shareconnect 分は保存する
 
       - name: Commit & push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/reservation-status.json
+          git add data/reservation-status.json data/apotool-status.json
           if git diff --cached --quiet; then
             echo "No changes to reservation-status.json"
             exit 0

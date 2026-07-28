@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v505';
+const APP_VERSION = 'v506';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -4195,20 +4195,40 @@ async function _fetchAvailabilityData() {
   }
 }
 
+// v506: Apotool (Stransa) の枠データも並行取得
+async function _fetchApotoolData() {
+  try {
+    const r = await fetch('./data/apotool-status.json?t=' + Date.now());
+    if (!r.ok) return null;
+    return await r.json();
+  } catch (e) {
+    console.error('apotool fetch error:', e);
+    return null;
+  }
+}
+
 async function renderAvailability() {
   const el = document.getElementById('bk-availability-content');
   if (!el) return;
   el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text-sub)">読み込み中...</div>';
-  const data = await _fetchAvailabilityData();
-  if (!data) {
-    el.innerHTML = '<div style="text-align:center;padding:40px;color:#b91c1c">データ取得に失敗しました。<br><span style="font-size:11px;color:var(--text-sub)">data/reservation-status.json が存在しないか、ネットワークエラーの可能性があります</span></div>';
+  // 並列取得: shareconnect + apotool
+  const [data, apotool] = await Promise.all([_fetchAvailabilityData(), _fetchApotoolData()]);
+  if (!data && !apotool) {
+    el.innerHTML = '<div style="text-align:center;padding:40px;color:#b91c1c">データ取得に失敗しました。<br><span style="font-size:11px;color:var(--text-sub)">data/reservation-status.json / apotool-status.json が存在しないか、ネットワークエラーの可能性があります</span></div>';
     return;
   }
-  _renderAvailabilityContent(el, data);
-  updateAvailabilityBadge(data);
+  if (data) {
+    _renderAvailabilityContent(el, data, apotool);
+    updateAvailabilityBadge(data);
+  } else {
+    // apotool のみ
+    el.innerHTML = '<div style="padding:12px"></div>';
+    const wrap = el.querySelector('div');
+    _renderApotoolSection(wrap, apotool);
+  }
 }
 
-function _renderAvailabilityContent(container, data) {
+function _renderAvailabilityContent(container, data, apotool) {
   const lastUpd = data.lastUpdated
     ? new Date(data.lastUpdated).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' })
     : '-';
@@ -4247,6 +4267,88 @@ function _renderAvailabilityContent(container, data) {
       <div style="margin-top:12px;font-size:11px;color:var(--text-muted);text-align:center">
         ※ 毎朝7時に自動更新 / shareconnect 矯正相談枠を14〜30日後の範囲でチェック
       </div>
+      <div id="apotool-section"></div>
+    </div>
+  `;
+  // v506: Apotool セクションを追加描画
+  const apoWrap = container.querySelector('#apotool-section');
+  if (apoWrap) _renderApotoolSection(apoWrap, apotool);
+}
+
+// v506: Apotool (Stransa) の枠状況カード表示
+function _renderApotoolSection(container, apotool) {
+  if (!apotool || !Array.isArray(apotool.clinics) || !apotool.clinics.length) {
+    container.innerHTML = `
+      <div class="card" style="margin-top:12px;padding:12px;background:#f9fafb">
+        <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:6px">医院別予約枠状況（Apotool / 矯正相談）</div>
+        <div style="color:var(--text-sub);padding:14px;text-align:center;font-size:12px">まだ Apotool の枠データがありません<br><span style="font-size:11px;color:var(--text-muted)">初回チェック実行後 (毎朝7時) に自動反映されます</span></div>
+      </div>`;
+    return;
+  }
+  const lastUpd = apotool.lastUpdated
+    ? new Date(apotool.lastUpdated).toLocaleString('ja-JP', { dateStyle: 'short', timeStyle: 'short' })
+    : '-';
+  const range = (apotool.checkRangeFrom && apotool.checkRangeTo)
+    ? `${apotool.checkRangeFrom} 〜 ${apotool.checkRangeTo}`
+    : '-';
+  const clinics = apotool.clinics;
+  const alertCount = clinics.filter(c => !c.available).length;
+  const summaryBadge = alertCount > 0
+    ? `<span class="badge badge-danger">⚠️ ${alertCount}医院が枠不足</span>`
+    : '<span class="badge badge-success">✓ 全医院 枠あり</span>';
+  container.innerHTML = `
+    <div class="card" style="margin-top:16px;padding:12px;border-top:3px solid #7c3aed">
+      <div style="display:flex;gap:12px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text-sub);margin-bottom:10px">
+        <div style="font-weight:700;color:#5b21b6">🅐 Apotool</div>
+        <div>${summaryBadge}</div>
+        <div>📅 範囲: <strong>${range}</strong>（0〜60日後）</div>
+        <div>🔄 最終確認: <strong>${lastUpd}</strong></div>
+      </div>
+      <div style="font-size:12px;font-weight:600;color:var(--text-sub);margin-bottom:10px">医院別予約枠状況（Apotool / 矯正相談）</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px">
+        ${clinics.map(_renderApotoolRow).join('')}
+      </div>
+      <div style="margin-top:10px;font-size:11px;color:var(--text-muted);text-align:center">
+        ※ 毎朝7時に自動更新 / Apotool 矯正相談枠を今日から60日後までチェック
+      </div>
+    </div>
+  `;
+}
+function _renderApotoolRow(clinic) {
+  const isAlert = clinic.available === false;
+  const hasError = !!clinic.error;
+  const slotCount = clinic.availableSlots || 0;
+  const days = clinic.availableDays || 0;
+  const latest = _formatAvailDate(clinic.lastAvailableDate);
+  const bgColor = isAlert ? '#fef2f2' : '#fff';
+  const accentColor = hasError ? '#f59e0b' : (isAlert ? '#dc2626' : '#7c3aed');
+  const borderColor = isAlert ? '#fecaca' : '#e5e7eb';
+  const statusIcon = hasError ? '⚠' : (isAlert ? '⚠' : '✓');
+  const statusColor = hasError ? '#b45309' : (isAlert ? '#b91c1c' : '#5b21b6');
+  const statusLabel = hasError ? '要確認' : (isAlert ? '枠なし' : '枠あり');
+  const slotColor = isAlert ? '#b91c1c' : '#1a1a1a';
+  let bottomHtml;
+  if (hasError) {
+    bottomHtml = `<span style="color:#b45309;font-weight:600;font-size:11px">⚠ ${escapeHtml(String(clinic.error).slice(0, 40))}</span>`;
+  } else if (latest) {
+    bottomHtml = `最終: <strong style="color:#1a1a1a">${latest}</strong>`;
+  } else {
+    bottomHtml = '<span style="color:#b91c1c">予約枠なし</span>';
+  }
+  return `
+    <div style="background:${bgColor};border:1px solid ${borderColor};border-top:4px solid ${accentColor};border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:6px;min-height:110px">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:6px">
+        <div style="font-weight:700;font-size:13px;color:#1a1a1a;line-height:1.2">${escapeHtml(clinic.name || '-')}</div>
+        <div style="font-size:10px;font-weight:700;color:${statusColor};white-space:nowrap">${statusIcon} ${statusLabel}</div>
+      </div>
+      ${hasError ? '' : `
+        <div style="display:flex;align-items:baseline;gap:4px">
+          <span style="font-size:22px;font-weight:800;color:${slotColor};font-variant-numeric:tabular-nums">${slotCount}</span>
+          <span style="font-size:11px;color:var(--text-sub)">枠</span>
+          <span style="font-size:10px;color:var(--text-muted);margin-left:4px">/ ${days}日分</span>
+        </div>
+      `}
+      <div style="font-size:11px;color:var(--text-sub);margin-top:auto">${bottomHtml}</div>
     </div>
   `;
 }

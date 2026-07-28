@@ -6,7 +6,10 @@
   "scripts": {
     "check": "node scripts/check-slots.js",
     "check:one": "node scripts/check-slots.js --only=BF銀座",
-    "check:debug": "DEBUG=1 node scripts/check-slots.js --headed --only=BF銀座"
+    "check:debug": "DEBUG=1 node scripts/check-slots.js --headed --only=BF銀座",
+    "check:apotool": "node scripts/check-apotool.js",
+    "check:apotool:one": "node scripts/check-apotool.js --only=BF銀座",
+    "check:apotool:debug": "DEBUG=1 node scripts/check-apotool.js --headed --only=BF銀座"
   },
   "devDependencies": {
     "playwright": "^1.59.1"
