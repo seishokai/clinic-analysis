@@ -1,24 +1,15 @@
 {
-  "checkedAt": "2026-07-30T22:58:27.402Z",
-  "lastUpdated": "2026-07-30T22:58:27.402Z",
+  "checkedAt": "2026-07-31T22:52:19.095Z",
+  "lastUpdated": "2026-07-31T22:52:19.095Z",
   "source": "apotool",
-  "checkRangeFrom": "2026-07-31",
-  "checkRangeTo": "2026-09-29",
+  "checkRangeFrom": "2026-08-01",
+  "checkRangeTo": "2026-09-30",
   "treatment": "矯正相談",
   "clinics": [
     {
       "name": "BF銀座",
-      "available": true,
-      "availableDays": 1,
-      "availableSlots": 0,
-      "lastAvailableDate": "2026-07-31",
-      "perDaySample": [
-        {
-          "date": "2026-07-31",
-          "slotCount": 0
-        }
-      ],
-      "elapsedMs": 8276
+      "available": null,
+      "error": "page.waitForFunction: Timeout 30000ms exceeded."
     }
   ]
 }
