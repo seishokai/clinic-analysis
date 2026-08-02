@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v507';
+const APP_VERSION = 'v508';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -6221,13 +6221,20 @@ async function quickSetBookingStatus(name, apply, newStatus) {
   if (!bkEx[key]) bkEx[key] = {};
   bkEx[key].editedStatus = newStatus;
   saveData('bk-extra', bkEx);
+  // v508: safeSave は throw せず ok:false を返すため戻り値を検査
   try {
-    await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    const _qsRes = await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    if (_qsRes && _qsRes.ok === false) throw new Error(_qsRes.error || 'save failed');
     fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate: apply, status: newStatus }) }).catch(() => {});
     showToast(`✅ ${name} → ${newStatus}`);
   } catch (e) {
     match.status = oldStatus;
-    showToast('⚠ 保存失敗', true);
+    // bk-extra の editedStatus も巻き戻す (v505 rescue で復活しないように)
+    try {
+      const _bkExRb = loadData('bk-extra', {});
+      if (_bkExRb[key]) { _bkExRb[key].editedStatus = oldStatus || ''; saveData('bk-extra', _bkExRb); }
+    } catch(_){}
+    showToast('⚠ 保存失敗。自動再送信します', true);
   }
   renderBookings();
 }
@@ -8481,17 +8488,17 @@ function renderBookings() {
                     setTimeout(() => { amtInp.style.background = ''; }, 1500);
                   }
                 } catch(_){}
-                // DB へも同時保存
-                (async () => {
-                  try {
-                    await safeSave({
-                      type: 'upsert', table: 'booking_status',
-                      payload: { name, apply_date: applyDate, contract_amount: amt },
-                      options: { onConflict: 'name,apply_date' }
-                    });
-                  } catch(_){}
-                })();
-                showToast('契約金額 ¥' + amt.toLocaleString() + ' を保存しました');
+                // DB へも同時保存 (v508: safeSave は throw しないので ok を検査。失敗時はトースト差し替え)
+                const _amtRes = await safeSave({
+                  type: 'upsert', table: 'booking_status',
+                  payload: { name, apply_date: applyDate, contract_amount: amt },
+                  options: { onConflict: 'name,apply_date' }
+                });
+                if (_amtRes && _amtRes.ok === false) {
+                  showToast('⚠ 契約金額の保存に失敗。自動再送信します', true);
+                } else {
+                  showToast('契約金額 ¥' + amt.toLocaleString() + ' を保存しました');
+                }
               } else if (String(raw).trim() !== '') {
                 showToast('⚠ 金額の書式が不正です。あとで必ず入力してください', true);
               } else {
@@ -11440,19 +11447,15 @@ async function renderKaiinAll(containerId) {
               const input = prompt(`${name} を「${val}」にするには 次回予定日 が必要です。\nYYYY-MM-DD 形式で入力してください (例: ${todayStr})`, nextIso || todayStr);
               if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input.trim())) {
                 showToast('次回予定日が未入力のためキャンセルしました', true);
-                // 元の値に戻す
-                const info2 = (typeof getBFInfo === 'function') ? (getBFInfo(name, apply) || {}) : {};
-                const target2 = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-                sel.value = info2.bf_status || target2?.status || '';
+                // v508: 未設定 option を削除したので sel.value='' にすると表示崩れ → 再描画で正しい値に戻す
+                renderKaiinAll(containerId);
                 return;
               }
               const chk = parseDate(input.trim().replace(/-/g, '/'));
               const today2 = new Date(); today2.setHours(0,0,0,0);
               if (!chk || chk <= today2) {
                 showToast('次回予定日は明日以降の日付を入力してください', true);
-                const info2 = (typeof getBFInfo === 'function') ? (getBFInfo(name, apply) || {}) : {};
-                const target2 = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-                sel.value = info2.bf_status || target2?.status || '';
+                renderKaiinAll(containerId);
                 return;
               }
               // 次回予定日 を bf_next_date に保存
