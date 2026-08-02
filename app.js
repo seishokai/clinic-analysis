@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v506';
+const APP_VERSION = 'v507';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -11078,13 +11078,21 @@ async function renderKaiinAll(containerId) {
                 // v446: 表示も統一ヘルパー getEffStatus を使用 (フィルターと完全一致)
                 const st = getEffStatus(d, 'fallback');
                 // 選択肢は治療タブと同一定義 (getStatusesForTreatment)
-                const stStatuses = (typeof getStatusesForTreatment === 'function') ? getStatusesForTreatment(_treatment) : [];
+                let stStatuses = (typeof getStatusesForTreatment === 'function') ? getStatusesForTreatment(_treatment) : [];
+                // v507: ①「未設定」削除 ②「未対応 → 検討中」を常に先頭2つに固定
+                //   来院タブでは治療系に関わらず全て 未対応 と 検討中 を最上位に置き、
+                //   その後に治療別の詳細ステータスを続ける。
+                stStatuses = stStatuses.filter(s => s.value !== '未対応' && s.value !== '検討中');
+                stStatuses = [
+                  { value: '未対応', color: '#9ca3af' },
+                  { value: '検討中', color: '#f59e0b' },
+                  ...stStatuses,
+                ];
                 const stColor = (stStatuses.find(s => s.value === st) || {}).color || '';
                 const stPill = statusPillCss(st, stColor);
                 // 現在値が定義リストに無い場合も選択状態を保てるよう先頭に補う (取りこぼし防止)
                 const stHasCurrent = !st || stStatuses.some(s => s.value === st);
                 const stBadge = `<select class="kaiin-all-status-sel ${stPill.c}" data-name="${escapeHtml(d.name)}" data-apply="${escapeHtml(d.applyDate)}" data-treatment="${escapeHtml(_treatment)}" style="font-size:10px;width:100%;${stPill.s ? stPill.s + ';' : ''}background-image:url('data:image/svg+xml;utf8,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 24 24%22 fill=%22none%22 stroke=%22currentColor%22 stroke-width=%222%22><path d=%22M6 9l6 6 6-6%22/></svg>');background-repeat:no-repeat;background-position:right 8px center;background-size:12px">
-                  <option value="">未設定</option>
                   ${!stHasCurrent ? `<option value="${escapeHtml(st)}" selected>${escapeHtml(statusPillLabel(st))}</option>` : ''}
                   ${stStatuses.map(s => { const lbl = statusPillLabel(s.value); return `<option value="${escapeHtml(s.value)}" ${st===s.value?'selected':''}>${escapeHtml(lbl)}</option>`; }).join('')}
                 </select>`;
@@ -11411,31 +11419,68 @@ async function renderKaiinAll(containerId) {
             saveData('bk-extra', bkEx);
           } catch(_){}
         } else {
-          // BF/矯正/その他: 治療別タブと同じく bf_status に保存 (正データを共有)
-          const ok = await saveBFLifecycleField(name, apply, 'bf_status', val);
-          if (!ok) throw new Error('save failed');
-          // 「予約変更」かつ次回予定(未来)があれば予約日を移動 (治療タブと同じ挙動)
-          if (val === '予約変更') {
-            const info = (typeof getBFInfo === 'function') ? (getBFInfo(name, apply) || {}) : {};
-            const nextIso = info.bf_next_date;
-            if (nextIso) {
+          // v507: 「予約変更/日程変更」選択時は 次回予定日 を必須入力にする (v499の成約→金額必須と同じパターン)
+          //   既に次回予定日があれば従来通り自動で予約日を移動。無ければ prompt で入力を求める。
+          if (val === '予約変更' || val === '日程変更') {
+            const infoPre = (typeof getBFInfo === 'function') ? (getBFInfo(name, apply) || {}) : {};
+            let nextIso = infoPre.bf_next_date || '';
+            const hasValid = (() => {
+              if (!nextIso) return false;
               const nd = parseDate(nextIso.replace(/-/g, '/'));
               const today = new Date(); today.setHours(0,0,0,0);
-              if (nd && nd > today) {
-                await safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: apply, book_date: nextIso, status:'予約変更' }, options:{ onConflict:'name,apply_date' } });
-                const match = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
-                if (match) { match.bookDate = nextIso.replace(/-/g, '/'); match.status = '予約変更'; }
-                try {
-                  const bkEx = loadData('bk-extra', {});
-                  const key = name + '|' + apply;
-                  if (!bkEx[key]) bkEx[key] = {};
-                  bkEx[key].editedStatus = '予約変更';
-                  bkEx[key].editedBookDate = nextIso.replace(/-/g, '/');
-                  saveData('bk-extra', bkEx);
-                } catch(_){}
-                showToast('予約日を ' + (nextIso.substring(5).replace('-','/')) + ' に移動しました (予約管理で確認)');
+              return nd && nd > today;
+            })();
+            if (!hasValid) {
+              // prompt で 次回予定日 を要求 (YYYY-MM-DD 形式)
+              const todayStr = (() => {
+                const t = new Date(); t.setDate(t.getDate() + 1);
+                const y = t.getFullYear(), m = String(t.getMonth()+1).padStart(2,'0'), d = String(t.getDate()).padStart(2,'0');
+                return `${y}-${m}-${d}`;
+              })();
+              const input = prompt(`${name} を「${val}」にするには 次回予定日 が必要です。\nYYYY-MM-DD 形式で入力してください (例: ${todayStr})`, nextIso || todayStr);
+              if (!input || !/^\d{4}-\d{2}-\d{2}$/.test(input.trim())) {
+                showToast('次回予定日が未入力のためキャンセルしました', true);
+                // 元の値に戻す
+                const info2 = (typeof getBFInfo === 'function') ? (getBFInfo(name, apply) || {}) : {};
+                const target2 = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+                sel.value = info2.bf_status || target2?.status || '';
+                return;
               }
+              const chk = parseDate(input.trim().replace(/-/g, '/'));
+              const today2 = new Date(); today2.setHours(0,0,0,0);
+              if (!chk || chk <= today2) {
+                showToast('次回予定日は明日以降の日付を入力してください', true);
+                const info2 = (typeof getBFInfo === 'function') ? (getBFInfo(name, apply) || {}) : {};
+                const target2 = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+                sel.value = info2.bf_status || target2?.status || '';
+                return;
+              }
+              // 次回予定日 を bf_next_date に保存
+              const okND = await saveBFLifecycleField(name, apply, 'bf_next_date', input.trim());
+              if (!okND) throw new Error('next date save failed');
+              nextIso = input.trim();
             }
+            // ここまでで nextIso は必ず有効な未来日付
+            // bf_status を保存
+            const ok = await saveBFLifecycleField(name, apply, 'bf_status', val);
+            if (!ok) throw new Error('save failed');
+            // 予約日を移動 (booking_status.book_date / status も同期)
+            await safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: apply, book_date: nextIso, status: val }, options:{ onConflict:'name,apply_date' } });
+            const match = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
+            if (match) { match.bookDate = nextIso.replace(/-/g, '/'); match.status = val; }
+            try {
+              const bkEx = loadData('bk-extra', {});
+              const key = name + '|' + apply;
+              if (!bkEx[key]) bkEx[key] = {};
+              bkEx[key].editedStatus = val;
+              bkEx[key].editedBookDate = nextIso.replace(/-/g, '/');
+              saveData('bk-extra', bkEx);
+            } catch(_){}
+            showToast('予約日を ' + (nextIso.substring(5).replace('-','/')) + ' に移動しました (予約管理で確認)');
+          } else {
+            // BF/矯正/その他: 治療別タブと同じく bf_status に保存 (正データを共有)
+            const ok = await saveBFLifecycleField(name, apply, 'bf_status', val);
+            if (!ok) throw new Error('save failed');
           }
         }
         sel.style.outline = '2px solid #16a34a';
