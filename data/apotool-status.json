@@ -1,9 +1,9 @@
 {
-  "checkedAt": "2026-08-03T02:25:07.774Z",
-  "lastUpdated": "2026-08-03T02:25:07.775Z",
+  "checkedAt": "2026-08-03T22:52:30.587Z",
+  "lastUpdated": "2026-08-03T22:52:30.587Z",
   "source": "apotool",
-  "checkRangeFrom": "2026-08-03",
-  "checkRangeTo": "2026-10-02",
+  "checkRangeFrom": "2026-08-04",
+  "checkRangeTo": "2026-10-03",
   "treatment": "矯正相談",
   "clinics": [
     {
@@ -62,7 +62,7 @@
           "slotCount": 0
         }
       ],
-      "elapsedMs": 26156
+      "elapsedMs": 26245
     }
   ]
 }
