@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v511';
+const APP_VERSION = 'v512';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -5136,7 +5136,7 @@ async function callModeApplyStatus(newStatus) {
     const newDate = await _promptNewBookDate(d);
     if (!newDate) return; // キャンセルされた
     try {
-      await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+      await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } });
       const match = bookingsData.find(b => b.name === d.name && b.applyDate === d.applyDate);
       if (match) { match.status = newStatus; match.bookDate = newDate; }
       d.status = newStatus; d.bookDate = newDate;
@@ -5149,7 +5149,7 @@ async function callModeApplyStatus(newStatus) {
     return;
   }
   try {
-    await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, status: newStatus }, options: { onConflict:'name,apply_date' } });
     const match = bookingsData.find(b => b.name === d.name && b.applyDate === d.applyDate);
     if (match) match.status = newStatus;
     d.status = newStatus;
@@ -7562,7 +7562,7 @@ async function loadBookings() {
             d.incentiveAmount = inc;
             // DBにも書き戻し
             (async () => {
-              const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
+              const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
               if (res && res.ok === false) console.warn('incentive upsert queued', d.name);
             })();
             recalcCount++;
@@ -8843,7 +8843,7 @@ function renderBookings() {
           //   safeSave が enqueueSave にも到達せず完全消失リスク。
           //   async IIFE に await + トーストを await 後に移動。
           (async () => {
-            const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+            const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, book_date: newDate }, options: { onConflict:'name,apply_date' } });
             if (res && res.ok === false) {
               showToast('⚠ 予約日保存に失敗 — 再送信キューに登録', true);
             } else {
@@ -10068,6 +10068,14 @@ function getBFInfo(name, applyDate) {
   const k2 = normName(name) + '|' + dateKey;
   return bfLifecycleCache[k2] || null;
 }
+// v512: Google Sheets の d.name (全角スペース等) を DB 側の実在 name (半角/無)
+//   に解決する。upsert 時に d.name をそのまま使うと onConflict('name,apply_date')
+//   が別行扱いで DB に duplicate 行が積まれる (安井さん現象の根源) ため、
+//   既存 DB 行が bfLifecycleCache にキャッシュ済なら DB の name を返す。
+function resolveDBName(name, applyDate) {
+  const info = getBFInfo(name, applyDate);
+  return (info && info.name) ? info.name : name;
+}
 
 async function loadBFHistory(names) {
   try {
@@ -10453,7 +10461,7 @@ async function syncStatusToBFStatus(bfRows) {
     if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: d.name, apply_date: d.applyDate };
     bfLifecycleCache[key].bf_status = mappedBF;
     tasks.push((async () => {
-      const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, bf_status: mappedBF }, options: { onConflict:'name,apply_date' } });
+      const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, bf_status: mappedBF }, options: { onConflict:'name,apply_date' } });
       if (res && res.ok === false) { console.warn('sync status->bf queued', d.name); return; }
       try {
         await sb.from('bf_history').insert({
@@ -12817,18 +12825,22 @@ function drawBFLifecycleTable(bfRows) {
 
   const today = new Date(); today.setHours(0,0,0,0);
   // CS医院自動反映: bf_cs_facilityが未設定なら来院医院を自動セット
+  // v512: 読み書き両方をスペース差異吸収に統一。
+  //   従来は bfLifecycleCache[raw key] 直参照で既存 bf_cs_facility を見逃し
+  //   → 描画毎に upsert 発火 → d.name (全角) の別行を DB に量産していた。
   const autoFacPromises = [];
   filtered.forEach(d => {
-    const key = d.name + '|' + d.applyDate;
-    const info = bfLifecycleCache[key] || {};
+    const info = getBFInfo(d.name, d.applyDate) || {};
     if (!info.bf_cs_facility && d.facility) {
       const fac = normFac(d.facility);
       if (fac && fac !== '-') {
+        const dbName = resolveDBName(d.name, d.applyDate);
+        const cacheKey = dbName + '|' + d.applyDate;
         autoFacPromises.push(
-          safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, bf_cs_facility: fac }, options: { onConflict:'name,apply_date' } })
+          safeSave({ type:'upsert', table:'booking_status', payload: { name: dbName, apply_date: d.applyDate, bf_cs_facility: fac }, options: { onConflict:'name,apply_date' } })
         );
-        if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: d.name, apply_date: d.applyDate };
-        bfLifecycleCache[key].bf_cs_facility = fac;
+        if (!bfLifecycleCache[cacheKey]) bfLifecycleCache[cacheKey] = { name: dbName, apply_date: d.applyDate };
+        bfLifecycleCache[cacheKey].bf_cs_facility = fac;
       }
     }
   });
@@ -12983,7 +12995,7 @@ function drawBFLifecycleTable(bfRows) {
             if (inc) {
               d.incentiveAmount = inc;
               (async () => {
-                const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
+                const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, incentive_amount: inc }, options: { onConflict:'name,apply_date' } });
                 if (res && res.ok === false) showToast('⚠ インセ保存に失敗。再送信します', true);
               })();
             }
@@ -16393,7 +16405,7 @@ function _openPaymentNoticeModal(source, bookings, _bkEx, targetMonth) {
         updates.push(safeSave({
           type: 'upsert',
           table: 'booking_status',
-          payload: { name: d.name, apply_date: d.applyDate, payment_notice_created: true, payment_notice_date: issueIso, payment_notice_month: tm },
+          payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, payment_notice_created: true, payment_notice_date: issueIso, payment_notice_month: tm },
           options: { onConflict: 'name,apply_date' }
         }));
       }
@@ -16951,7 +16963,7 @@ async function savePromoRate() {
           d.incentiveAmount = inc;
           savePromises.push(safeSave({
             type: 'upsert', table: 'booking_status',
-            payload: { name: d.name, apply_date: d.applyDate, incentive_amount: inc },
+            payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, incentive_amount: inc },
             options: { onConflict: 'name,apply_date' }
           }));
           recalc++;
