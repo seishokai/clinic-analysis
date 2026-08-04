@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v510';
+const APP_VERSION = 'v511';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -9963,6 +9963,10 @@ function isImplantBooking(d) {
 }
 
 const BF_STATUSES = [
+  // v511: 「未対応」を第一級市民として追加。従来は BF_STATUSES に無かったため、
+  //   来院タブ v507 で 未対応 を選ぶと funnel で noStatus++ に混入・フィルタで
+  //   絞れない・BF一覧の <option> にも出ないという副作用があった。
+  { value: '未対応', color: '#9ca3af' },
   { value: '予約連絡待ち', color: '#a855f7' },
   { value: '後追いLINE済み', color: '#06b6d4' },
   { value: '予約変更', color: '#f59e0b' },
@@ -12833,7 +12837,10 @@ function drawBFLifecycleTable(bfRows) {
 
   const rowsHtml = filtered.map(d => {
     const key = d.name + '|' + d.applyDate;
-    const info = bfLifecycleCache[key] || {};
+    // v511: bfLifecycleCache 直参照だとスペース差異 (全角/半角/無) で
+    //   info が空で返り「未設定」誤表示 → 何度も入力を促すバグの温床。
+    //   getBFInfo() 経由に統一 (normName フォールバックあり)。
+    const info = getBFInfo(d.name, d.applyDate) || {};
     const st = info.bf_status || '';
     const stColor = BF_STATUSES.find(s => s.value === st)?.color || '#ccc';
     const bookDate = parseDate(d.bookDate);
