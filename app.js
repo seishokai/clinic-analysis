@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v508';
+const APP_VERSION = 'v509';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10125,6 +10125,9 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
 
 
   // A2: 楽観的ロック - 既存行は updated_at チェック付きで更新
+  // v509: 実際の保存成否を追跡し戻り値に反映 (従来は常に true を返し、
+  //       silent save fail の見逃しで「保存できたつもり」の原因になっていた)
+  let _saveOk = true;
   const seenVersion = getVersion('booking_status', key);
   if (seenVersion) {
     // 既存行がある → 条件付き更新
@@ -10141,12 +10144,12 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     if (!lockRes.ok) {
       // ネットワークエラー等 → safeSave でリトライ
       const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
-      if (!res.ok) showToast('⚠ 一時保存に失敗。自動再送信します', true);
+      if (!res.ok) { showToast('⚠ 一時保存に失敗。自動再送信します', true); _saveOk = false; }
     }
   } else {
     // 新規 → 通常 upsert (safeSaveでリトライ付き)
     const res = await safeSave({ type:'upsert', table:'booking_status', payload: update, options: { onConflict:'name,apply_date' } });
-    if (!res.ok) showToast('⚠ 一時保存に失敗。自動再送信します', true);
+    if (!res.ok) { showToast('⚠ 一時保存に失敗。自動再送信します', true); _saveOk = false; }
   }
   // キャッシュ更新
   if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
@@ -10187,7 +10190,8 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   }
   // v374: 一覧/予約/電話前確認 タブも同期再描画
   if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
-  return true;
+  // v509: 実際の保存成否を返す (呼び出し側の `if (!ok) return` が機能するように)
+  return _saveOk;
 }
 
 async function renderBFLifecycle() {
