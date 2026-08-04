@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v509';
+const APP_VERSION = 'v510';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -7467,8 +7467,11 @@ async function loadBookings() {
           const exact = statusMap[key];
           let dbRow = exact;
           if (!dbRow) {
+            // v510: DB は apply_date キーなのでフォールバックは d.applyDate を優先。
+            //       従来は d.bookDate || d.applyDate だったため、bookDate 設定済みかつ
+            //       スペース差異あり患者でフォールバックが常に外れていた。
             const nnTarget = normName(d.name);
-            const dateKey = normDateKey(d.bookDate || d.applyDate);
+            const dateKey = normDateKey(d.applyDate || d.bookDate);
             const candidate = statusByNormDate.get(nnTarget + '|' + dateKey);
             if (candidate) dbRow = candidate;
           }
@@ -10054,7 +10057,11 @@ async function loadBFLifecycleData() {
 function getBFInfo(name, applyDate) {
   const k1 = name + '|' + applyDate;
   if (bfLifecycleCache[k1]) return bfLifecycleCache[k1];
-  const k2 = normName(name) + '|' + (applyDate||'').substring(0,10);
+  // v510: applyDate に時刻部分が付いている場合も先に substring した raw key を試す
+  const dateKey = (applyDate||'').substring(0,10);
+  const k1b = name + '|' + dateKey;
+  if (bfLifecycleCache[k1b]) return bfLifecycleCache[k1b];
+  const k2 = normName(name) + '|' + dateKey;
   return bfLifecycleCache[k2] || null;
 }
 
@@ -10254,7 +10261,7 @@ async function renderBFLifecycle() {
   BF_STATUSES.forEach(s => counts[s.value] = 0);
   let noStatus = 0;
   bfRows.forEach(d => {
-    const info = bfLifecycleCache[d.name + '|' + d.applyDate];
+    const info = getBFInfo(d.name, d.applyDate);
     const st = info?.bf_status;
     if (st && counts[st] !== undefined) counts[st]++;
     else noStatus++;
@@ -10466,7 +10473,7 @@ function updateBFFunnelAndTable(bfRows) {
   BF_STATUSES.forEach(s => counts[s.value] = 0);
   let noStatus = 0;
   bfRows.forEach(d => {
-    const info = bfLifecycleCache[d.name + '|' + d.applyDate];
+    const info = getBFInfo(d.name, d.applyDate);
     const st = info?.bf_status;
     if (st && counts[st] !== undefined) counts[st]++;
     else noStatus++;
@@ -10918,7 +10925,7 @@ async function renderKaiinAll(containerId) {
   const contractRate = visited ? Math.round(contracted / visited * 100) : 0;
   const sortMode = state.sortBy || '';
   const _contractKey = (d) => {
-    const info2 = bfLifecycleCache[d.name + '|' + d.applyDate];
+    const info2 = getBFInfo(d.name, d.applyDate);
     return (info2?.contract_date || '').substring(0, 7); // YYYY-MM
   };
   const sortedRows = allRows.slice().sort((a,b) => {
@@ -11039,7 +11046,7 @@ async function renderKaiinAll(containerId) {
               .map(d => {
                 const cat = getTreatmentCategory(d) || '-';
                 const fac = normFac(d.facility) || '-';
-                const info = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
+                const info = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? getBFInfo(d.name, d.applyDate) : null;
                 const nextDate = info?.bf_next_date || '';
                 const contractSvc = d.contractService || '';
                 const amt = _amt(d);
@@ -11322,7 +11329,7 @@ async function renderKaiinAll(containerId) {
       };
       allRows.forEach(d => {
         const cat = getTreatmentCategory(d) || '';
-        const info = bfLifecycleCache[d.name + '|' + d.applyDate] || {};
+        const info = (getBFInfo(d.name, d.applyDate) || {});
         const memo = d._memo || info.bf_memo || info.memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
         csvRows.push([
           d.bookDate || '',
@@ -11743,7 +11750,7 @@ async function renderKaiinTab(treatment, containerId) {
     if (bd && bd > todayEnd) return false;
     // 予約変更で次回予定(未来)が入っているものは来院管理から除外 (予約管理のみで追跡)
     if (d.status === '予約変更') {
-      const info = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? bfLifecycleCache[d.name + '|' + d.applyDate] : null;
+      const info = (typeof bfLifecycleCache === 'object' && bfLifecycleCache) ? getBFInfo(d.name, d.applyDate) : null;
       const nextIso = info && info.bf_next_date;
       if (nextIso) {
         const nd = parseDate(nextIso.replace(/-/g, '/'));
@@ -12131,7 +12138,7 @@ function renderKaiinSimpleList(treatment, rows, containerId) {
       };
       const csvRows = [headers.join(',')];
       filtered.forEach(d => {
-        const info = bfLifecycleCache[d.name + '|' + d.applyDate] || {};
+        const info = (getBFInfo(d.name, d.applyDate) || {});
         const memo = d._memo || info.bf_memo || info.memo || (typeof findMemoForBooking === 'function' ? findMemoForBooking(d.name, d.applyDate) : '') || '';
         csvRows.push([
           d.bookDate || '',
