@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v514';
+const APP_VERSION = 'v515';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -5136,7 +5136,9 @@ async function callModeApplyStatus(newStatus) {
     const newDate = await _promptNewBookDate(d);
     if (!newDate) return; // キャンセルされた
     try {
-      await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+      // v515: safeSave 戻り値検査 (電話モード silent 失敗防止)
+      const _cmRes1 = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } });
+      if (_cmRes1 && _cmRes1.ok === false) throw new Error(_cmRes1.error || 'save failed');
       const match = bookingsData.find(b => b.name === d.name && b.applyDate === d.applyDate);
       if (match) { match.status = newStatus; match.bookDate = newDate; }
       d.status = newStatus; d.bookDate = newDate;
@@ -5144,12 +5146,13 @@ async function callModeApplyStatus(newStatus) {
       renderCallMode();   // 即時バッジ更新
       setTimeout(() => callModeNext(), 600);
     } catch(e) {
-      _showBigToast('保存エラー: ' + e.message, '#dc2626');
+      _showBigToast('保存エラー: ' + (e?.message || e), '#dc2626');
     }
     return;
   }
   try {
-    await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    const _cmRes2 = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(d.name, d.applyDate), apply_date: d.applyDate, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    if (_cmRes2 && _cmRes2.ok === false) throw new Error(_cmRes2.error || 'save failed');
     const match = bookingsData.find(b => b.name === d.name && b.applyDate === d.applyDate);
     if (match) match.status = newStatus;
     d.status = newStatus;
@@ -6328,7 +6331,10 @@ function setupBulkBookingActions() {
               bfLifecycleCache[key].bf_status = targetBF;
             }
           }
-          await safeSave({ type:'upsert', table:'booking_status', payload: upsertData, options: { onConflict:'name,apply_date' } });
+          // v515: safeSave は throw しないので戻り値検査 (常に「✅ N 件更新」表示バグ修正)
+          upsertData.name = resolveDBName(item.name, item.applyDate);
+          const _blkRes = await safeSave({ type:'upsert', table:'booking_status', payload: upsertData, options: { onConflict:'name,apply_date' } });
+          if (_blkRes && _blkRes.ok === false) throw new Error(_blkRes.error || 'save failed');
           fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: item.name, applyDate: item.applyDate, status: newStatus }) }).catch(() => {});
           okCount++;
         } catch(e) {
@@ -9020,17 +9026,17 @@ async function saveRowEdit() {
       const amt = Number(String(raw).replace(/[^0-9]/g, ''));
       if (amt > 0) {
         d.contractAmount = amt;
-        // DB へも同時保存 (下の saves に混ぜる)
-        (async () => {
-          try {
-            await safeSave({
-              type: 'upsert', table: 'booking_status',
-              payload: { name: oldName, apply_date: oldApply, contract_amount: amt },
-              options: { onConflict: 'name,apply_date' }
-            });
-          } catch(_){}
-        })();
-        showToast('契約金額 ¥' + amt.toLocaleString() + ' を保存しました');
+        // v515: fire-and-forget + catch(_) 廃止、await + ok 検査に変更
+        const _rowAmtRes = await safeSave({
+          type: 'upsert', table: 'booking_status',
+          payload: { name: resolveDBName(oldName, oldApply), apply_date: oldApply, contract_amount: amt },
+          options: { onConflict: 'name,apply_date' }
+        });
+        if (_rowAmtRes && _rowAmtRes.ok === false) {
+          showToast('⚠ 契約金額の保存に失敗。再送信します', true);
+        } else {
+          showToast('契約金額 ¥' + amt.toLocaleString() + ' を保存しました');
+        }
       } else if (String(raw).trim() !== '') {
         showToast('⚠ 金額の書式が不正です。あとで必ず入力してください', true);
       } else {
@@ -9215,9 +9221,14 @@ async function saveMemoModal() {
     }
   }
   // 予約一覧メモとBFメモを連動 (v273: 空時も bf_memo を上書きする — 削除を反映するため)
-  const payload = { name: _memoTarget.name, apply_date: _memoTarget.apply, memo: val, bf_memo: val };
-  // Bug fix: await して保存完了を確認
-  await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+  // v515: name を DB 変種に resolve + safeSave 戻り値検査 (silent 保存失敗防止)
+  const _memoResolvedName = resolveDBName(_memoTarget.name, _memoTarget.apply);
+  const payload = { name: _memoResolvedName, apply_date: _memoTarget.apply, memo: val, bf_memo: val };
+  const _memoSaveRes = await safeSave({ type:'upsert', table:'booking_status', payload, options: { onConflict:'name,apply_date' } });
+  if (_memoSaveRes && _memoSaveRes.ok === false) {
+    showToast('⚠ メモ保存に失敗。自動再送信します', true);
+    // ローカル更新は続行 (再送信キューに乗っているため次回同期される)
+  }
   // BFライフサイクルキャッシュも同期 (空でも反映)
   if (bfLifecycleCache[_memoTarget.key]) {
     bfLifecycleCache[_memoTarget.key].bf_memo = val;
@@ -10186,12 +10197,17 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     if (!res.ok) { showToast('⚠ 一時保存に失敗。自動再送信します', true); _saveOk = false; }
   }
   // キャッシュ更新
-  // v513: dbKey (DB name ベース) 側にも同参照でエイリアス。
-  //   これにより getBFInfo が raw d.name でも normName でも DB name でも
-  //   同じオブジェクトを引ける (次回 loadBFLifecycleData 前でも整合)。
-  if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: dbName, apply_date: applyDate };
-  bfLifecycleCache[key][field] = value;
-  if (dbKey !== key && !bfLifecycleCache[dbKey]) bfLifecycleCache[dbKey] = bfLifecycleCache[key];
+  // v515: save 失敗時は cache も汚染しない (silent success 錯覚防止)
+  //   さらに新規 stub 作成時は current の他フィールドを継承 (v513 で欠落フィールドが
+  //   吹っ飛ぶバグを修正)。
+  if (_saveOk) {
+    if (!bfLifecycleCache[key]) {
+      // current は getBFInfo() で resolve 済 → 他フィールド (bf_memo, cs_facility 等) を継承
+      bfLifecycleCache[key] = Object.assign({}, current, { name: dbName, apply_date: applyDate });
+    }
+    bfLifecycleCache[key][field] = value;
+    if (dbKey !== key && !bfLifecycleCache[dbKey]) bfLifecycleCache[dbKey] = bfLifecycleCache[key];
+  }
   // メモ連動: 予約一覧の d._memo も更新
   // v386: name+applyDate の完全一致のみ (旧: normName で fuzzy match → 同名別人を上書きするバグ #4/#12)
   if (field === 'bf_memo' || field === 'memo') {
@@ -10547,6 +10563,9 @@ const STATUS_TO_BF = {
 // v386: BF治療途中の細かい段階 (CT/診断, P処置等) も全て '成約' にマッピング
 // (それ以前は未対応で、bf_status だけ更新されて status が古いまま残るバグがあった #5)
 const BF_TO_STATUS = {
+  // v515: v511 で追加した「未対応」は明示的に null (status カラム更新スキップ)。
+  //   undefined だと `if (mapped)` で扱いが不明確になるので明示。
+  '未対応': null,
   '離脱': '来院済',
   '検討中': '来院済',
   '成約': '成約',
@@ -13007,10 +13026,12 @@ function drawBFLifecycleTable(bfRows) {
         setTimeout(() => { inp.style.borderColor = ''; }, 1000);
         // 売上 → プロモ率でインセ自動計算も
         if (field === 'contract_amount') {
+          // v515: `n` は blur ハンドラのスコープ変数で change 内では未定義 → ReferenceError で
+          //   インセ自動計算が全く発火していなかった。change ハンドラのローカル `val` を使う。
           const d = bookingsData.find(x => x.name === inp.dataset.name && x.applyDate === inp.dataset.apply);
           if (d) {
-            d.contractAmount = n;
-            const inc = calcIncentive(d.source, n);
+            d.contractAmount = val;
+            const inc = calcIncentive(d.source, val);
             if (inc) {
               d.incentiveAmount = inc;
               (async () => {
@@ -15801,12 +15822,16 @@ function renderFollowup() {
       const isBF = (typeof isBFBooking === 'function') && isBFBooking(d);
       if (isBF) {
         // BF: 正データは bf_status。予約日(book_date)は booking_status に保存。
-        await safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: apply, book_date: newDate }, options:{ onConflict:'name,apply_date' } });
-        await saveBFLifecycleField(name, apply, 'bf_status', '予約変更');
+        // v515: safeSave 戻り値検査 (silent 失敗を防ぐ)
+        const _rb1 = await safeSave({ type:'upsert', table:'booking_status', payload:{ name: resolveDBName(name, apply), apply_date: apply, book_date: newDate }, options:{ onConflict:'name,apply_date' } });
+        if (_rb1 && _rb1.ok === false) { showToast('⚠ 予約日の保存に失敗。再送信します', true); return; }
+        const _rb2 = await saveBFLifecycleField(name, apply, 'bf_status', '予約変更');
+        if (!_rb2) { showToast('⚠ ステータス保存に失敗', true); return; }
         d.bookDate = newDate;
       } else {
         // 矯正/インプラント/その他: 正データは d.status
-        await safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: apply, book_date: newDate, status: '予約変更' }, options:{ onConflict:'name,apply_date' } });
+        const _rb3 = await safeSave({ type:'upsert', table:'booking_status', payload:{ name: resolveDBName(name, apply), apply_date: apply, book_date: newDate, status: '予約変更' }, options:{ onConflict:'name,apply_date' } });
+        if (_rb3 && _rb3.ok === false) { showToast('⚠ 再予約の保存に失敗。再送信します', true); return; }
         d.bookDate = newDate;
         d.status = '予約変更';
       }
