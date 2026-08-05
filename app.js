@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v513';
+const APP_VERSION = 'v514';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10021,15 +10021,17 @@ async function loadBFLifecycleData() {
       // ※ key / normKey は同一オブジェクト r への参照を共有するため、どちらを更新しても整合する。
       //   名前変更 (editPatientName) 時は両キーを明示的に掃除する必要がある (#11)
       const key = r.name + '|' + r.apply_date;
-      const normKey = normName(r.name) + '|' + (r.apply_date||'').substring(0,10);
+      // v514: 正規化キーの日付は normDateKey で slash/dash を統一
+      //   getBFInfo 側も normDateKey で照合するため、両サイドを揃える
+      const normDate = normDateKey(r.apply_date);
+      const normKey = normName(r.name) + '|' + normDate;
       nextCache[key] = r;
-      // 正規化キーでも引ける (空白有無どちらでもヒット) - 同一参照 r を共有
       if (!nextCache[normKey]) nextCache[normKey] = r;
       // v455: edited_name でも引けるようにする。loadBookings が d.name を edited_name
       //   に上書きするため、後段の bfLifecycleCache[d.name|apply] が edited 側で検索される
       if (r.edited_name) {
         const editedKey = r.edited_name + '|' + r.apply_date;
-        const editedNormKey = normName(r.edited_name) + '|' + (r.apply_date||'').substring(0,10);
+        const editedNormKey = normName(r.edited_name) + '|' + normDate;
         if (!nextCache[editedKey]) nextCache[editedKey] = r;
         if (!nextCache[editedNormKey]) nextCache[editedNormKey] = r;
       }
@@ -10061,8 +10063,11 @@ async function loadBFLifecycleData() {
 function getBFInfo(name, applyDate) {
   const k1 = name + '|' + applyDate;
   if (bfLifecycleCache[k1]) return bfLifecycleCache[k1];
-  // v510: applyDate に時刻部分が付いている場合も先に substring した raw key を試す
-  const dateKey = (applyDate||'').substring(0,10);
+  // v514: Google Sheets の日付は "2026/07/18 10:16" (スラッシュ)
+  //       DB Supabase の日付は "2026-07-18" (ダッシュ)
+  //   substring(0,10) だけだと slash/dash の違いを吸収できず get miss
+  //   → resolveDBName が raw name を返し duplicate 量産の主因 → normDateKey で統一
+  const dateKey = normDateKey(applyDate);
   const k1b = name + '|' + dateKey;
   if (bfLifecycleCache[k1b]) return bfLifecycleCache[k1b];
   const k2 = normName(name) + '|' + dateKey;
