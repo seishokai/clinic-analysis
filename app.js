@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v515';
+const APP_VERSION = 'v516';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -401,6 +401,22 @@ async function processQueue(force) {
 // safeSave: DB保存を試み、失敗したらキューに溜める
 async function safeSave(op) {
   try {
+    // v516: booking_status / manual_bookings への upsert/update/delete で、name を
+    //   DB 側の実在 name (半角/無スペース) に自動解決。呼出し側 40+ 箇所に個別
+    //   resolveDBName を貼るより単一点に集約する方が漏れが無い。
+    //   ヘルパ未ロード (初期化順) の場合は無変換で通す。
+    if (typeof resolveDBName === 'function' && (op.table === 'booking_status' || op.table === 'manual_bookings')) {
+      const resolveInObj = (obj) => {
+        if (obj && obj.name && obj.apply_date) {
+          try { obj.name = resolveDBName(obj.name, obj.apply_date); } catch(_){}
+        }
+      };
+      if (op.payload) {
+        if (Array.isArray(op.payload)) op.payload.forEach(resolveInObj);
+        else resolveInObj(op.payload);
+      }
+      if (op.match) resolveInObj(op.match);
+    }
     let result;
     if (op.type === 'upsert') result = await sb.from(op.table).upsert(op.payload, op.options || {});
     else if (op.type === 'insert') result = await sb.from(op.table).insert(op.payload);
@@ -5540,7 +5556,7 @@ function _bindPhoneCheckRowEvents(el) {
             // v297: 該当行だけ更新 (全テーブル再描画を回避)
             _updatePhoneRowInPlace(row, dRow);
             updateHeaderBadge();
-            safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } })
+            safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(name, apply), apply_date: apply, status: newStatus, book_date: newDate }, options: { onConflict:'name,apply_date' } })
               .then(res => { if (res && res.ok === false) showToast('⚠ 予約日変更の保存を再送信キューに入れました', true); });
             if (typeof syncCrossTabRender === 'function') syncCrossTabRender('phone');
           } catch(e) { _showBigToast('保存エラー: ' + e.message, '#dc2626'); }
@@ -5550,7 +5566,7 @@ function _bindPhoneCheckRowEvents(el) {
         const origBg = btn.style.background;
         btn.disabled = true; btn.textContent = '…';
         try {
-          const payload = { name, apply_date: apply, status: newStatus };
+          const payload = { name: resolveDBName(name, apply), apply_date: apply, status: newStatus };
           const match = bookingsData.find(b => b.name === name && b.applyDate === apply);
           if (match) match.status = newStatus;
           try {
@@ -6226,7 +6242,7 @@ async function quickSetBookingStatus(name, apply, newStatus) {
   saveData('bk-extra', bkEx);
   // v508: safeSave は throw せず ok:false を返すため戻り値を検査
   try {
-    const _qsRes = await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
+    const _qsRes = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(name, apply), apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
     if (_qsRes && _qsRes.ok === false) throw new Error(_qsRes.error || 'save failed');
     fetch(GAS_API_URL, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, applyDate: apply, status: newStatus }) }).catch(() => {});
     showToast(`✅ ${name} → ${newStatus}`);
@@ -7526,8 +7542,12 @@ async function loadBookings() {
     try {
       const bkEx = loadData('bk-extra', {});
       bookingsData.forEach(d => {
+        // v516: edited_name 上書き (line 7522) 後の d.name で bk-extra が引けないケースの救済。
+        //   editPatientName は oldName + apply でキー保存するので、d._db?.name (=DB 原名) と
+        //   d.name (=edited 表示名) の両方でルックアップして、見つかったほうを ex とする。
         const key = d.name + '|' + d.applyDate;
-        const ex = bkEx[key];
+        const oldKey = d._db && d._db.name ? d._db.name + '|' + d.applyDate : null;
+        const ex = bkEx[key] || (oldKey && oldKey !== key ? bkEx[oldKey] : null);
         if (!ex) return;
         const db = d._db || {};
         // ▼ DB にフィールドがある場合はそちらを優先、無ければ bk-extra
@@ -10238,9 +10258,13 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
       memo: current.bf_memo || null,
       changed_by: getLoggedUserName()
     };
-    try { await sb.from('bf_history').insert(hist); } catch(e) { console.warn('bf_history insert failed:', e); }
-    if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
-    bfHistoryCache[key].unshift({ ...hist, created_at: new Date().toISOString() });
+    // v516: safeSave 経由でリトライキュー化 (silent 失敗で履歴が DB に残らないケース対策)
+    //   ローカルキャッシュへの追加は成功時のみ (失敗時は再送後に自然反映)
+    const _hRes = await safeSave({ type:'insert', table:'bf_history', payload: hist });
+    if (_hRes && _hRes.ok !== false) {
+      if (!bfHistoryCache[key]) bfHistoryCache[key] = [];
+      bfHistoryCache[key].unshift({ ...hist, created_at: new Date().toISOString() });
+    }
   }
   // v374: 一覧/予約/電話前確認 タブも同期再描画
   if (typeof syncCrossTabRender === 'function') syncCrossTabRender();
@@ -10372,7 +10396,7 @@ async function deleteBFRow(name, applyDate) {
       // manual_bookings 削除 (手動登録されたもののみ影響)
       safeSave({ type:'delete', table:'manual_bookings', match:{ name, apply_date: applyDate } }),
       // booking_status を除外に
-      safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: applyDate, status:'除外' }, options:{ onConflict:'name,apply_date' } })
+      safeSave({ type:'upsert', table:'booking_status', payload:{ name: resolveDBName(name, applyDate), apply_date: applyDate, status:'除外' }, options:{ onConflict:'name,apply_date' } })
     ]);
     // manual_bookings は「元々存在しない (DXHUB 由来)」でも失敗ではないので
     // booking_status 側の成否だけで判断
@@ -11529,7 +11553,7 @@ async function renderKaiinAll(containerId) {
             const ok = await saveBFLifecycleField(name, apply, 'bf_status', val);
             if (!ok) throw new Error('save failed');
             // 予約日を移動 (booking_status.book_date / status も同期)
-            await safeSave({ type:'upsert', table:'booking_status', payload:{ name, apply_date: apply, book_date: nextIso, status: val }, options:{ onConflict:'name,apply_date' } });
+            await safeSave({ type:'upsert', table:'booking_status', payload:{ name: resolveDBName(name, apply), apply_date: apply, book_date: nextIso, status: val }, options:{ onConflict:'name,apply_date' } });
             const match = (bookingsData || []).find(b => b.name === name && b.applyDate === apply);
             if (match) { match.bookDate = nextIso.replace(/-/g, '/'); match.status = val; }
             try {
@@ -13290,7 +13314,7 @@ function renderBFBookings(allBFData) {
         sel.style.borderColor = 'var(--green)';
         setTimeout(() => sel.style.borderColor = '', 1000);
         (async () => {
-          const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name, apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
+          const res = await safeSave({ type:'upsert', table:'booking_status', payload: { name: resolveDBName(name, apply), apply_date: apply, status: newStatus }, options: { onConflict:'name,apply_date' } });
           if (res && res.ok === false) showToast('⚠ ステータス保存に失敗。再送信します', true);
         })();
       });
