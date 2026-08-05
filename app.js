@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v512';
+const APP_VERSION = 'v513';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10098,10 +10098,19 @@ function getLoggedUserName() {
 }
 
 async function saveBFLifecycleField(name, applyDate, field, value) {
+  // v513: DB 側で既存行があればその name (半角/無スペース) に解決してから upsert する。
+  //   従来は Google Sheets 由来の d.name (全角スペース) をそのまま payload に入れて
+  //   おり、onConflict('name,apply_date') が既存行にヒットせず duplicate 行を量産
+  //   → v510/v511 で読み側は正規化したが「昨日キャンセルにした人が今日また未対応」の
+  //   本命はこの書き側にあった。
+  //   cache/localStorage キーは raw 維持 (呼び出し側の d.name 参照との整合)、
+  //   DB payload / conditionalUpdate match のみ dbName に差し替える。
+  const dbName = resolveDBName(name, applyDate);
   const key = name + '|' + applyDate;
-  const current = bfLifecycleCache[key] || {};
+  const dbKey = dbName + '|' + applyDate;
+  const current = getBFInfo(name, applyDate) || {};
   const fromStatus = current.bf_status || null;
-  const update = { name, apply_date: applyDate };
+  const update = { name: dbName, apply_date: applyDate };
   update[field] = value;
   // メモ連動: 空値で上書きしないよう条件付き
   if (field === 'bf_memo' && value) update.memo = value;
@@ -10147,12 +10156,13 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
   // v509: 実際の保存成否を追跡し戻り値に反映 (従来は常に true を返し、
   //       silent save fail の見逃しで「保存できたつもり」の原因になっていた)
   let _saveOk = true;
-  const seenVersion = getVersion('booking_status', key);
+  // v513: 楽観的ロックの version は DB 行ベースなので dbKey で引く
+  const seenVersion = getVersion('booking_status', dbKey);
   if (seenVersion) {
     // 既存行がある → 条件付き更新
     const { ...changes } = update;
     delete changes.name; delete changes.apply_date;
-    const lockRes = await conditionalUpdate('booking_status', { name, apply_date: applyDate }, seenVersion, changes);
+    const lockRes = await conditionalUpdate('booking_status', { name: dbName, apply_date: applyDate }, seenVersion, changes);
     if (lockRes.conflict) {
       showConflictDialog(
         `${name} のデータが他の人によって先に更新されました。最新を読み込んでから編集してください。`,
@@ -10171,8 +10181,12 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     if (!res.ok) { showToast('⚠ 一時保存に失敗。自動再送信します', true); _saveOk = false; }
   }
   // キャッシュ更新
-  if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name, apply_date: applyDate };
+  // v513: dbKey (DB name ベース) 側にも同参照でエイリアス。
+  //   これにより getBFInfo が raw d.name でも normName でも DB name でも
+  //   同じオブジェクトを引ける (次回 loadBFLifecycleData 前でも整合)。
+  if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: dbName, apply_date: applyDate };
   bfLifecycleCache[key][field] = value;
+  if (dbKey !== key && !bfLifecycleCache[dbKey]) bfLifecycleCache[dbKey] = bfLifecycleCache[key];
   // メモ連動: 予約一覧の d._memo も更新
   // v386: name+applyDate の完全一致のみ (旧: normName で fuzzy match → 同名別人を上書きするバグ #4/#12)
   if (field === 'bf_memo' || field === 'memo') {
