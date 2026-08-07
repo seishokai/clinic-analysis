@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v517';
+const APP_VERSION = 'v518';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -10026,6 +10026,9 @@ const BF_STATUSES = [
 ];
 let bfLifecycleCache = {}; // key: name|applyDate → {bf_status, bf_next_date, ...}
 let bfHistoryCache = {}; // key: name|applyDate → [events]
+// v518: 直近書き込み (name+apply key) の追跡。saveBFLifecycleField 成功時に mark。
+//   30 秒 TTL で cache 保護に使う (loadBFLifecycleData の atomic swap race 対策)。
+const _recentBFWrites = new Map();
 
 async function loadBFLifecycleData() {
   try {
@@ -10088,7 +10091,21 @@ async function loadBFLifecycleData() {
     // v471: 最後に一括入れ替え (旧 cache は上書きまで生存)。ロード失敗時は旧 cache 維持。
     // ただし優先: DB に該当行あり → 全上書き。DB 応答が空配列でも上書きしてしまうと
     // 「一時的にゼロ件返した DB」で消える恐れがあるので data が null/undefined でない場合のみ swap。
+    // v518: 直近 30 秒の書き込みを保護 → in-flight save が atomic swap で消える race を防ぐ。
+    //   例: 安井さんが「キャンセル」→ saveBFLifecycleField 実行中 → auto-refresh が並行で
+    //   loadBFLifecycleData を発火 → DB 応答は save 前状態 → nextCache に保存済み行が
+    //   反映されず atomic swap で local の書き込みが失われる → 表示が「未対応」に戻る症状。
     if (data) {
+      const cutoff = Date.now() - 30_000;
+      for (const [k, ts] of _recentBFWrites) {
+        if (ts < cutoff) { _recentBFWrites.delete(k); continue; }
+        const local = bfLifecycleCache[k];
+        if (local && !nextCache[k]) {
+          // DB fetch には無いが直近書いた → local を保護
+          nextCache[k] = local;
+          console.debug('[v518] loadBFLifecycleData: preserved recent write', k);
+        }
+      }
       bfLifecycleCache = nextCache;
     } else {
       console.warn('BF lifecycle load: DB returned nothing, keeping previous cache');
@@ -10233,6 +10250,11 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     }
     bfLifecycleCache[key][field] = value;
     if (dbKey !== key && !bfLifecycleCache[dbKey]) bfLifecycleCache[dbKey] = bfLifecycleCache[key];
+    // v518: 30 秒間 in-flight/直近書き込み扱いにして、並行 loadBFLifecycleData の
+    //   atomic swap で消えないよう保護。key と dbKey 両方 mark。
+    const _now = Date.now();
+    _recentBFWrites.set(key, _now);
+    if (dbKey !== key) _recentBFWrites.set(dbKey, _now);
   }
   // メモ連動: 予約一覧の d._memo も更新
   // v386: name+applyDate の完全一致のみ (旧: normName で fuzzy match → 同名別人を上書きするバグ #4/#12)
