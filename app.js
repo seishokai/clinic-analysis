@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v519';
+const APP_VERSION = 'v520';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -631,7 +631,14 @@ function handleRealtimeChange(table, payload) {
     // 予約系: 該当行を bookingsData に反映
     if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
       const key = row.name + '|' + row.apply_date;
-      const d = (bookingsData || []).find(b => b.name === row.name && b.applyDate === row.apply_date);
+      // v520: 完全一致 → normName + normDateKey で fuzzy match (同僚の realtime 更新が
+      //   bookingsData の variant patient (Sheets 空白) に届かない不整合を修正)
+      const _rtNn = (typeof normName === 'function') ? normName(row.name) : row.name;
+      const _rtDk = (typeof normDateKey === 'function') ? normDateKey(row.apply_date) : row.apply_date;
+      const d = (bookingsData || []).find(b => {
+        if (b.name === row.name && b.applyDate === row.apply_date) return true;
+        return normName(b.name) === _rtNn && normDateKey(b.applyDate) === _rtDk;
+      });
       if (d) {
         if (row.status !== undefined) d.status = row.status;
         if (row.contract_amount !== undefined) d.contractAmount = row.contract_amount;
@@ -8445,7 +8452,8 @@ function renderBookings() {
     </select>`) : statusBadge(isBFBooking(d) ? (getBFInfo(d.name, d.applyDate)?.bf_status || d.status) : d.status)}</td>
     <td style="text-align:center">${(() => {
       const key = d.name + '|' + d.applyDate;
-      const info = bfLifecycleCache[key] || {};
+      // v520: raw-key 直参照 → getBFInfo (variant patient で次回予定が空表示になる不整合修正)
+      const info = getBFInfo(d.name, d.applyDate) || {};
       const iso = info.bf_next_date || '';
       const mmdd = iso ? iso.substring(5).replace('-','/') : '';
       // v500: 次回予定日が今日より前なら赤で強調 (足立先生 修正依頼 #6)
@@ -10326,6 +10334,9 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
       memos[key] = value;
       saveData('bk-memos', memos);
     } catch(_){}
+    // v520: _saveOk=false + cache 未生成 で TypeError → 保存モーダルが閉じない
+    //   → 安井さん再クリック地獄。stub を必ず用意してから代入。
+    if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: dbName, apply_date: applyDate };
     bfLifecycleCache[key].memo = value;
     bfLifecycleCache[key].bf_memo = value;
   }
@@ -12955,15 +12966,15 @@ function drawBFLifecycleTable(bfRows) {
 
   let filtered = bfRows.slice();
   if (fstSel) {
-    if (fstSel === '__none') filtered = filtered.filter(d => !bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_status);
-    else filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_status === fstSel);
+    if (fstSel === '__none') filtered = filtered.filter(d => !getBFInfo(d.name, d.applyDate)?.bf_status);
+    else filtered = filtered.filter(d => getBFInfo(d.name, d.applyDate)?.bf_status === fstSel);
   }
-  if (ffac) filtered = filtered.filter(d => parseCsFac(bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_facility).includes(ffac));
-  if (fdr) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_cs_doctor === fdr);
+  if (ffac) filtered = filtered.filter(d => parseCsFac(getBFInfo(d.name, d.applyDate)?.bf_cs_facility).includes(ffac));
+  if (fdr) filtered = filtered.filter(d => getBFInfo(d.name, d.applyDate)?.bf_cs_doctor === fdr);
   const fsetfac = document.getElementById('bf-lc-filter-setfac')?.value || '';
-  if (fsetfac) filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_set_facility === fsetfac);
-  if (fnext === 'fixed') filtered = filtered.filter(d => bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_next_date);
-  if (fnext === 'none') filtered = filtered.filter(d => !bfLifecycleCache[d.name+'|'+d.applyDate]?.bf_next_date);
+  if (fsetfac) filtered = filtered.filter(d => getBFInfo(d.name, d.applyDate)?.bf_set_facility === fsetfac);
+  if (fnext === 'fixed') filtered = filtered.filter(d => getBFInfo(d.name, d.applyDate)?.bf_next_date);
+  if (fnext === 'none') filtered = filtered.filter(d => !getBFInfo(d.name, d.applyDate)?.bf_next_date);
   if (fs) filtered = filtered.filter(d => (d.name||'').toLowerCase().includes(fs));
 
   filtered.sort((a,b) => (b.applyDate||'').localeCompare(a.applyDate||''));
@@ -13196,7 +13207,8 @@ function openBFCsdrModal(name, applyDate, bfRows) {
 
 function openBFCsFacModal(name, applyDate, bfRows) {
   const key = name + '|' + applyDate;
-  const info = bfLifecycleCache[key] || {};
+  // v520: raw-key 直参照 → getBFInfo。variant patient で既存 CS 医院選択が消える防止。
+  const info = getBFInfo(name, applyDate) || {};
   const current = parseCsFac(info.bf_cs_facility);
   document.getElementById('bf-lc-csfac-title').textContent = `CS医院を選択 (複数可) — ${name}`;
   const opts = ['BF銀座','エスカ','アール','ウィズ','ルミナス','茶屋','知立','小牧','八事','大森','京都','岩田','アサノ'];
@@ -13222,7 +13234,9 @@ function openBFCsFacModal(name, applyDate, bfRows) {
 
 function openBFMemoModal(name, applyDate, bfRows) {
   const key = name + '|' + applyDate;
-  const info = bfLifecycleCache[key] || {};
+  // v520: raw-key 直参照 → getBFInfo でスペース差異吸収。
+  //   variant patient (Sheets 全角 / DB 半角) で空メモモーダル表示 → 保存で既存メモ消失を防止。
+  const info = getBFInfo(name, applyDate) || {};
   document.getElementById('bf-lc-memo-title').textContent = '📝 ' + name + ' のメモ';
   const st = info.bf_status || '未設定';
   document.getElementById('bf-lc-memo-sub').textContent = `BFステータス: ${st}${st==='検討中'?' — 後追い状況を記録してください':''}`;
