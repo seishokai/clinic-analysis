@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v518';
+const APP_VERSION = 'v519';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -435,12 +435,64 @@ async function safeSave(op) {
     //   これで別端末が最新値で保存 → 自端末リロード → localStorage が上書きする事故が
     //   物理的に発生しなくなる。
     try { _cleanBkExtraAfterSave(op); } catch(_){}
+    // v519: booking_status 書き込みを 30 秒間追跡 (loadBookings の DB join 後に
+    //   直近書き込みを bookingsData に再適用 → in-flight/直近書き込みが reload race で
+    //   消える現象を防ぐ。v518 の BF cache 保護と同型の non-BF 対策)。
+    try { _trackRecentStatusWrite(op); } catch(_){}
     return { ok: true, data: result?.data };
   } catch(e) {
     console.warn('safeSave failed, queueing', op, e);
     enqueueSave(op);
     return { ok: false, error: e };
   }
+}
+// v519: 直近 booking_status/manual_bookings 書き込みトラッカ (30 秒 TTL)。
+//   loadBookings 再ロード時の DB join が保存前スナップショットで bookingsData を
+//   上書きする race を防ぐ。key = normName + '|' + normDateKey(apply_date)。
+const _recentStatusWrites = new Map();
+const _RECENT_WRITE_TTL_MS = 30_000;
+const _TRACKED_FIELDS = ['status','book_date','contract_amount','contract_service',
+  'payment_month','incentive_month','incentive_amount','incentive_paid','paid_at','paid_by',
+  'memo','bf_memo','edited_book_date','edited_name','edited_service'];
+function _trackRecentStatusWrite(op) {
+  if (op.table !== 'booking_status' && op.table !== 'manual_bookings') return;
+  const p = op.payload || op.match || {};
+  if (!p.name || !p.apply_date) return;
+  const nn = (typeof normName === 'function') ? normName(p.name) : p.name;
+  const dk = (typeof normDateKey === 'function') ? normDateKey(p.apply_date) : p.apply_date;
+  const key = nn + '|' + dk;
+  const now = Date.now();
+  const entry = _recentStatusWrites.get(key) || { ts: now };
+  entry.ts = now;
+  _TRACKED_FIELDS.forEach(f => { if (op.payload && op.payload[f] !== undefined) entry[f] = op.payload[f]; });
+  _recentStatusWrites.set(key, entry);
+  // cleanup expired
+  const cutoff = now - _RECENT_WRITE_TTL_MS;
+  for (const [k, v] of _recentStatusWrites) if (v.ts < cutoff) _recentStatusWrites.delete(k);
+}
+function _applyRecentWritesToBookings() {
+  const now = Date.now();
+  const cutoff = now - _RECENT_WRITE_TTL_MS;
+  (bookingsData || []).forEach(d => {
+    const nn = normName(d.name);
+    const dk = normDateKey(d.applyDate || d.bookDate);
+    const key = nn + '|' + dk;
+    const r = _recentStatusWrites.get(key);
+    if (!r || r.ts < cutoff) return;
+    // 直近書き込みで DB 値を上書き (bookingsData が保存前スナップショットに戻るのを防止)
+    if (r.status !== undefined && r.status !== null) d.status = r.status;
+    if (r.book_date !== undefined && r.book_date) d.bookDate = r.book_date;
+    if (r.contract_amount !== undefined && r.contract_amount !== null) d.contractAmount = r.contract_amount;
+    if (r.contract_service !== undefined) d.contractService = r.contract_service;
+    if (r.payment_month !== undefined) d.paymentMonth = r.payment_month;
+    if (r.incentive_month !== undefined) d.incentiveMonth = r.incentive_month;
+    if (r.incentive_amount !== undefined) d.incentiveAmount = r.incentive_amount;
+    if (r.incentive_paid !== undefined) d.incentivePaid = r.incentive_paid;
+    if (r.paid_at !== undefined) d.paidAt = r.paid_at;
+    if (r.paid_by !== undefined) d.paidBy = r.paid_by;
+    if (r.memo !== undefined) d._memo = r.memo;
+    else if (r.bf_memo !== undefined && !d._memo) d._memo = r.bf_memo;
+  });
 }
 // v505: booking_status/manual_bookings 保存成功時に、対応する
 //       localStorage.bk-extra の editedXxx キーを削除する。
@@ -7612,6 +7664,11 @@ async function loadBookings() {
     // BF相談のbf_status表示のためBFキャッシュもロード
     try { await loadBFLifecycleData(); } catch(_){}
     try { invalidateMemoIndex(); } catch(_){}
+    // v519: 直近 30 秒の書き込みを bookingsData に再適用 (reload race 対策)
+    //   loadBookings は Google Sheets + DB status を join するが、in-flight save は
+    //   DB に反映されず、また bookingsData 自体が新規オブジェクトに置き換わるため
+    //   直前の d.status 変更等が消える。トラッカから復元する。
+    try { _applyRecentWritesToBookings(); } catch(e) { console.warn('recent-writes reapply', e); }
 
     populateBookingFilters();
     renderBookings();
