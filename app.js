@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v516';
+const APP_VERSION = 'v517';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -5772,14 +5772,20 @@ async function _silentReloadBookings(reason) {
   } catch(e) { console.warn('auto refresh failed', e); }
 }
 function setupAutoRefresh() {
-  // タブフォーカス復帰時
+  // v517 【緊急】自動更新を全停止 (安井さん報告「処理しても時間が経つと未対応があがってくる」)
+  //   focus-return / 5分間隔ともに、Google Sheets 再fetch → DB join が抜ける場合に
+  //   キャンセル済みステータスが「未対応」で復活してしまう症状の主因。
+  //   安井さんが手動で 🔄 データ更新ボタンを押した時だけ更新するように暫定停止。
+  //   根本原因 (loadBookings 側の join) は別途 v518+ で調査。
+  console.debug('[v517] auto-refresh disabled');
+  return;
+  // 以下デッドコード (根本修正後に再有効化)
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       const since = Date.now() - _lastAutoRefreshAt;
       if (since > 60_000) _silentReloadBookings('focus-return');
     }
   });
-  // 5 分間隔
   clearInterval(_autoRefreshInterval);
   _autoRefreshInterval = setInterval(() => {
     if (document.visibilityState === 'visible') _silentReloadBookings('interval-5min');
