@@ -25,10 +25,16 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
 });
 
-// Status options — 実データから抽出した使用中の値をベース
+// Status options — v521 の BF ライフサイクル全 status を含める。
+//   使用頻度順 → 一般 → BF 特有 → 終端
 const STATUS_OPTIONS = [
   '未対応', '確認済', '来院済', '予約変更', '検討中',
-  'キャンセル', '成約', '離脱', '除外',
+  '予約連絡待ち', '後追いLINE済み', '離脱',
+  '成約', 'ローン審査中', 'ローン審査落',
+  '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
+  '印象待ち(治療無)', '印象待ち(治療有)', '治療中',
+  'セット日確定待ち', 'セット待ち', 'セット完了',
+  'キャンセル', '除外',
 ];
 const STATUS_HIDDEN_BY_DEFAULT = new Set(['除外', 'キャンセル']);
 
@@ -47,9 +53,13 @@ const state = {
   filters: {
     search: '',
     facility: '',
+    treatment: '',
     promo: '',
     status: '',
-    period: 'all',      // '30' | '60' | '90' | '365' | 'all'
+    period: 'all',      // 'thisMonth' | 'lastMonth' | '30'/'60'/'90'/'365' | 'month' | 'range' | 'all'
+    periodMonth: '',    // YYYY-MM (when period === 'month')
+    periodFrom: '',     // YYYY-MM-DD (when period === 'range')
+    periodTo: '',       // YYYY-MM-DD (when period === 'range')
   },
   memoTarget: null,     // { visit_id, name, current_memo }
 };
@@ -259,22 +269,61 @@ async function saveVisitField(visitId, field, value, extra = {}) {
 }
 
 // ==================== Filtering ====================
+function computePeriodRange(f) {
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const p = f.period;
+  if (p === 'all') return { from: null, to: null };
+  if (p === 'thisMonth') {
+    const from = new Date(now.getFullYear(), now.getMonth(), 1);
+    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+    return { from, to };
+  }
+  if (p === 'lastMonth') {
+    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+    return { from, to };
+  }
+  if (p === 'month') {
+    const m = f.periodMonth; // "YYYY-MM"
+    if (!m) return { from: null, to: null };
+    const [y, mo] = m.split('-').map(Number);
+    return {
+      from: new Date(y, mo - 1, 1),
+      to: new Date(y, mo, 0, 23, 59, 59),
+    };
+  }
+  if (p === 'range') {
+    return {
+      from: f.periodFrom ? new Date(f.periodFrom + 'T00:00:00') : null,
+      to:   f.periodTo   ? new Date(f.periodTo   + 'T23:59:59') : null,
+    };
+  }
+  // 直近 N 日
+  const n = Number(p);
+  if (isNaN(n)) return { from: null, to: null };
+  return { from: new Date(today.getTime() - n * 86400000), to: null };
+}
+
 function filteredVisits() {
   const f = state.filters;
   const q = f.search.trim().toLowerCase();
-  const cutoff = f.period === 'all' ? null
-    : new Date(Date.now() - Number(f.period) * 86400000);
+  const { from, to } = computePeriodRange(f);
   return state.visits.filter(v => {
     // v600 fix: facility は normFac で正規化して比較 (DXHUB のフル名対応)
     if (f.facility && normFac(v.facility) !== f.facility) return false;
+    if (f.treatment && getTreatment(v.service, v.contract_service) !== f.treatment) return false;
     if (f.promo && (v.promo_code || '') !== f.promo) return false;
     if (f.status) {
       const eff = v.bf_status || v.status || '未対応';
       if (eff !== f.status) return false;
     }
-    if (cutoff && v.book_date) {
+    if ((from || to) && v.book_date) {
       const bd = new Date(v.book_date);
-      if (!isNaN(bd) && bd < cutoff) return false;
+      if (!isNaN(bd)) {
+        if (from && bd < from) return false;
+        if (to && bd > to) return false;
+      }
     }
     if (q) {
       const hay = (v.patient_name || '') + ' ' + (v.normalized_name || '') + ' ' + (v.phone || '');
@@ -347,6 +396,9 @@ function bindShell() {
   });
 }
 
+// v600 fix #6: search debounce timer
+let _searchDebounce = null;
+
 function renderVisitsView(main) {
   if (!main.querySelector('.visits-view')) {
     main.innerHTML = '';
@@ -358,28 +410,54 @@ function renderVisitsView(main) {
     const stSel = $('#v-status');
     stSel.innerHTML = '<option value="">ステータス:全て</option>' +
       STATUS_OPTIONS.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
-    // Promo select — v600 では実データから抽出 (件数の多い順)
-    populatePromoOptions();
     // Bind filters
-    $('#v-search').addEventListener('input', e => { state.filters.search = e.target.value; renderVisitsTable(); });
+    $('#v-search').addEventListener('input', e => {
+      // v600 fix #6: 3000 行に対する検索は debounce (200ms) で軽量化
+      state.filters.search = e.target.value;
+      if (_searchDebounce) clearTimeout(_searchDebounce);
+      _searchDebounce = setTimeout(() => renderVisitsTable(), 200);
+    });
     $('#v-facility').addEventListener('change', e => { state.filters.facility = e.target.value; renderVisitsTable(); });
+    $('#v-treatment').addEventListener('change', e => { state.filters.treatment = e.target.value; renderVisitsTable(); });
     $('#v-promo').addEventListener('change', e => { state.filters.promo = e.target.value; renderVisitsTable(); });
     $('#v-status').addEventListener('change', e => { state.filters.status = e.target.value; renderVisitsTable(); });
-    $('#v-period').addEventListener('change', e => { state.filters.period = e.target.value; renderVisitsTable(); });
+    $('#v-period').addEventListener('change', e => {
+      state.filters.period = e.target.value;
+      updatePeriodExtraInputs();
+      renderVisitsTable();
+    });
+    $('#v-month').addEventListener('change', e => { state.filters.periodMonth = e.target.value; renderVisitsTable(); });
+    $('#v-from').addEventListener('change', e => { state.filters.periodFrom = e.target.value; renderVisitsTable(); });
+    $('#v-to').addEventListener('change', e => { state.filters.periodTo = e.target.value; renderVisitsTable(); });
     $('#v-reset').addEventListener('click', () => {
-      state.filters = { search: '', facility: '', promo: '', status: '', period: 'all' };
-      $('#v-search').value = ''; $('#v-facility').value = ''; $('#v-promo').value = '';
-      $('#v-status').value = ''; $('#v-period').value = 'all';
+      state.filters = { search: '', facility: '', treatment: '', promo: '', status: '', period: 'all',
+                        periodMonth: '', periodFrom: '', periodTo: '' };
+      $('#v-search').value = ''; $('#v-facility').value = ''; $('#v-treatment').value = '';
+      $('#v-promo').value = ''; $('#v-status').value = ''; $('#v-period').value = 'all';
+      $('#v-month').value = ''; $('#v-from').value = ''; $('#v-to').value = '';
+      updatePeriodExtraInputs();
       renderVisitsTable();
     });
     // Populate current filter values
     $('#v-search').value = state.filters.search;
     $('#v-facility').value = state.filters.facility;
-    $('#v-promo').value = state.filters.promo;
+    $('#v-treatment').value = state.filters.treatment;
     $('#v-status').value = state.filters.status;
     $('#v-period').value = state.filters.period;
   }
+  // v600 fix #5b: promo dropdown は毎回 populate (state.visits が更新されるたび)
+  //   → 初回 render 時 state.visits が空でも、fetch 完了後の 2 回目 render で正しく populate される
+  populatePromoOptions();
+  updatePeriodExtraInputs();
   renderVisitsTable();
+}
+
+function updatePeriodExtraInputs() {
+  const p = state.filters.period;
+  const monthInp = $('#v-month');
+  const rangeWrap = $('#v-range-wrap');
+  if (monthInp) monthInp.hidden = (p !== 'month');
+  if (rangeWrap) rangeWrap.hidden = (p !== 'range');
 }
 
 function populatePromoOptions() {

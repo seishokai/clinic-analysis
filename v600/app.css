@@ -401,7 +401,7 @@ main {
 /* v600 fix #4: 全列に絶対幅を指定 (table-layout: fixed と組み合わせ) */
 .c-book     { width: 58px;  font-family: var(--font-mono); font-size: 11px; white-space: nowrap; color: var(--ink); font-weight: 600; }
 .c-name     { width: 130px; font-weight: 700; color: var(--ink); white-space: nowrap; }
-.c-treatment{ width: 66px; }
+.c-treatment{ width: 88px; }   /* v600 fix #7: 「インプラント」6文字が入る幅 */
 .c-facility { width: 82px; font-size: 12px; color: var(--ink); font-weight: 500; white-space: nowrap; }
 .c-promo    { width: 102px; font-size: 11px; }
 .c-status   { width: 118px; }
@@ -435,6 +435,7 @@ main {
   border-radius: 4px;
   font-size: 11px;
   font-weight: 700;
+  white-space: nowrap;   /* v600 fix #7: 「インプラント」が縦に折れないよう */
 }
 .treatment-chip[data-t="BF"]         { background: #1a1a1a; color: #fff; }
 .treatment-chip[data-t="矯正"]       { background: #fed7aa; color: #7c2d12; }

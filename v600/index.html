@@ -6,7 +6,7 @@
 <title>Aladdin v600 — 清翔会</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🧾%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="app.css?v=4">
+<link rel="stylesheet" href="app.css?v=6">
 </head>
 <body>
   <div id="app">
@@ -69,6 +69,14 @@
         <div class="tb-row">
           <input type="search" id="v-search" placeholder="🔍 患者名で検索" class="tb-search">
           <select id="v-facility" class="tb-select"></select>
+          <select id="v-treatment" class="tb-select">
+            <option value="">治療:全て</option>
+            <option value="BF">BF</option>
+            <option value="矯正">矯正</option>
+            <option value="インプラント">インプラント</option>
+            <option value="ラブリエ">ラブリエ</option>
+            <option value="その他">その他</option>
+          </select>
           <select id="v-promo" class="tb-select">
             <option value="">プロモ:全て</option>
           </select>
@@ -76,12 +84,21 @@
             <option value="">ステータス:全て</option>
           </select>
           <select id="v-period" class="tb-select">
+            <option value="thisMonth">今月</option>
+            <option value="lastMonth">先月</option>
             <option value="30">直近 30 日</option>
-            <option value="60">直近 60 日</option>
             <option value="90">直近 90 日</option>
             <option value="365">直近 1 年</option>
+            <option value="month">月指定 →</option>
+            <option value="range">期間指定 →</option>
             <option value="all" selected>すべて</option>
           </select>
+          <input type="month" id="v-month" class="tb-select" hidden>
+          <span id="v-range-wrap" hidden style="display:inline-flex;align-items:center;gap:4px">
+            <input type="date" id="v-from" class="tb-select" style="width:130px">
+            <span style="color:var(--ink-soft);font-size:12px">〜</span>
+            <input type="date" id="v-to" class="tb-select" style="width:130px">
+          </span>
           <button id="v-reset" class="link-btn">リセット</button>
         </div>
         <div class="tb-row tb-summary">
@@ -159,6 +176,6 @@
     </div>
   </template>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>
