@@ -10,7 +10,8 @@
     "check:apotool": "node scripts/check-apotool.js",
     "check:apotool:one": "node scripts/check-apotool.js --only=BF銀座",
     "check:apotool:debug": "DEBUG=1 node scripts/check-apotool.js --headed --only=BF銀座",
-    "migrate:dryrun": "node scripts/migrate-v600-dryrun.js"
+    "migrate:dryrun": "node scripts/migrate-v600-dryrun.js",
+    "migrate:commit": "node scripts/migrate-v600-commit.js"
   },
   "devDependencies": {
     "@supabase/supabase-js": "^2.45.0",
