@@ -320,7 +320,7 @@ main {
 }
 .tb-search {
   flex: 1;
-  min-width: 200px;
+  min-width: 160px;
   padding: 7px 10px;
   border: 1px solid var(--line);
   border-radius: 5px;
@@ -379,6 +379,17 @@ main {
   color: var(--ink-soft);
 }
 .count-chip strong { color: var(--accent-ink); }
+/* v611: ヘッダー右側に格納した count/updated chip */
+.hdr-count, .hdr-updated {
+  font-size: 10.5px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+/* v611: 期間の date/month 入力 (hidden 属性が効くように inline style を撤廃) */
+.v-range-wrap { display: inline-flex; align-items: center; gap: 4px; }
+.v-range-wrap[hidden], .v-period-extra[hidden] { display: none !important; }
+.v-date-inp { width: 130px; }
+.v-range-sep { color: var(--ink-soft); font-size: 12px; }
 
 /* ------- Table ------- */
 /* v609: .table-wrap を独立 scroll container 化して thead sticky を確実に効かせる */
@@ -428,10 +439,10 @@ main {
 
 /* v600 fix #4: 全列に絶対幅を指定 (table-layout: fixed と組み合わせ) */
 .c-book     { width: 58px;  font-family: var(--font-mono); font-size: 11px; white-space: nowrap; color: var(--ink); font-weight: 600; }
-.c-name     { width: 130px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.c-name     { width: 100px; font-weight: 700; color: var(--ink); white-space: nowrap; }
 .c-treatment{ width: 88px; }   /* v600 fix #7: 「インプラント」6文字が入る幅 */
 .c-facility { width: 82px; font-size: 12px; color: var(--ink); font-weight: 500; white-space: nowrap; }
-.c-promo    { width: 102px; font-size: 11px; }
+.c-promo    { width: 78px; font-size: 11px; }
 .c-status   { width: 118px; }
 .c-next     { width: 118px; }
 .c-cs       { width: 118px; }
@@ -765,15 +776,147 @@ main {
 .slot-count .days { margin-left: 6px; font-size: 11px; color: var(--ink-soft); }
 .slot-meta { font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); }
 
-/* ------- Responsive ------- */
+/* ============================================================
+ * v611: Responsive — desktop / tablet / mobile 3 段階
+ * ============================================================ */
+
+/* ------- Tablet (< 1100px) ------- */
+@media (max-width: 1100px) {
+  .hdr-right .user-email { display: none; }
+  .table-wrap { max-height: calc(100vh - 200px); }
+}
+
+/* ------- Small tablet / large mobile (< 900px) ------- */
+@media (max-width: 900px) {
+  .hdr {
+    flex-wrap: wrap;
+    padding: 8px 12px;
+    gap: 6px;
+    row-gap: 6px;
+  }
+  .hdr-brand { flex-shrink: 0; }
+  .hdr-nav {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    flex-wrap: nowrap;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 2px;
+  }
+  .hdr-nav::-webkit-scrollbar { height: 3px; }
+  .hdr-nav .nav-btn { flex-shrink: 0; white-space: nowrap; }
+  .hdr-right { margin-left: auto; }
+  main { padding: 10px 12px; }
+  .tb-search { min-width: 140px; flex: 1 1 100%; }
+  .toolbar { padding: 10px 12px; }
+}
+
+/* ------- Mobile (< 720px) ------- */
 @media (max-width: 720px) {
-  .hdr { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
-  .hdr-right { width: 100%; justify-content: flex-end; order: 3; }
-  .hdr-nav { flex: 1; }
-  main { padding: 12px; }
-  .tb-search { min-width: 150px; }
-  .v-table { font-size: 12px; }
-  .v-table thead th, .v-table tbody td { padding: 6px 8px; }
-  .c-facility, .c-updated { display: none; }
-  .modal { max-width: 100%; }
+  :root {
+    /* モバイルでは文字を少し詰める */
+  }
+  /* ---- Header ---- */
+  .hdr {
+    padding: 6px 10px;
+    gap: 4px;
+  }
+  .hdr-title { font-size: 14px; }
+  .v-badge { font-size: 9px; padding: 1px 4px; }
+  .hdr-right { gap: 4px; }
+  .hdr-right .link-btn, .hdr-right button {
+    padding: 6px 8px;
+    font-size: 11px;
+    min-height: 36px;    /* タップターゲット確保 */
+  }
+  .hdr-count, .hdr-updated {
+    font-size: 10px;
+    padding: 2px 6px;
+  }
+  .hdr-updated { display: none; }   /* モバイルは件数のみ、時刻は省略 */
+  .save-status { min-width: auto; font-size: 10px; }
+  .nav-btn { padding: 7px 10px; font-size: 12px; min-height: 36px; }
+  .nav-btn.nav-ext { padding: 7px 8px; }
+  .ext-arrow { display: none; }
+
+  /* ---- Main / Toolbar ---- */
+  main { padding: 8px 10px; }
+  .toolbar {
+    padding: 8px 10px;
+    margin-bottom: 8px;
+    border-radius: 6px;
+  }
+  .tb-row { gap: 6px; }
+  .tb-search {
+    flex: 1 1 100%;
+    min-width: 0;
+    font-size: 14px;   /* iOS で 16px 未満はズーム発火するが 14px で許容 */
+    padding: 8px 10px;
+  }
+  .tb-select {
+    flex: 1 1 calc(50% - 3px);
+    min-width: 0;
+    font-size: 13px;
+    padding: 8px 10px;
+  }
+  .quick-period-btn {
+    flex: 1 1 calc(50% - 3px);
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .link-btn { padding: 8px 10px; font-size: 12px; min-height: 36px; }
+  .v-date-inp { flex: 1 1 40%; width: auto; min-width: 0; }
+
+  /* ---- Table ---- */
+  .table-wrap {
+    max-height: calc(100vh - 260px);
+    border-radius: 6px;
+  }
+  .v-table { font-size: 12px; min-width: 900px; }   /* モバイルは横スクロール */
+  .v-table thead th { padding: 8px 6px; font-size: 10px; letter-spacing: 0.02em; }
+  .v-table tbody td { padding: 6px 6px; }
+
+  /* モバイルで隠す列 — 縦幅節約 */
+  .c-updated, .c-cs, .c-cmonth { display: none; }
+
+  /* 入力コントロールのモバイル最適化 */
+  .status-select, .field-input {
+    padding: 5px 4px;
+    font-size: 12px;
+    min-height: 32px;
+  }
+  .memo-btn { font-size: 11px; padding: 4px 6px; }
+
+  /* ---- Modal ---- */
+  .modal {
+    max-width: calc(100vw - 20px);
+    margin: 10px;
+    border-radius: 8px;
+  }
+  .modal-body textarea { font-size: 14px; }
+  .modal-foot { flex-wrap: wrap; gap: 6px; }
+  .modal-foot .btn-primary, .modal-foot .btn-secondary {
+    flex: 1 1 40%;
+    min-height: 40px;
+  }
+
+  /* ---- Toast ---- */
+  .toast-host { bottom: 10px; right: 10px; left: 10px; }
+  .toast { max-width: 100%; font-size: 13px; }
+
+  /* ---- Slots ---- */
+  .slots-header { flex-wrap: wrap; gap: 8px; }
+  .slots-title { font-size: 16px; }
+  .slot-card { padding: 12px; }
+  .slot-count { font-size: 22px; }
+}
+
+/* ------- Very small (< 480px) ------- */
+@media (max-width: 480px) {
+  .hdr-right .link-btn[title="v521 に戻る"] { display: none; }   /* 極小画面では非表示 */
+  .user-email { display: none; }
+  .tb-select { flex: 1 1 100%; }
+  .quick-period-btn { flex: 1 1 calc(50% - 3px); }
+  .v-table { min-width: 780px; }
+  .c-cs, .c-cmonth, .c-updated, .c-facility { display: none; }
 }

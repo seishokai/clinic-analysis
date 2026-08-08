@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aladdin v610 — 清翔会</title>
+<title>Aladdin v611 — 清翔会</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🧾%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="app.css?v=17">
+<link rel="stylesheet" href="app.css?v=18">
 </head>
 <body>
   <div id="app">
@@ -17,7 +17,7 @@
   <template id="tpl-login">
     <div class="login-wrap">
       <div class="login-card">
-        <h1 class="login-title">Aladdin <span class="v-badge">v610</span></h1>
+        <h1 class="login-title">Aladdin <span class="v-badge">v611</span></h1>
         <p class="login-sub">Supabase 単一データ源版 — 入力したものは絶対に消えない</p>
         <div class="field">
           <label>メールアドレス</label>
@@ -42,7 +42,7 @@
       <div class="hdr-brand">
         <span class="hdr-logo">🧾</span>
         <span class="hdr-title">Aladdin</span>
-        <span class="v-badge">v610</span>
+        <span class="v-badge">v611</span>
       </div>
       <nav class="hdr-nav">
         <button class="nav-btn active" data-view="visits">🏥 来院</button>
@@ -57,6 +57,8 @@
            target="_blank" rel="noopener">📅 予約管理 <span class="ext-arrow">↗</span></a>
       </nav>
       <div class="hdr-right">
+        <span id="v-count" class="count-chip hdr-count" hidden>— 件</span>
+        <span id="v-updated" class="update-chip hdr-updated" hidden>更新: —</span>
         <span id="save-status" class="save-status"></span>
         <button id="refresh-btn" title="データ更新">🔄</button>
         <span id="user-email" class="user-email"></span>
@@ -91,7 +93,7 @@
           <select id="v-status" class="tb-select">
             <option value="">ステータス:全て</option>
           </select>
-          <!-- v610: 今月/先月 のクイックボタン -->
+          <!-- v611: 今月/先月 のクイックボタン -->
           <button type="button" class="quick-period-btn" data-period="thisMonth">今月</button>
           <button type="button" class="quick-period-btn" data-period="lastMonth">先月</button>
           <select id="v-period" class="tb-select">
@@ -104,18 +106,14 @@
             <option value="month">月指定 →</option>
             <option value="range">期間指定 →</option>
           </select>
-          <input type="month" id="v-month" class="tb-select" hidden>
-          <span id="v-range-wrap" hidden style="display:inline-flex;align-items:center;gap:4px">
-            <input type="date" id="v-from" class="tb-select" style="width:130px">
-            <span style="color:var(--ink-soft);font-size:12px">〜</span>
-            <input type="date" id="v-to" class="tb-select" style="width:130px">
+          <input type="month" id="v-month" class="tb-select v-period-extra" hidden>
+          <span id="v-range-wrap" class="v-range-wrap v-period-extra" hidden>
+            <input type="date" id="v-from" class="tb-select v-date-inp">
+            <span class="v-range-sep">〜</span>
+            <input type="date" id="v-to" class="tb-select v-date-inp">
           </span>
           <button id="v-reset" class="link-btn">リセット</button>
           <button id="v-export-csv" class="link-btn" title="現在のフィルタ結果を CSV でダウンロード">📥 CSV</button>
-        </div>
-        <div class="tb-row tb-summary">
-          <span id="v-count" class="count-chip">— 件</span>
-          <span id="v-updated" class="update-chip">更新: —</span>
         </div>
       </div>
 
@@ -241,6 +239,6 @@
     </div>
   </template>
 
-  <script src="app.js?v=17"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>

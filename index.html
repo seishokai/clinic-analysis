@@ -329,15 +329,17 @@
           </a>
         </div>
 
-        <!-- v490: 旧 UI (v521) は下に折り畳み — 通常は使わない -->
+        <!-- v611: 営業ボタンは表に戻す (details に埋めるとタブが行方不明との報告あり) -->
+        <div class="portal-col" id="portal-sales-col" style="margin-top:10px">
+          <button id="portal-sales-btn" onclick="location.href='sales/'" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">💼 営業</button>
+        </div>
+
+        <!-- v490: 旧 UI (v521) ログインフォームは下に折り畳み — 通常は使わない -->
         <details id="portal-legacy-section" style="margin-top:8px;padding:6px 0 0;border-top:1px dashed #d4d4d4">
           <summary style="cursor:pointer;font-size:11px;color:var(--text-muted);text-align:center;padding:8px;letter-spacing:1px;list-style:none">
             ▸ 旧 UI (v521) を開く
           </summary>
           <div style="padding:12px 0 0;display:flex;flex-direction:column;gap:10px">
-            <div class="portal-col" id="portal-sales-col">
-              <button id="portal-sales-btn" onclick="location.href='sales/'" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">営業 (旧)</button>
-            </div>
             <div class="portal-col">
               <button id="portal-manage-btn" hidden style="display:none">管理</button>
               <div id="login-section" style="display:block;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">

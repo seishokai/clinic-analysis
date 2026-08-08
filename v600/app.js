@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v610';
+const APP_VERSION = 'v611';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -420,6 +420,12 @@ function render() {
   $('#user-email').textContent = state.user.email || '';
   // Active nav
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
+  // v611: header 右上の件数/更新時刻 chip は visits view のときのみ表示
+  const hdrCount = $('#v-count');
+  const hdrUpdated = $('#v-updated');
+  const isVisits = state.view === 'visits';
+  if (hdrCount) hdrCount.hidden = !isVisits;
+  if (hdrUpdated) hdrUpdated.hidden = !isVisits;
   // View
   const main = $('#main');
   if (state.view === 'visits') renderVisitsView(main);
