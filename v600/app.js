@@ -47,6 +47,7 @@ const state = {
   filters: {
     search: '',
     facility: '',
+    promo: '',
     status: '',
     period: 'all',      // '30' | '60' | '90' | '365' | 'all'
   },
@@ -266,6 +267,7 @@ function filteredVisits() {
   return state.visits.filter(v => {
     // v600 fix: facility は normFac で正規化して比較 (DXHUB のフル名対応)
     if (f.facility && normFac(v.facility) !== f.facility) return false;
+    if (f.promo && (v.promo_code || '') !== f.promo) return false;
     if (f.status) {
       const eff = v.bf_status || v.status || '未対応';
       if (eff !== f.status) return false;
@@ -356,23 +358,44 @@ function renderVisitsView(main) {
     const stSel = $('#v-status');
     stSel.innerHTML = '<option value="">ステータス:全て</option>' +
       STATUS_OPTIONS.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    // Promo select — v600 では実データから抽出 (件数の多い順)
+    populatePromoOptions();
     // Bind filters
     $('#v-search').addEventListener('input', e => { state.filters.search = e.target.value; renderVisitsTable(); });
     $('#v-facility').addEventListener('change', e => { state.filters.facility = e.target.value; renderVisitsTable(); });
+    $('#v-promo').addEventListener('change', e => { state.filters.promo = e.target.value; renderVisitsTable(); });
     $('#v-status').addEventListener('change', e => { state.filters.status = e.target.value; renderVisitsTable(); });
     $('#v-period').addEventListener('change', e => { state.filters.period = e.target.value; renderVisitsTable(); });
     $('#v-reset').addEventListener('click', () => {
-      state.filters = { search: '', facility: '', status: '', period: 'all' };
-      $('#v-search').value = ''; $('#v-facility').value = ''; $('#v-status').value = ''; $('#v-period').value = 'all';
+      state.filters = { search: '', facility: '', promo: '', status: '', period: 'all' };
+      $('#v-search').value = ''; $('#v-facility').value = ''; $('#v-promo').value = '';
+      $('#v-status').value = ''; $('#v-period').value = 'all';
       renderVisitsTable();
     });
     // Populate current filter values
     $('#v-search').value = state.filters.search;
     $('#v-facility').value = state.filters.facility;
+    $('#v-promo').value = state.filters.promo;
     $('#v-status').value = state.filters.status;
     $('#v-period').value = state.filters.period;
   }
   renderVisitsTable();
+}
+
+function populatePromoOptions() {
+  const promoSel = $('#v-promo');
+  if (!promoSel) return;
+  // 件数集計 → 件数降順
+  const counts = new Map();
+  for (const v of state.visits) {
+    const p = v.promo_code || '';
+    if (!p) continue;
+    counts.set(p, (counts.get(p) || 0) + 1);
+  }
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const current = state.filters.promo;
+  promoSel.innerHTML = '<option value="">プロモ:全て</option>' +
+    sorted.map(([p, n]) => `<option value="${esc(p)}" ${p === current ? 'selected' : ''}>${esc(p)} (${n})</option>`).join('');
 }
 
 function renderVisitsTable() {
