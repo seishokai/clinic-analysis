@@ -25,16 +25,17 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: false },
 });
 
-// Status options — v521 の BF ライフサイクル全 status を含める。
-//   使用頻度順 → 一般 → BF 特有 → 終端
+// Status options — 使用頻度順 (ユーザー指定: 未対応 → キャンセル → 検討中 → 残り)
+// v606: 「確認済」は使わないので削除
 const STATUS_OPTIONS = [
-  '未対応', '確認済', '来院済', '予約変更', '検討中',
+  '未対応', 'キャンセル', '検討中',
+  '来院済', '予約変更',
   '予約連絡待ち', '後追いLINE済み', '離脱',
   '成約', 'ローン審査中', 'ローン審査落',
   '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
   '印象待ち(治療無)', '印象待ち(治療有)', '治療中',
   'セット日確定待ち', 'セット待ち', 'セット完了',
-  'キャンセル', '除外',
+  '除外',
 ];
 const STATUS_HIDDEN_BY_DEFAULT = new Set(['除外', 'キャンセル']);
 
