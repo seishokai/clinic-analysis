@@ -7,9 +7,9 @@
   --bg: #f5f4f0;
   --paper: #ffffff;
   --card: #ffffff;
-  --ink: #1a1d21;
-  --ink-soft: #4a5058;
-  --ink-mute: #8a9099;
+  --ink: #0f1418;
+  --ink-soft: #2b3138;
+  --ink-mute: #61686f;
   --line: #d9d6cf;
   --line-soft: #ebe8e0;
   --accent: #1d5f56;
@@ -362,7 +362,11 @@ main {
   overflow-x: auto;
 }
 .v-table {
+  /* v600 fix #4: table-layout: fixed で列幅を固定
+     → ステータス/医院変更のたびに 来院/名前 列の幅が揺れる問題を根絶 */
+  table-layout: fixed;
   width: 100%;
+  min-width: 1180px;    /* 列合計 min。狭い画面では横スクロール */
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -370,74 +374,81 @@ main {
   position: sticky;
   top: 0;
   background: var(--bg);
-  padding: 10px 12px;
+  padding: 10px 10px;
   text-align: left;
   font-size: 11px;
   font-weight: 700;
-  color: var(--ink-mute);
+  color: var(--ink);   /* v600 fix #5: ヘッダも濃く */
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 2px solid var(--line);
   z-index: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .v-table tbody td {
-  padding: 8px 12px;
+  padding: 8px 10px;
   border-bottom: 1px solid var(--line-soft);
   vertical-align: middle;
   color: var(--ink);
+  overflow: hidden;         /* 列幅を守る */
+  text-overflow: ellipsis;
 }
 .v-table tbody tr:hover td { background: var(--bg); }
 .v-table tbody tr:last-child td { border-bottom: none; }
 
-.c-book { width: 60px; font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
-.c-name { min-width: 110px; font-weight: 500; }
-.c-treatment { width: 66px; font-size: 11px; color: var(--ink-soft); }
-.c-facility { width: 78px; font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
-.c-promo { width: 100px; font-size: 11px; color: var(--ink-soft); }
-.c-status { width: 116px; }
-.c-next { width: 108px; }
-.c-cs { width: 108px; }
-.c-cmonth { width: 108px; }
-.c-amount { width: 100px; }
-.c-memo { min-width: 160px; }
-.c-updated { width: 82px; font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); white-space: nowrap; }
+/* v600 fix #4: 全列に絶対幅を指定 (table-layout: fixed と組み合わせ) */
+.c-book     { width: 58px;  font-family: var(--font-mono); font-size: 11px; white-space: nowrap; color: var(--ink); font-weight: 600; }
+.c-name     { width: 130px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.c-treatment{ width: 66px; }
+.c-facility { width: 82px; font-size: 12px; color: var(--ink); font-weight: 500; white-space: nowrap; }
+.c-promo    { width: 102px; font-size: 11px; }
+.c-status   { width: 118px; }
+.c-next     { width: 118px; }
+.c-cs       { width: 118px; }
+.c-cmonth   { width: 118px; }
+.c-amount   { width: 100px; }
+.c-memo     { width: auto; min-width: 140px; }   /* 残り幅は memo に配分 */
+.c-updated  { width: 82px;  font-size: 10.5px; color: var(--ink-soft); font-family: var(--font-mono); white-space: nowrap; }
 
 .promo-chip {
   display: inline-block;
-  padding: 2px 8px;
-  background: #e0f2fe;
-  color: #0369a1;
-  border: 1px solid #bae6fd;
+  padding: 3px 9px;
+  background: #dbeafe;
+  color: #1e40af;
+  border: 1px solid #93c5fd;
   border-radius: 10px;
-  font-size: 10px;
-  font-weight: 600;
+  font-size: 11px;
+  font-weight: 700;
   max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.promo-chip.select-type { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+.promo-chip.select-type { background: #fde68a; color: #78350f; border-color: #fbbf24; }
 .promo-chip.empty { background: transparent; border-color: transparent; color: var(--ink-mute); }
 
 .treatment-chip {
   display: inline-block;
-  padding: 1px 6px;
-  border-radius: 3px;
-  font-size: 10px;
-  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
 }
-.treatment-chip[data-t="BF"]         { background: #f1f5f9; color: #1a1a1a; }
-.treatment-chip[data-t="矯正"]       { background: #ffedd5; color: #9a3412; }
-.treatment-chip[data-t="インプラント"] { background: #e0e7ff; color: #3730a3; }
-.treatment-chip[data-t="ラブリエ"]    { background: #fce7f3; color: #9d174d; }
-.treatment-chip[data-t="その他"]     { background: var(--line-soft); color: var(--ink-mute); }
+.treatment-chip[data-t="BF"]         { background: #1a1a1a; color: #fff; }
+.treatment-chip[data-t="矯正"]       { background: #fed7aa; color: #7c2d12; }
+.treatment-chip[data-t="インプラント"] { background: #c7d2fe; color: #1e1b4b; }
+.treatment-chip[data-t="ラブリエ"]    { background: #fbcfe8; color: #500724; }
+.treatment-chip[data-t="その他"]     { background: var(--line-soft); color: var(--ink); }
 
 .field-input {
   width: 100%;
-  padding: 4px 6px;
+  padding: 5px 6px;
   border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 12px;
+  font-weight: 500;
   font-family: inherit;
   background: var(--paper);
   color: var(--ink);
@@ -448,6 +459,7 @@ main {
 .field-input[type=date], .field-input[type=month] {
   font-family: var(--font-mono);
   font-size: 11px;
+  color: var(--ink);
 }
 
 .status-sel {
@@ -456,6 +468,8 @@ main {
   border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
   font-family: inherit;
   background: var(--paper);
   cursor: pointer;
@@ -475,6 +489,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 4px;
   font-size: 12px;
+  font-weight: 600;
   font-family: var(--font-mono);
   background: var(--paper);
   color: var(--ink);
@@ -486,13 +501,13 @@ main {
 
 .memo-cell {
   cursor: pointer;
-  padding: 4px 8px;
+  padding: 5px 9px;
   border: 1px dashed var(--line);
   border-radius: 4px;
-  min-height: 22px;
-  color: var(--ink-soft);
+  min-height: 24px;
+  color: var(--ink);
   font-size: 12px;
-  max-width: 300px;
+  font-weight: 500;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
