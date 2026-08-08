@@ -66,6 +66,24 @@ function toDate(s) {
   const k = normDateKey(s);
   return /^\d{4}-\d{2}-\d{2}$/.test(k) ? k : null;
 }
+// v600 fix: DB DATE 列用の堅牢な parser。
+//   YYYY-MM-DD / YYYY/MM/DD → そのまま
+//   YYYY-MM / YYYY/MM (月のみ) → YYYY-MM-01
+//   その他/空/不正 → null (DB エラー回避)
+function toDbDate(s) {
+  if (!s) return null;
+  const s2 = String(s).trim();
+  if (!s2) return null;
+  // YYYY-MM-DD (already valid)
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s2)) return s2;
+  // YYYY/MM/DD or YYYY-M-D (with optional time)
+  let m = s2.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
+  // YYYY-MM or YYYY/MM (month-only) → add -01
+  m = s2.match(/^(\d{4})[\/\-](\d{1,2})$/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-01`;
+  return null;
+}
 
 // ==================== CSV Parsing ====================
 function parseCsvLine(line) {
@@ -171,9 +189,9 @@ function buildVisit(r, dbByKey, dbByNormDate) {
     source_tool: r.sourceTool || null,
     source_row_id: null,
     apply_at: toIsoTs(r.applyDate),
-    apply_date: toDate(r.applyDate),
+    apply_date: toDbDate(r.applyDate),
     book_at: toIsoTs(r.bookDate),
-    book_date: toDate(r.bookDate),
+    book_date: toDbDate(r.bookDate),
     facility: r.facility || null,
     service: r.service || null,
     promo_code: r.source || null,
@@ -181,20 +199,21 @@ function buildVisit(r, dbByKey, dbByNormDate) {
     bf_status: (dbRow && dbRow.bf_status) || null,
     contract_amount: dbRow && dbRow.contract_amount != null ? Number(dbRow.contract_amount) : null,
     contract_service: dbRow && dbRow.contract_service || null,
-    contract_date: dbRow && dbRow.contract_date || null,
-    payment_month: dbRow && dbRow.payment_month || null,
+    // v600 fix: DATE 型は全て toDbDate で YYYY-MM-DD or null に正規化 (「2026-04」対策)
+    contract_date: toDbDate(dbRow && dbRow.contract_date),
+    payment_month: toDbDate(dbRow && dbRow.payment_month),
     incentive_amount: dbRow && dbRow.incentive_amount != null ? Number(dbRow.incentive_amount) : null,
-    incentive_month: dbRow && dbRow.incentive_month || null,
+    incentive_month: toDbDate(dbRow && dbRow.incentive_month),
     incentive_paid: !!(dbRow && dbRow.incentive_paid),
     paid_at: dbRow && dbRow.paid_at || null,
     paid_by: dbRow && dbRow.paid_by || null,
     memo: dbRow && (dbRow.memo || dbRow.bf_memo) || null,
-    next_visit_date: dbRow && dbRow.bf_next_date || null,
+    next_visit_date: toDbDate(dbRow && dbRow.bf_next_date),
     cs_facility: dbRow && dbRow.bf_cs_facility || null,
     cs_doctor: dbRow && dbRow.bf_cs_doctor || null,
     set_facility: dbRow && dbRow.bf_set_facility || null,
     travel_cost: dbRow && dbRow.bf_travel_cost != null ? Number(dbRow.bf_travel_cost) : null,
-    edited_book_date: dbRow && dbRow.edited_book_date || null,
+    edited_book_date: toDbDate(dbRow && dbRow.edited_book_date),
     edited_service: dbRow && dbRow.edited_service || null,
     deleted: false,
     updated_by: 'migrate:v600',
