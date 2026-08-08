@@ -389,13 +389,66 @@ main {
 .v-table tbody tr:hover td { background: var(--bg); }
 .v-table tbody tr:last-child td { border-bottom: none; }
 
-.c-book { width: 80px; font-family: var(--font-mono); font-size: 11px; }
-.c-name { min-width: 140px; font-weight: 500; }
-.c-facility { width: 100px; font-size: 12px; color: var(--ink-soft); }
-.c-status { width: 140px; }
-.c-amount { width: 120px; }
-.c-memo { min-width: 180px; }
-.c-updated { width: 100px; font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); }
+.c-book { width: 60px; font-family: var(--font-mono); font-size: 11px; white-space: nowrap; }
+.c-name { min-width: 110px; font-weight: 500; }
+.c-treatment { width: 66px; font-size: 11px; color: var(--ink-soft); }
+.c-facility { width: 78px; font-size: 11px; color: var(--ink-soft); white-space: nowrap; }
+.c-promo { width: 100px; font-size: 11px; color: var(--ink-soft); }
+.c-status { width: 116px; }
+.c-next { width: 108px; }
+.c-cs { width: 108px; }
+.c-cmonth { width: 108px; }
+.c-amount { width: 100px; }
+.c-memo { min-width: 160px; }
+.c-updated { width: 82px; font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); white-space: nowrap; }
+
+.promo-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 600;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.promo-chip.select-type { background: #fef3c7; color: #b45309; border-color: #fde68a; }
+.promo-chip.empty { background: transparent; border-color: transparent; color: var(--ink-mute); }
+
+.treatment-chip {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+}
+.treatment-chip[data-t="BF"]         { background: #f1f5f9; color: #1a1a1a; }
+.treatment-chip[data-t="矯正"]       { background: #ffedd5; color: #9a3412; }
+.treatment-chip[data-t="インプラント"] { background: #e0e7ff; color: #3730a3; }
+.treatment-chip[data-t="ラブリエ"]    { background: #fce7f3; color: #9d174d; }
+.treatment-chip[data-t="その他"]     { background: var(--line-soft); color: var(--ink-mute); }
+
+.field-input {
+  width: 100%;
+  padding: 4px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 12px;
+  font-family: inherit;
+  background: var(--paper);
+  color: var(--ink);
+}
+.field-input.saving { border-color: var(--info); }
+.field-input.saved  { border-color: var(--ok); background: var(--ok-soft); }
+.field-input.failed { border-color: var(--warn); background: var(--warn-soft); }
+.field-input[type=date], .field-input[type=month] {
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
 
 .status-sel {
   width: 100%;

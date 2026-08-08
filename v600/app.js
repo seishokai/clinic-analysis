@@ -59,6 +59,33 @@ const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
+// v521 の getTreatmentCategory を移植: service 文字列 → 治療カテゴリ短縮
+function getTreatment(service, contractService) {
+  const s = String(service || '').toLowerCase();
+  const cs = String(contractService || '');
+  if (cs && (cs.includes('矯正') || cs === 'BF')) {
+    if (cs === 'BF') return 'BF';
+    return '矯正';
+  }
+  if (cs.includes('ﾗﾌﾞﾘｴ') || cs.includes('ラブリエ')) return 'ラブリエ';
+  if (cs.includes('ｲﾝﾌﾟﾗﾝﾄ') || cs.includes('インプラント')) return 'インプラント';
+  if (s.includes('bf') || s.includes('ブラック')) return 'BF';
+  if (s.includes('ラミネート')) return 'BF';
+  if (s.includes('矯正')) return '矯正';
+  if (s.includes('インプラント')) return 'インプラント';
+  if (s.includes('ラブリエ')) return 'ラブリエ';
+  return 'その他';
+}
+
+// 成約商材の選択肢 (v521 と同じ)
+const CONTRACT_SERVICE_OPTIONS = ['', 'BF', '矯正(表)', '矯正(裏)', '矯正(ﾋﾟｰｽ)', 'ﾗﾌﾞﾘｴ', 'ｲﾝﾌﾟﾗﾝﾄ'];
+
+// プロモコード → 表示ラベル短縮
+function shortPromo(p) {
+  if (!p) return '';
+  return p.length > 14 ? p.slice(0, 14) + '…' : p;
+}
+
 // v521 の normFac (医院名正規化) を移植: DXHUB のフル名を短縮名に寄せる
 function normFac(f) {
   if (!f) return '';
@@ -377,15 +404,39 @@ function rowHtml(v) {
   const statusOptsHtml = STATUS_OPTIONS
     .map(s => `<option value="${esc(s)}" ${s === eff ? 'selected' : ''}>${esc(s)}</option>`)
     .join('');
+  const treatment = getTreatment(v.service, v.contract_service);
+  const promo = v.promo_code || '';
+  const isSelectType = promo === 'セレクトタイプ';
+  const promoChipCls = !promo ? 'promo-chip empty'
+    : isSelectType ? 'promo-chip select-type' : 'promo-chip';
+  const csOptsHtml = CONTRACT_SERVICE_OPTIONS
+    .map(o => `<option value="${esc(o)}" ${o === (v.contract_service || '') ? 'selected' : ''}>${o ? esc(o) : '-'}</option>`)
+    .join('');
+  const contractMonth = v.contract_date ? String(v.contract_date).slice(0, 7) : '';
   const memo = v.memo || '';
   return `<tr data-visit-id="${esc(v.visit_id)}">
     <td class="c-book">${esc(bookDisplay)}</td>
     <td class="c-name" title="${esc(v.normalized_name || '')}">${esc(v.patient_name || '(名前なし)')}</td>
+    <td class="c-treatment"><span class="treatment-chip" data-t="${esc(treatment)}">${esc(treatment)}</span></td>
     <td class="c-facility" title="${esc(v.facility || '')}">${esc(normFac(v.facility) || '-')}</td>
+    <td class="c-promo"><span class="${promoChipCls}" title="${esc(promo)}">${promo ? esc(shortPromo(promo)) : '-'}</span></td>
     <td class="c-status">
       <select class="status-sel" data-value="${esc(eff)}" data-visit-id="${esc(v.visit_id)}">
         ${statusOptsHtml}
       </select>
+    </td>
+    <td class="c-next">
+      <input type="date" class="field-input date-input" data-field="next_visit_date"
+             data-visit-id="${esc(v.visit_id)}" value="${esc(v.next_visit_date || '')}">
+    </td>
+    <td class="c-cs">
+      <select class="field-input cs-sel" data-field="contract_service" data-visit-id="${esc(v.visit_id)}">
+        ${csOptsHtml}
+      </select>
+    </td>
+    <td class="c-cmonth">
+      <input type="month" class="field-input month-input" data-field="contract_date"
+             data-visit-id="${esc(v.visit_id)}" value="${esc(contractMonth)}">
     </td>
     <td class="c-amount">
       <input type="text" class="amount-input" data-visit-id="${esc(v.visit_id)}"
@@ -393,7 +444,7 @@ function rowHtml(v) {
     </td>
     <td class="c-memo">
       <div class="memo-cell ${memo ? 'has-value' : 'empty'}" data-visit-id="${esc(v.visit_id)}">
-        ${memo ? esc(memo.length > 40 ? memo.slice(0,40) + '…' : memo) : '+ メモ'}
+        ${memo ? esc(memo.length > 30 ? memo.slice(0,30) + '…' : memo) : '+ メモ'}
       </div>
     </td>
     <td class="c-updated">${esc(fmtRelative(v.updated_at))}</td>
@@ -463,6 +514,37 @@ function bindRow(v) {
   // Memo click → modal
   const memoEl = tr.querySelector('.memo-cell');
   memoEl.addEventListener('click', () => openMemoModal(v));
+
+  // v600 fix #3: 次回予定 / 成約商材 / 成約月 の即時保存
+  tr.querySelectorAll('.field-input').forEach(inp => {
+    let orig = inp.value;
+    inp.addEventListener('focus', () => { orig = inp.value; });
+    inp.addEventListener('change', async () => {
+      const field = inp.dataset.field;
+      if (!field) return;
+      let value = inp.value;
+      if (field === 'contract_date') {
+        // <input type=month> は "YYYY-MM" 値。DB DATE 型に合わせて "YYYY-MM-01"
+        value = value ? value + '-01' : null;
+      } else if (field === 'contract_service') {
+        value = value || null;
+      } else if (field === 'next_visit_date') {
+        value = value || null; // YYYY-MM-DD or null
+      }
+      inp.classList.remove('saved', 'failed');
+      inp.classList.add('saving');
+      const res = await saveVisitField(v.visit_id, field, value);
+      inp.classList.remove('saving');
+      if (res.ok) {
+        inp.classList.add('saved');
+        setTimeout(() => inp.classList.remove('saved'), 1500);
+        orig = inp.value;
+      } else {
+        inp.classList.add('failed');
+        inp.value = orig;
+      }
+    });
+  });
 }
 
 function openMemoModal(v) {
