@@ -54,6 +54,7 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-font-smoothing: antialiased; }
+html, body { height: 100%; }
 body {
   margin: 0;
   background: var(--bg);
@@ -61,8 +62,11 @@ body {
   font-family: var(--font-sans);
   font-size: 14px;
   line-height: 1.55;
-  min-height: 100vh;
+  /* v612: 画面外にスクロールバー出さない (テーブル内で完結) */
+  overflow: hidden;
 }
+#app { height: 100%; display: flex; flex-direction: column; overflow: hidden; }
+.hdr { flex-shrink: 0; }
 
 /* ------- Loader ------- */
 .loader {
@@ -294,8 +298,21 @@ body {
 /* ------- Main ------- */
 main {
   padding: 16px 20px;
-  min-height: calc(100vh - 60px);
+  flex: 1;
+  min-height: 0;   /* flex + overflow の必須お作法 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
+/* v612: view と table-wrap を flex 化して残りの高さを埋める (下枠余白の原因除去) */
+.view {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.view .toolbar { flex-shrink: 0; }
 
 /* ------- Toolbar ------- */
 .toolbar {
@@ -392,13 +409,14 @@ main {
 .v-range-sep { color: var(--ink-soft); font-size: 12px; }
 
 /* ------- Table ------- */
-/* v609: .table-wrap を独立 scroll container 化して thead sticky を確実に効かせる */
+/* v609/v612: .table-wrap を flex-1 の scroll container 化 → 残り高さを埋める */
 .table-wrap {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 8px;
   overflow: auto;
-  max-height: calc(100vh - 220px);   /* toolbar + hdr の下で残りの縦スペース */
+  flex: 1;
+  min-height: 0;   /* flex 子で overflow を効かせる */
 }
 .v-table {
   table-layout: fixed;
@@ -783,7 +801,6 @@ main {
 /* ------- Tablet (< 1100px) ------- */
 @media (max-width: 1100px) {
   .hdr-right .user-email { display: none; }
-  .table-wrap { max-height: calc(100vh - 200px); }
 }
 
 /* ------- Small tablet / large mobile (< 900px) ------- */
@@ -868,10 +885,7 @@ main {
   .v-date-inp { flex: 1 1 40%; width: auto; min-width: 0; }
 
   /* ---- Table ---- */
-  .table-wrap {
-    max-height: calc(100vh - 260px);
-    border-radius: 6px;
-  }
+  .table-wrap { border-radius: 6px; }
   .v-table { font-size: 12px; min-width: 900px; }   /* モバイルは横スクロール */
   .v-table thead th { padding: 8px 6px; font-size: 10px; letter-spacing: 0.02em; }
   .v-table tbody td { padding: 6px 6px; }
