@@ -388,11 +388,8 @@ function filteredVisits() {
     if (f.facility && v._normFacility !== f.facility) return false;
     if (f.treatment && v._treatment !== f.treatment) return false;
     if (f.promo && (v.promo_code || '') !== f.promo) return false;
-    if (f.status) {
-      if (v._effStatus !== f.status) return false;
-    } else {
-      if (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus)) return false;
-    }
+    // v604: STATUS_HIDDEN_BY_DEFAULT 撤回 — キャンセル/除外 も見たい (ユーザー要望)
+    if (f.status && v._effStatus !== f.status) return false;
     if ((fromMs || toMs) && v._bookMs) {
       if (fromMs && v._bookMs < fromMs) return false;
       if (toMs && v._bookMs > toMs) return false;
@@ -517,8 +514,8 @@ function renderVisitsView(main) {
     $('#v-status').value = state.filters.status;
     $('#v-period').value = state.filters.period;
   }
-  // v603 P6: promo dropdown は state.visits 更新時のみ populate (毎 render は不要)
-  populatePromoOptionsIfNeeded();
+  // v604: populatePromoOptionsIfNeeded の cache 判定にバグ → 毎 render に戻す (実測 <5ms)
+  populatePromoOptions();
   updatePeriodExtraInputs();
   setupTbodyDelegation();  // v603 P3: event delegation を tbody に 1 回だけ bind
   renderVisitsTable();
