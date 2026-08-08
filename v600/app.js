@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v609';
+const APP_VERSION = 'v610';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -560,13 +560,17 @@ function _csvEscape(v) {
   return s;
 }
 function exportVisitsCsv(rows) {
-  const headers = ['来院日', '名前', '治療', '医院', 'プロモ', 'ステータス',
+  const headers = ['来院日', '名前', '電話', 'メール', '治療', '医院', 'プロモ', 'ステータス',
     '次回予定', '成約商材', '成約月', '売上', 'メモ', '最終更新'];
   const lines = [headers.map(_csvEscape).join(',')];
   for (const v of rows) {
+    // 電話番号は Excel で "090..." が先頭 0 落ちしないよう前置き ' で文字列固定
+    const phone = v.phone ? "'" + String(v.phone) : '';
     lines.push([
       v.book_date || '',
       v.patient_name || '',
+      phone,
+      v.email || '',
       getTreatment(v.service, v.contract_service),
       normFac(v.facility) || '',
       v.promo_code || '',
