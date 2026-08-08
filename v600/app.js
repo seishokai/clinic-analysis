@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v608';
+const APP_VERSION = 'v609';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -515,6 +515,12 @@ function renderVisitsView(main) {
     $('#v-month').addEventListener('change', e => { state.filters.periodMonth = e.target.value; renderVisitsTable(); });
     $('#v-from').addEventListener('change', e => { state.filters.periodFrom = e.target.value; renderVisitsTable(); });
     $('#v-to').addEventListener('change', e => { state.filters.periodTo = e.target.value; renderVisitsTable(); });
+    // v609: CSV 出力 (現在のフィルタ結果のみ)
+    $('#v-export-csv').addEventListener('click', () => {
+      const rows = filteredVisits();
+      if (!rows.length) { toast('出力する行がありません', 'err'); return; }
+      exportVisitsCsv(rows);
+    });
     $('#v-reset').addEventListener('click', () => {
       state.filters = { search: '', facility: '', treatment: '', promo: '', status: '', period: 'all',
                         periodMonth: '', periodFrom: '', periodTo: '' };
@@ -544,6 +550,47 @@ function populatePromoOptionsIfNeeded() {
   if (_promoPopulatedForCount === state.visits.length) return;
   populatePromoOptions();
   _promoPopulatedForCount = state.visits.length;
+}
+
+// v609: CSV 出力ヘルパ (現在のフィルタ結果のみ、表示列と同じ)
+function _csvEscape(v) {
+  if (v == null) return '';
+  const s = String(v);
+  if (/[",\n\r]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+function exportVisitsCsv(rows) {
+  const headers = ['来院日', '名前', '治療', '医院', 'プロモ', 'ステータス',
+    '次回予定', '成約商材', '成約月', '売上', 'メモ', '最終更新'];
+  const lines = [headers.map(_csvEscape).join(',')];
+  for (const v of rows) {
+    lines.push([
+      v.book_date || '',
+      v.patient_name || '',
+      getTreatment(v.service, v.contract_service),
+      normFac(v.facility) || '',
+      v.promo_code || '',
+      v.bf_status || v.status || '未対応',
+      v.next_visit_date || '',
+      v.contract_service || '',
+      v.contract_date ? String(v.contract_date).slice(0, 7) : '',
+      v.contract_amount != null ? v.contract_amount : '',
+      (v.memo || '').replace(/\r?\n/g, ' '),
+      v.updated_at ? new Date(v.updated_at).toLocaleString('ja-JP') : '',
+    ].map(_csvEscape).join(','));
+  }
+  // Excel 対策で UTF-8 BOM を先頭に付与
+  const csv = '﻿' + lines.join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const ts = new Date().toISOString().slice(0, 16).replace(/[T:]/g, '-');
+  a.href = url;
+  a.download = `aladdin-visits-${ts}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+  toast(`${rows.length} 件を CSV 出力しました`, 'ok');
 }
 
 function updateQuickPeriodButtons() {

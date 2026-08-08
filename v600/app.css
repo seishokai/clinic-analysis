@@ -381,26 +381,25 @@ main {
 .count-chip strong { color: var(--accent-ink); }
 
 /* ------- Table ------- */
+/* v609: .table-wrap を独立 scroll container 化して thead sticky を確実に効かせる */
 .table-wrap {
   background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 8px;
-  overflow-x: auto;
+  overflow: auto;
+  max-height: calc(100vh - 220px);   /* toolbar + hdr の下で残りの縦スペース */
 }
 .v-table {
-  /* v600 fix #4: table-layout: fixed で列幅を固定
-     → ステータス/医院変更のたびに 来院/名前 列の幅が揺れる問題を根絶 */
   table-layout: fixed;
   width: 100%;
-  min-width: 1180px;    /* 列合計 min。狭い画面では横スクロール */
-  border-collapse: collapse;
+  min-width: 1180px;
+  border-collapse: separate;   /* sticky + border-collapse:collapse で border が消える対策 */
+  border-spacing: 0;
   font-size: 13px;
 }
 .v-table thead th {
   position: sticky;
-  /* v607: メインヘッダ (.hdr) が top:0 sticky にいるため、その下に固定
-     .hdr の実測は 52-58px 程度。少し余裕を持って 56px */
-  top: 56px;
+  top: 0;                       /* container 内で先頭固定 */
   background: var(--bg);
   padding: 10px 10px;
   text-align: left;
@@ -410,7 +409,7 @@ main {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 2px solid var(--line);
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);   /* スクロール時に浮遊感 */
+  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   z-index: 5;
   white-space: nowrap;
   overflow: hidden;
