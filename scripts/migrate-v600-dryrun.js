@@ -24,8 +24,14 @@ const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
 // service_role キーが env に設定されていれば RLS バイパス (推奨: 移行時のみ)。
 // 未設定なら anon キーで読み込み (booking_status / bf_history は RLS で 0 行になる)。
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
-const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
-const USING_SERVICE_ROLE = !!process.env.SUPABASE_SERVICE_KEY;
+// PowerShell/paste 経由で改行/空白が混入すると HTTP header に invalid value エラー。
+// JWT は base64url + '.' のみで構成されるので、それ以外の文字を全て除去して sanitize する。
+function _cleanJwt(s) {
+  if (!s) return '';
+  return String(s).replace(/[^A-Za-z0-9._\-=]/g, '');
+}
+const SUPABASE_KEY = _cleanJwt(process.env.SUPABASE_SERVICE_KEY) || SUPABASE_ANON_KEY;
+const USING_SERVICE_ROLE = !!process.env.SUPABASE_SERVICE_KEY && _cleanJwt(process.env.SUPABASE_SERVICE_KEY).length > 0;
 const BK_SHEET_ID = '10misKpAtMitwIagGDUoMvQS7U9pfEQ0ODxG8A7DLzaQ';
 
 const SHEETS = [
