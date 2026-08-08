@@ -59,6 +59,30 @@ const $$ = (sel, root=document) => Array.from(root.querySelectorAll(sel));
 const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
+// v521 の normFac (医院名正規化) を移植: DXHUB のフル名を短縮名に寄せる
+function normFac(f) {
+  if (!f) return '';
+  const s = String(f);
+  if (s.includes('BF銀座')) return 'BF銀座';
+  if (s.includes('銀座'))   return 'BF銀座';
+  if (s.includes('中日'))   return 'BF中日';
+  if (s.includes('BF'))     return 'BF銀座';   // "BF◯◯" → BF銀座扱い
+  if (s.includes('エスカ')) return 'エスカ';
+  if (s.includes('アール')) return 'アール';
+  if (s.includes('ウィズ')) return 'ウィズ';
+  if (s.includes('ルミナス'))return 'ルミナス';
+  if (s.includes('茶屋'))   return '茶屋';
+  if (s.includes('アサノ')) return 'アサノ';
+  if (s.includes('知立'))   return '知立';
+  if (s.includes('小牧'))   return '小牧';
+  if (s.includes('八事'))   return '八事';
+  if (s.includes('岩田'))   return '岩田';
+  if (s.includes('大森'))   return '大森';
+  if (s.includes('京都'))   return '京都';
+  if (s.includes('訪問'))   return '訪問';
+  return s;
+}
+
 function fmtDate(iso) {
   if (!iso) return '';
   const d = new Date(iso);
@@ -140,19 +164,32 @@ async function logout() {
 // ==================== Data fetch ====================
 async function fetchVisits() {
   state.loading = true;
-  const { data, error, count } = await sb
-    .from('v_visits_with_patient')
-    .select('*', { count: 'exact' })
-    .order('book_date', { ascending: false, nullsFirst: false })
-    .limit(5000);
-  state.loading = false;
-  if (error) {
-    console.error('fetchVisits', error);
-    toast('データ取得に失敗: ' + error.message, 'err', 5000);
-    return;
+  // v600 fix #1: Supabase JS の default max 1000 を超えるため range ページング必須
+  // v600 fix #2: 未来の予約 (book_date > today) は来院タブに出さない (v521 同挙動)
+  const todayIso = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  let all = [];
+  const pageSize = 1000;
+  let from = 0;
+  for (let page = 0; page < 20; page++) { // safety cap 20 pages = 20k rows
+    const { data, error } = await sb
+      .from('v_visits_with_patient')
+      .select('*')
+      .or(`book_date.is.null,book_date.lte.${todayIso}`)   // 未来来院除外
+      .order('book_date', { ascending: false, nullsFirst: false })
+      .range(from, from + pageSize - 1);
+    if (error) {
+      state.loading = false;
+      console.error('fetchVisits', error);
+      toast('データ取得に失敗: ' + error.message, 'err', 5000);
+      return;
+    }
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
   }
-  state.visits = data || [];
-  state.totalVisits = count || state.visits.length;
+  state.loading = false;
+  state.visits = all;
 }
 
 async function fetchPatients() {
@@ -200,7 +237,8 @@ function filteredVisits() {
   const cutoff = f.period === 'all' ? null
     : new Date(Date.now() - Number(f.period) * 86400000);
   return state.visits.filter(v => {
-    if (f.facility && v.facility !== f.facility) return false;
+    // v600 fix: facility は normFac で正規化して比較 (DXHUB のフル名対応)
+    if (f.facility && normFac(v.facility) !== f.facility) return false;
     if (f.status) {
       const eff = v.bf_status || v.status || '未対応';
       if (eff !== f.status) return false;
@@ -343,7 +381,7 @@ function rowHtml(v) {
   return `<tr data-visit-id="${esc(v.visit_id)}">
     <td class="c-book">${esc(bookDisplay)}</td>
     <td class="c-name" title="${esc(v.normalized_name || '')}">${esc(v.patient_name || '(名前なし)')}</td>
-    <td class="c-facility">${esc(v.facility || '-')}</td>
+    <td class="c-facility" title="${esc(v.facility || '')}">${esc(normFac(v.facility) || '-')}</td>
     <td class="c-status">
       <select class="status-sel" data-value="${esc(eff)}" data-visit-id="${esc(v.visit_id)}">
         ${statusOptsHtml}
