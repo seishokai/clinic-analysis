@@ -1,5 +1,5 @@
 // === アプリバージョン (UI表示用、index.htmlのapp.js?v=と一致させる) ===
-const APP_VERSION = 'v520';
+const APP_VERSION = 'v521';
 
 // === HTML escaping utility (XSS対策) ===
 function escapeHtml(s) {
@@ -631,14 +631,14 @@ function handleRealtimeChange(table, payload) {
     // 予約系: 該当行を bookingsData に反映
     if (payload.eventType === 'UPDATE' || payload.eventType === 'INSERT') {
       const key = row.name + '|' + row.apply_date;
-      // v520: 完全一致 → normName + normDateKey で fuzzy match (同僚の realtime 更新が
-      //   bookingsData の variant patient (Sheets 空白) に届かない不整合を修正)
+      // v521: exact 一致を優先、無ければ fuzzy fallback (2 パス化)。
+      //   単一 find 内で return true |  fuzzy の合体判定だと、
+      //   配列上で variant 行が exact 行より先に来た時に variant が誤ヒットしてしまう
+      //   → realtime 更新が別レコードに転写されるリスク (v520 regression)。
       const _rtNn = (typeof normName === 'function') ? normName(row.name) : row.name;
       const _rtDk = (typeof normDateKey === 'function') ? normDateKey(row.apply_date) : row.apply_date;
-      const d = (bookingsData || []).find(b => {
-        if (b.name === row.name && b.applyDate === row.apply_date) return true;
-        return normName(b.name) === _rtNn && normDateKey(b.applyDate) === _rtDk;
-      });
+      let d = (bookingsData || []).find(b => b.name === row.name && b.applyDate === row.apply_date);
+      if (!d) d = (bookingsData || []).find(b => normName(b.name) === _rtNn && normDateKey(b.applyDate) === _rtDk);
       if (d) {
         if (row.status !== undefined) d.status = row.status;
         if (row.contract_amount !== undefined) d.contractAmount = row.contract_amount;
@@ -10203,16 +10203,39 @@ function resolveDBName(name, applyDate) {
 
 async function loadBFHistory(names) {
   try {
-    const { data } = await sb.from('bf_history').select('*').in('booking_name', names).order('created_at', { ascending: false });
-    // v471: atomic swap — 空 cache ウィンドウで CSV/render がデータ吹っ飛びしないよう対策
+    // v521: .in('booking_name', names) を撤去。writer 端末の raw name で保存された履歴が
+    //   reader (Sheets variant) の names 配列で hit しない → 履歴が variant patient で
+    //   全滅していた。bf_history は小テーブルなので全件 fetch で十分。
+    //   加えて cache key を raw / normalized 両方で aliasing → getBFHistory で吸収。
+    const { data } = await sb.from('bf_history').select('*').order('created_at', { ascending: false });
     const nextCache = {};
     (data || []).forEach(h => {
       const key = h.booking_name + '|' + h.booking_apply_date;
       if (!nextCache[key]) nextCache[key] = [];
       nextCache[key].push(h);
+      // 正規化キーでも引ける (スペース差異/slash-dash 差異吸収)
+      const normKey = normName(h.booking_name) + '|' + normDateKey(h.booking_apply_date);
+      if (normKey !== key) {
+        if (!nextCache[normKey]) nextCache[normKey] = [];
+        // 同一オブジェクトを共有 (unshift/push 反映のため)
+        if (nextCache[normKey] !== nextCache[key]) {
+          // 別配列を作らず、raw key と同参照で共有
+          nextCache[normKey] = nextCache[key];
+        }
+      }
     });
     if (data) bfHistoryCache = nextCache;
   } catch(e) { console.warn('BF history load', e); }
+}
+// v521: 履歴取得 helper (raw / normalized 両方で lookup)。getBFInfo と同型。
+function getBFHistory(name, applyDate) {
+  const k1 = name + '|' + applyDate;
+  if (bfHistoryCache[k1]) return bfHistoryCache[k1];
+  const dateKey = normDateKey(applyDate);
+  const k1b = name + '|' + dateKey;
+  if (bfHistoryCache[k1b]) return bfHistoryCache[k1b];
+  const k2 = normName(name) + '|' + dateKey;
+  return bfHistoryCache[k2] || [];
 }
 
 function getLoggedUserName() {
@@ -10336,7 +10359,10 @@ async function saveBFLifecycleField(name, applyDate, field, value) {
     } catch(_){}
     // v520: _saveOk=false + cache 未生成 で TypeError → 保存モーダルが閉じない
     //   → 安井さん再クリック地獄。stub を必ず用意してから代入。
+    // v521: dbKey 側にもエイリアス張って、後続の getBFInfo(dbName, ...) も同参照でヒットさせる
+    //   (単キーだけ populate だと dbName 経由の別ルックアップで cache miss)。
     if (!bfLifecycleCache[key]) bfLifecycleCache[key] = { name: dbName, apply_date: applyDate };
+    if (dbKey !== key && !bfLifecycleCache[dbKey]) bfLifecycleCache[dbKey] = bfLifecycleCache[key];
     bfLifecycleCache[key].memo = value;
     bfLifecycleCache[key].bf_memo = value;
   }
@@ -13015,7 +13041,7 @@ function drawBFLifecycleTable(bfRows) {
     const stColor = BF_STATUSES.find(s => s.value === st)?.color || '#ccc';
     const bookDate = parseDate(d.bookDate);
     const daysSince = bookDate ? Math.floor((today - bookDate) / 86400000) : '-';
-    const histCount = (bfHistoryCache[key] || []).length;
+    const histCount = getBFHistory(d.name, d.applyDate).length;
     const csFac = info.bf_cs_facility || normFac(d.facility) || '';
     const stStyle = st
       ? `background:${stColor}22;color:${stColor};border:1px solid ${stColor};font-weight:700`
@@ -13265,7 +13291,8 @@ function openBFMemoModal(name, applyDate, bfRows) {
 
 function openBFHistoryModal(name, applyDate) {
   const key = name + '|' + applyDate;
-  const history = bfHistoryCache[key] || [];
+  // v521: variant patient で履歴が「なし」誤表示 → getBFHistory で normalized fallback
+  const history = getBFHistory(name, applyDate);
   document.getElementById('bf-lc-history-title').textContent = `📜 ${name} の履歴`;
   const body = document.getElementById('bf-lc-history-body');
   if (!history.length) {
