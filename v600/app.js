@@ -172,9 +172,10 @@ function fmtRelative(iso) {
   return fmtDateTime(iso).split(' ')[0];
 }
 function fmtYen(n) {
+  // v603 fix #9: 0 も明示的に "¥0" 表示 (空だと「保存されてない」と誤認するため)
   if (n == null || n === '') return '';
   const num = Number(n);
-  if (isNaN(num) || num === 0) return '';
+  if (isNaN(num)) return '';
   return '¥' + num.toLocaleString();
 }
 function parseAmount(s) {
@@ -182,6 +183,10 @@ function parseAmount(s) {
   if (!v) return null;
   const n = Number(v);
   return isNaN(n) ? null : n;
+}
+// v603 fix #1: JST 基準の今日 (YYYY-MM-DD)。toISOString() は UTC なので使わない
+function todayJst() {
+  return new Date().toLocaleDateString('sv-SE');   // "sv-SE" = YYYY-MM-DD
 }
 
 // ==================== Toast ====================
@@ -218,24 +223,31 @@ async function login(email, pw) {
 }
 async function logout() {
   await sb.auth.signOut();
+  // v603 fix #13: ログアウト時 state をクリア (別ユーザ再ログイン時の一瞬フラッシュ防止)
   state.user = null;
+  state.visits = [];
+  state.patients = [];
+  state.bookings = null;
+  state.slots = null;
+  _promoPopulatedForCount = -1;
+  _bookingsDebounce = null;
   render();
 }
 
 // ==================== Data fetch ====================
 async function fetchVisits() {
   state.loading = true;
-  // v600 fix #1: Supabase JS の default max 1000 を超えるため range ページング必須
-  // v600 fix #2: 未来の予約 (book_date > today) は来院タブに出さない (v521 同挙動)
-  const todayIso = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+  // v603 fix #1: JST 基準で今日を求める (toISOString だと UTC → 朝の時間帯に本日消失)
+  const todayIso = todayJst();
   let all = [];
   const pageSize = 1000;
   let from = 0;
-  for (let page = 0; page < 20; page++) { // safety cap 20 pages = 20k rows
+  let hitCap = false;
+  for (let page = 0; page < 20; page++) {
     const { data, error } = await sb
       .from('v_visits_with_patient')
       .select('*')
-      .or(`book_date.is.null,book_date.lte.${todayIso}`)   // 未来来院除外
+      .or(`book_date.is.null,book_date.lte.${todayIso}`)
       .order('book_date', { ascending: false, nullsFirst: false })
       .range(from, from + pageSize - 1);
     if (error) {
@@ -248,20 +260,47 @@ async function fetchVisits() {
     all = all.concat(data);
     if (data.length < pageSize) break;
     from += pageSize;
+    if (page === 19) hitCap = true;
   }
   state.loading = false;
+  // v603 P4/P8: fetch 時に事前計算した検索キー・日付 epoch・正規化フィールドを付与
+  //   filter/render で毎回計算するのを回避 (3150 rows × filter で ~30ms → ~3ms)
+  const now = Date.now();
+  all.forEach(v => {
+    v._effStatus = v.bf_status || v.status || '未対応';
+    v._normFacility = normFac(v.facility);
+    v._treatment = getTreatment(v.service, v.contract_service);
+    v._searchHay = ((v.patient_name || '') + ' ' + (v.normalized_name || '') + ' ' + (v.phone || '')).toLowerCase();
+    v._bookMs = v.book_date ? new Date(v.book_date + 'T00:00:00+09:00').getTime() : null;
+  });
   state.visits = all;
+  // v603 fix #19: 20 page cap 到達時は明示的に warn
+  if (hitCap) toast(`⚠ 20k 件の上限に達しました (${all.length} 件のみ表示)`, 'err', 6000);
 }
 
 async function fetchPatients() {
-  const { data, error } = await sb
-    .from('patients')
-    .select('id, name, normalized_name, phone_last4, primary_facility, last_activity')
-    .eq('deleted', false)
-    .order('last_activity', { ascending: false, nullsFirst: false })
-    .limit(5000);
-  if (error) { console.error(error); return; }
-  state.patients = data || [];
+  // v603 fix #14 + P1: Supabase default 1000 上限のため range ページング。失敗時は toast。
+  let all = [];
+  const pageSize = 1000;
+  let from = 0;
+  for (let page = 0; page < 20; page++) {
+    const { data, error } = await sb
+      .from('patients')
+      .select('id, name, normalized_name, phone_last4, primary_facility, last_activity')
+      .eq('deleted', false)
+      .order('last_activity', { ascending: false, nullsFirst: false })
+      .range(from, from + pageSize - 1);
+    if (error) {
+      console.error('fetchPatients', error);
+      toast('患者取得失敗: ' + error.message, 'err', 5000);
+      return;
+    }
+    if (!data || data.length === 0) break;
+    all = all.concat(data);
+    if (data.length < pageSize) break;
+    from += pageSize;
+  }
+  state.patients = all;
 }
 
 // ==================== Save operations (安全設計) ====================
@@ -282,10 +321,20 @@ async function saveVisitField(visitId, field, value, extra = {}) {
     toast(`保存失敗 (${field}): ${error.message}`, 'err', 5000);
     return { ok: false, error };
   }
-  // ローカル state に反映 (差分更新、丸ごと置換しない)
   const idx = state.visits.findIndex(v => v.visit_id === visitId);
   if (idx >= 0) {
-    Object.assign(state.visits[idx], patch, { updated_at: data.updated_at });
+    // v603 fix #12: Object.assign で undefined が入らないよう明示コピー
+    const v = state.visits[idx];
+    Object.keys(patch).forEach(k => {
+      if (patch[k] !== undefined) v[k] = patch[k];
+    });
+    if (data && data.updated_at) v.updated_at = data.updated_at;
+    // 事前計算フィールドの再算出 (status/facility/treatment が変わった時)
+    if (patch.status !== undefined || patch.bf_status !== undefined) {
+      v._effStatus = v.bf_status || v.status || '未対応';
+    }
+    if (patch.facility !== undefined) v._normFacility = normFac(v.facility);
+    if (patch.contract_service !== undefined) v._treatment = getTreatment(v.service, v.contract_service);
   }
   setSaveStatus('保存完了 ✓', 'saved');
   return { ok: true, data };
@@ -294,64 +343,61 @@ async function saveVisitField(visitId, field, value, extra = {}) {
 // ==================== Filtering ====================
 function computePeriodRange(f) {
   const now = new Date();
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const p = f.period;
-  if (p === 'all') return { from: null, to: null };
+  if (p === 'all') return { fromMs: null, toMs: null };
   if (p === 'thisMonth') {
-    const from = new Date(now.getFullYear(), now.getMonth(), 1);
-    const to = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
-    return { from, to };
+    return {
+      fromMs: new Date(now.getFullYear(), now.getMonth(), 1).getTime(),
+      toMs:   new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59).getTime(),
+    };
   }
   if (p === 'lastMonth') {
-    const from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const to = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
-    return { from, to };
+    return {
+      fromMs: new Date(now.getFullYear(), now.getMonth() - 1, 1).getTime(),
+      toMs:   new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).getTime(),
+    };
   }
   if (p === 'month') {
-    const m = f.periodMonth; // "YYYY-MM"
-    if (!m) return { from: null, to: null };
+    const m = f.periodMonth;
+    if (!m) return { fromMs: null, toMs: null };
     const [y, mo] = m.split('-').map(Number);
     return {
-      from: new Date(y, mo - 1, 1),
-      to: new Date(y, mo, 0, 23, 59, 59),
+      fromMs: new Date(y, mo - 1, 1).getTime(),
+      toMs:   new Date(y, mo, 0, 23, 59, 59).getTime(),
     };
   }
   if (p === 'range') {
     return {
-      from: f.periodFrom ? new Date(f.periodFrom + 'T00:00:00') : null,
-      to:   f.periodTo   ? new Date(f.periodTo   + 'T23:59:59') : null,
+      fromMs: f.periodFrom ? new Date(f.periodFrom + 'T00:00:00+09:00').getTime() : null,
+      toMs:   f.periodTo   ? new Date(f.periodTo   + 'T23:59:59+09:00').getTime() : null,
     };
   }
-  // 直近 N 日
   const n = Number(p);
-  if (isNaN(n)) return { from: null, to: null };
-  return { from: new Date(today.getTime() - n * 86400000), to: null };
+  if (isNaN(n)) return { fromMs: null, toMs: null };
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return { fromMs: today.getTime() - n * 86400000, toMs: null };
 }
 
 function filteredVisits() {
   const f = state.filters;
   const q = f.search.trim().toLowerCase();
-  const { from, to } = computePeriodRange(f);
+  const { fromMs, toMs } = computePeriodRange(f);
+  // v603 P4: 事前計算フィールド (_effStatus, _normFacility, _treatment, _searchHay, _bookMs) を利用
+  // v603 fix #4: status filter が空の時は 除外/キャンセル をデフォルト非表示
   return state.visits.filter(v => {
-    // v600 fix: facility は normFac で正規化して比較 (DXHUB のフル名対応)
-    if (f.facility && normFac(v.facility) !== f.facility) return false;
-    if (f.treatment && getTreatment(v.service, v.contract_service) !== f.treatment) return false;
+    if (f.facility && v._normFacility !== f.facility) return false;
+    if (f.treatment && v._treatment !== f.treatment) return false;
     if (f.promo && (v.promo_code || '') !== f.promo) return false;
     if (f.status) {
-      const eff = v.bf_status || v.status || '未対応';
-      if (eff !== f.status) return false;
+      if (v._effStatus !== f.status) return false;
+    } else {
+      if (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus)) return false;
     }
-    if ((from || to) && v.book_date) {
-      const bd = new Date(v.book_date);
-      if (!isNaN(bd)) {
-        if (from && bd < from) return false;
-        if (to && bd > to) return false;
-      }
+    if ((fromMs || toMs) && v._bookMs) {
+      if (fromMs && v._bookMs < fromMs) return false;
+      if (toMs && v._bookMs > toMs) return false;
     }
-    if (q) {
-      const hay = (v.patient_name || '') + ' ' + (v.normalized_name || '') + ' ' + (v.phone || '');
-      if (!hay.toLowerCase().includes(q)) return false;
-    }
+    if (q && !v._searchHay.includes(q)) return false;
     return true;
   });
 }
@@ -423,6 +469,7 @@ function bindShell() {
 
 // v600 fix #6: search debounce timer
 let _searchDebounce = null;
+let _bookingsDebounce = null;
 
 function renderVisitsView(main) {
   if (!main.querySelector('.visits-view')) {
@@ -470,19 +517,37 @@ function renderVisitsView(main) {
     $('#v-status').value = state.filters.status;
     $('#v-period').value = state.filters.period;
   }
-  // v600 fix #5b: promo dropdown は毎回 populate (state.visits が更新されるたび)
-  //   → 初回 render 時 state.visits が空でも、fetch 完了後の 2 回目 render で正しく populate される
-  populatePromoOptions();
+  // v603 P6: promo dropdown は state.visits 更新時のみ populate (毎 render は不要)
+  populatePromoOptionsIfNeeded();
   updatePeriodExtraInputs();
+  setupTbodyDelegation();  // v603 P3: event delegation を tbody に 1 回だけ bind
   renderVisitsTable();
+}
+
+let _promoPopulatedForCount = -1;
+function populatePromoOptionsIfNeeded() {
+  if (_promoPopulatedForCount === state.visits.length) return;
+  populatePromoOptions();
+  _promoPopulatedForCount = state.visits.length;
 }
 
 function updatePeriodExtraInputs() {
   const p = state.filters.period;
   const monthInp = $('#v-month');
   const rangeWrap = $('#v-range-wrap');
-  if (monthInp) monthInp.hidden = (p !== 'month');
-  if (rangeWrap) rangeWrap.hidden = (p !== 'range');
+  if (monthInp) {
+    monthInp.hidden = (p !== 'month');
+    // v603 fix #10: 月/期間 の値を state から復元 (タブ復帰後に消える対策)
+    if (p === 'month' && state.filters.periodMonth) monthInp.value = state.filters.periodMonth;
+  }
+  if (rangeWrap) {
+    rangeWrap.hidden = (p !== 'range');
+    if (p === 'range') {
+      const fromInp = $('#v-from'), toInp = $('#v-to');
+      if (fromInp && state.filters.periodFrom) fromInp.value = state.filters.periodFrom;
+      if (toInp && state.filters.periodTo) toInp.value = state.filters.periodTo;
+    }
+  }
 }
 
 function populatePromoOptions() {
@@ -501,6 +566,8 @@ function populatePromoOptions() {
     sorted.map(([p, n]) => `<option value="${esc(p)}" ${p === current ? 'selected' : ''}>${esc(p)} (${n})</option>`).join('');
 }
 
+// v603 fix #11 / P2: 500 行 → 「もっと見る」でページ拡張
+let _visitsShownLimit = 500;
 function renderVisitsTable() {
   const rows = filteredVisits();
   $('#v-count').innerHTML = `<strong>${rows.length}</strong> / ${state.visits.length} 件`;
@@ -513,14 +580,35 @@ function renderVisitsTable() {
     return;
   }
   empty.hidden = true;
-  // Render (max 500 rows for perf; add pagination later)
-  const shown = rows.slice(0, 500);
-  tbody.innerHTML = shown.map(rowHtml).join('');
-  // Bind events (event delegation would be cleaner but this is fine for MVP)
-  shown.forEach(v => bindRow(v));
-  if (rows.length > 500) {
+  // v603 fix #6: 編集中の row (focused input を持つ tr) は再描画から除外
+  //   → filter 変更中でも入力途中の値が消えない
+  const focusedRow = document.activeElement && document.activeElement.closest && document.activeElement.closest('tr[data-visit-id]');
+  const focusedId = focusedRow && focusedRow.dataset.visitId;
+  const shown = rows.slice(0, _visitsShownLimit);
+  // v603 P2: DocumentFragment + template で高速化
+  const html = shown.map(rowHtml).join('');
+  if (focusedId) {
+    // 編集中の行を保持しつつ他を差し替え
+    const focusedHtml = focusedRow.outerHTML;
+    tbody.innerHTML = html;
+    const newRow = tbody.querySelector(`tr[data-visit-id="${CSS.escape(focusedId)}"]`);
+    if (newRow) newRow.outerHTML = focusedHtml;
+  } else {
+    tbody.innerHTML = html;
+  }
+  // v603 fix #11: 「もっと見る」ボタン
+  if (rows.length > _visitsShownLimit) {
     tbody.insertAdjacentHTML('beforeend',
-      `<tr><td colspan="7" class="empty-msg">…他 ${rows.length - 500} 件 (フィルタで絞り込んでください)</td></tr>`);
+      `<tr><td colspan="12" style="text-align:center;padding:14px">
+        <button id="v-more" class="link-btn" style="font-size:12px">
+          もっと見る (残り ${rows.length - _visitsShownLimit} 件)
+        </button>
+      </td></tr>`);
+    const moreBtn = $('#v-more');
+    if (moreBtn) moreBtn.addEventListener('click', () => {
+      _visitsShownLimit += 500;
+      renderVisitsTable();
+    });
   }
 }
 
@@ -577,103 +665,129 @@ function rowHtml(v) {
   </tr>`;
 }
 
-function bindRow(v) {
-  const tr = $(`tr[data-visit-id="${CSS.escape(v.visit_id)}"]`);
-  if (!tr) return;
-
-  // Status change
-  const sel = tr.querySelector('.status-sel');
-  sel.addEventListener('change', async () => {
-    const newValue = sel.value;
-    sel.classList.remove('saved', 'failed');
-    sel.classList.add('saving');
-    sel.dataset.value = newValue;
-    // BF 系の status は bf_status、それ以外は status に保存
-    //   MVP では両方に書く (どちらでも参照可能)
-    const patch = { status: newValue };
-    // If it looks like a BF-specific status keep as bf_status too
-    if (['予約連絡待ち', '後追いLINE済み', '予約変更', '検討中', '離脱',
-         'ローン審査中', 'ローン審査落', '成約', 'キャンセル', '未対応'].includes(newValue)) {
-      patch.bf_status = newValue;
-    }
-    const res = await sb.from('patient_visits')
-      .update({ ...patch, updated_by: state.user?.email || 'unknown' })
-      .eq('id', v.visit_id).select().single();
-    sel.classList.remove('saving');
-    if (res.error) {
-      sel.classList.add('failed');
-      toast('ステータス保存失敗: ' + res.error.message, 'err', 5000);
-    } else {
-      sel.classList.add('saved');
-      // Update local state
-      const idx = state.visits.findIndex(x => x.visit_id === v.visit_id);
-      if (idx >= 0) {
-        Object.assign(state.visits[idx], patch, { updated_at: res.data.updated_at });
-      }
-      setTimeout(() => sel.classList.remove('saved'), 1500);
-      setSaveStatus('保存完了 ✓', 'saved');
-    }
-  });
-
-  // Amount input (blur to save)
-  const amt = tr.querySelector('.amount-input');
-  let amtOrigValue = amt.value;
-  amt.addEventListener('focus', () => { amtOrigValue = amt.value; });
-  amt.addEventListener('blur', async () => {
-    const raw = amt.value.trim();
-    if (raw === amtOrigValue) return; // no change
-    const num = parseAmount(raw);
-    amt.classList.remove('saved', 'failed');
-    amt.classList.add('saving');
-    const res = await saveVisitField(v.visit_id, 'contract_amount', num);
-    amt.classList.remove('saving');
-    if (res.ok) {
-      amt.value = fmtYen(num);
-      amt.classList.add('saved');
-      setTimeout(() => amt.classList.remove('saved'), 1500);
-    } else {
-      amt.classList.add('failed');
-      amt.value = amtOrigValue;
-    }
-  });
-
-  // Memo click → modal
-  const memoEl = tr.querySelector('.memo-cell');
-  memoEl.addEventListener('click', () => openMemoModal(v));
-
-  // v600 fix #3: 次回予定 / 成約商材 / 成約月 の即時保存
-  tr.querySelectorAll('.field-input').forEach(inp => {
-    let orig = inp.value;
-    inp.addEventListener('focus', () => { orig = inp.value; });
-    inp.addEventListener('change', async () => {
-      const field = inp.dataset.field;
-      if (!field) return;
-      let value = inp.value;
-      if (field === 'contract_date') {
-        // <input type=month> は "YYYY-MM" 値。DB DATE 型に合わせて "YYYY-MM-01"
-        value = value ? value + '-01' : null;
-      } else if (field === 'contract_service') {
-        value = value || null;
-      } else if (field === 'next_visit_date') {
-        value = value || null; // YYYY-MM-DD or null
-      }
-      inp.classList.remove('saved', 'failed');
-      inp.classList.add('saving');
-      const res = await saveVisitField(v.visit_id, field, value);
-      inp.classList.remove('saving');
-      if (res.ok) {
-        inp.classList.add('saved');
-        setTimeout(() => inp.classList.remove('saved'), 1500);
-        orig = inp.value;
+// v603 P3: bindRow を廃止 → tbody 全体に delegated handler (500 rows × 6 listener = 3000 →  6)
+//   (setupTbodyDelegation は init 時に 1 回だけ呼ぶ)
+function findVisitById(id) {
+  return state.visits.find(v => v.visit_id === id) || null;
+}
+function setupTbodyDelegation() {
+  const tbody = $('#v-tbody');
+  if (!tbody || tbody._delegated) return;
+  tbody._delegated = true;
+  const origValues = new WeakMap();
+  // status change
+  tbody.addEventListener('change', async (e) => {
+    const t = e.target;
+    if (!t.matches) return;
+    const tr = t.closest('tr[data-visit-id]');
+    if (!tr) return;
+    const visitId = tr.dataset.visitId;
+    const v = findVisitById(visitId);
+    if (!v) return;
+    // Status select
+    if (t.classList.contains('status-sel')) {
+      const newValue = t.value;
+      const orig = t.dataset.value;
+      t.classList.remove('saved', 'failed');
+      t.classList.add('saving');
+      t.dataset.value = newValue;
+      // v603 fix #2: 非 BF 系 status の時、bf_status を null 明示クリア (残留防止)
+      const isBFStatus = ['予約連絡待ち', '後追いLINE済み', '予約変更', '検討中', '離脱',
+        'ローン審査中', 'ローン審査落', '成約', 'キャンセル', '未対応',
+        '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
+        '印象待ち(治療無)', '印象待ち(治療有)', '治療中',
+        'セット日確定待ち', 'セット待ち', 'セット完了'].includes(newValue);
+      const patch = { status: newValue, bf_status: isBFStatus ? newValue : null };
+      const res = await sb.from('patient_visits')
+        .update({ ...patch, updated_by: state.user?.email || 'unknown' })
+        .eq('id', visitId).select().single();
+      t.classList.remove('saving');
+      if (res.error) {
+        // v603 fix #3: 失敗時 select を元に戻す
+        t.value = orig;
+        t.dataset.value = orig;
+        t.classList.add('failed');
+        toast('ステータス保存失敗: ' + res.error.message, 'err', 5000);
       } else {
-        inp.classList.add('failed');
-        inp.value = orig;
+        t.classList.add('saved');
+        v.status = newValue;
+        v.bf_status = patch.bf_status;
+        v._effStatus = v.bf_status || v.status || '未対応';
+        if (res.data && res.data.updated_at) v.updated_at = res.data.updated_at;
+        setTimeout(() => t.classList.remove('saved'), 1500);
+        setSaveStatus('保存完了 ✓', 'saved');
       }
-    });
+      return;
+    }
+    // field-input change (date/month/select)
+    if (t.classList.contains('field-input')) {
+      const field = t.dataset.field;
+      if (!field) return;
+      const orig = origValues.get(t) ?? t.defaultValue;
+      let value = t.value;
+      if (field === 'contract_date') value = value ? value + '-01' : null;
+      else if (field === 'contract_service') value = value || null;
+      else if (field === 'next_visit_date') value = value || null;
+      t.classList.remove('saved', 'failed');
+      t.classList.add('saving');
+      const res = await saveVisitField(visitId, field, value);
+      t.classList.remove('saving');
+      if (res.ok) {
+        t.classList.add('saved');
+        setTimeout(() => t.classList.remove('saved'), 1500);
+        origValues.set(t, t.value);
+      } else {
+        t.classList.add('failed');
+        t.value = orig;
+      }
+      return;
+    }
+  });
+  // amount input (blur)
+  tbody.addEventListener('focusin', (e) => {
+    const t = e.target;
+    if (t.classList && (t.classList.contains('amount-input') || t.classList.contains('field-input'))) {
+      origValues.set(t, t.value);
+    }
+  });
+  tbody.addEventListener('focusout', async (e) => {
+    const t = e.target;
+    if (!t.classList || !t.classList.contains('amount-input')) return;
+    const tr = t.closest('tr[data-visit-id]');
+    if (!tr) return;
+    const visitId = tr.dataset.visitId;
+    const raw = t.value.trim();
+    const origRaw = origValues.get(t) || '';
+    // v603 fix #20: 数値比較で無駄 UPDATE 回避 (¥1,000 と 1000 は同値)
+    if (parseAmount(raw) === parseAmount(origRaw)) return;
+    const num = parseAmount(raw);
+    t.classList.remove('saved', 'failed');
+    t.classList.add('saving');
+    const res = await saveVisitField(visitId, 'contract_amount', num);
+    t.classList.remove('saving');
+    if (res.ok) {
+      t.value = fmtYen(num);
+      t.classList.add('saved');
+      setTimeout(() => t.classList.remove('saved'), 1500);
+    } else {
+      t.classList.add('failed');
+      t.value = origRaw;
+    }
+  });
+  // memo cell click
+  tbody.addEventListener('click', (e) => {
+    const memo = e.target.closest('.memo-cell');
+    if (!memo) return;
+    const tr = memo.closest('tr[data-visit-id]');
+    if (!tr) return;
+    const v = findVisitById(tr.dataset.visitId);
+    if (v) openMemoModal(v);
   });
 }
 
 function openMemoModal(v) {
+  // v603 fix #5: 連打で複数モーダル重なる問題 → 既存があれば無視
+  if (document.querySelector('.modal-backdrop')) return;
   state.memoTarget = { visit_id: v.visit_id, name: v.patient_name, current: v.memo || '' };
   const backdrop = document.body.appendChild($('#tpl-memo').content.cloneNode(true).firstElementChild);
   const title = backdrop.querySelector('#mm-title');
@@ -684,27 +798,38 @@ function openMemoModal(v) {
   text.value = v.memo || '';
   hint.textContent = v.updated_at ? `最終更新: ${fmtDateTime(v.updated_at)}` : '';
   text.focus();
-  const close = () => backdrop.remove();
-  backdrop.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
-  saveBtn.addEventListener('click', async () => {
+  const close = () => {
+    backdrop.remove();
+    document.removeEventListener('keydown', onKey);
+  };
+  const doSave = async () => {
     saveBtn.disabled = true; saveBtn.textContent = '保存中…';
     const res = await saveVisitField(v.visit_id, 'memo', text.value || null);
     if (res.ok) {
-      // Update DOM row
       const tr = $(`tr[data-visit-id="${CSS.escape(v.visit_id)}"]`);
       if (tr) {
         const mc = tr.querySelector('.memo-cell');
         const m = text.value || '';
         mc.classList.toggle('has-value', !!m);
         mc.classList.toggle('empty', !m);
-        mc.textContent = m ? (m.length > 40 ? m.slice(0,40) + '…' : m) : '+ メモ';
+        mc.textContent = m ? (m.length > 30 ? m.slice(0,30) + '…' : m) : '+ メモ';
       }
       toast('メモを保存しました', 'ok');
       close();
     } else {
       saveBtn.disabled = false; saveBtn.textContent = '保存';
     }
-  });
+  };
+  // v603 fix #15/#16: ESC で閉じる, Ctrl/Cmd+Enter で保存
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doSave(); }
+  };
+  document.addEventListener('keydown', onKey);
+  // v603 fix #15: backdrop 直接クリックで閉じる
+  backdrop.addEventListener('click', (e) => { if (e.target === backdrop) close(); });
+  backdrop.querySelectorAll('[data-close]').forEach(b => b.addEventListener('click', close));
+  saveBtn.addEventListener('click', doSave);
 }
 
 // v601: 予約一覧 — Sheets を直接 fetch して read-only 表示
@@ -771,7 +896,12 @@ function renderBookingsView(main) {
     main.appendChild($('#tpl-bookings').content.cloneNode(true));
     $('#b-facility').innerHTML = '<option value="">医院:全て</option>' +
       FACILITIES.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
-    $('#b-search').addEventListener('input', e => { state.bookingFilters.search = e.target.value; renderBookingsTable(); });
+    // v603 P8: 予約一覧の検索も debounce (200ms)
+    $('#b-search').addEventListener('input', e => {
+      state.bookingFilters.search = e.target.value;
+      if (_bookingsDebounce) clearTimeout(_bookingsDebounce);
+      _bookingsDebounce = setTimeout(() => renderBookingsTable(), 200);
+    });
     $('#b-facility').addEventListener('change', e => { state.bookingFilters.facility = e.target.value; renderBookingsTable(); });
     $('#b-tool').addEventListener('change', e => { state.bookingFilters.tool = e.target.value; renderBookingsTable(); });
     $('#b-refresh').addEventListener('click', async () => {
@@ -789,6 +919,8 @@ function renderBookingsView(main) {
 }
 
 function renderBookingsTable() {
+  // v603 fix #8: view 切替中に呼ばれた時のガード
+  if (state.view !== 'bookings') return;
   const st = state.bookings || { rows: [] };
   const f = state.bookingFilters;
   const q = f.search.trim().toLowerCase();
@@ -850,6 +982,8 @@ function renderSlotsView(main) {
 }
 
 function renderSlotsBody() {
+  // v603 fix #8: view 切替中に呼ばれた時のガード
+  if (state.view !== 'slots') return;
   const body = $('#slots-body');
   if (!body) return;
   const { shareconnect, apotool } = state.slots || {};
@@ -906,40 +1040,53 @@ function renderSlotCard(c) {
   </div>`;
 }
 
+// v603 fix #18: 患者 view の template を初回のみ挿入
+let _patientSearchQ = '';
 function renderPatientsView(main) {
-  main.innerHTML = '';
-  main.appendChild($('#tpl-patients').content.cloneNode(true));
-  const tbody = $('#p-tbody');
+  if (!main.querySelector('.view')) {
+    main.innerHTML = '';
+    main.appendChild($('#tpl-patients').content.cloneNode(true));
+    $('#p-search').value = _patientSearchQ;
+    $('#p-search').addEventListener('input', e => {
+      _patientSearchQ = e.target.value;
+      renderPatientsTable();
+    });
+  }
+  renderPatientsTable();
+}
+function renderPatientsTable() {
   const rows = state.patients;
-  $('#p-count').innerHTML = `<strong>${rows.length}</strong> 患者`;
-  tbody.innerHTML = rows.slice(0, 500).map(p => `<tr>
+  const q = _patientSearchQ.trim().toLowerCase();
+  const qNorm = q.replace(/\s/g, '');
+  // v603 fix #12: name と normalized_name 両方で検索
+  const filtered = q ? rows.filter(p =>
+    (p.normalized_name || '').includes(qNorm) ||
+    (p.name || '').toLowerCase().includes(q)) : rows;
+  $('#p-count').innerHTML = `<strong>${filtered.length}</strong> 患者`;
+  $('#p-tbody').innerHTML = filtered.slice(0, 500).map(p => `<tr>
     <td class="c-name">${esc(p.name)}</td>
     <td>${esc(p.phone_last4 || '-')}</td>
     <td class="c-facility">${esc(p.primary_facility || '-')}</td>
     <td>-</td>
     <td class="c-updated">${esc(fmtRelative(p.last_activity))}</td>
   </tr>`).join('');
-  $('#p-search').addEventListener('input', e => {
-    const q = e.target.value.trim().toLowerCase();
-    const filtered = q ? rows.filter(p => (p.normalized_name || '').includes(q.replace(/\s/g,''))) : rows;
-    $('#p-count').innerHTML = `<strong>${filtered.length}</strong> 患者`;
-    tbody.innerHTML = filtered.slice(0, 500).map(p => `<tr>
-      <td class="c-name">${esc(p.name)}</td>
-      <td>${esc(p.phone_last4 || '-')}</td>
-      <td class="c-facility">${esc(p.primary_facility || '-')}</td>
-      <td>-</td>
-      <td class="c-updated">${esc(fmtRelative(p.last_activity))}</td>
-    </tr>`).join('');
-  });
 }
 
 // ==================== Boot ====================
+// v603 fix #7: bootAfterLogin 二重発火防止
+let _bootingInProgress = false;
 async function bootAfterLogin() {
-  render(); // shell + placeholder
-  setSaveStatus('データ取得中…', 'saving');
-  await Promise.all([fetchVisits(), fetchPatients()]);
-  setSaveStatus('データ取得完了 ✓', 'saved');
-  render();
+  if (_bootingInProgress) return;
+  _bootingInProgress = true;
+  try {
+    render();
+    setSaveStatus('データ取得中…', 'saving');
+    await Promise.all([fetchVisits(), fetchPatients()]);
+    setSaveStatus('データ取得完了 ✓', 'saved');
+    render();
+  } finally {
+    _bootingInProgress = false;
+  }
 }
 
 async function boot() {
