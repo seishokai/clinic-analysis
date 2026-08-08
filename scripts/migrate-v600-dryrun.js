@@ -21,7 +21,11 @@ const { createClient } = require('@supabase/supabase-js');
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+// service_role キーが env に設定されていれば RLS バイパス (推奨: 移行時のみ)。
+// 未設定なら anon キーで読み込み (booking_status / bf_history は RLS で 0 行になる)。
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || SUPABASE_ANON_KEY;
+const USING_SERVICE_ROLE = !!process.env.SUPABASE_SERVICE_KEY;
 const BK_SHEET_ID = '10misKpAtMitwIagGDUoMvQS7U9pfEQ0ODxG8A7DLzaQ';
 
 const SHEETS = [
@@ -130,14 +134,29 @@ async function fetchAll(table) {
   const pageSize = 1000;
   let from = 0;
   for (;;) {
-    const { data, error } = await sb.from(table).select('*').range(from, from + pageSize - 1);
-    if (error) throw error;
-    if (!data || data.length === 0) break;
+    const { data, error, status } = await sb.from(table).select('*').range(from, from + pageSize - 1);
+    if (error) {
+      console.error(`  ✗ ${table} fetch error [status=${status}]:`, error.message);
+      if (error.details) console.error('    details:', error.details);
+      if (error.hint) console.error('    hint:', error.hint);
+      throw error;
+    }
+    if (!data || data.length === 0) {
+      if (all.length === 0) {
+        console.warn(`  ⚠ ${table} は 0 行を返した。RLS で anon がブロックされている可能性あり。`);
+      }
+      break;
+    }
     all = all.concat(data);
     if (data.length < pageSize) break;
     from += pageSize;
   }
   return all;
+}
+async function countRowsHead(table) {
+  const { count, error } = await sb.from(table).select('*', { count: 'exact', head: true });
+  if (error) return `error: ${error.message}`;
+  return count;
 }
 
 // ==================== Clustering (name + phone_last4 → patient) ====================
@@ -350,6 +369,18 @@ async function main() {
   console.log('==================================================');
   console.log('  Aladdin v600 Migration Dry-Run');
   console.log('==================================================');
+  console.log(`  Supabase key: ${USING_SERVICE_ROLE ? '★ service_role (RLS バイパス)' : 'anon (RLS 有効)'}`);
+  if (!USING_SERVICE_ROLE) {
+    console.log('  ⚠ anon で実行中。booking_status/bf_history は RLS で 0 行になる可能性大。');
+    console.log('  → service_role キーを env var に設定して再実行を推奨:');
+    console.log('     $env:SUPABASE_SERVICE_KEY = "eyJ..."');
+  }
+
+  console.log('\n[0/4] Supabase 疎通確認 (RLS/anon 可視性チェック)...');
+  for (const t of ['booking_status', 'manual_bookings', 'bf_history']) {
+    const n = await countRowsHead(t);
+    console.log(`  ${t.padEnd(20)} 見える行数: ${n}`);
+  }
 
   console.log('\n[1/4] Sheets を取得中...');
   const sheetRows = await fetchAllSheets();
