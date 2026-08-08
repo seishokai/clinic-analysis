@@ -319,38 +319,46 @@
             } catch(_){}
           })();
         </script>
-        <!-- v490: デフォルトで営業ボタン表示 (社内・拓未さん向け)
-             URL パラメータ ?a (or ?affiliate) で非表示 (代理店向け) -->
-        <div class="portal-col" id="portal-sales-col" style="display:flex;flex-direction:column;gap:10px">
-          <button id="portal-sales-btn" onclick="location.href='sales/'" style="width:100%;padding:18px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">営業</button>
+        <!-- v603: 新 UI (v600) をメインボタンに昇格 -->
+        <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
+          <a href="v600/" id="portal-v600-btn"
+             style="display:block;text-align:center;padding:20px;background:linear-gradient(135deg,#1d5f56,#0f4842);border:2px solid #0f4842;color:#fff;border-radius:10px;font-size:17px;font-weight:700;cursor:pointer;transition:all .2s;letter-spacing:2px;text-decoration:none;box-shadow:0 4px 12px rgba(29,95,86,.25)"
+             onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 6px 16px rgba(29,95,86,.35)'"
+             onmouseout="this.style.transform='';this.style.boxShadow='0 4px 12px rgba(29,95,86,.25)'">
+            🏥 Aladdin を開く
+          </a>
         </div>
 
-        <!-- v486: 「管理」ボタン廃止、ログインフォームを初期表示に -->
-        <div class="portal-col" style="display:flex;flex-direction:column;gap:10px">
-          <button id="portal-manage-btn" hidden style="display:none">管理</button>
-          <div id="login-section" style="display:block;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
-            <div id="login-form">
-              <div class="input-group">
-                <label for="login-email">Email</label>
-                <input type="email" id="login-email" placeholder="メールアドレス" autocomplete="email">
+        <!-- v490: 旧 UI (v521) は下に折り畳み — 通常は使わない -->
+        <details id="portal-legacy-section" style="margin-top:8px;padding:6px 0 0;border-top:1px dashed #d4d4d4">
+          <summary style="cursor:pointer;font-size:11px;color:var(--text-muted);text-align:center;padding:8px;letter-spacing:1px;list-style:none">
+            ▸ 旧 UI (v521) を開く
+          </summary>
+          <div style="padding:12px 0 0;display:flex;flex-direction:column;gap:10px">
+            <div class="portal-col" id="portal-sales-col">
+              <button id="portal-sales-btn" onclick="location.href='sales/'" style="width:100%;padding:14px;border:2px solid #1a1a1a;background:white;color:#1a1a1a;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;transition:all 0.2s;letter-spacing:2px" onmouseover="this.style.background='#1a1a1a';this.style.color='white'" onmouseout="this.style.background='white';this.style.color='#1a1a1a'">営業 (旧)</button>
+            </div>
+            <div class="portal-col">
+              <button id="portal-manage-btn" hidden style="display:none">管理</button>
+              <div id="login-section" style="display:block;padding:14px;border:1px solid var(--border);border-radius:10px;background:#fafafa">
+                <div id="login-form">
+                  <div class="input-group">
+                    <label for="login-email">Email</label>
+                    <input type="email" id="login-email" placeholder="メールアドレス" autocomplete="email">
+                  </div>
+                  <div class="input-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" placeholder="パスワードを入力" autocomplete="current-password">
+                  </div>
+                  <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
+                  <button type="button" class="btn-primary" id="login-btn">ログイン (旧)</button>
+                  <p id="login-error" class="error-msg" role="alert" aria-live="assertive" hidden>メールまたはパスワードが正しくありません</p>
+                  <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center">権限に応じた画面が表示されます</p>
+                </div>
               </div>
-              <div class="input-group">
-                <label for="password">Password</label>
-                <input type="password" id="password" placeholder="パスワードを入力" autocomplete="current-password">
-              </div>
-              <div style="display:flex;justify-content:flex-end;margin-top:-8px;margin-bottom:8px"><label style="font-size:11px;color:var(--text-sub);cursor:pointer;display:flex;align-items:center;gap:4px"><input type="checkbox" id="pw-toggle" style="width:14px;height:14px">表示</label></div>
-              <button type="button" class="btn-primary" id="login-btn">ログイン</button>
-              <p id="login-error" class="error-msg" role="alert" aria-live="assertive" hidden>メールまたはパスワードが正しくありません</p>
-              <p style="font-size:11px;color:var(--text-muted);margin-top:10px;text-align:center">権限に応じた画面が表示されます</p>
-              <!-- v487: 労務管理 (ピノキオ) / パラ管理 (外注用) リンクは削除 -->
-              <!-- 元コード保持コメント:
-                <a href="https://kintai.pinocchio-navi.com/seishokai/" target="_blank">労務管理（ピノキオ）</a>
-                <a href="?view=para">パラ管理 (外注用)</a>
-              -->
-
             </div>
           </div>
-        </div>
+        </details>
       </div>
       <!-- v271: 小さなユーザー管理リンク → 専用 /users/ ページへ直行 -->
       <div style="text-align:center;margin-top:18px">
@@ -370,15 +378,8 @@
           🤝 代理店・プロモ用ログイン
         </a>
       </div>
-      <!-- v600: 新 UI 試験版へのリンク -->
-      <div style="text-align:center;margin-top:8px">
-        <a href="v600/"
-          style="display:inline-block;background:linear-gradient(135deg,#1d5f56,#0f4842);border:1px solid #0f4842;color:#fff;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;padding:8px 18px;letter-spacing:1px;text-decoration:none;border-radius:20px;transition:all .2s;box-shadow:0 2px 4px rgba(29,95,86,.25)"
-          onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 4px 8px rgba(29,95,86,.35)'"
-          onmouseout="this.style.transform='';this.style.boxShadow='0 2px 4px rgba(29,95,86,.25)'">
-          🧪 新 UI 試験版 (v600) ↗
-        </a>
-      </div>
+      <!-- v603: 新 UI (v600) はメインボタンに昇格したためこの位置のリンクは削除 -->
+
       <script>
         // 代理店モード (?a) では「代理店用ログイン」リンクを隠し
         // 代わりに「社内ログインへ戻る」リンクを表示
