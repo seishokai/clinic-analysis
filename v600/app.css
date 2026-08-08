@@ -351,6 +351,20 @@ main {
   text-decoration: none;
   display: inline-block;
 }
+/* v607: 今月/先月 のクイックボタン */
+.quick-period-btn {
+  padding: 6px 12px;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.quick-period-btn:hover { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+.quick-period-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 .link-btn:hover {
   background: var(--line-soft);
 }
@@ -384,17 +398,20 @@ main {
 }
 .v-table thead th {
   position: sticky;
-  top: 0;
+  /* v607: メインヘッダ (.hdr) が top:0 sticky にいるため、その下に固定
+     .hdr の実測は 52-58px 程度。少し余裕を持って 56px */
+  top: 56px;
   background: var(--bg);
   padding: 10px 10px;
   text-align: left;
   font-size: 11px;
   font-weight: 700;
-  color: var(--ink);   /* v600 fix #5: ヘッダも濃く */
+  color: var(--ink);
   text-transform: uppercase;
   letter-spacing: 0.05em;
   border-bottom: 2px solid var(--line);
-  z-index: 1;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);   /* スクロール時に浮遊感 */
+  z-index: 5;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;

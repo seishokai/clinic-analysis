@@ -17,6 +17,9 @@
 (() => {
 'use strict';
 
+// v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
+const APP_VERSION = 'v608';
+
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5kbGZxcnZvZWp3Z3FmZHRnaG1nIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1ODIxNjcsImV4cCI6MjA5MTE1ODE2N30.pE-l-4NgQTpEb9DvjeRptargvrsYH9YKyRLt06flPik';
@@ -494,7 +497,20 @@ function renderVisitsView(main) {
     $('#v-period').addEventListener('change', e => {
       state.filters.period = e.target.value;
       updatePeriodExtraInputs();
+      updateQuickPeriodButtons();
       renderVisitsTable();
+    });
+    // v607: 今月 / 先月 クイックボタン
+    document.querySelectorAll('.quick-period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const p = btn.dataset.period;
+        state.filters.period = p;
+        const sel = $('#v-period');
+        if (sel) sel.value = p;
+        updatePeriodExtraInputs();
+        updateQuickPeriodButtons();
+        renderVisitsTable();
+      });
     });
     $('#v-month').addEventListener('change', e => { state.filters.periodMonth = e.target.value; renderVisitsTable(); });
     $('#v-from').addEventListener('change', e => { state.filters.periodFrom = e.target.value; renderVisitsTable(); });
@@ -517,6 +533,7 @@ function renderVisitsView(main) {
   }
   // v604: populatePromoOptionsIfNeeded の cache 判定にバグ → 毎 render に戻す (実測 <5ms)
   populatePromoOptions();
+  updateQuickPeriodButtons();  // v607
   updatePeriodExtraInputs();
   setupTbodyDelegation();  // v603 P3: event delegation を tbody に 1 回だけ bind
   renderVisitsTable();
@@ -529,6 +546,11 @@ function populatePromoOptionsIfNeeded() {
   _promoPopulatedForCount = state.visits.length;
 }
 
+function updateQuickPeriodButtons() {
+  document.querySelectorAll('.quick-period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.period === state.filters.period);
+  });
+}
 function updatePeriodExtraInputs() {
   const p = state.filters.period;
   const monthInp = $('#v-month');
@@ -1109,6 +1131,56 @@ sb.auth.onAuthStateChange((event, session) => {
     // If we just logged in (no visits yet), fetch
     if (!state.visits.length) bootAfterLogin();
   }
+});
+
+// v607: 更新チェッカ ─ version.txt を polling し、APP_VERSION と違えばバナー表示
+let _updateBannerShown = false;
+async function checkForUpdate() {
+  try {
+    const res = await fetch('./version.txt?t=' + Date.now(), { cache: 'no-store' });
+    if (!res.ok) return;
+    const remote = (await res.text()).trim();
+    if (!remote || remote === APP_VERSION) return;
+    if (_updateBannerShown) return;
+    _updateBannerShown = true;
+    showUpdateBanner(remote);
+  } catch(_) { /* ネット断・404 は無視 */ }
+}
+function showUpdateBanner(newVer) {
+  const bar = document.createElement('div');
+  bar.id = 'update-banner';
+  bar.setAttribute('role', 'alert');
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:1000;background:linear-gradient(135deg,#1d5f56,#0f4842);color:#fff;padding:10px 20px;display:flex;align-items:center;gap:14px;box-shadow:0 2px 10px rgba(0,0,0,.25);font-family:inherit;font-size:13px;animation:slideDown 0.3s ease-out';
+  bar.innerHTML = `
+    <span style="flex:1">
+      🎉 <strong>新しいバージョン ${esc(newVer)}</strong> があります (現在: ${esc(APP_VERSION)})
+      <span style="opacity:.85;margin-left:6px;font-size:11px">・更新すると最新機能が使えます</span>
+    </span>
+    <button id="update-now-btn" style="padding:6px 16px;background:#fff;color:#0f4842;border:none;border-radius:5px;font-weight:700;font-size:12px;cursor:pointer;font-family:inherit">🔄 更新する</button>
+    <button id="update-later-btn" style="padding:6px 12px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,.5);border-radius:5px;font-size:11px;cursor:pointer;font-family:inherit">後で</button>
+  `;
+  document.body.appendChild(bar);
+  // アニメーション CSS
+  if (!document.getElementById('update-banner-style')) {
+    const style = document.createElement('style');
+    style.id = 'update-banner-style';
+    style.textContent = '@keyframes slideDown { from { transform: translateY(-100%); } to { transform: translateY(0); } }';
+    document.head.appendChild(style);
+  }
+  document.getElementById('update-now-btn').addEventListener('click', () => {
+    // キャッシュを回避しつつリロード
+    location.reload();
+  });
+  document.getElementById('update-later-btn').addEventListener('click', () => {
+    bar.style.transition = 'transform 0.2s'; bar.style.transform = 'translateY(-100%)';
+    setTimeout(() => bar.remove(), 200);
+  });
+}
+// 初回チェック (5 秒後) + 5 分ごと + タブ復帰時
+setTimeout(checkForUpdate, 5000);
+setInterval(checkForUpdate, 5 * 60 * 1000);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForUpdate();
 });
 
 // Start

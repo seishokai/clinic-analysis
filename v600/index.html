@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aladdin v606 — 清翔会</title>
+<title>Aladdin v608 — 清翔会</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🧾%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="app.css?v=13">
+<link rel="stylesheet" href="app.css?v=15">
 </head>
 <body>
   <div id="app">
@@ -17,7 +17,7 @@
   <template id="tpl-login">
     <div class="login-wrap">
       <div class="login-card">
-        <h1 class="login-title">Aladdin <span class="v-badge">v606</span></h1>
+        <h1 class="login-title">Aladdin <span class="v-badge">v608</span></h1>
         <p class="login-sub">Supabase 単一データ源版 — 入力したものは絶対に消えない</p>
         <div class="field">
           <label>メールアドレス</label>
@@ -42,7 +42,7 @@
       <div class="hdr-brand">
         <span class="hdr-logo">🧾</span>
         <span class="hdr-title">Aladdin</span>
-        <span class="v-badge">v606</span>
+        <span class="v-badge">v608</span>
       </div>
       <nav class="hdr-nav">
         <button class="nav-btn active" data-view="visits">🏥 来院</button>
@@ -91,7 +91,11 @@
           <select id="v-status" class="tb-select">
             <option value="">ステータス:全て</option>
           </select>
+          <!-- v608: 今月/先月 のクイックボタン -->
+          <button type="button" class="quick-period-btn" data-period="thisMonth">今月</button>
+          <button type="button" class="quick-period-btn" data-period="lastMonth">先月</button>
           <select id="v-period" class="tb-select">
+            <option value="all" selected>期間:すべて</option>
             <option value="thisMonth">今月</option>
             <option value="lastMonth">先月</option>
             <option value="30">直近 30 日</option>
@@ -99,7 +103,6 @@
             <option value="365">直近 1 年</option>
             <option value="month">月指定 →</option>
             <option value="range">期間指定 →</option>
-            <option value="all" selected>すべて</option>
           </select>
           <input type="month" id="v-month" class="tb-select" hidden>
           <span id="v-range-wrap" hidden style="display:inline-flex;align-items:center;gap:4px">
@@ -237,6 +240,6 @@
     </div>
   </template>
 
-  <script src="app.js?v=13"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>
