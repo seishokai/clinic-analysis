@@ -242,6 +242,18 @@ body {
   color: var(--accent-ink);
   font-weight: 600;
 }
+/* v600 fix #8: 外部リンク (Google Sheets) 用のナビリンク */
+.nav-btn.nav-ext {
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+.nav-btn.nav-ext:hover { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
+.nav-btn.nav-ext .ext-arrow { font-size: 10px; color: var(--ink-mute); }
+.nav-btn.nav-ext:hover .ext-arrow { color: var(--accent-ink); }
 .hdr-right {
   margin-left: auto;
   display: flex;
@@ -644,6 +656,98 @@ main {
   from { transform: translateX(20px); opacity: 0; }
   to   { transform: translateX(0);    opacity: 1; }
 }
+
+/* ------- Slots view ------- */
+.slots-view { padding-bottom: 40px; }
+.slots-header {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.slots-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+.slots-source {
+  margin: 24px 0 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.slots-source h3 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin: 0;
+}
+.slots-source .badge-ok {
+  padding: 3px 10px;
+  background: var(--ok-soft);
+  color: var(--ok);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.slots-source .badge-none {
+  padding: 3px 10px;
+  background: var(--warn-soft);
+  color: var(--warn);
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+.slots-source .meta {
+  font-size: 11px;
+  color: var(--ink-mute);
+  font-family: var(--font-mono);
+  margin-left: auto;
+}
+.slots-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+.slot-card {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.slot-card.has-slots { border-color: var(--ok); background: var(--ok-soft); }
+.slot-card.empty { opacity: 0.6; }
+.slot-clinic {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.slot-mark { font-size: 10px; }
+.slot-mark.ok { color: var(--ok); font-weight: 700; }
+.slot-mark.none { color: var(--warn); font-weight: 700; }
+.slot-count {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  font-family: var(--font-mono);
+}
+.slot-count .num {
+  font-size: 26px;
+  font-weight: 700;
+  color: var(--ink);
+}
+.slot-count .unit { font-size: 11px; color: var(--ink-soft); }
+.slot-count .days { margin-left: 6px; font-size: 11px; color: var(--ink-soft); }
+.slot-meta { font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); }
 
 /* ------- Responsive ------- */
 @media (max-width: 720px) {

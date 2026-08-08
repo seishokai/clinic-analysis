@@ -43,10 +43,29 @@ const FACILITIES = [
   '茶屋', 'アサノ', '知立', '小牧', '八事', '岩田', '大森', '京都', '訪問',
 ];
 
+// v600 fix #8: 予約枠 JSON の格納先 (github.io からの相対パス)
+const SLOT_JSON = {
+  shareconnect: '../data/reservation-status.json',
+  apotool:      '../data/apotool-status.json',
+};
+
+// v601 fix: 予約一覧 (read-only) の Google Sheets ソース (v521 の loadBookings と同じ URL)
+const BK_SHEET_ID = '10misKpAtMitwIagGDUoMvQS7U9pfEQ0ODxG8A7DLzaQ';
+const BK_SHEETS = [
+  { label: '元データ', encoded: '%E5%85%83%E3%83%87%E3%83%BC%E3%82%BF', tool: 'DXHUB' },
+  { label: '銀座セレクトタイプ', encoded: '%E9%8A%80%E5%BA%A7%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', tool: 'セレクト', facility: 'BF銀座' },
+  { label: 'ウィズセレクトタイプ', encoded: '%E3%82%A6%E3%82%A3%E3%82%BA%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', tool: 'セレクト', facility: 'ウィズ' },
+  { label: '京都セレクトタイプ', encoded: '%E4%BA%AC%E9%83%BD%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', tool: 'セレクト', facility: '京都' },
+  { label: 'ルミナスセレクトタイプ', encoded: '%E3%83%AB%E3%83%9F%E3%83%8A%E3%82%B9%E3%82%BB%E3%83%AC%E3%82%AF%E3%83%88%E3%82%BF%E3%82%A4%E3%83%97', tool: 'セレクト', facility: 'ルミナス' },
+];
+
 // ==================== State ====================
 const state = {
   user: null,           // Supabase user
   view: 'visits',
+  slots: null,          // { shareconnect, apotool } fetched JSONs
+  bookings: null,       // 予約一覧 (Sheets 読取) の生データ
+  bookingFilters: { search: '', facility: '', tool: '' },
   visits: [],           // v_visits_with_patient rows
   patients: [],         // patients rows
   loading: false,
@@ -71,6 +90,9 @@ const esc = (s) => String(s == null ? '' : s)
   .replace(/[&<>"']/g, c => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c]));
 
 // v521 の getTreatmentCategory を移植: service 文字列 → 治療カテゴリ短縮
+// v601 fix: 「削らないラミネートベニア」→ ラブリエ (0.04mmジルコニアラミネート) に修正。
+//   従来は s.includes('ラミネート') → BF となっていて全部 BF 表示だった。
+//   BF = ブラックフィルム、ラブリエ = 削らないラミネートベニア (別商材)。
 function getTreatment(service, contractService) {
   const s = String(service || '').toLowerCase();
   const cs = String(contractService || '');
@@ -80,11 +102,12 @@ function getTreatment(service, contractService) {
   }
   if (cs.includes('ﾗﾌﾞﾘｴ') || cs.includes('ラブリエ')) return 'ラブリエ';
   if (cs.includes('ｲﾝﾌﾟﾗﾝﾄ') || cs.includes('インプラント')) return 'インプラント';
-  if (s.includes('bf') || s.includes('ブラック')) return 'BF';
-  if (s.includes('ラミネート')) return 'BF';
-  if (s.includes('矯正')) return '矯正';
+  // v601: BF は「ブラック」または「BF」を含む場合のみ (ラミネート は含まない)
+  if (s.includes('ブラック') || s.includes('bf')) return 'BF';
+  // 「削らない」「ラミネート」「ラブリエ」いずれか含めばラブリエ
+  if (s.includes('ラブリエ') || s.includes('ラミネート') || s.includes('削らない')) return 'ラブリエ';
   if (s.includes('インプラント')) return 'インプラント';
-  if (s.includes('ラブリエ')) return 'ラブリエ';
+  if (s.includes('矯正')) return '矯正';
   return 'その他';
 }
 
@@ -353,7 +376,9 @@ function render() {
   // View
   const main = $('#main');
   if (state.view === 'visits') renderVisitsView(main);
+  else if (state.view === 'bookings') renderBookingsView(main);
   else if (state.view === 'patients') renderPatientsView(main);
+  else if (state.view === 'slots') renderSlotsView(main);
 }
 
 function renderLogin(app) {
@@ -680,6 +705,205 @@ function openMemoModal(v) {
       saveBtn.disabled = false; saveBtn.textContent = '保存';
     }
   });
+}
+
+// v601: 予約一覧 — Sheets を直接 fetch して read-only 表示
+function _parseBkCsvLine(line) {
+  const r = []; let cur = ''; let q = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') q = !q;
+    else if (c === ',' && !q) { r.push(cur.trim()); cur = ''; }
+    else cur += c;
+  }
+  r.push(cur.trim());
+  return r;
+}
+async function fetchBkSheet(spec) {
+  const url = `https://docs.google.com/spreadsheets/d/${BK_SHEET_ID}/gviz/tq?tqx=out:csv&sheet=${spec.encoded}`;
+  const res = await fetch(url + '&_=' + Date.now());
+  if (!res.ok) throw new Error(spec.label + ': ' + res.status);
+  const csv = await res.text();
+  const lines = csv.split('\n');
+  const rows = [];
+  for (let i = 1; i < lines.length; i++) {
+    const c = _parseBkCsvLine(lines[i]);
+    if (!c[2]) continue;
+    if (spec.tool === 'DXHUB') {
+      rows.push({
+        applyDate: c[0] || '', bookDate: c[1] || '', name: c[2] || '',
+        service: c[3] || '', facility: c[4] || '', email: c[5] || '',
+        phone: (c[6] || '').replace(/[-\s]/g,''), source: c[7] || '',
+        tool: 'DXHUB', sheet: spec.label,
+      });
+    } else {
+      rows.push({
+        applyDate: c[0] || '', bookDate: c[1] || '', name: c[2] || '',
+        service: '矯正無料相談', facility: spec.facility, email: c[4] || '',
+        phone: (c[3] || '').replace(/[-\s]/g,''), source: 'セレクトタイプ',
+        tool: 'セレクト', sheet: spec.label,
+      });
+    }
+  }
+  return rows;
+}
+async function fetchBookings() {
+  try {
+    const results = await Promise.all(BK_SHEETS.map(fetchBkSheet));
+    const all = results.flat();
+    // v600 fix: 来院管理と同じソート = book_date DESC
+    all.sort((a, b) => {
+      const ad = a.bookDate || a.applyDate || '';
+      const bd = b.bookDate || b.applyDate || '';
+      return bd.localeCompare(ad);
+    });
+    state.bookings = { rows: all, fetchedAt: new Date().toISOString() };
+  } catch(e) {
+    console.error('fetchBookings', e);
+    toast('スプレッドシート取得失敗: ' + e.message, 'err', 5000);
+    state.bookings = { rows: [], fetchedAt: null, error: e.message };
+  }
+}
+
+function renderBookingsView(main) {
+  if (!main.querySelector('.bookings-view')) {
+    main.innerHTML = '';
+    main.appendChild($('#tpl-bookings').content.cloneNode(true));
+    $('#b-facility').innerHTML = '<option value="">医院:全て</option>' +
+      FACILITIES.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+    $('#b-search').addEventListener('input', e => { state.bookingFilters.search = e.target.value; renderBookingsTable(); });
+    $('#b-facility').addEventListener('change', e => { state.bookingFilters.facility = e.target.value; renderBookingsTable(); });
+    $('#b-tool').addEventListener('change', e => { state.bookingFilters.tool = e.target.value; renderBookingsTable(); });
+    $('#b-refresh').addEventListener('click', async () => {
+      $('#b-tbody').innerHTML = '<tr><td colspan="8" class="empty-msg">読み込み中…</td></tr>';
+      await fetchBookings();
+      renderBookingsTable();
+    });
+  }
+  if (!state.bookings) {
+    $('#b-tbody').innerHTML = '<tr><td colspan="8" class="empty-msg">読み込み中…</td></tr>';
+    fetchBookings().then(renderBookingsTable);
+  } else {
+    renderBookingsTable();
+  }
+}
+
+function renderBookingsTable() {
+  const st = state.bookings || { rows: [] };
+  const f = state.bookingFilters;
+  const q = f.search.trim().toLowerCase();
+  const rows = (st.rows || []).filter(r => {
+    if (f.facility && normFac(r.facility) !== f.facility) return false;
+    if (f.tool && r.tool !== f.tool) return false;
+    if (q && !(r.name || '').toLowerCase().includes(q)) return false;
+    return true;
+  });
+  $('#b-count').innerHTML = `<strong>${rows.length}</strong> / ${(st.rows||[]).length} 件`;
+  $('#b-updated').textContent = st.fetchedAt ? `更新: ${new Date(st.fetchedAt).toLocaleTimeString()}` : '更新: —';
+  const tbody = $('#b-tbody');
+  const empty = $('#b-empty');
+  if (!rows.length) {
+    tbody.innerHTML = '';
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  const shown = rows.slice(0, 500);
+  tbody.innerHTML = shown.map(r => `<tr>
+    <td class="c-book">${esc(r.bookDate ? r.bookDate.substring(5,10).replace('-','/').replace(/^0/,'') : '-')}</td>
+    <td class="c-name">${esc(r.name || '')}</td>
+    <td class="c-facility">${esc(normFac(r.facility) || '-')}</td>
+    <td class="c-promo"><span class="promo-chip ${r.tool==='セレクト'?'select-type':''}" title="${esc(r.source||'')}">${esc(shortPromo(r.source||'') || '-')}</span></td>
+    <td>${esc(r.service || '-')}</td>
+    <td style="font-size:11px;color:var(--ink-mute);font-family:var(--font-mono)">${esc(r.email || '-')}</td>
+    <td style="font-family:var(--font-mono);font-size:11px">${esc(r.phone || '-')}</td>
+    <td class="c-book">${esc(r.applyDate ? r.applyDate.substring(0,10) : '-')}</td>
+  </tr>`).join('');
+  if (rows.length > 500) {
+    tbody.insertAdjacentHTML('beforeend',
+      `<tr><td colspan="8" class="empty-msg">…他 ${rows.length - 500} 件 (フィルタで絞ってください)</td></tr>`);
+  }
+}
+
+async function fetchSlots() {
+  const bust = '?t=' + Date.now();
+  const [sc, apo] = await Promise.all([
+    fetch(SLOT_JSON.shareconnect + bust).then(r => r.ok ? r.json() : null).catch(() => null),
+    fetch(SLOT_JSON.apotool + bust).then(r => r.ok ? r.json() : null).catch(() => null),
+  ]);
+  state.slots = { shareconnect: sc, apotool: apo };
+}
+
+function renderSlotsView(main) {
+  main.innerHTML = '';
+  main.appendChild($('#tpl-slots').content.cloneNode(true));
+  $('#slots-refresh').addEventListener('click', async () => {
+    $('#slots-body').innerHTML = '<div class="loader" style="min-height:120px"><div class="spinner"></div></div>';
+    await fetchSlots();
+    renderSlotsBody();
+  });
+  if (!state.slots) {
+    fetchSlots().then(renderSlotsBody);
+  } else {
+    renderSlotsBody();
+  }
+}
+
+function renderSlotsBody() {
+  const body = $('#slots-body');
+  if (!body) return;
+  const { shareconnect, apotool } = state.slots || {};
+  const parts = [];
+  if (shareconnect) parts.push(renderSlotSource('shareconnect', shareconnect));
+  if (apotool)      parts.push(renderSlotSource('apotool',      apotool));
+  if (!parts.length) {
+    body.innerHTML = '<div class="empty-msg">予約枠データが取得できませんでした (data/reservation-status.json / apotool-status.json を確認)</div>';
+    return;
+  }
+  body.innerHTML = parts.join('');
+  // Update 最終確認 (from shareconnect, fallback apotool)
+  const latest = (shareconnect?.lastUpdated) || (apotool?.lastUpdated) || '';
+  $('#slots-updated').textContent = latest ? `最終確認: ${new Date(latest).toLocaleString('ja-JP')}` : '最終確認: —';
+}
+
+function renderSlotSource(label, json) {
+  if (!json) return '';
+  const clinics = json.clinics || [];
+  const totalOpen = clinics.filter(c => c.available).length;
+  const allOpenBadge = totalOpen > 0
+    ? `<span class="badge-ok">✓ ${totalOpen}/${clinics.length} 医院 枠あり</span>`
+    : `<span class="badge-none">✗ 全医院 枠なし</span>`;
+  const rangeText = json.checkRangeFrom && json.checkRangeTo
+    ? `${json.checkRangeFrom} 〜 ${json.checkRangeTo}` : '';
+  const title = label === 'shareconnect'
+    ? '📆 shareconnect (矯正相談)' : '🅰️ Apotool (矯正相談)';
+  const cards = clinics.map(c => renderSlotCard(c)).join('');
+  return `<section class="slot-section">
+    <div class="slots-source">
+      <h3>${esc(title)}</h3>
+      ${allOpenBadge}
+      <span class="meta">${esc(rangeText)}</span>
+    </div>
+    <div class="slots-grid">${cards}</div>
+  </section>`;
+}
+
+function renderSlotCard(c) {
+  const cls = c.available ? 'has-slots' : 'empty';
+  const mark = c.available
+    ? '<span class="slot-mark ok">✓ 枠あり</span>'
+    : '<span class="slot-mark none">✗ 枠なし</span>';
+  const meta = c.earliestDate && c.latestDate
+    ? `最早: ${c.earliestDate.substring(5)} / 最終: ${c.latestDate.substring(5)}`
+    : (c.latestDate ? `最終: ${c.latestDate.substring(5)}` : '-');
+  return `<div class="slot-card ${cls}">
+    <div class="slot-clinic"><span>${esc(c.name)}</span>${mark}</div>
+    <div class="slot-count">
+      <span class="num">${c.totalSlots ?? 0}</span><span class="unit">枠</span>
+      <span class="days">/ ${c.availableDays ?? 0} 日分</span>
+    </div>
+    <div class="slot-meta">${esc(meta)}</div>
+  </div>`;
 }
 
 function renderPatientsView(main) {
