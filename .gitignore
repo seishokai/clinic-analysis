@@ -17,3 +17,4 @@ Thumbs.db
 # Local env (本番secrets は GitHub Secrets で管理)
 .env
 .env.local
+.dry-run-report.json
