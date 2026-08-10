@@ -814,6 +814,9 @@ main {
   white-space: nowrap;
 }
 
+/* v627: 絞込ボタンはモバイル専用 (デスクトップでは常時フィルタ表示なので隠す) */
+.tb-filter-toggle { display: none; }
+
 /* ------- v614: アクティビティビュー ------- */
 .activity-summary {
   padding: 10px 12px;
@@ -897,6 +900,7 @@ main {
   .tb-row-filters { display: none; }
   body.filters-open .tb-row-filters { display: flex; margin-top: 8px; }
   .tb-filter-toggle {
+    display: inline-block;   /* v627: モバイルでは表示 (デスクトップ用 display:none を上書き) */
     flex: 0 0 auto;
     padding: 8px 10px;
     font-size: 12px;
