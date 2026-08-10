@@ -938,9 +938,11 @@ main {
  *   - フィルタ群はデフォ折りたたみ → 検索と一覧に集中
  * ============================================================ */
 @media (max-width: 720px) {
-  /* v618: フィルタ折りたたみ */
+  /* v618: フィルタ折りたたみ (来院/予約タブ用) */
   .tb-row-filters { display: none; }
   body.filters-open .tb-row-filters { display: flex; margin-top: 8px; }
+  /* v731: 分析タブは絞込トグル無し → 常に表示 (医院/治療 select が押せない問題 fix) */
+  .analytics-view .tb-row-filters { display: flex !important; margin-top: 0; }
   .tb-filter-toggle {
     display: inline-block;   /* v627: モバイルでは表示 (デスクトップ用 display:none を上書き) */
     flex: 0 0 auto;
