@@ -1074,7 +1074,8 @@ main {
   }
   .visits-view .v-table tbody td.c-memo {
     order: 62;
-    flex: 1 1 auto;              /* 残り幅 全部 memo に */
+    /* v624: flex-basis を 0 に (auto だと長文memo の content 幅で折り返しが起きる) */
+    flex: 1 1 0;
     min-width: 0;
     overflow: hidden;
   }
@@ -1123,21 +1124,31 @@ main {
     box-sizing: border-box;
   }
 
-  /* memo: ボタン風 */
+  /* v624: memo は 1 行厳密 (nowrap+ellipsis)。カード高さを 92px に固定
+     長文はタップでモーダルを開いて全文表示 (既存の click delegation) */
   .visits-view .v-table tbody td .memo-cell {
     width: 100%;
-    min-height: 34px;
+    height: 34px;
+    max-height: 34px;
     font-size: 12px;
     font-weight: 500;
-    padding: 7px 8px;
-    -webkit-line-clamp: 1;
-    line-clamp: 1;
+    padding: 7px 10px;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
     background: #ffffff;
     color: #35443e;
     border: 1px dashed #bdc7c2;
     border-radius: 8px;
     text-align: left;
     box-sizing: border-box;
+    cursor: pointer;
+  }
+  /* has-value に「👀 全部見る」ヒント色を付与 (タップ可視化) */
+  .visits-view .v-table tbody td .memo-cell.has-value::after {
+    content: '';
   }
   .visits-view .v-table tbody td .memo-cell.has-value {
     background: #eef6f2;
