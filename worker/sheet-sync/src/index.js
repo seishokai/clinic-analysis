@@ -1,22 +1,26 @@
 /* ============================================================
- * sheet-sync Worker v800
+ * sheet-sync Worker v900
  *   Cron: なし (Aladdin ブラウザから 10 分毎 fetch)
  *   HTTP: /status, /sync (手動、要 token), /debug
  *
- * v800 の設計変更 (旧: INSERT ONLY → 新: UPDATE-or-INSERT):
+ * v900 の設計:
  *
- *   シート行 = 「実際に来院した人」の証跡。それを Aladdin に反映:
+ *   Phase A: 予約管理シート (BOOKING_SHEET) → patient_visits INSERT
+ *      - 5 タブ (元データ + 4 セレクト) を fetch
+ *      - source_tool='DXHUB' or 'セレクト' で INSERT
+ *      - status='未対応' (来院待ち)
+ *      - sync_source='booking:<tab>:row=<N>' で dedup
  *
- *   1. 予約ツール経由 (source_tool=DXHUB/セレクト) の予約行が存在:
- *      - 未編集 → 「検討中」に UPDATE (来院したことを反映)
- *      - 編集済み → 何もしない (安井さん等の作業を守る)
- *   2. 予約ツール経由の行が無い (直予約 walk-in):
- *      - 「検討中」で新規 INSERT (保険 含めば「治療中」)
- *      - service に来院理由を格納
+ *   Phase B: 初診管理シート (SHEET) → 来院確認 & 直予約追加
+ *      - 予約行あり (Phase A で入ったもの or migrate:v600)
+ *        + 未編集 → 「検討中」に UPDATE
+ *      - 予約行なし → 「検討中」で INSERT (直予約 walk-in)
+ *      - 保険初診 → 「治療中」
+ *      - 触った行 (実ユーザ email) → SKIP
  *
- * subrequest 見積 (Free 50 制限):
- *   12 (CSV) + 15 (patient SELECT/INSERT batches) + 1 (visits SELECT)
- *   + 15 (UPDATE/INSERT batches) + 1 (sync_log) = ~44
+ * subrequest budget (Free 50):
+ *   5 (booking CSV) + 12 (initial CSV) + 10 (patients) +
+ *   1 (visits SELECT) + 15 (INSERT/UPDATE batches) + 1 (sync_log) ≈ 44
  * ============================================================ */
 
 import CONFIG from '../config/sheet-tabs.js';
@@ -24,7 +28,6 @@ import CONFIG from '../config/sheet-tabs.js';
 // ==================== Utils ====================
 const normName = (n) => (n == null ? '' : String(n).replace(/[\s　]+/g, '').toLowerCase());
 
-// 医院名の正規化 (フル名 → 短縮名)。Aladdin app.js の normFac と揃える
 function normFac(f) {
   if (!f) return '';
   const s = String(f);
@@ -48,6 +51,7 @@ function normFac(f) {
   return s;
 }
 
+// M/D or YYYY/M/D → ISO date. M/D は当年度、未来日は前年扱い
 function toIsoDate(s, fallbackYear) {
   if (!s) return null;
   const t = String(s).trim();
@@ -55,11 +59,7 @@ function toIsoDate(s, fallbackYear) {
   let m = t.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
   if (m) return `${m[1]}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
   m = t.match(/^(\d{2})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
-  if (m) {
-    const yr = 2000 + Number(m[1]);
-    return `${yr}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
-  }
-  // v800: M/D 形式は現在日以降なら「去年」と解釈 (2026-12-28 のような未来日 → 2025-12-28)
+  if (m) return `${2000 + Number(m[1])}-${String(m[2]).padStart(2, '0')}-${String(m[3]).padStart(2, '0')}`;
   m = t.match(/^(\d{1,2})[\/\-](\d{1,2})$/);
   if (m) {
     const now = new Date();
@@ -71,7 +71,27 @@ function toIsoDate(s, fallbackYear) {
   return null;
 }
 
-// sync_source → 決定的 hash (0..86399 秒)。apply_at のユニーク化用
+// v900: 「2026年8月10日(土) 14時30分」 形式の日本語日時 → ISO date & ISO datetime
+function parseJpDateTime(s) {
+  if (!s) return { date: null, at: null };
+  const t = String(s).trim();
+  if (!t) return { date: null, at: null };
+  const m = t.match(/(\d{4})年(\d{1,2})月(\d{1,2})日(?:\([^)]*\))?\s*(\d{1,2})?時?(\d{1,2})?/);
+  if (m) {
+    const y = m[1], mo = String(m[2]).padStart(2, '0'), d = String(m[3]).padStart(2, '0');
+    const hh = String(m[4] || 0).padStart(2, '0'), mi = String(m[5] || 0).padStart(2, '0');
+    return { date: `${y}-${mo}-${d}`, at: `${y}-${mo}-${d}T${hh}:${mi}:00+09:00` };
+  }
+  // Fallback: 2026/8/16 9:30 形式
+  const m2 = t.match(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})\s*(\d{1,2})?:?(\d{1,2})?/);
+  if (m2) {
+    const y = m2[1], mo = String(m2[2]).padStart(2, '0'), d = String(m2[3]).padStart(2, '0');
+    const hh = String(m2[4] || 0).padStart(2, '0'), mi = String(m2[5] || 0).padStart(2, '0');
+    return { date: `${y}-${mo}-${d}`, at: `${y}-${mo}-${d}T${hh}:${mi}:00+09:00` };
+  }
+  return { date: null, at: null };
+}
+
 function hashSec(s) {
   let h = 0;
   const str = String(s || '');
@@ -79,7 +99,6 @@ function hashSec(s) {
   return Math.abs(h) % 86400;
 }
 
-// CSV parser (quoted, embedded \n 対応)
 function parseCsv(text) {
   const rows = [];
   let row = [], cell = '', inQuote = false;
@@ -122,7 +141,72 @@ function detectColumns(headers, aliases) {
   return cols;
 }
 
-async function extractCandidates(sheetId, tab, aliases, cutoffIso) {
+function sbHeaders(env, extra = {}) {
+  return {
+    'apikey': env.SUPABASE_SERVICE_KEY,
+    'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
+    ...extra,
+  };
+}
+
+function isTouched(visit) {
+  if (visit.status && visit.status !== '未対応') return true;
+  if (visit.memo != null && String(visit.memo).length > 0) return true;
+  if (visit.contract_amount != null && Number(visit.contract_amount) > 0) return true;
+  if (visit.next_visit_date != null) return true;
+  const u = visit.updated_by;
+  if (u && String(u).includes('@')) return true;   // email 形式のみ実ユーザ
+  return false;
+}
+
+function statusFromReason(reason) {
+  if (!reason) return '検討中';
+  return String(reason).includes('保険初診') ? '治療中' : '検討中';
+}
+
+// ==================== 予約管理シート extractor (v900) ====================
+async function extractBookingCandidates(sheetId, tab, cutoffIso) {
+  const csv = await fetchTabCsv(sheetId, tab.name);
+  const rows = parseCsv(csv);
+  const startRow = tab.has_header ? 1 : 0;
+  if (rows.length < startRow + 1) return [];
+  const cols = tab.cols;
+  const out = [];
+  for (let i = startRow; i < rows.length; i++) {
+    const r = rows[i];
+    const rawBookAt = r[cols.book_at];
+    const rawName = r[cols.name];
+    if (!rawBookAt || !rawName) continue;
+    const { date: bookDate, at: bookAt } = parseJpDateTime(rawBookAt);
+    if (!bookDate || bookDate < cutoffIso) continue;
+    const nn = normName(rawName);
+    if (!nn) continue;
+    // Facility 決定 — DXHUB は col 4 から動的、セレクトはタブ設定固定
+    const facility = tab.facility || (cols.facility != null ? normFac(r[cols.facility]) : null);
+    if (!facility) continue;
+    const phone = cols.phone != null ? String(r[cols.phone] || '').replace(/\D/g, '') : '';
+    out.push({
+      tab: tab.name,
+      row: i + 1,
+      tool: tab.tool,               // 'DXHUB' or 'セレクト'
+      facility,
+      book_date: bookDate,
+      book_at: bookAt,
+      patient_name: String(rawName).trim(),
+      normalized_name: nn,
+      phone: phone || null,
+      phone_last4: phone ? phone.slice(-4) : null,
+      email: cols.email != null ? String(r[cols.email] || '').trim() || null : null,
+      service: cols.service != null ? String(r[cols.service] || '').trim() || null : null,
+      promo_code: cols.promo_code != null ? String(r[cols.promo_code] || '').trim() || null : null,
+      sync_source: `booking:${tab.name}:row=${i + 1}`,
+    });
+  }
+  return out;
+}
+
+// ==================== 初診管理シート extractor (v802 と同じ) ====================
+async function extractInitialCandidates(sheetId, tab, aliases, cutoffIso) {
   const csv = await fetchTabCsv(sheetId, tab.name);
   const rows = parseCsv(csv);
   if (rows.length < 2) return [];
@@ -145,7 +229,7 @@ async function extractCandidates(sheetId, tab, aliases, cutoffIso) {
     out.push({
       tab: tab.name,
       row: i + 1,
-      facility: tab.facility,     // 短縮名 (BF銀座, ウィズ 等)
+      facility: tab.facility,
       book_date: iso,
       patient_name: String(rawName).trim(),
       normalized_name: nn,
@@ -159,80 +243,61 @@ async function extractCandidates(sheetId, tab, aliases, cutoffIso) {
   return out;
 }
 
-function sbHeaders(env, extra = {}) {
-  return {
-    'apikey': env.SUPABASE_SERVICE_KEY,
-    'Authorization': `Bearer ${env.SUPABASE_SERVICE_KEY}`,
-    ...extra,
-  };
-}
-
-// v802: 「触った」判定 — updated_by は email 形式 (@ 含む) のみ実ユーザ扱い
-//   sheet-direct / sheet-came / system-sync / migrate:v600 等の bot marker は非ユーザ
-function isTouched(visit) {
-  if (visit.status && visit.status !== '未対応') return true;
-  if (visit.memo != null && String(visit.memo).length > 0) return true;
-  if (visit.contract_amount != null && Number(visit.contract_amount) > 0) return true;
-  if (visit.next_visit_date != null) return true;
-  // updated_by に '@' 含む = メールアドレス形式 = 実ユーザ (touched)
-  //   例: adachi@aladdin.local, tkm.koike@gmail.com, seishokai.koukoku@gmail.com
-  //   除外: migrate:v600, system-sync, sheet-direct, sheet-came, unknown, NULL
-  const u = visit.updated_by;
-  if (u && String(u).includes('@')) return true;
-  return false;
-}
-
-// v801: 保険判定 (来院理由が 「保険初診」 の場合のみ 治療中、それ以外は 検討中)
-//   ユーザ確認: 「保険初診」→ 治療中、「保険+ORT相談」等の相談系は 検討中
-function statusFromReason(reason) {
-  if (!reason) return '検討中';
-  const s = String(reason).trim();
-  // 「保険初診」を含む (「保険初診相談」等の variant にも対応)、ただし単なる「保険」や
-  // 「保険+ORT相談」は「初診」の文字がないので検討中扱い
-  if (s.includes('保険初診')) return '治療中';
-  return '検討中';
-}
-
-// ==================== Main sync (v800) ====================
+// ==================== Main sync (v900) ====================
 async function runSync(env, triggerName) {
   const startMs = Date.now();
   const cutoffIso = env.CUTOFF_DATE || CONFIG.cutoff_date;
   const aliases = CONFIG.header_aliases;
 
-  // ---- Phase 1: 12 タブ CSV 取得 & candidates 抽出 (12 subrequests) ----
-  const perTab = [];
-  const allCandidates = [];
-  for (const tab of CONFIG.tabs) {
+  // ---- Phase 1: 予約管理シート candidates 抽出 ----
+  const bookingCandidates = [];
+  const bookingPerTab = [];
+  for (const tab of CONFIG.booking_tabs || []) {
     try {
-      const cands = await extractCandidates(env.SHEET_ID, tab, aliases, cutoffIso);
-      perTab.push({ name: tab.name, read: cands.length });
-      allCandidates.push(...cands);
+      const cands = await extractBookingCandidates(CONFIG.booking_sheet_id, tab, cutoffIso);
+      bookingPerTab.push({ name: tab.name, read: cands.length });
+      bookingCandidates.push(...cands);
     } catch (e) {
-      perTab.push({ name: tab.name, read: 0, error: 1, note: String(e.message || e) });
+      bookingPerTab.push({ name: tab.name, read: 0, error: 1, note: String(e.message || e) });
     }
   }
-  if (allCandidates.length === 0) {
-    return await finalize(env, triggerName, startMs, perTab, 0, 0, 0, 0, 0);
+
+  // ---- Phase 2: 初診管理シート candidates 抽出 ----
+  const initialCandidates = [];
+  const initialPerTab = [];
+  for (const tab of CONFIG.tabs) {
+    try {
+      const cands = await extractInitialCandidates(CONFIG.sheet_id, tab, aliases, cutoffIso);
+      initialPerTab.push({ name: tab.name, read: cands.length });
+      initialCandidates.push(...cands);
+    } catch (e) {
+      initialPerTab.push({ name: tab.name, read: 0, error: 1, note: String(e.message || e) });
+    }
   }
 
-  // ---- Phase 2: 既存 patients を chunk SELECT ----
+  const allCandidates = [...bookingCandidates, ...initialCandidates];
+  if (allCandidates.length === 0) {
+    return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, 0);
+  }
+
+  // ---- Phase 3: patients SELECT (chunked) ----
   const uniqueNames = Array.from(new Set(allCandidates.map(c => c.normalized_name)));
   const CHUNK = 200;
   const patientMap = new Map();
   for (let i = 0; i < uniqueNames.length; i += CHUNK) {
     const chunk = uniqueNames.slice(i, i + CHUNK);
     const inList = chunk.map(n => `"${n.replace(/"/g, '\\"')}"`).join(',');
-    const selUrl = `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=in.(${encodeURIComponent(inList)})&select=id,normalized_name,phone_last4`;
+    const selUrl = `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=in.(${encodeURIComponent(inList)})&select=id,normalized_name`;
     const selRes = await fetch(selUrl, { headers: sbHeaders(env) });
     if (!selRes.ok) {
-      return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, 0, 0, allCandidates.length,
+      return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, allCandidates.length,
         `patients SELECT chunk ${i} failed: ${selRes.status} ${await selRes.text()}`);
     }
     const existing = await selRes.json();
     for (const p of existing) if (!patientMap.has(p.normalized_name)) patientMap.set(p.normalized_name, p.id);
   }
 
-  // ---- Phase 3: 不足 patients を bulk INSERT ----
+  // ---- Phase 4: 不足 patients を bulk INSERT ----
   const missingByKey = new Map();
   for (const c of allCandidates) {
     if (patientMap.has(c.normalized_name)) continue;
@@ -256,7 +321,7 @@ async function runSync(env, triggerName) {
         body: JSON.stringify(batch),
       });
       if (!insRes.ok) {
-        return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, 0, 0, allCandidates.length,
+        return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, allCandidates.length,
           `patients INSERT batch ${i} failed: ${insRes.status} ${await insRes.text()}`);
       }
       const created = await insRes.json();
@@ -264,17 +329,60 @@ async function runSync(env, triggerName) {
     }
   }
 
-  // ---- Phase 4: cutoff 以降の既存 visits を全 SELECT ----
-  //   マッチング用に (patient_id, normFac(facility), book_date) をキーにする
+  // ---- Phase 5: 予約管理シート → patient_visits INSERT (dedup on sync_source) ----
+  let bookingInserted = 0;
+  const bookingPayload = bookingCandidates
+    .filter(c => patientMap.has(c.normalized_name))
+    .map(c => {
+      const sec = hashSec(c.sync_source);
+      const hh = String(Math.floor(sec / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      const applyAtIso = `${c.book_date}T${hh}:${mm}:${ss}+09:00`;
+      return {
+        patient_id: patientMap.get(c.normalized_name),
+        facility: c.facility,
+        book_date: c.book_date,
+        book_at: c.book_at,
+        apply_date: c.book_date,
+        apply_at: applyAtIso,
+        status: '未対応',
+        service: c.service,
+        source_tool: c.tool,           // 'DXHUB' or 'セレクト'
+        promo_code: c.promo_code,
+        sync_source: c.sync_source,
+        updated_by: 'system-sync',
+        created_by: 'system-sync',
+      };
+    });
+  const BATCH_B = 200;
+  for (let i = 0; i < bookingPayload.length; i += BATCH_B) {
+    const batch = bookingPayload.slice(i, i + BATCH_B);
+    // sync_source unique index (uidx_visits_sync_source) + patient_id,apply_at unique key の両方に対応するため
+    // ignore-duplicates 使用。target は指定しない → PostgREST が best-effort で ON CONFLICT DO NOTHING
+    const iRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patient_visits?on_conflict=sync_source`, {
+      method: 'POST',
+      headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=ignore-duplicates' }),
+      body: JSON.stringify(batch),
+    });
+    if (iRes.ok) {
+      const created = await iRes.json();
+      bookingInserted += Array.isArray(created) ? created.length : 0;
+    } else {
+      console.log('booking INSERT batch failed', iRes.status, await iRes.text());
+    }
+  }
+
+  // ---- Phase 6: 初診管理シート → マッチ + UPDATE/INSERT ----
+  //   Phase 5 が終わってから existing visits を SELECT (新規 booking 行も含む fresh pool)
   const visSelUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool`;
   const visRes = await fetch(visSelUrl, { headers: sbHeaders(env) });
   if (!visRes.ok) {
-    return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, 0, 0, allCandidates.length,
+    return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, bookingInserted, 0, 0, 0, 0, initialCandidates.length,
       `visits SELECT failed: ${visRes.status} ${await visRes.text()}`);
   }
   const existingVisits = await visRes.json();
 
-  // key = patient_id | normFac(facility) | book_date
   const visitsByKey = new Map();
   for (const v of existingVisits) {
     const key = `${v.patient_id}|${normFac(v.facility)}|${v.book_date}`;
@@ -282,41 +390,27 @@ async function runSync(env, triggerName) {
     visitsByKey.get(key).push(v);
   }
 
-  // ---- Phase 5: 各 candidate を分類 (update / skip / insert) ----
-  const toUpdate = [];  // 予約ツール由来の未編集行を検討中に
-  const toInsert = [];  // walk-in (直予約)
+  const toUpdate = [];
+  const toInsert = [];
   let skippedTouched = 0;
-  let skippedAlreadyTagged = 0;  // 既に 検討中/治療中 で shieet 起源
-
-  for (const c of allCandidates) {
+  for (const c of initialCandidates) {
     const patientId = patientMap.get(c.normalized_name);
     if (!patientId) continue;
-
     const key = `${patientId}|${c.facility}|${c.book_date}`;
     const matches = visitsByKey.get(key) || [];
-
     if (matches.length > 0) {
-      // Case A: 予約ツール由来の未編集行を検討中に UPDATE
       const untouched = matches.filter(m => !isTouched(m));
       if (untouched.length > 0) {
-        for (const u of untouched) {
-          toUpdate.push(u.id);
-        }
+        for (const u of untouched) toUpdate.push(u.id);
       } else {
         skippedTouched++;
       }
-      // Case B: 全部 touched なら何もしない (既に人手で処理済み)
     } else {
-      // Case C: 直予約 (walk-in) → 新規 INSERT
-      toInsert.push({
-        candidate: c,
-        patient_id: patientId,
-        status: statusFromReason(c.reason),
-      });
+      toInsert.push({ candidate: c, patient_id: patientId, status: statusFromReason(c.reason) });
     }
   }
 
-  // ---- Phase 6: UPDATE (検討中 + updated_by=sheet-came) ----
+  // ---- Phase 7: UPDATE (予約行 → 検討中) ----
   let updated = 0;
   const BATCH_U = 200;
   for (let i = 0; i < toUpdate.length; i += BATCH_U) {
@@ -332,14 +426,12 @@ async function runSync(env, triggerName) {
       const updatedRows = await patchRes.json();
       updated += Array.isArray(updatedRows) ? updatedRows.length : 0;
     } else {
-      // 部分失敗は許容、ログのみ
       console.log('visits UPDATE batch failed', patchRes.status, await patchRes.text());
     }
   }
 
-  // ---- Phase 7: INSERT (直予約 walk-in) ----
-  let inserted = 0;
-  const BATCH_I = 200;
+  // ---- Phase 8: INSERT (直予約 walk-in) ----
+  let walkinInserted = 0;
   const insPayload = toInsert.map(({ candidate: c, patient_id, status }) => {
     const sec = hashSec(c.sync_source);
     const hh = String(Math.floor(sec / 3600)).padStart(2, '0');
@@ -363,28 +455,32 @@ async function runSync(env, triggerName) {
       created_by: 'sheet-direct',
     };
   });
-  for (let i = 0; i < insPayload.length; i += BATCH_I) {
-    const batch = insPayload.slice(i, i + BATCH_I);
-    const iRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patient_visits?on_conflict=patient_id,apply_at`, {
+  const BATCH_W = 200;
+  for (let i = 0; i < insPayload.length; i += BATCH_W) {
+    const batch = insPayload.slice(i, i + BATCH_W);
+    const iRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patient_visits?on_conflict=sync_source`, {
       method: 'POST',
       headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=ignore-duplicates' }),
       body: JSON.stringify(batch),
     });
     if (iRes.ok) {
       const created = await iRes.json();
-      inserted += Array.isArray(created) ? created.length : 0;
+      walkinInserted += Array.isArray(created) ? created.length : 0;
     } else {
-      console.log('visits INSERT batch failed', iRes.status, await iRes.text());
+      console.log('walk-in INSERT batch failed', iRes.status, await iRes.text());
     }
   }
 
-  return await finalize(env, triggerName, startMs, perTab, allCandidates.length, updated, inserted, skippedTouched);
+  return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab,
+    bookingInserted, updated, walkinInserted, skippedTouched,
+    bookingCandidates.length + initialCandidates.length);
 }
 
-async function finalize(env, trigger, startMs, details, rowsRead, rowsUpdated, rowsInserted, rowsSkipped, rowsError, errorMessage) {
+async function finalize(env, trigger, startMs, bookingPerTab, initialPerTab,
+                        bookingInserted, initialUpdated, walkinInserted, skippedTouched, rowsRead, rowsError, errorMessage) {
   const durationMs = Date.now() - startMs;
-  const tabsRead = details.filter(d => !d.error).length;
-  const errs = rowsError != null ? rowsError : details.filter(d => d.error).length;
+  const errs = rowsError || 0;
+  const tabsRead = (bookingPerTab.filter(d => !d.error).length) + (initialPerTab.filter(d => !d.error).length);
   try {
     await fetch(`${env.SUPABASE_URL}/rest/v1/sync_log`, {
       method: 'POST',
@@ -392,24 +488,29 @@ async function finalize(env, trigger, startMs, details, rowsRead, rowsUpdated, r
       body: JSON.stringify({
         trigger,
         tabs_read: tabsRead,
-        rows_read: rowsRead,
-        rows_inserted: rowsInserted,
-        rows_skipped: (rowsUpdated || 0) + (rowsSkipped || 0),   // 「触ってない」count を skip 相当に
+        rows_read: rowsRead || 0,
+        rows_inserted: (bookingInserted || 0) + (walkinInserted || 0),
+        rows_skipped: (initialUpdated || 0) + (skippedTouched || 0),
         rows_error: errs,
         duration_ms: durationMs,
         error_message: errorMessage,
-        details: { perTab: details, updated: rowsUpdated || 0, inserted_walkin: rowsInserted || 0, skipped_touched: rowsSkipped || 0 },
+        details: {
+          booking: { perTab: bookingPerTab, inserted: bookingInserted || 0 },
+          initial: { perTab: initialPerTab, updated: initialUpdated || 0, walkin: walkinInserted || 0, skipped_touched: skippedTouched || 0 },
+        },
       }),
     });
   } catch (_) {}
   return {
-    tabsRead, rowsRead,
-    rowsUpdated: rowsUpdated || 0,      // 予約ツール行 → 検討中 に更新した数
-    rowsInserted: rowsInserted || 0,    // 直予約 (walk-in) 新規追加
-    rowsSkippedTouched: rowsSkipped || 0, // 人手で編集済のためスキップ
+    tabsRead,
+    rowsRead: rowsRead || 0,
+    bookingInserted: bookingInserted || 0,
+    rowsUpdatedInitial: initialUpdated || 0,
+    walkinInserted: walkinInserted || 0,
+    rowsSkippedTouched: skippedTouched || 0,
     rowsError: errs,
     durationMs, errorMessage,
-    details,
+    details: { booking: bookingPerTab, initial: initialPerTab },
   };
 }
 
@@ -441,26 +542,35 @@ export default {
         return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
       const cutoffIso = env.CUTOFF_DATE || CONFIG.cutoff_date;
-      const aliases = CONFIG.header_aliases;
-      const debug = [];
-      for (const tab of CONFIG.tabs) {
+      const debug = { booking: [], initial: [] };
+      // Booking
+      for (const tab of CONFIG.booking_tabs || []) {
         try {
-          const csv = await fetchTabCsv(env.SHEET_ID, tab.name);
-          const rows = parseCsv(csv);
-          const cols = tab.columns || detectColumns(rows[0], aliases);
-          const cands = await extractCandidates(env.SHEET_ID, tab, aliases, cutoffIso);
-          debug.push({
-            tab: tab.name,
-            header_first15: (rows[0] || []).slice(0, 15),
-            detected_cols: cols,
+          const cands = await extractBookingCandidates(CONFIG.booking_sheet_id, tab, cutoffIso);
+          debug.booking.push({
+            tab: tab.name, tool: tab.tool,
             candidate_count: cands.length,
             first_3: cands.slice(0, 3).map(c => ({
-              name: c.patient_name, book_date: c.book_date,
-              reason: c.reason, source_channel: c.source_channel, facility: c.facility,
+              name: c.patient_name, book_date: c.book_date, facility: c.facility, service: c.service,
             })),
           });
         } catch (e) {
-          debug.push({ tab: tab.name, error: String(e.message || e) });
+          debug.booking.push({ tab: tab.name, error: String(e.message || e) });
+        }
+      }
+      // Initial
+      for (const tab of CONFIG.tabs) {
+        try {
+          const cands = await extractInitialCandidates(CONFIG.sheet_id, tab, CONFIG.header_aliases, cutoffIso);
+          debug.initial.push({
+            tab: tab.name,
+            candidate_count: cands.length,
+            first_3: cands.slice(0, 3).map(c => ({
+              name: c.patient_name, book_date: c.book_date, reason: c.reason, facility: c.facility,
+            })),
+          });
+        } catch (e) {
+          debug.initial.push({ tab: tab.name, error: String(e.message || e) });
         }
       }
       return new Response(JSON.stringify(debug, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
@@ -470,12 +580,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v800',
+        service: 'sheet-sync v900',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v800\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v900\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
