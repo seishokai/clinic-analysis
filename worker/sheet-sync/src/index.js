@@ -332,6 +332,42 @@ export default {
       });
     }
 
+    if (url.pathname === '/debug') {
+      // v709: 診断用 — 各タブの列検出結果 + 最初 3 行の candidate を返す
+      const token = request.headers.get('x-sync-token') || url.searchParams.get('token');
+      if (token !== env.MANUAL_TRIGGER_TOKEN) {
+        return new Response(JSON.stringify({ error: 'unauthorized' }), {
+          status: 401, headers: { ...cors, 'Content-Type': 'application/json' },
+        });
+      }
+      const cutoffIso = env.CUTOFF_DATE || CONFIG.cutoff_date;
+      const aliases = CONFIG.header_aliases;
+      const debug = [];
+      for (const tab of CONFIG.tabs) {
+        try {
+          const csv = await fetchTabCsv(env.SHEET_ID, tab.name);
+          const rows = parseCsv(csv);
+          const cols = tab.columns || detectColumns(rows[0], aliases);
+          const cands = await extractCandidates(env.SHEET_ID, tab, aliases, cutoffIso);
+          debug.push({
+            tab: tab.name,
+            header_row0_first10: (rows[0] || []).slice(0, 15),
+            detected_cols: cols,
+            candidate_count: cands.length,
+            first_3_candidates: cands.slice(0, 3).map(c => ({
+              name: c.patient_name, book_date: c.book_date,
+              reason: c.reason, source_channel: c.source_channel,
+            })),
+          });
+        } catch(e) {
+          debug.push({ tab: tab.name, error: String(e.message || e) });
+        }
+      }
+      return new Response(JSON.stringify(debug, null, 2), {
+        headers: { ...cors, 'Content-Type': 'application/json' },
+      });
+    }
+
     if (url.pathname === '/status' || url.pathname === '/') {
       const r = await fetch(
         `${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`,
