@@ -191,16 +191,23 @@ async function syncOneTab(env, tab, aliases, cutoffIso) {
     if (!patientId) { errored++; continue; }
 
     // 3) patient_visits INSERT (uidx_visits_dedup で既存行あれば 409 → skip)
+    //   v701: patient_visits には normalized_name / patient_name カラム無し
+    //         (それらは patients 側)。patient_id + facility + book_date で dedup
+    //         apply_at / apply_date は NOT NULL なので book_date から補完
+    const bookAtIso = `${c.book_date}T00:00:00+09:00`;
     const visitPayload = {
       patient_id: patientId,
-      patient_name: c.patient_name,
-      normalized_name: c.normalized_name,
       facility: c.facility,
       book_date: c.book_date,
+      book_at: bookAtIso,
+      apply_date: c.book_date,   // シートには申込日欠落 → 来院日で代用
+      apply_at: bookAtIso,
       status: '未対応',
+      source_tool: 'sheet',
       source_channel: c.source_channel,
       sync_source: c.sync_source,
       updated_by: 'system-sync',
+      created_by: 'system-sync',
     };
     const r3 = await fetch(
       `${env.SUPABASE_URL}/rest/v1/patient_visits`,

@@ -21,10 +21,15 @@ COMMENT ON COLUMN patient_visits.source_channel IS
 COMMENT ON COLUMN patient_visits.sync_source IS
   'v700: シート同期由来行の識別子。形式「sheet:<タブ名>:<row>」。手動 INSERT 行は NULL';
 
--- dedup index (同じ facility+name+date は 1 行のみ)
+-- 過去に間違って作った index があれば削除 (v700 初版)
+DROP INDEX IF EXISTS uidx_visits_dedup;
+
+-- dedup index (同じ patient+facility+date は 1 行のみ)
+--   normalized_name は patients テーブル側にあるので、代わりに patient_id で dedup
+--   deleted=FALSE のみ対象 (ソフト削除された行は再取込可)
 CREATE UNIQUE INDEX IF NOT EXISTS uidx_visits_dedup
-  ON patient_visits (facility, normalized_name, book_date)
-  WHERE normalized_name IS NOT NULL AND book_date IS NOT NULL;
+  ON patient_visits (patient_id, facility, book_date)
+  WHERE book_date IS NOT NULL AND deleted = FALSE;
 
 -- 2) sync_log テーブル ---------------------------------------------------------
 CREATE TABLE IF NOT EXISTS sync_log (
