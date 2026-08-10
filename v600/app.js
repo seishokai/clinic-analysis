@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v711';
+const APP_VERSION = 'v712';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -318,10 +318,11 @@ async function fetchVisits() {
   // v603 P4/P8: fetch 時に事前計算した検索キー・日付 epoch・正規化フィールドを付与
   //   filter/render で毎回計算するのを回避 (3150 rows × filter で ~30ms → ~3ms)
   const now = Date.now();
-  // v711: クライアント側の二重防御 — View が deleted 除外できてない場合の safety net。
-  //   patient_name/normalized_name に「テスト/てすと/test」を含む行は表示しない。
+  // v712: クライアント側の二重防御 — View が deleted 除外できてない場合の safety net。
+  //   deleted=true / patient_name/normalized_name に「テスト/てすと/test」/ 名前空 を全て除外。
   const testRe = /テスト|てすと|test/i;
   all = all.filter(v => {
+    if (v.deleted === true) return false;   // v712: View fallback で deleted=true が混入する対策
     const nm = (v.patient_name || '') + (v.normalized_name || '');
     if (!nm.trim()) return false;
     if (testRe.test(nm)) return false;
