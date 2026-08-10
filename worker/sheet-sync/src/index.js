@@ -121,6 +121,7 @@ async function extractCandidates(sheetId, tab, aliases, cutoffIso) {
       phone: phone || null,
       phone_last4: phone4,
       source_channel: cols.source != null ? String(r[cols.source] || '').trim() || null : null,
+      reason: cols.reason != null ? String(r[cols.reason] || '').trim() || null : null,
       sync_source: `sheet:${tab.name}:row=${i + 1}`,
     });
   }
