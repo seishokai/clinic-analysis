@@ -27,6 +27,8 @@ const STAFF = [
   { id: 'uemura',   name: '上村' },
   { id: 'yasui',    name: '安井' },
   { id: 'kitajima', name: '北島' },
+  { id: 'maruta',   name: '丸田' },
+  { id: 'moriwaki', name: '森脇' },
 ];
 
 const INITIAL_PASSWORD = 'Aladdin2026!';

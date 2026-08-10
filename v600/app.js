@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v614';
+const APP_VERSION = 'v615';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -1267,7 +1267,7 @@ function shortenUserLabel(u) {
   if (!u) return '(不明)';
   const local = String(u).split('@')[0];
   // adachi → 足立 のマッピング (create-staff-users.js の STAFF と一致)
-  const map = { adachi: '足立', uemura: '上村', yasui: '安井', kitajima: '北島' };
+  const map = { adachi: '足立', uemura: '上村', yasui: '安井', kitajima: '北島', maruta: '丸田', moriwaki: '森脇' };
   return map[local] ? `${map[local]} (${local})` : local;
 }
 
