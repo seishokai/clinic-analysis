@@ -18,7 +18,24 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v724';
+const APP_VERSION = 'v725';
+
+// v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
+//   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
+(async () => {
+  try {
+    const r = await fetch('./version.txt?t=' + Date.now(), { cache: 'no-store' });
+    if (!r.ok) return;
+    const remote = (await r.text()).trim();
+    if (remote && remote !== APP_VERSION) {
+      // ループ防止: URL に ?bust= が既にあれば再リロードしない (直近試行済み)
+      if (!location.search.includes('bust=')) {
+        console.log('[self-heal] APP=' + APP_VERSION + ' remote=' + remote + ' → force reload');
+        location.replace(location.pathname + '?bust=' + Date.now());
+      }
+    }
+  } catch (_) { /* offline なら諦める */ }
+})();
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
