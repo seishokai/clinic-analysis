@@ -513,7 +513,7 @@ main {
 .treatment-chip[data-t="補綴"]       { background: #d1fae5; color: #064e3b; }
 .treatment-chip[data-t="転院"]       { background: #fecaca; color: #7f1d1d; }
 /* v706: 該当なし (service 空) は淡いダッシュ表示、badge なし */
-.tx-empty { color: var(--muted); font-size: .95em; }
+.tx-empty { color: var(--ink-mute); font-size: .95em; }   /* v709 fix: --muted 未定義 → --ink-mute */
 
 .field-input {
   width: 100%;
@@ -1146,19 +1146,26 @@ main {
   .visits-view .v-table tbody td.c-cmonth,
   .visits-view .v-table tbody td.c-updated { display: none; }
 
-  /* status select: 薄い赤枠 (未対応系を目立たせる mockup 準拠) */
+  /* v709 UX BUG#1 修正: status select の色は data-value 別ルールに任せる。
+     以前は border/background/color を blanket 指定 → specificity で全ステータス赤色になっていた。
+     ここでは寸法・padding のみ調整。 */
   .visits-view .v-table tbody td.c-status select {
     width: 100%;
     font-size: 13px !important;
     font-weight: 500;
     min-height: 34px;
     padding: 8px 22px 8px 8px;
-    border: 1px solid #e4a39d;
     border-radius: 8px;
-    background: #fff5f3;
-    color: #9d2f25;
     box-sizing: border-box;
   }
+  /* status 別の色を PC 用 rule と同 specificity 以上でモバイルでも上書き適用 */
+  .visits-view .v-table tbody td.c-status .status-sel[data-value="未対応"] { background: #fff5f3; color: #9d2f25; border: 1px solid #e4a39d; }
+  .visits-view .v-table tbody td.c-status .status-sel[data-value="キャンセル"] { background: var(--warn-soft); color: var(--warn); border: 1px solid var(--warn); }
+  .visits-view .v-table tbody td.c-status .status-sel[data-value="成約"] { background: var(--ok-soft); color: var(--ok); border: 1px solid var(--ok); }
+  .visits-view .v-table tbody td.c-status .status-sel[data-value="来院済"] { background: var(--info-soft); color: var(--info); border: 1px solid var(--info); }
+  .visits-view .v-table tbody td.c-status .status-sel[data-value="検討中"] { background: #fff5d6; color: #8a6d1a; border: 1px solid #d1a933; }
+  .visits-view .v-table tbody td.c-status .status-sel[data-value="除外"] { background: var(--line-soft); color: var(--ink-mute); border: 1px solid var(--line); }
+  .visits-view .v-table tbody td.c-status .status-sel[data-value="重複削除"] { background: #e5e7eb; color: #6b7280; border: 1px solid #9ca3af; }
 
   /* 売上: 数字だけ表示 */
   .visits-view .v-table tbody td.c-amount input {

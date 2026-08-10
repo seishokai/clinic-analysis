@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v708';
+const APP_VERSION = 'v709';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -313,6 +313,7 @@ async function fetchVisits() {
     v._bookMs = v.book_date ? new Date(v.book_date + 'T00:00:00+09:00').getTime() : null;
   });
   state.visits = all;
+  state.visitsFetchedAt = Date.now();   // v709 BUG#4 修正: 更新チップに実際の fetch 時刻を出すため記録
   // v603 fix #19: 20 page cap 到達時は明示的に warn
   if (hitCap) toast(`⚠ 20k 件の上限に達しました (${all.length} 件のみ表示)`, 'err', 6000);
 }
@@ -615,6 +616,7 @@ function renderVisitsView(main) {
       $('#v-promo').value = ''; $('#v-status').value = ''; $('#v-period').value = 'all';
       $('#v-month').value = ''; $('#v-from').value = ''; $('#v-to').value = '';
       updatePeriodExtraInputs();
+      updateQuickPeriodButtons();   // v709 BUG#5 修正: 今月/先月ボタンの active ハイライト残留
       renderVisitsTable();
     });
     // Populate current filter values
@@ -731,10 +733,17 @@ function renderVisitsTable() {
   //   #v-tbody / #v-empty / #v-count / #v-updated は visits view でしか存在しない
   if (state.view !== 'visits' || !$('#v-tbody')) return;
   const rows = filteredVisits();
-  // v707: 分母も '重複削除' を除いた実来院ベース数にする
-  const totalNoDup = state.visits.reduce((n, v) => n + (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus) ? 0 : 1), 0);
-  $('#v-count').innerHTML = `<strong>${rows.length}</strong> / ${totalNoDup} 件`;
-  $('#v-updated').textContent = `更新: ${new Date().toLocaleTimeString()}`;
+  // v707: 分母は '重複削除' を除いた実来院ベース数。
+  // v709 fix: ただしユーザが明示的に「ステータス:重複削除」を選んだ時は全件を分母にする (分子 ⊄ 分母 の破綻回避)
+  const showingHidden = state.filters.status && STATUS_HIDDEN_BY_DEFAULT.has(state.filters.status);
+  const totalDenom = showingHidden
+    ? state.visits.length
+    : state.visits.reduce((n, v) => n + (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus) ? 0 : 1), 0);
+  $('#v-count').innerHTML = `<strong>${rows.length}</strong> / ${totalDenom} 件`;
+  // v709 BUG#4 修正: フィルタ再描画時も「実データ取得時刻」を出す (renderVisitsTable 内で now() すると誤認)
+  $('#v-updated').textContent = state.visitsFetchedAt
+    ? `更新: ${new Date(state.visitsFetchedAt).toLocaleTimeString()}`
+    : '更新: —';
   const tbody = $('#v-tbody');
   const empty = $('#v-empty');
   if (!rows.length) {
@@ -851,6 +860,13 @@ function setupTbodyDelegation() {
     if (t.classList.contains('status-sel')) {
       const newValue = t.value;
       const orig = t.dataset.value;
+      // v709 BUG#3 修正: 「重複削除」は非表示化 (実質ソフトデリート) → 誤タップ防止に確認
+      if (newValue === '重複削除' && orig !== '重複削除') {
+        if (!confirm('この行を「重複削除」にすると一覧から非表示になります。よろしいですか？\n(復元: ステータス:重複削除 でフィルタ)')) {
+          t.value = orig;
+          return;
+        }
+      }
       t.classList.remove('saved', 'failed');
       t.classList.add('saving');
       t.dataset.value = newValue;
