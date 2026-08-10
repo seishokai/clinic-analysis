@@ -1339,3 +1339,7 @@ main {
 .a2-empty { color: var(--ink-mute); font-size: 11px; }
 .a2-card-alert { border-color: #f8bbd0; background: #fff5f8; }
 .a2-card-alert .a2-card-num { color: #c2185b; }
+
+/* v726 相談数 注記 */
+.a2-notice { background: #fff9e6; border: 1px solid #f4d78e; color: #7a5a0f; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; line-height: 1.5; }
+.a2-notice strong { color: #a36f00; }
