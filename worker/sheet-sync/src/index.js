@@ -200,6 +200,15 @@ function promoFromSource(src) {
   return SOURCE_TO_PROMO[String(src).trim()] || null;
 }
 
+// v917: テストデータ判定 — シート側にゴミ名残ってても再作成しない
+//   'テスト', 'テストテスト', 'テスト_xxx', 'てすと', 'test' 等を除外
+function isTestName(name) {
+  if (!name) return true;   // 名前空も除外
+  const s = String(name).trim().toLowerCase().replace(/[\s　]+/g, '');
+  if (!s) return true;
+  return /^(テスト|てすと|test)/.test(s) || /テスト/.test(s);
+}
+
 // ==================== 予約管理シート extractor (v900) ====================
 async function extractBookingCandidates(sheetId, tab, cutoffIso) {
   const csv = await fetchTabCsv(sheetId, tab.name);
@@ -213,6 +222,7 @@ async function extractBookingCandidates(sheetId, tab, cutoffIso) {
     const rawBookAt = r[cols.book_at];
     const rawName = r[cols.name];
     if (!rawBookAt || !rawName) continue;
+    if (isTestName(rawName)) continue;   // v917: シート側のテストデータを sync 対象外
     const { date: bookDate, at: bookAt } = parseJpDateTime(rawBookAt);
     if (!bookDate || bookDate < cutoffIso) continue;
     const nn = normName(rawName);
@@ -257,6 +267,7 @@ async function extractInitialCandidates(sheetId, tab, aliases, cutoffIso) {
     const rawDate = r[cols.visit_date];
     const rawName = r[cols.name];
     if (!rawDate || !rawName) continue;
+    if (isTestName(rawName)) continue;   // v917: シート側のテストデータを sync 対象外
     const iso = toIsoDate(rawDate, currentYear);
     if (!iso || iso < cutoffIso) continue;
     const nn = normName(rawName);
@@ -682,12 +693,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v916',
+        service: 'sheet-sync v917',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v916\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v917\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
