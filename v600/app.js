@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v719';
+const APP_VERSION = 'v720';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -1240,14 +1240,26 @@ function bkFmtDate(raw) {
   return s.slice(0, 10);
 }
 
-// ==================== v719: Analytics view (分析) ====================
-// state.visits を集計して 予約→来院率/来院→成約率/売上 を 治療別/プロモ別/医院別 に出す。
-// state.visits は既に fetchVisits でロード済み、deleted/テスト行は client filter で除外済み。
+// ==================== v720: Analytics view (分析) 改良版 ====================
+// 予約→来院率 は 予約由来 (source_tool = DXHUB/セレクト) のみで計算 (walkin除外)
+// 医院別 初診数 は 実来院者を 治療分類マトリクスで
+// 保険/WT/転院/審美 は walkin ベースなので 来院率は出さず、初診数のみ表示
 const A2_NON_VISIT = new Set(['未対応', 'キャンセル', '予約変更', '離脱', '除外', '重複削除', '予約連絡待ち', '後追いLINE済み']);
-const A2_CONTRACT = new Set(['成約', 'ローン審査中', 'ローン審査落',
+const A2_CONTRACT = new Set(['成約',
   '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
-  '印象待ち(治療無)', '印象待ち(治療有)', '治療中',
+  '印象待ち(治療有)', '治療中',
   'セット日確定待ち', 'セット待ち', 'セット完了']);
+// 予約由来判定: source_tool が DXHUB/セレクト、または promo_code が入ってる、または status='未対応' で walkin ではない
+const A2_BOOKING_TOOLS = new Set(['DXHUB', 'セレクト']);
+function a2IsBooked(v) {
+  if (A2_BOOKING_TOOLS.has(v.source_tool)) return true;
+  if (v.promo_code) return true;  // promo_code あり = DXHUB 由来
+  return false;
+}
+function a2IsVisited(v) { return !A2_NON_VISIT.has(v._effStatus); }
+function a2IsContracted(v) { return A2_CONTRACT.has(v._effStatus); }
+const A2_TREAT_ORDER = ['矯正', 'BF', 'インプラント', 'ラブリエ', '保険', 'WT', '審美', '補綴', '転院', '(未分類)'];
+const A2_BOOKING_TREATS = new Set(['矯正', 'BF', 'インプラント', 'ラブリエ']);
 
 function a2Bucket(v, key) {
   if (key === 'facility') return v._normFacility || '(不明)';
@@ -1259,15 +1271,17 @@ function a2Bucket(v, key) {
   return '?';
 }
 
-function a2Aggregate(visits, key) {
+// v720: 予約母数 = 予約由来 のみ の 予約→来院率 集計
+function a2AggregateBooked(visits, key) {
   const buckets = new Map();
   for (const v of visits) {
+    if (!a2IsBooked(v)) continue;
     const k = a2Bucket(v, key);
     if (!buckets.has(k)) buckets.set(k, { key: k, booking: 0, visited: 0, contract: 0, revenue: 0 });
     const b = buckets.get(k);
     b.booking += 1;
-    if (!A2_NON_VISIT.has(v._effStatus)) b.visited += 1;
-    if (A2_CONTRACT.has(v._effStatus)) b.contract += 1;
+    if (a2IsVisited(v)) b.visited += 1;
+    if (a2IsContracted(v)) b.contract += 1;
     if (v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
   }
   const arr = [...buckets.values()];
@@ -1276,6 +1290,24 @@ function a2Aggregate(visits, key) {
     b.contractRate = b.visited ? (b.contract / b.visited) : 0;
   }
   arr.sort((a, b) => b.booking - a.booking);
+  return arr;
+}
+
+// v720: 医院別 × 治療分類 の 実来院数マトリクス
+function a2FacilityMatrix(visits) {
+  const byFac = new Map();
+  for (const v of visits) {
+    if (!a2IsVisited(v)) continue;   // 実来院者のみ
+    const fac = v._normFacility || '(不明)';
+    const treat = v._treatment || '(未分類)';
+    if (!byFac.has(fac)) byFac.set(fac, { facility: fac, cells: {}, total: 0, revenue: 0 });
+    const row = byFac.get(fac);
+    row.cells[treat] = (row.cells[treat] || 0) + 1;
+    row.total += 1;
+    if (v.contract_amount) row.revenue += Number(v.contract_amount) || 0;
+  }
+  const arr = [...byFac.values()];
+  arr.sort((a, b) => b.total - a.total);
   return arr;
 }
 
@@ -1379,6 +1411,43 @@ function a2UpdateQuickButtons() {
     btn.classList.toggle('active', btn.dataset.a2Period === state.a2Period);
   });
 }
+// v720: 医院別 治療内訳マトリクス render
+function a2RenderFacilityMatrix(rows) {
+  const treats = A2_TREAT_ORDER.filter(t => rows.some(r => r.cells[t]));
+  const colTotals = { total: 0, revenue: 0 };
+  for (const t of treats) colTotals[t] = 0;
+  for (const r of rows) {
+    for (const t of treats) colTotals[t] += (r.cells[t] || 0);
+    colTotals.total += r.total;
+    colTotals.revenue += r.revenue;
+  }
+  return `<section class="a2-section">
+    <h3 class="a2-title">医院別 初診数 (実来院)</h3>
+    <div class="a2-table-wrap"><table class="a2-table">
+      <thead><tr>
+        <th style="text-align:left">医院</th>
+        ${treats.map(t => `<th style="text-align:right">${esc(t)}</th>`).join('')}
+        <th style="text-align:right">合計</th>
+        <th style="text-align:right">売上</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr>
+          <td><strong>${esc(r.facility)}</strong></td>
+          ${treats.map(t => `<td class="a2-num">${r.cells[t] || 0}</td>`).join('')}
+          <td class="a2-num"><strong>${r.total}</strong></td>
+          <td class="a2-num a2-yen">${a2FormatYen(r.revenue)}</td>
+        </tr>`).join('')}
+        <tr class="a2-total">
+          <td><strong>合計</strong></td>
+          ${treats.map(t => `<td class="a2-num">${colTotals[t]}</td>`).join('')}
+          <td class="a2-num"><strong>${colTotals.total}</strong></td>
+          <td class="a2-num a2-yen"><strong>${a2FormatYen(colTotals.revenue)}</strong></td>
+        </tr>
+      </tbody>
+    </table></div>
+  </section>`;
+}
+
 function renderAnalyticsTable() {
   const body = $('#a2-body');
   if (!body) return;
@@ -1387,25 +1456,39 @@ function renderAnalyticsTable() {
     return;
   }
   const visits = a2FilterByPeriod(state.visits);
-  const total = a2Aggregate(visits, () => 'all').reduce((s, r) => ({
-    booking: s.booking + r.booking, visited: s.visited + r.visited,
-    contract: s.contract + r.contract, revenue: s.revenue + r.revenue,
-  }), { booking: 0, visited: 0, contract: 0, revenue: 0 });
-  const visitRate = total.booking ? (total.visited / total.booking) : 0;
-  const contractRate = total.visited ? (total.contract / total.visited) : 0;
+
+  // ---- 全体サマリー ----
+  //   予約 = 予約由来のみ (walkin除く) / 来院 = 実来院 (walkin含む) / 成約は厳格化
+  let booking=0, visited=0, contract=0, revenue=0, visitedAll=0;
+  for (const v of visits) {
+    if (a2IsBooked(v)) booking++;
+    if (a2IsVisited(v)) { visitedAll++; if (a2IsBooked(v)) visited++; }
+    if (a2IsContracted(v)) contract++;
+    if (v.contract_amount) revenue += Number(v.contract_amount) || 0;
+  }
+  const visitRate = booking ? (visited / booking) : 0;
+  const contractRate = visitedAll ? (contract / visitedAll) : 0;
   const summary = `<section class="a2-summary">
-    <div class="a2-card"><div class="a2-card-lbl">予約</div><div class="a2-card-num">${total.booking.toLocaleString()}</div></div>
-    <div class="a2-card"><div class="a2-card-lbl">来院</div><div class="a2-card-num">${total.visited.toLocaleString()}</div><div class="a2-card-sub">${a2Pct(visitRate)}</div></div>
-    <div class="a2-card"><div class="a2-card-lbl">成約</div><div class="a2-card-num">${total.contract.toLocaleString()}</div><div class="a2-card-sub">${a2Pct(contractRate)}</div></div>
-    <div class="a2-card"><div class="a2-card-lbl">売上</div><div class="a2-card-num a2-yen">${a2FormatYen(total.revenue)}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">予約 (由来)</div><div class="a2-card-num">${booking.toLocaleString()}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">来院 (全)</div><div class="a2-card-num">${visitedAll.toLocaleString()}</div><div class="a2-card-sub">予約由来 ${visited.toLocaleString()} → ${a2Pct(visitRate)}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">成約</div><div class="a2-card-num">${contract.toLocaleString()}</div><div class="a2-card-sub">${a2Pct(contractRate)}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">売上</div><div class="a2-card-num a2-yen">${a2FormatYen(revenue)}</div></div>
   </section>`;
-  const byTreat = a2Aggregate(visits, 'treatment');
-  const byPromo = a2Aggregate(visits, 'promo');
-  const byFac = a2Aggregate(visits, 'facility');
+
+  // ---- 医院別 治療分類マトリクス (実来院数) ----
+  const facMatrix = a2FacilityMatrix(visits);
+
+  // ---- 治療別 予約→来院率 (予約系 4 種のみ = 矯正/BF/インプラント/ラブリエ) ----
+  const byTreat = a2AggregateBooked(visits, 'treatment')
+    .filter(r => A2_BOOKING_TREATS.has(r.key));
+
+  // ---- プロモ別 予約→来院率 (予約由来のみ) ----
+  const byPromo = a2AggregateBooked(visits, 'promo');
+
   body.innerHTML = summary
-    + a2RenderTable('治療別', byTreat)
-    + a2RenderTable('プロモ別', byPromo)
-    + a2RenderTable('医院別', byFac);
+    + a2RenderFacilityMatrix(facMatrix)
+    + a2RenderTable('治療別 予約→来院率 (予約系のみ)', byTreat)
+    + a2RenderTable('プロモ別 予約→来院率', byPromo);
 }
 
 async function fetchSlots() {
