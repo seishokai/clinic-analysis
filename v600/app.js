@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v617';
+const APP_VERSION = 'v618';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -545,6 +545,15 @@ function renderVisitsView(main) {
         renderVisitsTable();
       });
     });
+    // v618: モバイル用フィルタ折りたたみボタン
+    const ftBtn = $('#v-filter-toggle');
+    if (ftBtn) {
+      ftBtn.addEventListener('click', () => {
+        const expanded = document.body.classList.toggle('filters-open');
+        ftBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        ftBtn.textContent = expanded ? '▾ 絞込' : '▸ 絞込';
+      });
+    }
     $('#v-month').addEventListener('change', e => { state.filters.periodMonth = e.target.value; renderVisitsTable(); });
     $('#v-from').addEventListener('change', e => { state.filters.periodFrom = e.target.value; renderVisitsTable(); });
     $('#v-to').addEventListener('change', e => { state.filters.periodTo = e.target.value; renderVisitsTable(); });
@@ -1050,7 +1059,7 @@ function renderBookingsTable() {
     <td class="c-book">${esc(r.bookDate ? r.bookDate.substring(5,10).replace('-','/').replace(/^0/,'') : '-')}</td>
     <td class="c-name">${esc(r.name || '')}</td>
     <td class="c-facility">${esc(normFac(r.facility) || '-')}</td>
-    <td class="c-promo"><span class="promo-chip ${r.tool==='セレクト'?'select-type':''}" title="${esc(r.source||'')}">${esc(shortPromo(r.source||'') || '-')}</span></td>
+    <td class="c-promo"><span class="promo-chip ${r.tool==='セレクト'?'select-type':''}" title="${esc(r.source||'')}">${r.tool==='セレクト' ? '—' : esc(shortPromo(r.source||'') || '-')}</span></td>
     <td>${esc(r.service || '-')}</td>
     <td style="font-size:11px;color:var(--ink-mute);font-family:var(--font-mono)">${esc(r.email || '-')}</td>
     <td style="font-family:var(--font-mono);font-size:11px">${esc(r.phone || '-')}</td>
