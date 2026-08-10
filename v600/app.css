@@ -1343,3 +1343,36 @@ main {
 /* v726 相談数 注記 */
 .a2-notice { background: #fff9e6; border: 1px solid #f4d78e; color: #7a5a0f; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; line-height: 1.5; }
 .a2-notice strong { color: #a36f00; }
+
+/* ===== v727 分析タブ スマホUI 全面改善 ===== */
+@media (max-width: 720px) {
+  .analytics-view { padding: 8px; }
+  /* 期間+3軸フィルタ: 縦積み・全幅 */
+  .analytics-view .toolbar { padding: 4px 6px; }
+  .analytics-view .tb-row-filters { flex-wrap: wrap; gap: 6px; }
+  .analytics-view .tb-select { flex: 1 1 calc(50% - 6px); min-width: 0; font-size: 13px; padding: 6px 8px; }
+  .analytics-view .quick-period-btn { flex: 1 1 calc(50% - 6px); padding: 8px 10px; font-size: 13px; }
+  .analytics-view .link-btn { flex: 1 1 100%; padding: 6px 10px; text-align: center; }
+  /* サマリーカード: 2列 → 数字大きく */
+  .a2-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
+  .a2-card { padding: 10px 12px; }
+  .a2-card-lbl { font-size: 10px; }
+  .a2-card-num { font-size: 18px; margin-top: 2px; }
+  .a2-card-sub { font-size: 10px; }
+  /* 未処理アラートだけ全幅で目立たせる */
+  .a2-card-alert { grid-column: 1 / -1; }
+  /* テーブル: 横スクロール + font 縮小 + セル padding 減 */
+  .a2-section { margin-bottom: 18px; }
+  .a2-title { font-size: 13px; padding-left: 6px; }
+  .a2-table { font-size: 11px; }
+  .a2-table th, .a2-table td { padding: 5px 6px; }
+  .a2-table th { font-size: 10px; }
+  .a2-pct { padding: 1px 5px; font-size: 10px; }
+  .a2-filter-line { font-size: 11px; margin-bottom: 8px; }
+  .a2-chip { padding: 2px 8px; font-size: 10px; }
+  /* 分類列は sticky で横スクロール中も見える */
+  .a2-table thead th:first-child,
+  .a2-table tbody td:first-child { position: sticky; left: 0; background: var(--paper); z-index: 1; }
+  .a2-table thead th:first-child { background: var(--bg); }
+  .a2-table tr.a2-total td:first-child { background: var(--bg); }
+}

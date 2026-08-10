@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v726';
+const APP_VERSION = 'v727';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -1529,7 +1529,7 @@ function a2RenderFacilityMatrix(rows, suffix = '') {
     colTotals.revenue += r.revenue;
   }
   return `<section class="a2-section">
-    <h3 class="a2-title">医院別 相談数 (実来院ベース, ±10%)${esc(suffix)}</h3>
+    <h3 class="a2-title">医院別 相談数${esc(suffix)}</h3>
     <div class="a2-table-wrap"><table class="a2-table">
       <thead><tr>
         <th style="text-align:left">医院</th>
@@ -1587,11 +1587,10 @@ function renderAnalyticsTable() {
     f.promo ? `プロモ:${f.promo}` : '',
   ].filter(Boolean);
   const filterLine = filterChips.length ? `<div class="a2-filter-line">絞込: ${filterChips.map(c => `<span class="a2-chip">${esc(c)}</span>`).join('')}</div>` : '';
-  // v726: 「相談 (実来院)」表記に統一 + ±10% 誤差注記
-  const noticeLine = `<div class="a2-notice">ℹ 「相談数 = 実来院数」 (未対応/キャンセル/離脱 等を除いた集計)。<strong>staff の手動カウントとは ±10% 前後の誤差</strong>が出る場合があります (status 変更の運用差)。</div>`;
-  const summary = `${filterLine}${noticeLine}<section class="a2-summary">
-    <div class="a2-card"><div class="a2-card-lbl">予約 (由来)</div><div class="a2-card-num">${booking.toLocaleString()}</div></div>
-    <div class="a2-card"><div class="a2-card-lbl">相談 (実来院, ±10%)</div><div class="a2-card-num">${visitedAll.toLocaleString()}</div><div class="a2-card-sub">予約由来 ${visited.toLocaleString()} → ${a2Pct(visitRate)}</div></div>
+  // v727: ±10% 表記削除、シンプル化
+  const summary = `${filterLine}<section class="a2-summary">
+    <div class="a2-card"><div class="a2-card-lbl">予約</div><div class="a2-card-num">${booking.toLocaleString()}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">相談</div><div class="a2-card-num">${visitedAll.toLocaleString()}</div><div class="a2-card-sub">予約由来 ${visited.toLocaleString()} → ${a2Pct(visitRate)}</div></div>
     <div class="a2-card"><div class="a2-card-lbl">成約</div><div class="a2-card-num">${contract.toLocaleString()}</div><div class="a2-card-sub">相談比 ${a2Pct(contractRate)}</div></div>
     <div class="a2-card"><div class="a2-card-lbl">売上</div><div class="a2-card-num a2-yen">${a2FormatYen(revenue)}</div><div class="a2-card-sub">客単価 ${contract ? a2FormatYen(arpc) : '—'}</div></div>
     <div class="a2-card a2-card-alert"><div class="a2-card-lbl">⚠ 未処理 (予約日過ぎ)</div><div class="a2-card-num">${pendingOverdue.toLocaleString()}</div><div class="a2-card-sub">来院タブ → 未対応 で確認</div></div>
@@ -1605,8 +1604,8 @@ function renderAnalyticsTable() {
 
   body.innerHTML = summary
     + a2RenderFacilityMatrix(facMatrix, suffix)
-    + a2RenderTable('治療別 相談数 (walk-in は 予約→相談率なし)' + suffix, byTreat)
-    + a2RenderTable('プロモ別 予約→相談率 (予約由来)' + suffix, byPromo);
+    + a2RenderTable('治療別' + suffix, byTreat)
+    + a2RenderTable('プロモ別' + suffix, byPromo);
 }
 
 async function fetchSlots() {
