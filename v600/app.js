@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v710';
+const APP_VERSION = 'v711';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -284,12 +284,24 @@ async function fetchVisits() {
   let from = 0;
   let hitCap = false;
   for (let page = 0; page < 20; page++) {
-    const { data, error } = await sb
+    // v711 fix: view が deleted 列を持ってないと Supabase が 400 返す → try/catch で fallback
+    let { data, error } = await sb
       .from('v_visits_with_patient')
       .select('*')
       .or(`book_date.is.null,book_date.lte.${todayIso}`)
+      .eq('deleted', false)   // v711: 削除済 visits を除外
       .order('book_date', { ascending: false, nullsFirst: false })
       .range(from, from + pageSize - 1);
+    // deleted 列が View に無い場合の fallback (列不明エラー 42703)
+    if (error && String(error.code) === '42703') {
+      const retry = await sb
+        .from('v_visits_with_patient')
+        .select('*')
+        .or(`book_date.is.null,book_date.lte.${todayIso}`)
+        .order('book_date', { ascending: false, nullsFirst: false })
+        .range(from, from + pageSize - 1);
+      data = retry.data; error = retry.error;
+    }
     if (error) {
       state.loading = false;
       console.error('fetchVisits', error);
@@ -306,6 +318,15 @@ async function fetchVisits() {
   // v603 P4/P8: fetch 時に事前計算した検索キー・日付 epoch・正規化フィールドを付与
   //   filter/render で毎回計算するのを回避 (3150 rows × filter で ~30ms → ~3ms)
   const now = Date.now();
+  // v711: クライアント側の二重防御 — View が deleted 除外できてない場合の safety net。
+  //   patient_name/normalized_name に「テスト/てすと/test」を含む行は表示しない。
+  const testRe = /テスト|てすと|test/i;
+  all = all.filter(v => {
+    const nm = (v.patient_name || '') + (v.normalized_name || '');
+    if (!nm.trim()) return false;
+    if (testRe.test(nm)) return false;
+    return true;
+  });
   all.forEach(v => {
     v._effStatus = v.bf_status || v.status || '未対応';
     v._normFacility = normFac(v.facility);
