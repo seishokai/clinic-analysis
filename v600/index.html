@@ -3,10 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Aladdin v613 — 清翔会</title>
+<title>Aladdin v614 — 清翔会</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🧾%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<link rel="stylesheet" href="app.css?v=20">
+<link rel="stylesheet" href="app.css?v=21">
 </head>
 <body>
   <div id="app">
@@ -17,11 +17,11 @@
   <template id="tpl-login">
     <div class="login-wrap">
       <div class="login-card">
-        <h1 class="login-title">Aladdin <span class="v-badge">v613</span></h1>
+        <h1 class="login-title">Aladdin <span class="v-badge">v614</span></h1>
         <p class="login-sub">Supabase 単一データ源版 — 入力したものは絶対に消えない</p>
         <div class="field">
-          <label>メールアドレス</label>
-          <input type="email" id="lg-email" placeholder="your@example.com" autocomplete="email">
+          <label>社員 ID (例: adachi / yasui) またはメールアドレス</label>
+          <input type="text" id="lg-email" placeholder="adachi" autocomplete="username">
         </div>
         <div class="field">
           <label>パスワード</label>
@@ -29,8 +29,12 @@
         </div>
         <button id="lg-btn" class="btn-primary">ログイン</button>
         <div id="lg-err" class="err-msg"></div>
+        <div class="login-foot" style="font-size:11px;color:var(--ink-mute);line-height:1.6">
+          初回ログインの初期パスワードは共有された値です。<br>
+          ログイン後、右上「🔑 PW変更」から必ず変更してください。
+        </div>
         <div class="login-foot">
-          <a href="../">← 現行 Aladdin (v521) に戻る</a>
+          <a href="../">← ポータルに戻る</a>
         </div>
       </div>
     </div>
@@ -42,13 +46,14 @@
       <div class="hdr-brand">
         <span class="hdr-logo">🧾</span>
         <span class="hdr-title">Aladdin</span>
-        <span class="v-badge">v613</span>
+        <span class="v-badge">v614</span>
       </div>
       <nav class="hdr-nav">
         <button class="nav-btn active" data-view="visits">🏥 来院</button>
         <button class="nav-btn" data-view="bookings">📋 予約一覧</button>
         <button class="nav-btn" data-view="patients">👥 患者</button>
         <button class="nav-btn" data-view="slots">📅 予約枠</button>
+        <button class="nav-btn" data-view="activity">📊 アクティビティ</button>
         <a class="nav-btn nav-ext"
            href="https://docs.google.com/spreadsheets/d/167IYM21HW0DGPlL1CrnCn4yTaTyC0KJU4f7gWyKtHf4/edit?usp=sharing"
            target="_blank" rel="noopener">📋 初診管理 <span class="ext-arrow">↗</span></a>
@@ -62,6 +67,7 @@
         <span id="save-status" class="save-status"></span>
         <button id="refresh-btn" title="データ更新">🔄</button>
         <span id="user-email" class="user-email"></span>
+        <button id="pw-change-btn" class="link-btn" title="パスワード変更">🔑 PW変更</button>
         <a href="../" class="link-btn" title="v521 に戻る">v521 ↗</a>
         <button id="logout-btn" class="link-btn">ログアウト</button>
       </div>
@@ -93,7 +99,7 @@
           <select id="v-status" class="tb-select">
             <option value="">ステータス:全て</option>
           </select>
-          <!-- v613: 今月/先月 のクイックボタン -->
+          <!-- v614: 今月/先月 のクイックボタン -->
           <button type="button" class="quick-period-btn" data-period="thisMonth">今月</button>
           <button type="button" class="quick-period-btn" data-period="lastMonth">先月</button>
           <select id="v-period" class="tb-select">
@@ -219,6 +225,75 @@
     </div>
   </template>
 
+  <!-- Activity view -->
+  <template id="tpl-activity">
+    <div class="view activity-view">
+      <div class="toolbar">
+        <div class="tb-row">
+          <select id="a-scope" class="tb-select">
+            <option value="today">今日</option>
+            <option value="yesterday">昨日</option>
+            <option value="7">直近 7 日</option>
+            <option value="30">直近 30 日</option>
+            <option value="date">日付指定 →</option>
+          </select>
+          <input type="date" id="a-date" class="tb-select" hidden>
+          <select id="a-user" class="tb-select">
+            <option value="">社員:全員</option>
+          </select>
+          <button id="a-refresh" class="link-btn">🔄 更新</button>
+          <span id="a-count" class="count-chip">— 件</span>
+        </div>
+      </div>
+      <div class="activity-summary" id="a-summary"></div>
+      <div class="table-wrap">
+        <table class="v-table activity-table">
+          <thead>
+            <tr>
+              <th style="width:110px">日時</th>
+              <th style="width:100px">社員</th>
+              <th style="width:130px">患者</th>
+              <th style="width:80px">医院</th>
+              <th style="width:110px">ステータス</th>
+              <th>メモ</th>
+              <th style="width:100px">売上</th>
+            </tr>
+          </thead>
+          <tbody id="a-tbody"></tbody>
+        </table>
+        <div id="a-empty" class="empty-msg" hidden>該当する変更ログがありません</div>
+      </div>
+    </div>
+  </template>
+
+  <!-- Password change modal -->
+  <template id="tpl-pw">
+    <div class="modal-backdrop">
+      <div class="modal">
+        <header class="modal-hdr">
+          <h3>🔑 パスワード変更</h3>
+          <button class="modal-close" data-close>×</button>
+        </header>
+        <div class="modal-body">
+          <div class="field">
+            <label>新しいパスワード (8 文字以上)</label>
+            <input type="password" id="pw-new" placeholder="新パスワード" autocomplete="new-password">
+          </div>
+          <div class="field">
+            <label>確認のためもう一度</label>
+            <input type="password" id="pw-new2" placeholder="もう一度入力" autocomplete="new-password">
+          </div>
+          <div id="pw-err" class="err-msg" style="min-height:18px"></div>
+        </div>
+        <footer class="modal-foot">
+          <span class="modal-hint">パスワードは 8 文字以上を推奨</span>
+          <button class="btn-secondary" data-close>キャンセル</button>
+          <button id="pw-save" class="btn-primary">変更する</button>
+        </footer>
+      </div>
+    </div>
+  </template>
+
   <!-- Memo modal -->
   <template id="tpl-memo">
     <div class="modal-backdrop">
@@ -239,6 +314,6 @@
     </div>
   </template>
 
-  <script src="app.js?v=20"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>

@@ -807,6 +807,43 @@ main {
 .slot-count .days { margin-left: 6px; font-size: 11px; color: var(--ink-soft); }
 .slot-meta { font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); }
 
+/* ------- v614: アクティビティビュー ------- */
+.activity-summary {
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 42px;
+  align-items: center;
+  flex-shrink: 0;
+}
+.activity-chip {
+  display: inline-block;
+  padding: 4px 12px;
+  background: var(--accent-soft);
+  color: var(--accent-ink);
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.activity-chip strong { font-size: 14px; margin: 0 2px; }
+.activity-table tbody td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.status-tag {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  font-size: 10.5px;
+}
+
 /* ============================================================
  * v611: Responsive — desktop / tablet / mobile 3 段階
  * ============================================================ */

@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v613';
+const APP_VERSION = 'v614';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -220,10 +220,33 @@ async function checkAuth() {
   const { data: { session } } = await sb.auth.getSession();
   return session?.user || null;
 }
-async function login(email, pw) {
+// v614: 社員 ID (adachi 等) を入れたら @aladdin.local を自動付与。email 形式ならそのまま。
+const STAFF_EMAIL_DOMAIN = 'aladdin.local';
+function normalizeLoginId(input) {
+  const s = String(input || '').trim();
+  if (!s) return s;
+  if (s.includes('@')) return s;                    // 既に email
+  return `${s.toLowerCase()}@${STAFF_EMAIL_DOMAIN}`;
+}
+// email → 表示名 (metadata.display_name 優先、無ければ ID 部分)
+function displayNameOf(user) {
+  if (!user) return '';
+  const meta = user.user_metadata || {};
+  if (meta.display_name) return meta.display_name;
+  const email = user.email || '';
+  const local = email.split('@')[0];
+  return local;
+}
+async function login(loginId, pw) {
+  const email = normalizeLoginId(loginId);
   const { data, error } = await sb.auth.signInWithPassword({ email, password: pw });
   if (error) throw error;
   return data.user;
+}
+async function changePassword(newPw) {
+  const { error } = await sb.auth.updateUser({ password: newPw });
+  if (error) throw error;
+  return true;
 }
 async function logout() {
   await sb.auth.signOut();
@@ -417,7 +440,7 @@ function render() {
     app.appendChild(shell);
     bindShell();
   }
-  $('#user-email').textContent = state.user.email || '';
+  $('#user-email').textContent = displayNameOf(state.user);
   // Active nav
   $$('.nav-btn').forEach(b => b.classList.toggle('active', b.dataset.view === state.view));
   // v611: header 右上の件数/更新時刻 chip は visits view のときのみ表示
@@ -432,6 +455,7 @@ function render() {
   else if (state.view === 'bookings') renderBookingsView(main);
   else if (state.view === 'patients') renderPatientsView(main);
   else if (state.view === 'slots') renderSlotsView(main);
+  else if (state.view === 'activity') renderActivityView(main);
 }
 
 function renderLogin(app) {
@@ -466,6 +490,9 @@ function bindShell() {
     });
   });
   $('#logout-btn').addEventListener('click', logout);
+  // v614: パスワード変更
+  const pwBtn = $('#pw-change-btn');
+  if (pwBtn) pwBtn.addEventListener('click', openPasswordModal);
   $('#refresh-btn').addEventListener('click', async () => {
     setSaveStatus('更新中…', 'saving');
     await Promise.all([fetchVisits(), fetchPatients()]);
@@ -889,7 +916,8 @@ function openMemoModal(v) {
         const m = text.value || '';
         mc.classList.toggle('has-value', !!m);
         mc.classList.toggle('empty', !m);
-        mc.textContent = m ? (m.length > 30 ? m.slice(0,30) + '…' : m) : '+ メモ';
+        mc.textContent = m || '+ メモ';   /* v613: 全文表示 (CSS の line-clamp で省略) */
+        mc.setAttribute('title', m || '');
       }
       toast('メモを保存しました', 'ok');
       close();
@@ -1147,6 +1175,178 @@ function renderPatientsTable() {
     <td>-</td>
     <td class="c-updated">${esc(fmtRelative(p.last_activity))}</td>
   </tr>`).join('');
+}
+
+// ==================== v614: パスワード変更モーダル ====================
+function openPasswordModal() {
+  if (document.querySelector('.modal-backdrop')) return;
+  const backdrop = document.body.appendChild($('#tpl-pw').content.cloneNode(true).firstElementChild);
+  const newInp = backdrop.querySelector('#pw-new');
+  const new2Inp = backdrop.querySelector('#pw-new2');
+  const err = backdrop.querySelector('#pw-err');
+  const saveBtn = backdrop.querySelector('#pw-save');
+  const close = () => { backdrop.remove(); document.removeEventListener('keydown', onKey); };
+  const doSave = async () => {
+    err.textContent = '';
+    const p1 = newInp.value, p2 = new2Inp.value;
+    if (!p1 || p1.length < 8) { err.textContent = '8 文字以上を入力してください'; return; }
+    if (p1 !== p2) { err.textContent = '確認用パスワードが一致しません'; return; }
+    saveBtn.disabled = true; saveBtn.textContent = '変更中…';
+    try {
+      await changePassword(p1);
+      toast('パスワードを変更しました', 'ok');
+      close();
+    } catch(e) {
+      err.textContent = '変更失敗: ' + (e.message || e);
+      saveBtn.disabled = false; saveBtn.textContent = '変更する';
+    }
+  };
+  const onKey = (e) => {
+    if (e.key === 'Escape') { e.preventDefault(); close(); }
+    else if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); doSave(); }
+  };
+  document.addEventListener('keydown', onKey);
+  backdrop.querySelectorAll('[data-close]').forEach(el => el.addEventListener('click', close));
+  backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+  saveBtn.addEventListener('click', doSave);
+  newInp.focus();
+}
+
+// ==================== v614: アクティビティビュー ====================
+// updated_by と updated_at をベースに「誰がいつどの患者を触ったか」を集計。
+// フィールドレベルの diff は取れないが、行レベルの活動追跡としては十分。
+const activityState = {
+  scope: 'today',
+  date: '',
+  user: '',
+};
+function renderActivityView(main) {
+  main.innerHTML = '';
+  const node = $('#tpl-activity').content.cloneNode(true);
+  main.appendChild(node);
+
+  const scopeSel = $('#a-scope');
+  const dateInp = $('#a-date');
+  const userSel = $('#a-user');
+  scopeSel.value = activityState.scope;
+  dateInp.hidden = (activityState.scope !== 'date');
+  if (activityState.date) dateInp.value = activityState.date;
+
+  // ユーザー選択肢: 現在の visits データ内で見つかった updated_by を全部リストアップ
+  const users = new Set();
+  for (const v of state.visits) {
+    if (v.updated_by) users.add(v.updated_by);
+  }
+  const sortedUsers = Array.from(users).sort();
+  for (const u of sortedUsers) {
+    const opt = document.createElement('option');
+    opt.value = u;
+    opt.textContent = shortenUserLabel(u);
+    userSel.appendChild(opt);
+  }
+  userSel.value = activityState.user;
+
+  scopeSel.addEventListener('change', () => {
+    activityState.scope = scopeSel.value;
+    dateInp.hidden = (scopeSel.value !== 'date');
+    renderActivityTable();
+  });
+  dateInp.addEventListener('change', () => { activityState.date = dateInp.value; renderActivityTable(); });
+  userSel.addEventListener('change', () => { activityState.user = userSel.value; renderActivityTable(); });
+  $('#a-refresh').addEventListener('click', async () => {
+    setSaveStatus('更新中…', 'saving');
+    await fetchVisits();
+    setSaveStatus('更新完了 ✓', 'saved');
+    renderActivityView(main);   // 再描画
+  });
+
+  renderActivityTable();
+}
+
+function shortenUserLabel(u) {
+  if (!u) return '(不明)';
+  const local = String(u).split('@')[0];
+  // adachi → 足立 のマッピング (create-staff-users.js の STAFF と一致)
+  const map = { adachi: '足立', uemura: '上村', yasui: '安井', kitajima: '北島' };
+  return map[local] ? `${map[local]} (${local})` : local;
+}
+
+function computeActivityRange() {
+  const { scope, date } = activityState;
+  const now = new Date();
+  const startOfDay = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0);
+  if (scope === 'today') return { from: startOfDay(now), to: new Date() };
+  if (scope === 'yesterday') {
+    const y = new Date(now); y.setDate(y.getDate() - 1);
+    return { from: startOfDay(y), to: new Date(y.getFullYear(), y.getMonth(), y.getDate(), 23, 59, 59, 999) };
+  }
+  if (scope === '7' || scope === '30') {
+    const days = parseInt(scope, 10);
+    const from = new Date(now); from.setDate(from.getDate() - days);
+    return { from, to: new Date() };
+  }
+  if (scope === 'date' && date) {
+    const [Y, M, D] = date.split('-').map(Number);
+    const from = new Date(Y, M - 1, D, 0, 0, 0, 0);
+    const to = new Date(Y, M - 1, D, 23, 59, 59, 999);
+    return { from, to };
+  }
+  return { from: startOfDay(now), to: new Date() };
+}
+
+function renderActivityTable() {
+  const { from, to } = computeActivityRange();
+  const fromMs = from.getTime(), toMs = to.getTime();
+  const userFilter = activityState.user;
+  const rows = state.visits.filter(v => {
+    if (!v.updated_at || !v.updated_by) return false;
+    const t = new Date(v.updated_at).getTime();
+    if (isNaN(t)) return false;
+    if (t < fromMs || t > toMs) return false;
+    if (userFilter && v.updated_by !== userFilter) return false;
+    return true;
+  }).sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
+
+  // 社員別サマリ
+  const perUser = new Map();
+  for (const v of rows) {
+    const k = v.updated_by;
+    perUser.set(k, (perUser.get(k) || 0) + 1);
+  }
+  const sumParts = Array.from(perUser.entries())
+    .sort((a, b) => b[1] - a[1])
+    .map(([u, n]) => `<span class="activity-chip">${esc(shortenUserLabel(u))}: <strong>${n}</strong> 件</span>`);
+  $('#a-summary').innerHTML = sumParts.length ? sumParts.join('') : '<span class="empty-msg">この期間の変更なし</span>';
+  $('#a-count').innerHTML = `<strong>${rows.length}</strong> 件`;
+
+  const tbody = $('#a-tbody');
+  tbody.innerHTML = '';
+  const empty = $('#a-empty');
+  empty.hidden = (rows.length > 0);
+  if (!rows.length) return;
+
+  // 500 件までに抑える (パフォーマンス)
+  const shown = rows.slice(0, 500);
+  const frag = document.createDocumentFragment();
+  for (const v of shown) {
+    const tr = document.createElement('tr');
+    const memo = v.memo || '';
+    tr.innerHTML = `
+      <td style="font-family:var(--font-mono);font-size:11px;white-space:nowrap">${esc(fmtDateTime(v.updated_at))}</td>
+      <td style="font-size:12px">${esc(shortenUserLabel(v.updated_by))}</td>
+      <td style="font-weight:600">${esc(v.patient_name || '-')}</td>
+      <td style="font-size:11px">${esc(normFac(v.facility) || '-')}</td>
+      <td style="font-size:11px"><span class="status-tag">${esc(v.bf_status || v.status || '')}</span></td>
+      <td style="font-size:11px;color:var(--ink-soft)">${esc(memo)}</td>
+      <td style="font-family:var(--font-mono);font-size:11px;text-align:right">${v.contract_amount != null ? '¥' + Number(v.contract_amount).toLocaleString() : ''}</td>`;
+    frag.appendChild(tr);
+  }
+  tbody.appendChild(frag);
+  if (rows.length > 500) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td colspan="7" style="text-align:center;color:var(--ink-mute);font-size:11px">…他 ${rows.length - 500} 件 (期間を絞ってください)</td>`;
+    tbody.appendChild(tr);
+  }
 }
 
 // ==================== Boot ====================
