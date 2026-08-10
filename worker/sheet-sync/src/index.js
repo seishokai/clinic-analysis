@@ -178,9 +178,14 @@ function isTouched(visit) {
   return false;
 }
 
-// v800: 保険判定 (来院理由に「保険」含めば 治療中)
+// v801: 保険判定 (来院理由が 「保険初診」 の場合のみ 治療中、それ以外は 検討中)
+//   ユーザ確認: 「保険初診」→ 治療中、「保険+ORT相談」等の相談系は 検討中
 function statusFromReason(reason) {
-  if (reason && String(reason).includes('保険')) return '治療中';
+  if (!reason) return '検討中';
+  const s = String(reason).trim();
+  // 「保険初診」を含む (「保険初診相談」等の variant にも対応)、ただし単なる「保険」や
+  // 「保険+ORT相談」は「初診」の文字がないので検討中扱い
+  if (s.includes('保険初診')) return '治療中';
   return '検討中';
 }
 
