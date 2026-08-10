@@ -382,6 +382,19 @@ main {
 }
 .quick-period-btn:hover { background: var(--accent-soft); color: var(--accent-ink); border-color: var(--accent); }
 .quick-period-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+/* v710 重複ボタン: 未選択=柔ピンク、active=濃ピンク */
+.quick-dup-btn {
+  padding: 6px 12px; background: #fff5f5; color: #c2185b; border: 1px solid #f8bbd0;
+  border-radius: 5px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit;
+}
+.quick-dup-btn:hover { background: #fce4ec; border-color: #f48fb1; }
+.quick-dup-btn.active { background: #c2185b; color: #fff; border-color: #c2185b; }
+/* 重複バッジ: 名前列の右に小さく ×N */
+.dup-badge {
+  display: inline-block; margin-left: 6px; padding: 1px 6px;
+  background: #fce4ec; color: #c2185b; border: 1px solid #f48fb1;
+  border-radius: 8px; font-size: 10px; font-weight: 700; vertical-align: middle;
+}
 .link-btn:hover {
   background: var(--line-soft);
 }

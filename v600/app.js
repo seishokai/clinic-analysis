@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v709';
+const APP_VERSION = 'v710';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -88,6 +88,7 @@ const state = {
     periodMonth: '',    // YYYY-MM (when period === 'month')
     periodFrom: '',     // YYYY-MM-DD (when period === 'range')
     periodTo: '',       // YYYY-MM-DD (when period === 'range')
+    dupOnly: false,     // v710: 同日同患者に複数行ある行だけ表示
   },
   memoTarget: null,     // { visit_id, name, current_memo }
 };
@@ -312,8 +313,19 @@ async function fetchVisits() {
     v._searchHay = ((v.patient_name || '') + ' ' + (v.normalized_name || '') + ' ' + (v.phone || '')).toLowerCase();
     v._bookMs = v.book_date ? new Date(v.book_date + 'T00:00:00+09:00').getTime() : null;
   });
+  // v710: 重複件数を precompute (同一 patient_id + book_date + 重複削除除く)
+  const dupBuckets = new Map();
+  for (const v of all) {
+    if (v._effStatus === '重複削除') { v._dupCount = 0; continue; }
+    const k = `${v.patient_id}|${v.book_date}`;
+    dupBuckets.set(k, (dupBuckets.get(k) || 0) + 1);
+  }
+  for (const v of all) {
+    v._dupCount = v._effStatus === '重複削除' ? 0 : (dupBuckets.get(`${v.patient_id}|${v.book_date}`) || 1);
+  }
   state.visits = all;
-  state.visitsFetchedAt = Date.now();   // v709 BUG#4 修正: 更新チップに実際の fetch 時刻を出すため記録
+  state.visitsFetchedAt = Date.now();
+  if (typeof updateDupButton === 'function') updateDupButton();   // v710: 重複ボタンの件数ラベル更新
   // v603 fix #19: 20 page cap 到達時は明示的に warn
   if (hitCap) toast(`⚠ 20k 件の上限に達しました (${all.length} 件のみ表示)`, 'err', 6000);
 }
@@ -429,12 +441,13 @@ function filteredVisits() {
     if (f.treatment && v._treatment !== f.treatment) return false;
     if (f.promo && (v.promo_code || '') !== f.promo) return false;
     // v707: status filter が空なら '重複削除' はデフォルト非表示 & カウント除外
-    //       (キャンセル/除外 は v604 で再表示)
     if (f.status) {
       if (v._effStatus !== f.status) return false;
     } else {
       if (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus)) return false;
     }
+    // v710: 「重複」ボタン: 同日同患者に2行以上ある行だけ
+    if (f.dupOnly && (v._dupCount || 0) < 2) return false;
     if ((fromMs || toMs) && v._bookMs) {
       if (fromMs && v._bookMs < fromMs) return false;
       if (toMs && v._bookMs > toMs) return false;
@@ -591,6 +604,15 @@ function renderVisitsView(main) {
         renderVisitsTable();
       });
     });
+    // v710: 重複ボタン (トグル)
+    const dupBtn = $('#v-dup-toggle');
+    if (dupBtn) {
+      dupBtn.addEventListener('click', () => {
+        state.filters.dupOnly = !state.filters.dupOnly;
+        updateDupButton();
+        renderVisitsTable();
+      });
+    }
     // v618: モバイル用フィルタ折りたたみボタン
     const ftBtn = $('#v-filter-toggle');
     if (ftBtn) {
@@ -611,12 +633,13 @@ function renderVisitsView(main) {
     });
     $('#v-reset').addEventListener('click', () => {
       state.filters = { search: '', facility: '', treatment: '', promo: '', status: '', period: 'all',
-                        periodMonth: '', periodFrom: '', periodTo: '' };
+                        periodMonth: '', periodFrom: '', periodTo: '', dupOnly: false };   // v710
       $('#v-search').value = ''; $('#v-facility').value = ''; $('#v-treatment').value = '';
       $('#v-promo').value = ''; $('#v-status').value = ''; $('#v-period').value = 'all';
       $('#v-month').value = ''; $('#v-from').value = ''; $('#v-to').value = '';
       updatePeriodExtraInputs();
-      updateQuickPeriodButtons();   // v709 BUG#5 修正: 今月/先月ボタンの active ハイライト残留
+      updateQuickPeriodButtons();
+      updateDupButton();   // v710
       renderVisitsTable();
     });
     // Populate current filter values
@@ -690,6 +713,16 @@ function updateQuickPeriodButtons() {
   document.querySelectorAll('.quick-period-btn').forEach(btn => {
     btn.classList.toggle('active', btn.dataset.period === state.filters.period);
   });
+}
+// v710: 重複トグル ボタンの active state 反映 + 総重複数を label に
+function updateDupButton() {
+  const btn = $('#v-dup-toggle');
+  if (!btn) return;
+  const on = !!state.filters.dupOnly;
+  btn.classList.toggle('active', on);
+  // 重複が何件あるか (2+ dupCount) を計算して label に付ける
+  const dupCount = state.visits.reduce((n, v) => n + ((v._dupCount || 0) >= 2 ? 1 : 0), 0);
+  btn.textContent = dupCount > 0 ? `重複 ${dupCount}` : '重複';
 }
 function updatePeriodExtraInputs() {
   const p = state.filters.period;
@@ -802,7 +835,7 @@ function rowHtml(v) {
   const memo = v.memo || '';
   return `<tr data-visit-id="${esc(v.visit_id)}">
     <td class="c-book">${esc(bookDisplay)}</td>
-    <td class="c-name" title="${esc(v.normalized_name || '')}">${esc(v.patient_name || '(名前なし)')}</td>
+    <td class="c-name" title="${esc(v.normalized_name || '')}">${esc(v.patient_name || '(名前なし)')}${(v._dupCount || 0) >= 2 ? `<span class="dup-badge" title="同日同患者に ${v._dupCount} 行あります">×${v._dupCount}</span>` : ''}</td>
     <td class="c-treatment">${treatment ? `<span class="treatment-chip" data-t="${esc(treatment)}">${esc(treatment)}</span>` : '<span class="tx-empty">-</span>'}</td>
     <td class="c-facility" title="${esc(v.facility || '')}">${esc(normFac(v.facility) || '-')}</td>
     <td class="c-promo"><span class="${promoChipCls}" title="${esc(promo)}">${promo ? esc(shortPromo(promo)) : '-'}</span></td>

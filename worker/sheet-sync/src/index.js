@@ -357,10 +357,40 @@ async function runSync(env, triggerName) {
     for (const p of (Array.isArray(rows) ? rows : [])) patientMap.set(p.normalized_name, p.id);
   }
 
-  // ---- Phase 5: 予約管理シート → patient_visits INSERT (dedup on sync_source) ----
+  // ---- v916: Phase 5 の前に「触った (patient, book_date)」を SELECT して事前フィルタ ----
+  //   sheet-sync が新規 booking を INSERT する前に、既に staff が処理済の (patient, date) は skip して重複防止。
+  //   Phase 6 の visitsByPatFac 構築にも同じ結果を使い回して subreq 節約。
+  const allVisSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&status=neq.${encodeURIComponent('重複削除')}&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code&order=id`;
+  const allExistingVisits = [];
+  const VIS_CHUNK_ALL = 1000;
+  for (let offset = 0; offset < 100000; offset += VIS_CHUNK_ALL) {
+    const visRes = await fetch(`${allVisSelBase}&offset=${offset}&limit=${VIS_CHUNK_ALL}`, { headers: sbHeaders(env) });
+    if (!visRes.ok) {
+      return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, initialCandidates.length,
+        `visits pre-SELECT offset ${offset} failed: ${visRes.status} ${await visRes.text()}`);
+    }
+    const rows = await visRes.json();
+    allExistingVisits.push(...rows);
+    if (rows.length < VIS_CHUNK_ALL) break;
+  }
+  const touchedPatDate = new Set();      // v916: これらの (patient, book_date) に新規 INSERT しない
+  for (const v of allExistingVisits) {
+    const isTouchedV = (v.memo && v.memo.length > 0) || v.contract_amount != null || v.next_visit_date != null
+      || (v.updated_by && String(v.updated_by).includes('@')) || (v.status && !SYNC_MANAGED_STATUS.has(v.status));
+    if (isTouchedV) touchedPatDate.add(`${v.patient_id}|${v.book_date}`);
+  }
+
+  // ---- Phase 5: 予約管理シート → patient_visits INSERT (dedup on sync_source + touched patient+date) ----
   let bookingInserted = 0;
+  let bookingSkippedTouched = 0;
   const bookingPayload = bookingCandidates
     .filter(c => patientMap.has(c.normalized_name))
+    .filter(c => {
+      // v916: 既に触った行がある patient+book_date に新規 booking を作らない (重複防止の恒久対策)
+      const pid = patientMap.get(c.normalized_name);
+      if (touchedPatDate.has(`${pid}|${c.book_date}`)) { bookingSkippedTouched++; return false; }
+      return true;
+    })
     .map(c => {
       const sec = hashSec(c.sync_source);
       const hh = String(Math.floor(sec / 3600)).padStart(2, '0');
@@ -376,14 +406,14 @@ async function runSync(env, triggerName) {
         apply_at: applyAtIso,
         status: '未対応',
         service: c.service,
-        source_tool: c.tool,           // 'DXHUB' or 'セレクト'
+        source_tool: c.tool,
         promo_code: c.promo_code,
         sync_source: c.sync_source,
         updated_by: 'system-sync',
         created_by: 'system-sync',
       };
     });
-  const BATCH_B = 2000;   // v915: 大バッチ化 (10k booking / 2000 = 5 subreq、ignore-duplicates で衝突OK)
+  const BATCH_B = 2000;
   for (let i = 0; i < bookingPayload.length; i += BATCH_B) {
     const batch = bookingPayload.slice(i, i + BATCH_B);
     // sync_source unique index (uidx_visits_sync_source) + patient_id,apply_at unique key の両方に対応するため
@@ -402,22 +432,10 @@ async function runSync(env, triggerName) {
   }
 
   // ---- Phase 6: 初診管理シート → マッチ + UPDATE/INSERT ----
-  //   Phase 5 が終わってから existing visits を SELECT (新規 booking 行も含む fresh pool)
-  // v915: 未対応のみに絞る (isTouched が来院済/検討中/... 全て touched 扱いに変わったので、
-  //   マッチ対象は事実上 未対応 のみ。SELECT を数分の一に削減し subreq 節約)
-  const visSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&status=eq.${encodeURIComponent('未対応')}&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code&order=id`;
-  const existingVisits = [];
-  const VIS_CHUNK = 1000;
-  for (let offset = 0; offset < 50000; offset += VIS_CHUNK) {
-    const visRes = await fetch(`${visSelBase}&offset=${offset}&limit=${VIS_CHUNK}`, { headers: sbHeaders(env) });
-    if (!visRes.ok) {
-      return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, bookingInserted, 0, 0, 0, 0, initialCandidates.length,
-        `visits SELECT offset ${offset} failed: ${visRes.status} ${await visRes.text()}`);
-    }
-    const rows = await visRes.json();
-    existingVisits.push(...rows);
-    if (rows.length < VIS_CHUNK) break;
-  }
+  //   v916: Phase 5 前の allExistingVisits を再利用 (subreq 節約)。未対応行のみ Phase 6 対象。
+  //   今回 Phase 5 で INSERT した booking は id 未確定なので Phase 6 では扱わず、次回 sync で処理。
+  //   代わりに Phase 8 walk-in で 触った pat+date に INSERT しないガードを入れる。
+  const existingVisits = allExistingVisits.filter(v => v.status === '未対応');
 
   // v911 Phase 2: matcher の日付マッチを撤廃。
   //   ユーザー方針: 「来院日は初診管理シートが正」
@@ -456,7 +474,12 @@ async function runSync(env, triggerName) {
         skippedTouched++;
       }
     } else {
-      toInsert.push({ candidate: c, patient_id: patientId, status: statusFromReason(c.reason), promo: sheetPromo });
+      // v916: 同 patient+book_date に既に「触った行」があれば walk-in INSERT しない (重複防止)
+      if (touchedPatDate.has(`${patientId}|${c.book_date}`)) {
+        skippedTouched++;
+      } else {
+        toInsert.push({ candidate: c, patient_id: patientId, status: statusFromReason(c.reason), promo: sheetPromo });
+      }
     }
   }
 
@@ -549,7 +572,9 @@ async function runSync(env, triggerName) {
   return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab,
     bookingInserted, updated, walkinInserted, skippedTouched,
     bookingCandidates.length + initialCandidates.length, undefined, undefined,
-    { patientMapSize: patientMap.size, uniquePatientsSize: uniquePatients.size, no_patient_id: dbg_no_patient, existingVisits: existingVisits.length });
+    { patientMapSize: patientMap.size, uniquePatientsSize: uniquePatients.size, no_patient_id: dbg_no_patient,
+      untouchedVisits: existingVisits.length, allExistingVisits: allExistingVisits.length,
+      touchedPatDate: touchedPatDate.size, bookingSkippedTouched });
 }
 
 async function finalize(env, trigger, startMs, bookingPerTab, initialPerTab,
@@ -657,12 +682,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v915',
+        service: 'sheet-sync v916',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v915\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v916\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
