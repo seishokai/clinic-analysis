@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v712';
+const APP_VERSION = 'v713';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -315,14 +315,27 @@ async function fetchVisits() {
     if (page === 19) hitCap = true;
   }
   state.loading = false;
+  // v713: View に deleted 列が無い → 別 SELECT で deleted=true の id リストを取得し client 側で除外
+  //   (Supabase default limit 1000 対策で range paging も入れる)
+  const deletedIds = new Set();
+  try {
+    let dOffset = 0;
+    while (dOffset < 20000) {
+      const dRes = await sb.from('patient_visits').select('id').eq('deleted', true).range(dOffset, dOffset + 999);
+      if (dRes.error) break;
+      const rows = dRes.data || [];
+      for (const r of rows) deletedIds.add(r.id);
+      if (rows.length < 1000) break;
+      dOffset += 1000;
+    }
+  } catch (_) { /* deleted 取得失敗しても続行 */ }
   // v603 P4/P8: fetch 時に事前計算した検索キー・日付 epoch・正規化フィールドを付与
-  //   filter/render で毎回計算するのを回避 (3150 rows × filter で ~30ms → ~3ms)
   const now = Date.now();
-  // v712: クライアント側の二重防御 — View が deleted 除外できてない場合の safety net。
-  //   deleted=true / patient_name/normalized_name に「テスト/てすと/test」/ 名前空 を全て除外。
+  // v712/v713: クライアント側の二重防御 — deleted / テスト / 名前空 を全て除外
   const testRe = /テスト|てすと|test/i;
   all = all.filter(v => {
-    if (v.deleted === true) return false;   // v712: View fallback で deleted=true が混入する対策
+    if (v.deleted === true) return false;              // v712: 直接 deleted 列があれば
+    if (deletedIds.has(v.visit_id) || deletedIds.has(v.id)) return false;   // v713: 別テーブル参照で判定
     const nm = (v.patient_name || '') + (v.normalized_name || '');
     if (!nm.trim()) return false;
     if (testRe.test(nm)) return false;
