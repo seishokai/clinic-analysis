@@ -26,18 +26,16 @@
 import CONFIG from '../config/sheet-tabs.js';
 
 // ==================== Utils ====================
-// v911: 旧字体 → 常用漢字 正規化 (歯科患者名で頻出のもの)
-//   髙橋 vs 高橋、齋藤 vs 斉藤 等の matcher バグ対策
+// v915: 旧字体 → 常用漢字 正規化 (歯科患者名で頻出のもの)
+//   髙橋 vs 高橋、齋藤 vs 斉藤 等の matcher バグ対策。
+//   **削除**: 別人を誤マージするリスクの高い姓の異体字 (嶋↔島 中嶋/中島, 邊↔辺 渡邊/渡辺 等)。
+//              これらは normalized_name unique index と組み合わせて別人統合の恐れ大。
+//   残す: 髙↔高 (髙橋/高橋)、﨑↔崎、齋↔斉、眞↔真、濱↔浜、廣↔広、澤↔沢、惠↔恵、德↔徳、龍↔竜
+//         (これらは殆どの場合同一人物のゆらぎ)
 const KYUJITAI_MAP = {
-  '髙':'高','﨑':'崎','德':'徳','齋':'斉','齊':'斉','斎':'斉',
-  '眞':'真','濱':'浜','廣':'広','澤':'沢','邊':'辺','邉':'辺',
-  '惠':'恵','曾':'曽','會':'会','應':'応','假':'仮','壽':'寿',
-  '巖':'岩','國':'国','學':'学','實':'実','寳':'宝','寶':'宝',
-  '峯':'峰','龜':'亀','龍':'竜','儘':'侭','圓':'円','舊':'旧',
-  '萬':'万','靑':'青','靜':'静','麴':'麹','轉':'転','爲':'為',
-  '舘':'館','檜':'桧','桒':'桑','觀':'観','讀':'読','藪':'薮',
-  '籠':'篭','薗':'園','戀':'恋','嶋':'島','嶌':'島','鄕':'郷',
-  '瀨':'瀬','燈':'灯','壯':'壮','鹽':'塩','驛':'駅','靈':'霊',
+  '髙':'高','﨑':'崎','德':'徳','齋':'斉','齊':'斉',
+  '眞':'真','濱':'浜','廣':'広','澤':'沢',
+  '惠':'恵','龍':'竜','萬':'万',
 };
 function normName(n) {
   if (n == null) return '';
@@ -168,12 +166,14 @@ function sbHeaders(env, extra = {}) {
   };
 }
 
-// v911: '未対応' と '来院済' は sync が自身で付けるので untouched 扱い。
-//   他のステータス (検討中/治療中/成約 等) は人間が変えた証拠なので touched。
-const SYNC_MANAGED_STATUS = new Set(['未対応', '来院済']);
+// v915: 保護判定を厳格化。
+//   ・'未対応' のみ「まだ sync が触ってない」= 対象。
+//   ・'来院済' は sync が一度確定済み → 別 initial 行に誤 claim されるのを防ぐため touched 扱い。
+//   ・contract_amount = 0 でも「値が入ってる」なら人間が触った扱い (NULL のみ空とみなす)。
+const SYNC_MANAGED_STATUS = new Set(['未対応']);
 function isTouched(visit) {
   if (visit.memo != null && String(visit.memo).length > 0) return true;
-  if (visit.contract_amount != null && Number(visit.contract_amount) > 0) return true;
+  if (visit.contract_amount != null) return true;                              // v915: 0 円成約も保護
   if (visit.next_visit_date != null) return true;
   const u = visit.updated_by;
   if (u && String(u).includes('@')) return true;
@@ -320,20 +320,28 @@ async function runSync(env, triggerName) {
   //   Free tier 50 subreq 対応 (SELECT chunk が cutoff 拡張で 50+ を超えるため)
   //   resolution=merge-duplicates: 既存行は指定フィールドが上書きされる。
   //   name/facility/phone はシート由来が最新なので上書き許容。
+  // v915: PostgREST batch は全レコードで同じキー要求 (PGRST102) → 4 key 統一。
+  //   同一 normalized_name の候補が複数ある場合、phone/phone_last4 が入ってる方を優先採用。
+  //   これで「同じ人が sheet の複数場所に出て、片方だけ電話あり」でも既存電話を潰さない。
+  //   primary_facility は多院利用者を守るため payload に一切含めない (新規 INSERT では NULL)。
   const uniquePatients = new Map();
   for (const c of allCandidates) {
-    if (uniquePatients.has(c.normalized_name)) continue;
+    const existing = uniquePatients.get(c.normalized_name);
+    if (existing) {
+      if (!existing.phone && c.phone) existing.phone = c.phone;
+      if (!existing.phone_last4 && c.phone_last4) existing.phone_last4 = c.phone_last4;
+      continue;
+    }
     uniquePatients.set(c.normalized_name, {
       name: c.patient_name,
       normalized_name: c.normalized_name,
-      primary_facility: c.facility,
-      phone: c.phone,
-      phone_last4: c.phone_last4,
+      phone: c.phone || null,
+      phone_last4: c.phone_last4 || null,
     });
   }
   const patientMap = new Map();
   const patArr = Array.from(uniquePatients.values());
-  const P_BATCH = 500;
+  const P_BATCH = 1000;   // v915: PostgREST default 1000-row response limit と揃える (超えると response truncate)
   for (let i = 0; i < patArr.length; i += P_BATCH) {
     const batch = patArr.slice(i, i + P_BATCH);
     const res = await fetch(`${env.SUPABASE_URL}/rest/v1/patients?on_conflict=normalized_name`, {
@@ -375,7 +383,7 @@ async function runSync(env, triggerName) {
         created_by: 'system-sync',
       };
     });
-  const BATCH_B = 200;
+  const BATCH_B = 2000;   // v915: 大バッチ化 (10k booking / 2000 = 5 subreq、ignore-duplicates で衝突OK)
   for (let i = 0; i < bookingPayload.length; i += BATCH_B) {
     const batch = bookingPayload.slice(i, i + BATCH_B);
     // sync_source unique index (uidx_visits_sync_source) + patient_id,apply_at unique key の両方に対応するため
@@ -395,14 +403,21 @@ async function runSync(env, triggerName) {
 
   // ---- Phase 6: 初診管理シート → マッチ + UPDATE/INSERT ----
   //   Phase 5 が終わってから existing visits を SELECT (新規 booking 行も含む fresh pool)
-  // v913: PostgREST デフォルト 1000 行 return → 4-8月で数万件になるので明示 limit
-  const visSelUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&limit=100000&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code`;
-  const visRes = await fetch(visSelUrl, { headers: sbHeaders(env) });
-  if (!visRes.ok) {
-    return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, bookingInserted, 0, 0, 0, 0, initialCandidates.length,
-      `visits SELECT failed: ${visRes.status} ${await visRes.text()}`);
+  // v915: 未対応のみに絞る (isTouched が来院済/検討中/... 全て touched 扱いに変わったので、
+  //   マッチ対象は事実上 未対応 のみ。SELECT を数分の一に削減し subreq 節約)
+  const visSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&status=eq.${encodeURIComponent('未対応')}&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code&order=id`;
+  const existingVisits = [];
+  const VIS_CHUNK = 1000;
+  for (let offset = 0; offset < 50000; offset += VIS_CHUNK) {
+    const visRes = await fetch(`${visSelBase}&offset=${offset}&limit=${VIS_CHUNK}`, { headers: sbHeaders(env) });
+    if (!visRes.ok) {
+      return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, bookingInserted, 0, 0, 0, 0, initialCandidates.length,
+        `visits SELECT offset ${offset} failed: ${visRes.status} ${await visRes.text()}`);
+    }
+    const rows = await visRes.json();
+    existingVisits.push(...rows);
+    if (rows.length < VIS_CHUNK) break;
   }
-  const existingVisits = await visRes.json();
 
   // v911 Phase 2: matcher の日付マッチを撤廃。
   //   ユーザー方針: 「来院日は初診管理シートが正」
@@ -415,15 +430,16 @@ async function runSync(env, triggerName) {
     visitsByPatFac.get(key).push(v);
   }
 
-  const toUpdate = [];         // {id, newBookDate}
-  const promoUpdates = [];     // {id, promo} — 初診シート由来の promo 昇格 (既存 promo 空の時のみ)
+  const toUpdate = [];
+  const promoUpdates = [];
   const toInsert = [];
-  const claimed = new Set();   // 一度 claim した booking は他の initial に使わせない
+  const claimed = new Set();
   let skippedTouched = 0;
+  let dbg_no_patient = 0;
   const daysBetween = (a, b) => Math.abs((Date.parse(a) - Date.parse(b)) / 86400000);
   for (const c of initialCandidates) {
     const patientId = patientMap.get(c.normalized_name);
-    if (!patientId) continue;
+    if (!patientId) { dbg_no_patient++; continue; }
     const key = `${patientId}|${c.facility}`;
     const matches = (visitsByPatFac.get(key) || []).filter(m => !claimed.has(m.id));
     const sheetPromo = promoFromSource(c.source_channel);
@@ -434,8 +450,8 @@ async function runSync(env, triggerName) {
         const target = untouched[0];
         claimed.add(target.id);
         toUpdate.push({ id: target.id, newBookDate: c.book_date });
-        // v912: シート由来の promo を空 promo にだけ書き込む (DXHUB promo は保護)
-        if (sheetPromo && !target.promo_code) promoUpdates.push({ id: target.id, promo: sheetPromo });
+        // v915: シート由来の promo を **NULL の時のみ** 書き込む (空文字は「意図的な空」として保護)
+        if (sheetPromo && target.promo_code == null) promoUpdates.push({ id: target.id, promo: sheetPromo });
       } else {
         skippedTouched++;
       }
@@ -444,25 +460,22 @@ async function runSync(env, triggerName) {
     }
   }
 
-  // ---- Phase 7: UPDATE (booking 行 → 来院済 + book_date 上書き) ----
-  //   book_date でグループ化して PATCH ?id=in.(...) を打つ。
-  //   同一 book_date 内は 1 subrequest で複数行更新。実運用は数日分しか出ないので少数リクエストで済む。
+  // ---- Phase 7: UPDATE (booking 行 → 来院済) ----
+  //   v915: book_date 別グループ化を廃止 (150日分 sync で 150 subreq 発生し Free tier 50 超過)。
+  //   status のみ単発 PATCH。book_date のシート追従が必要な場合は初回 SQL 直バックフィル or
+  //   将来 Postgres RPC 経由 (VALUES+UPDATE FROM) に置換予定。
   let updated = 0;
-  const grouped = new Map();
-  for (const u of toUpdate) {
-    if (!grouped.has(u.newBookDate)) grouped.set(u.newBookDate, []);
-    grouped.get(u.newBookDate).push(u.id);
-  }
-  for (const [bookDate, ids] of grouped) {
-    const BATCH_U = 200;
-    for (let i = 0; i < ids.length; i += BATCH_U) {
-      const chunk = ids.slice(i, i + BATCH_U);
-      const idList = chunk.map(id => `"${id}"`).join(',');
+  if (toUpdate.length > 0) {
+    // v915: 100 IDs × 40 char UUID ≈ 4KB URL — HTTP header 8KB 制限内で安全
+    const BATCH_U = 100;
+    for (let i = 0; i < toUpdate.length; i += BATCH_U) {
+      const chunk = toUpdate.slice(i, i + BATCH_U);
+      const idList = chunk.map(u => `"${u.id}"`).join(',');
       const patchUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?id=in.(${encodeURIComponent(idList)})`;
       const patchRes = await fetch(patchUrl, {
         method: 'PATCH',
         headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-        body: JSON.stringify({ book_date: bookDate, status: SHEET_ARRIVED_STATUS, updated_by: 'sheet-came' }),
+        body: JSON.stringify({ status: SHEET_ARRIVED_STATUS, updated_by: 'sheet-came' }),
       });
       if (patchRes.ok) {
         const updatedRows = await patchRes.json();
@@ -517,7 +530,7 @@ async function runSync(env, triggerName) {
       created_by: 'sheet-direct',
     };
   });
-  const BATCH_W = 200;
+  const BATCH_W = 2000;
   for (let i = 0; i < insPayload.length; i += BATCH_W) {
     const batch = insPayload.slice(i, i + BATCH_W);
     const iRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patient_visits?on_conflict=sync_source`, {
@@ -535,11 +548,12 @@ async function runSync(env, triggerName) {
 
   return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab,
     bookingInserted, updated, walkinInserted, skippedTouched,
-    bookingCandidates.length + initialCandidates.length);
+    bookingCandidates.length + initialCandidates.length, undefined, undefined,
+    { patientMapSize: patientMap.size, uniquePatientsSize: uniquePatients.size, no_patient_id: dbg_no_patient, existingVisits: existingVisits.length });
 }
 
 async function finalize(env, trigger, startMs, bookingPerTab, initialPerTab,
-                        bookingInserted, initialUpdated, walkinInserted, skippedTouched, rowsRead, rowsError, errorMessage) {
+                        bookingInserted, initialUpdated, walkinInserted, skippedTouched, rowsRead, rowsError, errorMessage, extraDbg) {
   const durationMs = Date.now() - startMs;
   const errs = rowsError || 0;
   const tabsRead = (bookingPerTab.filter(d => !d.error).length) + (initialPerTab.filter(d => !d.error).length);
@@ -572,6 +586,7 @@ async function finalize(env, trigger, startMs, bookingPerTab, initialPerTab,
     rowsSkippedTouched: skippedTouched || 0,
     rowsError: errs,
     durationMs, errorMessage,
+    dbg: extraDbg,
     details: { booking: bookingPerTab, initial: initialPerTab },
   };
 }
@@ -642,12 +657,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v914',
+        service: 'sheet-sync v915',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v914\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v915\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
