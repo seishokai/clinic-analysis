@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v723';
+const APP_VERSION = 'v724';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -500,8 +500,12 @@ function filteredVisits() {
 // ==================== Rendering ====================
 function render() {
   const app = $('#app');
+  // v724: version badge を APP_VERSION から常に反映 (HTML hardcode 廃止で 手動 bump 不要)
+  document.querySelectorAll('[data-app-version]').forEach(el => { el.textContent = APP_VERSION; });
   if (!state.user) {
     renderLogin(app);
+    // renderLogin 内でも template を差し込むので改めて populate
+    document.querySelectorAll('[data-app-version]').forEach(el => { el.textContent = APP_VERSION; });
     return;
   }
   // Shell (only render once)
