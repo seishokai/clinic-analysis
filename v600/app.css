@@ -194,7 +194,22 @@ body {
   position: sticky;
   top: 0;
   z-index: 10;
+  /* v626: 1 行固定 (幅が足りない時は横スクロール) */
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overflow-y: visible;
+  min-height: 52px;
 }
+.hdr-nav {
+  flex-wrap: nowrap;
+  flex-shrink: 0;
+}
+.hdr-brand { flex-shrink: 0; }
+.hdr-right {
+  flex-shrink: 0;
+  flex-wrap: nowrap;
+}
+.hdr-right * { white-space: nowrap; }
 .hdr-brand {
   display: flex;
   align-items: center;
@@ -221,6 +236,9 @@ body {
   cursor: pointer;
   font-family: inherit;
   transition: background 0.15s, color 0.15s;
+  /* v626: 1 行固定 (これがないと狭い時に「来」「院」が縦積みされる) */
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .nav-btn:hover { background: var(--line-soft); color: var(--ink); }
 .nav-btn.active {
