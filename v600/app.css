@@ -466,7 +466,14 @@ main {
 .c-cs       { width: 118px; }
 .c-cmonth   { width: 118px; }
 .c-amount   { width: 100px; }
-.c-memo     { width: auto; min-width: 140px; }   /* 残り幅は memo に配分 */
+.c-memo     {
+  width: auto; min-width: 140px;
+  /* v613: メモは折り返して全文表示 (行高が伸びる) */
+  white-space: normal;
+  overflow: visible;
+  text-overflow: unset;
+  vertical-align: middle;
+}
 .c-updated  { width: 82px;  font-size: 10.5px; color: var(--ink-soft); font-family: var(--font-mono); white-space: nowrap; }
 
 .promo-chip {
@@ -566,9 +573,15 @@ main {
   color: var(--ink);
   font-size: 12px;
   font-weight: 500;
+  /* v613: 折り返して複数行表示 (最大 4 行、それ以上は省略) */
+  white-space: normal;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
 }
 .memo-cell:hover { background: var(--bg); border-style: solid; }
 .memo-cell.has-value {

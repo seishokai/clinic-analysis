@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v612';
+const APP_VERSION = 'v613';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -734,8 +734,8 @@ function rowHtml(v) {
              value="${esc(fmtYen(v.contract_amount))}" placeholder="¥0">
     </td>
     <td class="c-memo">
-      <div class="memo-cell ${memo ? 'has-value' : 'empty'}" data-visit-id="${esc(v.visit_id)}">
-        ${memo ? esc(memo.length > 30 ? memo.slice(0,30) + '…' : memo) : '+ メモ'}
+      <div class="memo-cell ${memo ? 'has-value' : 'empty'}" data-visit-id="${esc(v.visit_id)}" title="${esc(memo || '')}">
+        ${memo ? esc(memo) : '+ メモ'}
       </div>
     </td>
     <td class="c-updated">${esc(fmtRelative(v.updated_at))}</td>
