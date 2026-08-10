@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v728';
+const APP_VERSION = 'v729';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -340,17 +340,30 @@ async function fetchVisits() {
   // v713: View に deleted 列が無い → 別 SELECT で deleted=true の id リストを取得し client 側で除外
   //   (Supabase default limit 1000 対策で range paging も入れる)
   const deletedIds = new Set();
+  // v729: deleted 一覧の取得失敗を silent-swallow から toast + console.error に格上げ
+  //   (RLS/権限変更で 集計が黙って壊れるのを防ぐ)
+  let deletedFetchFailed = false;
   try {
     let dOffset = 0;
     while (dOffset < 20000) {
       const dRes = await sb.from('patient_visits').select('id').eq('deleted', true).range(dOffset, dOffset + 999);
-      if (dRes.error) break;
+      if (dRes.error) {
+        deletedFetchFailed = true;
+        console.error('[fetchVisits] deleted 一覧の取得に失敗', dRes.error);
+        toast('deleted 一覧の取得に失敗: ' + (dRes.error.message || dRes.error.code || 'unknown'), 'err', 5000);
+        break;
+      }
       const rows = dRes.data || [];
       for (const r of rows) deletedIds.add(r.id);
       if (rows.length < 1000) break;
       dOffset += 1000;
     }
-  } catch (_) { /* deleted 取得失敗しても続行 */ }
+  } catch (e) {
+    deletedFetchFailed = true;
+    console.error('[fetchVisits] deleted 一覧取得中に例外', e);
+    toast('deleted 一覧取得に例外: ' + (e && e.message ? e.message : e), 'err', 5000);
+  }
+  state.deletedFetchFailed = deletedFetchFailed;
   // v603 P4/P8: fetch 時に事前計算した検索キー・日付 epoch・正規化フィールドを付与
   const now = Date.now();
   // v712/v713: クライアント側の二重防御 — deleted / テスト / 名前空 を全て除外
@@ -1271,65 +1284,85 @@ const A2_CONTRACT = new Set(['成約',
   '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
   '印象待ち(治療有)', '治療中',
   'セット日確定待ち', 'セット待ち', 'セット完了']);
-// 予約由来判定: source_tool が DXHUB/セレクト、または promo_code が入ってる、または status='未対応' で walkin ではない
+// 予約由来判定: source_tool が DXHUB/セレクト のみ (v729: promo_code フォールバック撤去
+//   — sheet-sync Phase 8 が sheet-direct walk-in に promo_code を付ける挙動と衝突し
+//   広告経由 walk-in を『予約由来』誤カウントしていた)
 const A2_BOOKING_TOOLS = new Set(['DXHUB', 'セレクト']);
 function a2IsBooked(v) {
-  if (A2_BOOKING_TOOLS.has(v.source_tool)) return true;
-  if (v.promo_code) return true;  // promo_code あり = DXHUB 由来
-  return false;
+  return A2_BOOKING_TOOLS.has(v.source_tool);
 }
 function a2IsVisited(v) { return !A2_NON_VISIT.has(v._effStatus); }
 function a2IsContracted(v) { return A2_CONTRACT.has(v._effStatus); }
 const A2_TREAT_ORDER = ['矯正', 'BF', 'インプラント', 'ラブリエ', '保険', 'WT', '審美', '補綴', '転院', '(未分類)'];
 const A2_BOOKING_TREATS = new Set(['矯正', 'BF', 'インプラント', 'ラブリエ']);
 
+// v729: セレクトタブ由来の promo 表示を worker/legacy 双方で統一
+//   — sheet-tabs.js は tool='セレクト' 行に promo_code を付けないため DB では null
+//   — legacy migrate 済み行は 'セレクトタイプ' が入っている
+//   → 表示側で source_tool='セレクト' なら常に promo='セレクト' に寄せる
+function a2NormPromo(v) {
+  if (v.source_tool === 'セレクト') return 'セレクト';
+  const p = v.promo_code;
+  if (!p) return '';
+  return p === 'セレクトタイプ' ? 'セレクト' : p;
+}
 function a2Bucket(v, key) {
   if (key === 'facility') return v._normFacility || '(不明)';
   if (key === 'treatment') return v._treatment || '(未分類)';
   if (key === 'promo') {
-    const p = v.promo_code;
-    return p ? (p === 'セレクトタイプ' ? 'セレクト' : p) : '(なし)';
+    const p = a2NormPromo(v);
+    return p || '(なし)';
   }
   return '?';
 }
 
 // v720: 予約母数 = 予約由来 のみ の 予約→来院率 集計
+// v729: 売上は実来院ベースで統一 (a2FacilityMatrix と揃える)、arpc 計算漏れも補修
 function a2AggregateBooked(visits, key) {
   const buckets = new Map();
   for (const v of visits) {
     if (!a2IsBooked(v)) continue;
     const k = a2Bucket(v, key);
-    if (!buckets.has(k)) buckets.set(k, { key: k, booking: 0, visited: 0, contract: 0, revenue: 0 });
+    if (!buckets.has(k)) buckets.set(k, { key: k, bookedVisited: 0, booking: 0, visited: 0, contract: 0, revenue: 0 });
     const b = buckets.get(k);
     b.booking += 1;
-    if (a2IsVisited(v)) b.visited += 1;
+    const isVis = a2IsVisited(v);
+    if (isVis) { b.visited += 1; b.bookedVisited += 1; }
     if (a2IsContracted(v)) b.contract += 1;
-    if (v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
+    // v729: 売上は実来院者のみ加算 (未対応/キャンセル行の contract_amount ゴミを排除)
+    if (isVis && v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
   }
   const arr = [...buckets.values()];
   for (const b of arr) {
     b.visitRate = b.booking ? (b.visited / b.booking) : 0;
     b.contractRate = b.visited ? (b.contract / b.visited) : 0;
+    b.arpc = b.contract ? (b.revenue / b.contract) : 0;   // v729: プロモ別 客単価 欠落 fix
   }
   arr.sort((a, b) => b.booking - a.booking);
   return arr;
 }
 
 // v723: 全治療の集計 (来院ベース + 予約→来院率は予約系のみ)
+// v729: 予約→来院率 の分子/分母のスコープ非対称を解消
+//   — visitRate は 予約由来 かつ 来院 のみ (bookedVisited) を分子に。
+//   売上も 実来院ベース で統一 (未対応キャンセル行の contract_amount ゴミを排除)。
 function a2AggregateByTreatment(visits) {
   const buckets = new Map();
   for (const v of visits) {
     const t = v._treatment || '(未分類)';
-    if (!buckets.has(t)) buckets.set(t, { key: t, booking: 0, visited: 0, contract: 0, revenue: 0, isBookedTreat: A2_BOOKING_TREATS.has(t) });
+    if (!buckets.has(t)) buckets.set(t, { key: t, bookedVisited: 0, booking: 0, visited: 0, contract: 0, revenue: 0, isBookedTreat: A2_BOOKING_TREATS.has(t) });
     const b = buckets.get(t);
-    if (a2IsBooked(v)) b.booking += 1;
-    if (a2IsVisited(v)) b.visited += 1;
+    const isBk = a2IsBooked(v);
+    const isVis = a2IsVisited(v);
+    if (isBk) b.booking += 1;
+    if (isVis) b.visited += 1;
+    if (isBk && isVis) b.bookedVisited += 1;   // v729: 予約→来院率 の正しい分子
     if (a2IsContracted(v)) b.contract += 1;
-    if (v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
+    if (isVis && v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
   }
   const arr = [...buckets.values()];
   for (const b of arr) {
-    b.visitRate = (b.isBookedTreat && b.booking) ? (b.visited / b.booking) : null;
+    b.visitRate = (b.isBookedTreat && b.booking) ? (b.bookedVisited / b.booking) : null;
     b.contractRate = b.visited ? (b.contract / b.visited) : 0;
     b.arpc = b.contract ? (b.revenue / b.contract) : 0;   // 客単価
   }
@@ -1367,6 +1400,9 @@ function a2Pct(p) {
   return (p * 100).toFixed(1) + '%';
 }
 
+// v729: 期間フィルタは 来院タブ (filteredVisits: `if ((fromMs||toMs) && v._bookMs)`) と
+//   同じセマンティクスに揃える — book_date=null は期間絞込を通す (両タブで件数が一致)。
+//   lastMonth は上限 (現月頭) があるため null を通さず現在の挙動を維持。
 function a2FilterByPeriod(visits) {
   const p = state.a2Period || 'all';
   if (p === 'all') return visits;
@@ -1377,7 +1413,7 @@ function a2FilterByPeriod(visits) {
   } else if (p === 'lastMonth') {
     from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const to = new Date(now.getFullYear(), now.getMonth(), 1);
-    return visits.filter(v => v._bookMs && v._bookMs >= from.getTime() && v._bookMs < to.getTime());
+    return visits.filter(v => !v._bookMs || (v._bookMs >= from.getTime() && v._bookMs < to.getTime()));
   } else if (p === '3m') {
     from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
   } else if (p === '6m') {
@@ -1385,15 +1421,19 @@ function a2FilterByPeriod(visits) {
   }
   if (!from) return visits;
   const fromMs = from.getTime();
-  return visits.filter(v => v._bookMs && v._bookMs >= fromMs);
+  return visits.filter(v => !v._bookMs || v._bookMs >= fromMs);
 }
 
 function a2RenderTable(title, rows) {
   const totalBooking = rows.reduce((s, r) => s + r.booking, 0);
   const totalVisited = rows.reduce((s, r) => s + r.visited, 0);
+  // v729: 治療別合計行の相談率が >100% になる不具合修正
+  //   — 分母(booking) は 予約由来のみ、分子は 予約由来かつ来院 の bookedVisited を使う。
+  //   walk-in 治療 (保険/WT/転院/審美/補綴) の visited は分子に混ぜない。
+  const totalBookedVisited = rows.reduce((s, r) => s + (r.bookedVisited || 0), 0);
   const totalContract = rows.reduce((s, r) => s + r.contract, 0);
   const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
-  const totalVisitRate = totalBooking ? totalVisited / totalBooking : 0;
+  const totalVisitRate = totalBooking ? totalBookedVisited / totalBooking : 0;
   const totalContractRate = totalVisited ? totalContract / totalVisited : 0;
   const totalArpc = totalContract ? (totalRevenue / totalContract) : 0;
   return `<section class="a2-section">
@@ -1473,6 +1513,8 @@ function renderAnalyticsView(main) {
       $('#a2-facility').value = ''; $('#a2-treatment').value = ''; $('#a2-promo').value = '';
       $('#a2-period').value = 'all';
       a2UpdateQuickButtons();
+      // v729: option リストも全期間ベースに戻す (今月ゼロだった医院が再選択可能に)
+      a2PopulateFilters();
       renderAnalyticsTable();
     });
   }
@@ -1480,6 +1522,8 @@ function renderAnalyticsView(main) {
   renderAnalyticsTable();
 }
 // v721: フィルタ select の option を state.visits から動的生成
+// v729: 期間切替で選択中の値が候補集合に無くなった場合は state と select.value を同期クリア
+//   (幽霊フィルタで「全て 選択 → 0件・チップだけ残る」不整合を解消)
 function a2PopulateFilters() {
   const facSel = $('#a2-facility');
   const treatSel = $('#a2-treatment');
@@ -1490,8 +1534,13 @@ function a2PopulateFilters() {
   for (const v of period) {
     if (v._normFacility) facs.add(v._normFacility);
     if (v._treatment) treats.add(v._treatment);
-    if (v.promo_code) promos.add(v.promo_code === 'セレクトタイプ' ? 'セレクト' : v.promo_code);
+    const p = a2NormPromo(v);
+    if (p) promos.add(p);
   }
+  // v729: state に残った orphan 値を候補ベースで検証してクリア
+  if (state.a2Filters.facility && !facs.has(state.a2Filters.facility)) state.a2Filters.facility = '';
+  if (state.a2Filters.treatment && !treats.has(state.a2Filters.treatment)) state.a2Filters.treatment = '';
+  if (state.a2Filters.promo && !promos.has(state.a2Filters.promo)) state.a2Filters.promo = '';
   const buildOpts = (curr, all, prefix) => {
     return `<option value="">${prefix}:全て</option>` +
       [...all].sort().map(x => `<option value="${esc(x)}" ${x === curr ? 'selected' : ''}>${esc(x)}</option>`).join('');
@@ -1499,6 +1548,10 @@ function a2PopulateFilters() {
   facSel.innerHTML = buildOpts(state.a2Filters.facility, facs, '医院');
   treatSel.innerHTML = buildOpts(state.a2Filters.treatment, treats, '治療');
   promoSel.innerHTML = buildOpts(state.a2Filters.promo, promos, 'プロモ');
+  // v729: innerHTML 差し替え後、DOM 側 value も state に合わせる (先頭 '' フォールバック防止)
+  facSel.value = state.a2Filters.facility || '';
+  treatSel.value = state.a2Filters.treatment || '';
+  promoSel.value = state.a2Filters.promo || '';
 }
 // v721: 絞込フィルタ適用
 function a2ApplyFilters(visits) {
@@ -1507,7 +1560,7 @@ function a2ApplyFilters(visits) {
     if (f.facility && (v._normFacility || '') !== f.facility) return false;
     if (f.treatment && (v._treatment || '') !== f.treatment) return false;
     if (f.promo) {
-      const p = v.promo_code === 'セレクトタイプ' ? 'セレクト' : (v.promo_code || '');
+      const p = a2NormPromo(v);
       if (p !== f.promo) return false;
     }
     return true;
@@ -1562,16 +1615,21 @@ function renderAnalyticsTable() {
     body.innerHTML = '<div class="empty-msg">来院データがロードされていません。来院タブを一度開いてください。</div>';
     return;
   }
-  const visits = a2ApplyFilters(a2FilterByPeriod(state.visits));
+  // v729: 分析タブ集計から '重複削除' 行を除外 (来院タブと定義を揃える。
+  //   従来は a2IsBooked が status を見ないため 重複削除 でも booking にカウントされていた)
+  const visitsRaw = state.visits.filter(v => !STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus));
+  const visits = a2ApplyFilters(a2FilterByPeriod(visitsRaw));
 
   // ---- 全体サマリー + 未処理アラート ----
   let booking=0, visited=0, contract=0, revenue=0, visitedAll=0, pendingOverdue=0;
   const todayMs = Date.now();
   for (const v of visits) {
     if (a2IsBooked(v)) booking++;
-    if (a2IsVisited(v)) { visitedAll++; if (a2IsBooked(v)) visited++; }
+    const isVis = a2IsVisited(v);
+    if (isVis) { visitedAll++; if (a2IsBooked(v)) visited++; }
     if (a2IsContracted(v)) contract++;
-    if (v.contract_amount) revenue += Number(v.contract_amount) || 0;
+    // v729: 売上は 実来院ベース で統一 (a2FacilityMatrix / 治療別 / プロモ別 と揃える)
+    if (isVis && v.contract_amount) revenue += Number(v.contract_amount) || 0;
     // v723: 未処理 = 未対応 かつ 予約日が過ぎている (来院確認漏れの可能性)
     if (v._effStatus === '未対応' && v._bookMs && v._bookMs < todayMs - 86400000) pendingOverdue++;
   }

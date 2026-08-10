@@ -244,7 +244,12 @@ async function extractBookingCandidates(sheetId, tab, cutoffIso) {
       phone_last4: phone ? phone.slice(-4) : null,
       email: cols.email != null ? String(r[cols.email] || '').trim() || null : null,
       service: cols.service != null ? String(r[cols.service] || '').trim() || null : null,
-      promo_code: cols.promo_code != null ? String(r[cols.promo_code] || '').trim() || null : null,
+      // v729: セレクトタブ (cols.promo_code 未定義) は legacy 移行データ ('セレクトタイプ') と
+      //   shape を揃えて promo_code を明示付与。分析タブ/来院タブでの表示乖離を解消。
+      //   ※ 実効化には要デプロイ (app.js 側にも表示 fallback を追加済み)
+      promo_code: cols.promo_code != null
+        ? (String(r[cols.promo_code] || '').trim() || null)
+        : (tab.tool === 'セレクト' ? 'セレクトタイプ' : null),
       sync_source: `booking:${tab.name}:row=${i + 1}`,
     });
   }
