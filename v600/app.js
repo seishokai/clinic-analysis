@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v704';
+const APP_VERSION = 'v705';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -114,8 +114,14 @@ function getTreatment(service, contractService) {
   if (s.includes('ブラック') || s.includes('bf')) return 'BF';
   // 「削らない」「ラミネート」「ラブリエ」いずれか含めばラブリエ
   if (s.includes('ラブリエ') || s.includes('ラミネート') || s.includes('削らない')) return 'ラブリエ';
-  if (s.includes('インプラント')) return 'インプラント';
+  if (s.includes('インプラント') || s.includes('ｲﾝﾌﾟﾗﾝﾄ')) return 'インプラント';
   if (s.includes('矯正')) return '矯正';
+  // v705: sheet-sync 由来行の追加カテゴリ (保険初診 / ホワイトニング / 審美)
+  if (s.includes('保険')) return '保険';
+  if (s.includes('ホワイトニング') || s.includes('ﾎﾜｲﾄﾆﾝｸﾞ')) return 'WT';
+  if (s.includes('審美')) return '審美';
+  if (s.includes('補綴')) return '補綴';
+  if (s.includes('転院')) return '転院';
   return 'その他';
 }
 
