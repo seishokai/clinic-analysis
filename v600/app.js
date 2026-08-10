@@ -18,10 +18,10 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v703';
+const APP_VERSION = 'v704';
 
-// v700: 初診管理シート → Aladdin 同期 Worker
-const SHEET_SYNC_WORKER = 'https://sheet-sync.tkm-koike.workers.dev';
+// v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
+const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
 const SHEET_SYNC_TOKEN = 'aladdin-sync-2026';
 
 // ==================== Config ====================
