@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v621';
+const APP_VERSION = 'v622';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -493,11 +493,29 @@ function bindShell() {
   // v614: パスワード変更
   const pwBtn = $('#pw-change-btn');
   if (pwBtn) pwBtn.addEventListener('click', openPasswordModal);
-  $('#refresh-btn').addEventListener('click', async () => {
-    setSaveStatus('更新中…', 'saving');
-    await Promise.all([fetchVisits(), fetchPatients()]);
-    setSaveStatus('更新完了 ✓', 'saved');
-    render();
+  // v622: 最新版チェック (旧 refresh-btn の代替) — 手動チェック + データ再取得を兼ねる
+  const verBtn = $('#ver-check-btn');
+  if (verBtn) verBtn.addEventListener('click', async () => {
+    verBtn.disabled = true; const orig = verBtn.textContent; verBtn.textContent = 'チェック中…';
+    try {
+      // 1) バージョンチェック — 新版があれば banner 出す
+      const res = await fetch('./version.txt?t=' + Date.now(), { cache: 'no-store' });
+      const remote = res.ok ? (await res.text()).trim() : '';
+      // 2) データ再取得
+      setSaveStatus('データ更新中…', 'saving');
+      await Promise.all([fetchVisits(), fetchPatients()]);
+      setSaveStatus('データ更新完了 ✓', 'saved');
+      render();
+      if (remote && remote !== APP_VERSION) {
+        if (!_updateBannerShown) { _updateBannerShown = true; showUpdateBanner(remote); }
+      } else {
+        toast(`最新版です (${APP_VERSION})`, 'ok', 2500);
+      }
+    } catch(e) {
+      toast('確認に失敗: ' + (e.message || e), 'err');
+    } finally {
+      verBtn.disabled = false; verBtn.textContent = orig;
+    }
   });
 }
 

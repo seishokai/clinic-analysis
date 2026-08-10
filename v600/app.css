@@ -789,6 +789,13 @@ main {
 .slot-count .days { margin-left: 6px; font-size: 11px; color: var(--ink-soft); }
 .slot-meta { font-size: 10px; color: var(--ink-mute); font-family: var(--font-mono); }
 
+/* v622: 更新確認ボタン (旧 🔄 の代替) */
+.ver-check-btn {
+  font-size: 11px !important;
+  padding: 4px 8px !important;
+  white-space: nowrap;
+}
+
 /* ------- v614: アクティビティビュー ------- */
 .activity-summary {
   padding: 10px 12px;
@@ -1002,8 +1009,9 @@ main {
   }
   .visits-view .v-table tbody td.c-name {
     order: 2;
-    flex: 1 1 60px;
-    min-width: 0;
+    flex: 0 1 auto;              /* v622: 名前は伸ばさず content 幅で。右側要素を近くに */
+    min-width: 40px;
+    max-width: calc(100% - 200px); /* clinic+treat+promo(約195) の分は残す */
     font-size: 14.5px;
     font-weight: 600;
     color: #17201d;
@@ -1011,9 +1019,11 @@ main {
   .visits-view .v-table tbody td.c-facility {
     order: 3;
     flex: 0 0 auto;
-    font-size: 11px;
-    color: #56635e;
-    max-width: 58px;
+    font-size: 12px;
+    color: #35443e;
+    font-weight: 600;
+    max-width: 68px;
+    margin-left: auto;   /* v622: メタ群 (医院+治療+プロモ) を右に寄せて余白解消 */
   }
   .visits-view .v-table tbody td.c-treatment {
     order: 4;
@@ -1048,21 +1058,29 @@ main {
     vertical-align: middle;
   }
 
-  /* Row 2: status amount memo */
+  /* Row 2: status amount memo — v622: status/amount 短く、memo 長く */
   .visits-view .v-table tbody td.c-status {
     order: 60;
-    flex: 0 0 auto;
-    min-width: 100px;
+    flex: 0 0 88px;              /* 100 → 88 */
   }
   .visits-view .v-table tbody td.c-amount {
     order: 61;
-    flex: 0 0 78px;
+    flex: 0 0 82px;   /* ¥999,999 (7 桁) が切れないよう確保 */
   }
   .visits-view .v-table tbody td.c-memo {
     order: 62;
-    flex: 1 1 100px;
+    flex: 1 1 auto;              /* 残り幅 全部 memo に */
     min-width: 0;
     overflow: hidden;
+  }
+  /* status select 内部の padding も詰める */
+  .visits-view .v-table tbody td.c-status select {
+    padding: 8px 22px 8px 8px;
+    font-size: 12px !important;
+  }
+  .visits-view .v-table tbody td.c-amount input {
+    font-size: 12px !important;
+    padding: 7px 6px;
   }
 
   /* モバイル非表示 (詳細編集は デスクトップで) */
