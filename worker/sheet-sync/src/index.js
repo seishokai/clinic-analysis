@@ -38,6 +38,14 @@ function toIsoDate(s, fallbackYear) {
   return null;
 }
 
+// v707: sync_source → 0..86399 秒 の決定的 hash (apply_at のユニーク化に使用)
+function hashSec(s) {
+  let h = 0;
+  const str = String(s || '');
+  for (let i = 0; i < str.length; i++) h = ((h << 5) - h + str.charCodeAt(i)) | 0;
+  return Math.abs(h) % 86400;
+}
+
 // CSV parser (quoted, embedded \n 対応)
 function parseCsv(text) {
   const rows = [];
@@ -209,10 +217,18 @@ async function runSync(env, triggerName) {
     }
   }
 
-  // --- Phase 4: patient_visits を bulk INSERT (1 subrequest) ---
+  // --- Phase 4: patient_visits を bulk INSERT ---
+  //   v707: 既存 unique constraint patient_visits_patient_id_apply_at_key に衝突するため
+  //   apply_at を sync_source の hash から行ごとにユニーク化する。
+  //   同時に on_conflict=patient_id,apply_at + ignore-duplicates で衝突時サイレントスキップ。
   const visitPayload = allCandidates
     .filter(c => patientMap.has(c.normalized_name))
     .map(c => {
+      const sec = hashSec(c.sync_source);
+      const hh = String(Math.floor(sec / 3600)).padStart(2, '0');
+      const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
+      const ss = String(sec % 60).padStart(2, '0');
+      const applyAtIso = `${c.book_date}T${hh}:${mm}:${ss}+09:00`;
       const bookAtIso = `${c.book_date}T00:00:00+09:00`;
       return {
         patient_id: patientMap.get(c.normalized_name),
@@ -220,7 +236,7 @@ async function runSync(env, triggerName) {
         book_date: c.book_date,
         book_at: bookAtIso,
         apply_date: c.book_date,
-        apply_at: bookAtIso,
+        apply_at: applyAtIso,   // sync_source から決定的にユニーク化
         status: '未対応',
         source_tool: 'sheet',
         source_channel: c.source_channel,
@@ -234,7 +250,8 @@ async function runSync(env, triggerName) {
   const BATCH_V = 200;
   for (let i = 0; i < visitPayload.length; i += BATCH_V) {
     const batch = visitPayload.slice(i, i + BATCH_V);
-    const visRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patient_visits`, {
+    // v707: on_conflict target を明示して conflict を silently skip
+    const visRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patient_visits?on_conflict=patient_id,apply_at`, {
       method: 'POST',
       headers: sbHeaders(env, {
         'Content-Type': 'application/json',
