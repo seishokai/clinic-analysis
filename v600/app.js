@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v700';
+const APP_VERSION = 'v703';
 
 // v700: 初診管理シート → Aladdin 同期 Worker
 const SHEET_SYNC_WORKER = 'https://sheet-sync.tkm-koike.workers.dev';
@@ -1273,7 +1273,10 @@ async function runSheetSync(showToast) {
   }
 }
 
-// 5 分ごとに status 更新 (Worker 側は 10 分毎 cron)
+// v703: Aladdin から 10 分ごとに sync 発火 (Worker 側の cron が Free プラン枠切れのため)
+//   sync は冪等 (sync_source unique) なので複数タブ同時発火も安全
+//   さらに 5 分ごとに status 表示だけ更新
+setInterval(() => { if (state.user) runSheetSync(false); }, 10 * 60 * 1000);
 setInterval(() => { if (state.user) refreshSheetSyncStatus(); }, 5 * 60 * 1000);
 
 // ==================== v614: パスワード変更モーダル ====================

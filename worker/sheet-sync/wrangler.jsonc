@@ -6,10 +6,11 @@
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
 
-  // 10 分ごとに sync 実行
-  "triggers": {
-    "crons": ["*/10 * * * *"]
-  },
+  // 注: Cloudflare Free は cron 5 個/アカウントまで。既に他 Worker で埋まってるため
+  //     ここでは cron trigger 登録せず、Aladdin ブラウザから 10 分毎に自動 fetch する。
+  //     sync は冪等 (sync_source unique index) で並列発火安全。
+  //   有料プラン ($5/月) にしたければ ↓ をアンコメントして再 deploy:
+  // "triggers": { "crons": ["*/10 * * * *"] },
 
   // 環境変数 (secret は wrangler secret put で登録)
   //   SUPABASE_SERVICE_KEY → 秘密キー
