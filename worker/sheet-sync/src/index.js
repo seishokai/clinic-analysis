@@ -384,8 +384,12 @@ async function runSync(env, triggerName) {
     allExistingVisits.push(...rows);
     if (rows.length < VIS_CHUNK_ALL) break;
   }
-  const touchedPatDate = new Set();      // v916: これらの (patient, book_date) に新規 INSERT しない
+  // v918: touched だけでなく「存在するだけ」で新規 INSERT を skip する (完全重複防止)。
+  //   これで同 (patient, book_date) には常に 1 行しかない状態を維持。
+  const existingPatDate = new Set();   // Phase 5 booking / Phase 8 walk-in の両方でチェック
+  const touchedPatDate = new Set();    // Phase 6 で untouched 判定に使う (残す)
   for (const v of allExistingVisits) {
+    existingPatDate.add(`${v.patient_id}|${v.book_date}`);
     const isTouchedV = (v.memo && v.memo.length > 0) || v.contract_amount != null || v.next_visit_date != null
       || (v.updated_by && String(v.updated_by).includes('@')) || (v.status && !SYNC_MANAGED_STATUS.has(v.status));
     if (isTouchedV) touchedPatDate.add(`${v.patient_id}|${v.book_date}`);
@@ -399,7 +403,7 @@ async function runSync(env, triggerName) {
     .filter(c => {
       // v916: 既に触った行がある patient+book_date に新規 booking を作らない (重複防止の恒久対策)
       const pid = patientMap.get(c.normalized_name);
-      if (touchedPatDate.has(`${pid}|${c.book_date}`)) { bookingSkippedTouched++; return false; }
+      if (existingPatDate.has(`${pid}|${c.book_date}`)) { bookingSkippedTouched++; return false; }   // v918: touched から existing に強化
       return true;
     })
     .map(c => {
@@ -485,8 +489,8 @@ async function runSync(env, triggerName) {
         skippedTouched++;
       }
     } else {
-      // v916: 同 patient+book_date に既に「触った行」があれば walk-in INSERT しない (重複防止)
-      if (touchedPatDate.has(`${patientId}|${c.book_date}`)) {
+      // v918: 同 patient+book_date に何らかの行があれば walk-in INSERT しない (完全重複防止)
+      if (existingPatDate.has(`${patientId}|${c.book_date}`)) {
         skippedTouched++;
       } else {
         toInsert.push({ candidate: c, patient_id: patientId, status: statusFromReason(c.reason), promo: sheetPromo });
@@ -693,12 +697,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v917',
+        service: 'sheet-sync v918',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v917\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v918\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
