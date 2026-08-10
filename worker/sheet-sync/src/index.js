@@ -26,7 +26,26 @@
 import CONFIG from '../config/sheet-tabs.js';
 
 // ==================== Utils ====================
-const normName = (n) => (n == null ? '' : String(n).replace(/[\s　]+/g, '').toLowerCase());
+// v911: 旧字体 → 常用漢字 正規化 (歯科患者名で頻出のもの)
+//   髙橋 vs 高橋、齋藤 vs 斉藤 等の matcher バグ対策
+const KYUJITAI_MAP = {
+  '髙':'高','﨑':'崎','德':'徳','齋':'斉','齊':'斉','斎':'斉',
+  '眞':'真','濱':'浜','廣':'広','澤':'沢','邊':'辺','邉':'辺',
+  '惠':'恵','曾':'曽','會':'会','應':'応','假':'仮','壽':'寿',
+  '巖':'岩','國':'国','學':'学','實':'実','寳':'宝','寶':'宝',
+  '峯':'峰','龜':'亀','龍':'竜','儘':'侭','圓':'円','舊':'旧',
+  '萬':'万','靑':'青','靜':'静','麴':'麹','轉':'転','爲':'為',
+  '舘':'館','檜':'桧','桒':'桑','觀':'観','讀':'読','藪':'薮',
+  '籠':'篭','薗':'園','戀':'恋','嶋':'島','嶌':'島','鄕':'郷',
+  '瀨':'瀬','燈':'灯','壯':'壮','鹽':'塩','驛':'駅','靈':'霊',
+};
+function normName(n) {
+  if (n == null) return '';
+  let s = String(n).replace(/[\s　]+/g, '').toLowerCase();
+  let out = '';
+  for (const ch of s) out += KYUJITAI_MAP[ch] || ch;
+  return out;
+}
 
 function normFac(f) {
   if (!f) return '';
@@ -149,13 +168,16 @@ function sbHeaders(env, extra = {}) {
   };
 }
 
+// v911: '未対応' と '来院済' は sync が自身で付けるので untouched 扱い。
+//   他のステータス (検討中/治療中/成約 等) は人間が変えた証拠なので touched。
+const SYNC_MANAGED_STATUS = new Set(['未対応', '来院済']);
 function isTouched(visit) {
-  if (visit.status && visit.status !== '未対応') return true;
   if (visit.memo != null && String(visit.memo).length > 0) return true;
   if (visit.contract_amount != null && Number(visit.contract_amount) > 0) return true;
   if (visit.next_visit_date != null) return true;
   const u = visit.updated_by;
-  if (u && String(u).includes('@')) return true;   // email 形式のみ実ユーザ
+  if (u && String(u).includes('@')) return true;
+  if (visit.status && !SYNC_MANAGED_STATUS.has(visit.status)) return true;
   return false;
 }
 
@@ -384,25 +406,35 @@ async function runSync(env, triggerName) {
   }
   const existingVisits = await visRes.json();
 
-  const visitsByKey = new Map();
+  // v911 Phase 2: matcher の日付マッチを撤廃。
+  //   ユーザー方針: 「来院日は初診管理シートが正」
+  //   (patient_id, facility) のみで match し、最も近い日付の untouched booking を選ぶ。
+  //   選ばれた booking の book_date は sheet の来院日で上書きする。
+  const visitsByPatFac = new Map();
   for (const v of existingVisits) {
-    const key = `${v.patient_id}|${normFac(v.facility)}|${v.book_date}`;
-    if (!visitsByKey.has(key)) visitsByKey.set(key, []);
-    visitsByKey.get(key).push(v);
+    const key = `${v.patient_id}|${normFac(v.facility)}`;
+    if (!visitsByPatFac.has(key)) visitsByPatFac.set(key, []);
+    visitsByPatFac.get(key).push(v);
   }
 
-  const toUpdate = [];
+  const toUpdate = [];         // {id, newBookDate}
   const toInsert = [];
+  const claimed = new Set();   // 一度 claim した booking は他の initial に使わせない
   let skippedTouched = 0;
+  const daysBetween = (a, b) => Math.abs((Date.parse(a) - Date.parse(b)) / 86400000);
   for (const c of initialCandidates) {
     const patientId = patientMap.get(c.normalized_name);
     if (!patientId) continue;
-    const key = `${patientId}|${c.facility}|${c.book_date}`;
-    const matches = visitsByKey.get(key) || [];
+    const key = `${patientId}|${c.facility}`;
+    const matches = (visitsByPatFac.get(key) || []).filter(m => !claimed.has(m.id));
     if (matches.length > 0) {
       const untouched = matches.filter(m => !isTouched(m));
       if (untouched.length > 0) {
-        for (const u of untouched) toUpdate.push(u.id);
+        // 来院日に一番近い booking を選ぶ (完全一致優先)
+        untouched.sort((a, b) => daysBetween(a.book_date, c.book_date) - daysBetween(b.book_date, c.book_date));
+        const target = untouched[0];
+        claimed.add(target.id);
+        toUpdate.push({ id: target.id, newBookDate: c.book_date });
       } else {
         skippedTouched++;
       }
@@ -411,23 +443,32 @@ async function runSync(env, triggerName) {
     }
   }
 
-  // ---- Phase 7: UPDATE (予約行 → 検討中) ----
+  // ---- Phase 7: UPDATE (booking 行 → 来院済 + book_date 上書き) ----
+  //   book_date でグループ化して PATCH ?id=in.(...) を打つ。
+  //   同一 book_date 内は 1 subrequest で複数行更新。実運用は数日分しか出ないので少数リクエストで済む。
   let updated = 0;
-  const BATCH_U = 200;
-  for (let i = 0; i < toUpdate.length; i += BATCH_U) {
-    const ids = toUpdate.slice(i, i + BATCH_U);
-    const idList = ids.map(id => `"${id}"`).join(',');
-    const patchUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?id=in.(${encodeURIComponent(idList)})`;
-    const patchRes = await fetch(patchUrl, {
-      method: 'PATCH',
-      headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-      body: JSON.stringify({ status: SHEET_ARRIVED_STATUS, updated_by: 'sheet-came' }),
-    });
-    if (patchRes.ok) {
-      const updatedRows = await patchRes.json();
-      updated += Array.isArray(updatedRows) ? updatedRows.length : 0;
-    } else {
-      console.log('visits UPDATE batch failed', patchRes.status, await patchRes.text());
+  const grouped = new Map();
+  for (const u of toUpdate) {
+    if (!grouped.has(u.newBookDate)) grouped.set(u.newBookDate, []);
+    grouped.get(u.newBookDate).push(u.id);
+  }
+  for (const [bookDate, ids] of grouped) {
+    const BATCH_U = 200;
+    for (let i = 0; i < ids.length; i += BATCH_U) {
+      const chunk = ids.slice(i, i + BATCH_U);
+      const idList = chunk.map(id => `"${id}"`).join(',');
+      const patchUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?id=in.(${encodeURIComponent(idList)})`;
+      const patchRes = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+        body: JSON.stringify({ book_date: bookDate, status: SHEET_ARRIVED_STATUS, updated_by: 'sheet-came' }),
+      });
+      if (patchRes.ok) {
+        const updatedRows = await patchRes.json();
+        updated += Array.isArray(updatedRows) ? updatedRows.length : 0;
+      } else {
+        console.log('visits PATCH batch failed', patchRes.status, await patchRes.text());
+      }
     }
   }
 
@@ -581,12 +622,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v910',
+        service: 'sheet-sync v911',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v910\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v911\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
