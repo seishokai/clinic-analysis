@@ -1412,3 +1412,101 @@ main {
   /* Toolbar が sticky で下の内容を覆わないよう解除 */
   .analytics-view .toolbar { position: static; }
 }
+
+/* ============================================================
+ * v730 モバイル UX 全面 fix
+ * ============================================================ */
+
+/* [Finding 14] iOS のアドレスバー可変吸収 (100dvh 対応) */
+@supports (height: 100dvh) {
+  html, body, #app { height: 100dvh; }
+}
+
+/* [Finding 7] iOS notch / safe-area */
+.hdr {
+  padding-left: max(10px, env(safe-area-inset-left));
+  padding-right: max(10px, env(safe-area-inset-right));
+  padding-top: max(6px, env(safe-area-inset-top));
+}
+.toast-host {
+  bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+/* [Finding 1] slots-view / patients-view / activity-view にスクロール救済 */
+.slots-view, .patients-view, .activity-view {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
+  box-sizing: border-box;
+  overscroll-behavior: contain;
+}
+
+@media (max-width: 720px) {
+  /* [Finding 5] 患者/アクティビティ view の table min-width を狭める */
+  .patients-view .v-table, .activity-view .v-table { min-width: 0; }
+  .patients-view .v-table th, .activity-view .v-table th,
+  .patients-view .v-table td, .activity-view .v-table td {
+    font-size: 12px; padding: 6px 8px;
+  }
+
+  /* [Finding 4] nav 横スクロールのエッジフェード + 右端ヒント */
+  .hdr-nav {
+    -webkit-mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+    mask-image: linear-gradient(to right, black calc(100% - 20px), transparent);
+    position: relative;
+  }
+  .hdr-nav::-webkit-scrollbar { height: 4px; }
+  .hdr-nav::after {
+    content: '▶';
+    position: sticky; right: 0;
+    color: var(--accent);
+    font-size: 12px;
+    padding: 6px 4px 6px 6px;
+    background: linear-gradient(to right, transparent, var(--paper) 40%);
+    pointer-events: none;
+    align-self: center;
+  }
+
+  /* [Finding 8] モーダル close 44x44 */
+  .modal-close { width: 44px; height: 44px; font-size: 26px; }
+
+  /* [Finding 9] hdr 内ボタンを 40px 確保 (!important 上書き) */
+  .sheet-sync-btn, .ver-check-btn {
+    padding: 8px 10px !important;
+    min-height: 40px;
+    font-size: 12px !important;
+  }
+
+  /* [Finding 10] 「重複」トグルを 38px */
+  .quick-dup-btn {
+    padding: 8px 12px;
+    font-size: 13px;
+    min-height: 38px;
+  }
+
+  /* [Finding 13] modal をキーボードで隠れない配置 (iOS 対応) */
+  .modal-backdrop { align-items: flex-start; padding-top: 10px; }
+  .modal {
+    max-height: calc(100dvh - 20px);
+    max-height: 90vh; /* fallback */
+    margin-top: 0;
+  }
+  .modal-body textarea { min-height: 80px; }
+  /* footer はキーボード横まで安全に */
+  .modal-foot { padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+
+  /* [補足] メモセル 40px タップターゲット */
+  .memo-cell { min-height: 40px; }
+
+  /* [補足] status select 等の user-select 制御 */
+  .status-sel, .field-input, .amount-input { touch-action: manipulation; }
+
+  /* [補足] update-banner を safe-area top に */
+  #update-banner {
+    padding-top: max(10px, calc(env(safe-area-inset-top) + 4px)) !important;
+  }
+}
+
+/* [Finding 15] toast err はデフォルト長め + タップで消せる */
+.toast { cursor: pointer; }
+

@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v729';
+const APP_VERSION = 'v730';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -234,7 +234,18 @@ function toast(msg, kind='info', ttl=3000) {
   el.className = 'toast ' + kind;
   el.textContent = msg;
   host.appendChild(el);
-  setTimeout(() => { el.style.opacity = '0'; setTimeout(() => el.remove(), 200); }, ttl);
+  // v730: タップで即消し (モバイル)
+  const dismiss = () => { el.style.opacity = '0'; setTimeout(() => el.remove(), 200); };
+  el.addEventListener('click', dismiss, { once: true });
+  setTimeout(dismiss, ttl);
+}
+
+// v730: 編集中フィールド判定 (sheet-sync 中に focus 奪わない用)
+function isEditingField() {
+  const a = document.activeElement;
+  if (!a) return false;
+  const tag = a.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || a.isContentEditable;
 }
 
 // ==================== Save status ====================
@@ -592,6 +603,8 @@ function bindShell() {
   $$('.nav-btn').forEach(b => {
     b.addEventListener('click', () => {
       state.view = b.dataset.view;
+      // v730: タブ切替時にモバイル絞込パネルを閉じる (残留すると次画面で邪魔)
+      document.body.classList.remove('filters-open');
       render();
     });
   });
@@ -650,22 +663,24 @@ function renderVisitsView(main) {
     const stSel = $('#v-status');
     stSel.innerHTML = '<option value="">ステータス:全て</option>' +
       STATUS_OPTIONS.map(s => `<option value="${esc(s)}">${esc(s)}</option>`).join('');
+    // v730: フィルタ変更時は 500 件表示にリセット (フィルタ後 20 件なのに "残り 480 件" 誤表示防止)
+    const _refilter = () => { _visitsShownLimit = 500; renderVisitsTable(); };
     // Bind filters
     $('#v-search').addEventListener('input', e => {
       // v600 fix #6: 3000 行に対する検索は debounce (200ms) で軽量化
       state.filters.search = e.target.value;
       if (_searchDebounce) clearTimeout(_searchDebounce);
-      _searchDebounce = setTimeout(() => renderVisitsTable(), 200);
+      _searchDebounce = setTimeout(_refilter, 200);
     });
-    $('#v-facility').addEventListener('change', e => { state.filters.facility = e.target.value; renderVisitsTable(); });
-    $('#v-treatment').addEventListener('change', e => { state.filters.treatment = e.target.value; renderVisitsTable(); });
-    $('#v-promo').addEventListener('change', e => { state.filters.promo = e.target.value; renderVisitsTable(); });
-    $('#v-status').addEventListener('change', e => { state.filters.status = e.target.value; renderVisitsTable(); });
+    $('#v-facility').addEventListener('change', e => { state.filters.facility = e.target.value; _refilter(); });
+    $('#v-treatment').addEventListener('change', e => { state.filters.treatment = e.target.value; _refilter(); });
+    $('#v-promo').addEventListener('change', e => { state.filters.promo = e.target.value; _refilter(); });
+    $('#v-status').addEventListener('change', e => { state.filters.status = e.target.value; _refilter(); });
     $('#v-period').addEventListener('change', e => {
       state.filters.period = e.target.value;
       updatePeriodExtraInputs();
       updateQuickPeriodButtons();
-      renderVisitsTable();
+      _refilter();
     });
     // v607: 今月 / 先月 クイックボタン
     document.querySelectorAll('.quick-period-btn').forEach(btn => {
@@ -676,7 +691,7 @@ function renderVisitsView(main) {
         if (sel) sel.value = p;
         updatePeriodExtraInputs();
         updateQuickPeriodButtons();
-        renderVisitsTable();
+        _refilter();
       });
     });
     // v710: 重複ボタン (トグル)
@@ -685,7 +700,7 @@ function renderVisitsView(main) {
       dupBtn.addEventListener('click', () => {
         state.filters.dupOnly = !state.filters.dupOnly;
         updateDupButton();
-        renderVisitsTable();
+        _refilter();
       });
     }
     // v618: モバイル用フィルタ折りたたみボタン
@@ -697,9 +712,9 @@ function renderVisitsView(main) {
         ftBtn.textContent = expanded ? '▾ 絞込' : '▸ 絞込';
       });
     }
-    $('#v-month').addEventListener('change', e => { state.filters.periodMonth = e.target.value; renderVisitsTable(); });
-    $('#v-from').addEventListener('change', e => { state.filters.periodFrom = e.target.value; renderVisitsTable(); });
-    $('#v-to').addEventListener('change', e => { state.filters.periodTo = e.target.value; renderVisitsTable(); });
+    $('#v-month').addEventListener('change', e => { state.filters.periodMonth = e.target.value; _refilter(); });
+    $('#v-from').addEventListener('change', e => { state.filters.periodFrom = e.target.value; _refilter(); });
+    $('#v-to').addEventListener('change', e => { state.filters.periodTo = e.target.value; _refilter(); });
     // v609: CSV 出力 (現在のフィルタ結果のみ)
     $('#v-export-csv').addEventListener('click', () => {
       const rows = filteredVisits();
@@ -715,7 +730,7 @@ function renderVisitsView(main) {
       updatePeriodExtraInputs();
       updateQuickPeriodButtons();
       updateDupButton();   // v710
-      renderVisitsTable();
+      _refilter();
     });
     // Populate current filter values
     $('#v-search').value = state.filters.search;
@@ -860,19 +875,21 @@ function renderVisitsTable() {
     return;
   }
   empty.hidden = true;
-  // v603 fix #6: 編集中の row (focused input を持つ tr) は再描画から除外
-  //   → filter 変更中でも入力途中の値が消えない
-  const focusedRow = document.activeElement && document.activeElement.closest && document.activeElement.closest('tr[data-visit-id]');
+  // v730 fix: 編集中の row を再描画から除外 (outerHTML では input.value 消える)
+  //   → focused row 全体を保持し、他の行だけ差し替え
+  const active = document.activeElement;
+  const focusedRow = active && active.closest && active.closest('tr[data-visit-id]');
   const focusedId = focusedRow && focusedRow.dataset.visitId;
   const shown = rows.slice(0, _visitsShownLimit);
-  // v603 P2: DocumentFragment + template で高速化
   const html = shown.map(rowHtml).join('');
   if (focusedId) {
-    // 編集中の行を保持しつつ他を差し替え
-    const focusedHtml = focusedRow.outerHTML;
+    // 編集中の行の DOM ノードを退避 → tbody 差し替え → 元位置に差し込み
+    const savedNode = focusedRow;
     tbody.innerHTML = html;
-    const newRow = tbody.querySelector(`tr[data-visit-id="${CSS.escape(focusedId)}"]`);
-    if (newRow) newRow.outerHTML = focusedHtml;
+    const placeholder = tbody.querySelector(`tr[data-visit-id="${CSS.escape(focusedId)}"]`);
+    if (placeholder) placeholder.replaceWith(savedNode);
+    // フォーカス復元 (念のため)
+    if (savedNode.contains(active)) { try { active.focus(); } catch(_){} }
   } else {
     tbody.innerHTML = html;
   }
@@ -1810,6 +1827,8 @@ async function runSheetSync(showToast) {
   const btn = $('#sheet-sync-btn');
   const label = $('#ss-label');
   if (!btn || btn.classList.contains('syncing')) return;
+  // v730: 入力中の自動 sync は fetchVisits で focus / 値を奪う → skip
+  if (!showToast && isEditingField()) return;
   btn.classList.add('syncing');
   if (label) label.textContent = 'シート同期中…';
   try {
