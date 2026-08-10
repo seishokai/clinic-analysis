@@ -187,6 +187,19 @@ function isTouched(visit) {
 const SHEET_ARRIVED_STATUS = '来院済';
 function statusFromReason(_reason) { return SHEET_ARRIVED_STATUS; }
 
+// v912: 初診由来 (source_channel) の一部をプロモコードに昇格
+//   ユーザー方針: スマイルモア/ウィスマイル/オーマチティース の 3 種は
+//   広告経由の識別として promo_code に反映する (半角/全角カナ両対応)。
+const SOURCE_TO_PROMO = {
+  'スマイルモア': 'スマイルモア', 'ｽﾏｲﾙﾓｱ': 'スマイルモア',
+  'ウィスマイル': 'ウィスマイル', 'ｳｨｽﾏｲﾙ': 'ウィスマイル', 'ウイスマイル': 'ウィスマイル',
+  'オーマチティース': 'オーマチティース', 'ｵｰﾏﾁﾃｨｰｽ': 'オーマチティース',
+};
+function promoFromSource(src) {
+  if (!src) return null;
+  return SOURCE_TO_PROMO[String(src).trim()] || null;
+}
+
 // ==================== 予約管理シート extractor (v900) ====================
 async function extractBookingCandidates(sheetId, tab, cutoffIso) {
   const csv = await fetchTabCsv(sheetId, tab.name);
@@ -398,7 +411,7 @@ async function runSync(env, triggerName) {
 
   // ---- Phase 6: 初診管理シート → マッチ + UPDATE/INSERT ----
   //   Phase 5 が終わってから existing visits を SELECT (新規 booking 行も含む fresh pool)
-  const visSelUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool`;
+  const visSelUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code`;
   const visRes = await fetch(visSelUrl, { headers: sbHeaders(env) });
   if (!visRes.ok) {
     return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, bookingInserted, 0, 0, 0, 0, initialCandidates.length,
@@ -418,6 +431,7 @@ async function runSync(env, triggerName) {
   }
 
   const toUpdate = [];         // {id, newBookDate}
+  const promoUpdates = [];     // {id, promo} — 初診シート由来の promo 昇格 (既存 promo 空の時のみ)
   const toInsert = [];
   const claimed = new Set();   // 一度 claim した booking は他の initial に使わせない
   let skippedTouched = 0;
@@ -427,19 +441,21 @@ async function runSync(env, triggerName) {
     if (!patientId) continue;
     const key = `${patientId}|${c.facility}`;
     const matches = (visitsByPatFac.get(key) || []).filter(m => !claimed.has(m.id));
+    const sheetPromo = promoFromSource(c.source_channel);
     if (matches.length > 0) {
       const untouched = matches.filter(m => !isTouched(m));
       if (untouched.length > 0) {
-        // 来院日に一番近い booking を選ぶ (完全一致優先)
         untouched.sort((a, b) => daysBetween(a.book_date, c.book_date) - daysBetween(b.book_date, c.book_date));
         const target = untouched[0];
         claimed.add(target.id);
         toUpdate.push({ id: target.id, newBookDate: c.book_date });
+        // v912: シート由来の promo を空 promo にだけ書き込む (DXHUB promo は保護)
+        if (sheetPromo && !target.promo_code) promoUpdates.push({ id: target.id, promo: sheetPromo });
       } else {
         skippedTouched++;
       }
     } else {
-      toInsert.push({ candidate: c, patient_id: patientId, status: statusFromReason(c.reason) });
+      toInsert.push({ candidate: c, patient_id: patientId, status: statusFromReason(c.reason), promo: sheetPromo });
     }
   }
 
@@ -472,9 +488,27 @@ async function runSync(env, triggerName) {
     }
   }
 
+  // ---- Phase 7b: promo 昇格 (シート 初診由来 → promo_code) ----
+  //   promo が同じもの同士でグループ化して PATCH id=in.() を打つ (通常 3 種以下)
+  const promoGroups = new Map();
+  for (const p of promoUpdates) {
+    if (!promoGroups.has(p.promo)) promoGroups.set(p.promo, []);
+    promoGroups.get(p.promo).push(p.id);
+  }
+  for (const [promo, ids] of promoGroups) {
+    const idList = ids.map(id => `"${id}"`).join(',');
+    const url = `${env.SUPABASE_URL}/rest/v1/patient_visits?id=in.(${encodeURIComponent(idList)})`;
+    const res = await fetch(url, {
+      method: 'PATCH',
+      headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
+      body: JSON.stringify({ promo_code: promo }),
+    });
+    if (!res.ok) console.log('promo PATCH failed', res.status, await res.text());
+  }
+
   // ---- Phase 8: INSERT (直予約 walk-in) ----
   let walkinInserted = 0;
-  const insPayload = toInsert.map(({ candidate: c, patient_id, status }) => {
+  const insPayload = toInsert.map(({ candidate: c, patient_id, status, promo }) => {
     const sec = hashSec(c.sync_source);
     const hh = String(Math.floor(sec / 3600)).padStart(2, '0');
     const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
@@ -492,6 +526,7 @@ async function runSync(env, triggerName) {
       service: c.reason,
       source_tool: 'sheet-direct',
       source_channel: c.source_channel,
+      promo_code: promo || null,
       sync_source: c.sync_source,
       updated_by: 'sheet-direct',
       created_by: 'sheet-direct',
@@ -622,12 +657,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v911',
+        service: 'sheet-sync v912',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v911\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v912\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
