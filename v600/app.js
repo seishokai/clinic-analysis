@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v714';
+const APP_VERSION = 'v715';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -1155,13 +1155,13 @@ function renderBookingsView(main) {
     $('#b-facility').addEventListener('change', e => { state.bookingFilters.facility = e.target.value; renderBookingsTable(); });
     $('#b-tool').addEventListener('change', e => { state.bookingFilters.tool = e.target.value; renderBookingsTable(); });
     $('#b-refresh').addEventListener('click', async () => {
-      $('#b-tbody').innerHTML = '<tr><td colspan="8" class="empty-msg">読み込み中…</td></tr>';
+      $('#b-tbody').innerHTML = '<tr><td colspan="9" class="empty-msg">読み込み中…</td></tr>';
       await fetchBookings();
       renderBookingsTable();
     });
   }
   if (!state.bookings) {
-    $('#b-tbody').innerHTML = '<tr><td colspan="8" class="empty-msg">読み込み中…</td></tr>';
+    $('#b-tbody').innerHTML = '<tr><td colspan="9" class="empty-msg">読み込み中…</td></tr>';
     fetchBookings().then(renderBookingsTable);
   } else {
     renderBookingsTable();
@@ -1191,20 +1191,34 @@ function renderBookingsTable() {
   }
   empty.hidden = true;
   const shown = rows.slice(0, 500);
-  tbody.innerHTML = shown.map(r => `<tr>
-    <td class="c-book">${esc(r.bookDate ? r.bookDate.substring(5,10).replace('-','/').replace(/^0/,'') : '-')}</td>
+  tbody.innerHTML = shown.map(r => {
+    const treatment = getTreatment(r.service, '');   // v715: 相談内容から治療分類
+    return `<tr>
+    <td class="c-book">${esc(bkFmtDate(r.bookDate))}</td>
     <td class="c-name">${esc(r.name || '')}</td>
     <td class="c-facility">${esc(normFac(r.facility) || '-')}</td>
+    <td class="c-treatment">${treatment ? `<span class="treatment-chip" data-t="${esc(treatment)}">${esc(treatment)}</span>` : '<span class="tx-empty">-</span>'}</td>
     <td class="c-promo"><span class="promo-chip ${r.tool==='セレクト'?'select-type':''}" title="${esc(r.source||'')}">${r.tool==='セレクト' ? '—' : esc(shortPromo(r.source||'') || '-')}</span></td>
-    <td>${esc(r.service || '-')}</td>
+    <td style="font-size:12px">${esc(r.service || '-')}</td>
     <td style="font-size:11px;color:var(--ink-mute);font-family:var(--font-mono)">${esc(r.email || '-')}</td>
     <td style="font-family:var(--font-mono);font-size:11px">${esc(r.phone || '-')}</td>
-    <td class="c-book">${esc(r.applyDate ? r.applyDate.substring(0,10) : '-')}</td>
-  </tr>`).join('');
+    <td class="c-book">${esc(bkFmtDate(r.applyDate))}</td>
+  </tr>`;
+  }).join('');
   if (rows.length > 500) {
     tbody.insertAdjacentHTML('beforeend',
-      `<tr><td colspan="8" class="empty-msg">…他 ${rows.length - 500} 件 (フィルタで絞ってください)</td></tr>`);
+      `<tr><td colspan="9" class="empty-msg">…他 ${rows.length - 500} 件 (フィルタで絞ってください)</td></tr>`);
   }
+}
+
+// v715: 予約シートの日付表記統一 (DXHUB "2026/8/16 9:30" / セレクト "2026年9月8日(火) 18時30分" / ISO どれでも)
+function bkFmtDate(raw) {
+  if (!raw) return '-';
+  const s = String(raw).trim();
+  let m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+  if (!m) m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日/);
+  if (m) return `${m[2]}/${m[3]}`;
+  return s.slice(0, 10);
 }
 
 async function fetchSlots() {
