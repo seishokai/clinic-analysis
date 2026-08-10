@@ -316,29 +316,14 @@ async function runSync(env, triggerName) {
     return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, 0);
   }
 
-  // ---- Phase 3: patients SELECT (chunked) ----
-  const uniqueNames = Array.from(new Set(allCandidates.map(c => c.normalized_name)));
-  const CHUNK = 200;
-  const patientMap = new Map();
-  for (let i = 0; i < uniqueNames.length; i += CHUNK) {
-    const chunk = uniqueNames.slice(i, i + CHUNK);
-    const inList = chunk.map(n => `"${n.replace(/"/g, '\\"')}"`).join(',');
-    const selUrl = `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=in.(${encodeURIComponent(inList)})&select=id,normalized_name`;
-    const selRes = await fetch(selUrl, { headers: sbHeaders(env) });
-    if (!selRes.ok) {
-      return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, allCandidates.length,
-        `patients SELECT chunk ${i} failed: ${selRes.status} ${await selRes.text()}`);
-    }
-    const existing = await selRes.json();
-    for (const p of existing) if (!patientMap.has(p.normalized_name)) patientMap.set(p.normalized_name, p.id);
-  }
-
-  // ---- Phase 4: 不足 patients を bulk INSERT ----
-  const missingByKey = new Map();
+  // ---- Phase 3+4 統合 (v914): POST upsert で SELECT + INSERT を 1 段化 ----
+  //   Free tier 50 subreq 対応 (SELECT chunk が cutoff 拡張で 50+ を超えるため)
+  //   resolution=merge-duplicates: 既存行は指定フィールドが上書きされる。
+  //   name/facility/phone はシート由来が最新なので上書き許容。
+  const uniquePatients = new Map();
   for (const c of allCandidates) {
-    if (patientMap.has(c.normalized_name)) continue;
-    if (missingByKey.has(c.normalized_name)) continue;
-    missingByKey.set(c.normalized_name, {
+    if (uniquePatients.has(c.normalized_name)) continue;
+    uniquePatients.set(c.normalized_name, {
       name: c.patient_name,
       normalized_name: c.normalized_name,
       primary_facility: c.facility,
@@ -346,23 +331,22 @@ async function runSync(env, triggerName) {
       phone_last4: c.phone_last4,
     });
   }
-  if (missingByKey.size > 0) {
-    const arr = Array.from(missingByKey.values());
-    const BATCH = 100;
-    for (let i = 0; i < arr.length; i += BATCH) {
-      const batch = arr.slice(i, i + BATCH);
-      const insRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patients`, {
-        method: 'POST',
-        headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=merge-duplicates' }),
-        body: JSON.stringify(batch),
-      });
-      if (!insRes.ok) {
-        return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, allCandidates.length,
-          `patients INSERT batch ${i} failed: ${insRes.status} ${await insRes.text()}`);
-      }
-      const created = await insRes.json();
-      for (const p of (Array.isArray(created) ? created : [])) patientMap.set(p.normalized_name, p.id);
+  const patientMap = new Map();
+  const patArr = Array.from(uniquePatients.values());
+  const P_BATCH = 500;
+  for (let i = 0; i < patArr.length; i += P_BATCH) {
+    const batch = patArr.slice(i, i + P_BATCH);
+    const res = await fetch(`${env.SUPABASE_URL}/rest/v1/patients?on_conflict=normalized_name`, {
+      method: 'POST',
+      headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation,resolution=merge-duplicates' }),
+      body: JSON.stringify(batch),
+    });
+    if (!res.ok) {
+      return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, allCandidates.length,
+        `patients UPSERT batch ${i} failed: ${res.status} ${await res.text()}`);
     }
+    const rows = await res.json();
+    for (const p of (Array.isArray(rows) ? rows : [])) patientMap.set(p.normalized_name, p.id);
   }
 
   // ---- Phase 5: 予約管理シート → patient_visits INSERT (dedup on sync_source) ----
@@ -411,7 +395,8 @@ async function runSync(env, triggerName) {
 
   // ---- Phase 6: 初診管理シート → マッチ + UPDATE/INSERT ----
   //   Phase 5 が終わってから existing visits を SELECT (新規 booking 行も含む fresh pool)
-  const visSelUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code`;
+  // v913: PostgREST デフォルト 1000 行 return → 4-8月で数万件になるので明示 limit
+  const visSelUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&limit=100000&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code`;
   const visRes = await fetch(visSelUrl, { headers: sbHeaders(env) });
   if (!visRes.ok) {
     return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, bookingInserted, 0, 0, 0, 0, initialCandidates.length,
@@ -657,12 +642,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v912',
+        service: 'sheet-sync v914',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v912\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v914\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
