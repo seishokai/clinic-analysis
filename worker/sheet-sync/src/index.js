@@ -1,5 +1,5 @@
 /* ============================================================
- * sheet-sync Worker v900
+ * sheet-sync Worker v910
  *   Cron: なし (Aladdin ブラウザから 10 分毎 fetch)
  *   HTTP: /status, /sync (手動、要 token), /debug
  *
@@ -159,10 +159,11 @@ function isTouched(visit) {
   return false;
 }
 
-function statusFromReason(reason) {
-  if (!reason) return '検討中';
-  return String(reason).includes('保険初診') ? '治療中' : '検討中';
-}
+// v910: シート反映 = 「来院済」で一律 INSERT/UPDATE。
+//   スタッフが後で「検討中(まだ考え中)」or「成約(治療進行)」に手動振り分け。
+//   保険初診の自動「治療中」も廃止 (振り分けは人間の判断)。
+const SHEET_ARRIVED_STATUS = '来院済';
+function statusFromReason(_reason) { return SHEET_ARRIVED_STATUS; }
 
 // ==================== 予約管理シート extractor (v900) ====================
 async function extractBookingCandidates(sheetId, tab, cutoffIso) {
@@ -420,7 +421,7 @@ async function runSync(env, triggerName) {
     const patchRes = await fetch(patchUrl, {
       method: 'PATCH',
       headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
-      body: JSON.stringify({ status: '検討中', updated_by: 'sheet-came' }),
+      body: JSON.stringify({ status: SHEET_ARRIVED_STATUS, updated_by: 'sheet-came' }),
     });
     if (patchRes.ok) {
       const updatedRows = await patchRes.json();
@@ -580,12 +581,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v900',
+        service: 'sheet-sync v910',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v900\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v910\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },

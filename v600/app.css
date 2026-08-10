@@ -505,7 +505,14 @@ main {
 .treatment-chip[data-t="矯正"]       { background: #fed7aa; color: #7c2d12; }
 .treatment-chip[data-t="インプラント"] { background: #c7d2fe; color: #1e1b4b; }
 .treatment-chip[data-t="ラブリエ"]    { background: #fbcfe8; color: #500724; }
-.treatment-chip[data-t="その他"]     { background: var(--line-soft); color: var(--ink); }
+/* v706 新カテゴリ */
+.treatment-chip[data-t="保険"]       { background: #bae6fd; color: #0c4a6e; }
+.treatment-chip[data-t="WT"]         { background: #fef9c3; color: #713f12; }
+.treatment-chip[data-t="審美"]       { background: #ddd6fe; color: #4c1d95; }
+.treatment-chip[data-t="補綴"]       { background: #d1fae5; color: #064e3b; }
+.treatment-chip[data-t="転院"]       { background: #fecaca; color: #7f1d1d; }
+/* v706: 該当なし (service 空) は淡いダッシュ表示、badge なし */
+.tx-empty { color: var(--muted); font-size: .95em; }
 
 .field-input {
   width: 100%;

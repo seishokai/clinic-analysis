@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v705';
+const APP_VERSION = 'v706';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -122,7 +122,8 @@ function getTreatment(service, contractService) {
   if (s.includes('審美')) return '審美';
   if (s.includes('補綴')) return '補綴';
   if (s.includes('転院')) return '転院';
-  return 'その他';
+  // v706: 治療のその他は基本ない (セレクトタイプ booking 行等で service 空の場合) → 空返し (render 側で '-' 表示)
+  return '';
 }
 
 // 成約商材の選択肢 (v521 と同じ)
@@ -785,7 +786,7 @@ function rowHtml(v) {
   return `<tr data-visit-id="${esc(v.visit_id)}">
     <td class="c-book">${esc(bookDisplay)}</td>
     <td class="c-name" title="${esc(v.normalized_name || '')}">${esc(v.patient_name || '(名前なし)')}</td>
-    <td class="c-treatment"><span class="treatment-chip" data-t="${esc(treatment)}">${esc(treatment)}</span></td>
+    <td class="c-treatment">${treatment ? `<span class="treatment-chip" data-t="${esc(treatment)}">${esc(treatment)}</span>` : '<span class="tx-empty">-</span>'}</td>
     <td class="c-facility" title="${esc(v.facility || '')}">${esc(normFac(v.facility) || '-')}</td>
     <td class="c-promo"><span class="${promoChipCls}" title="${esc(promo)}">${promo ? esc(shortPromo(promo)) : '-'}</span></td>
     <td class="c-status">
