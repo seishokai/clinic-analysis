@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v721';
+const APP_VERSION = 'v722';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -1973,8 +1973,9 @@ function showUpdateBanner(newVer) {
     document.head.appendChild(style);
   }
   document.getElementById('update-now-btn').addEventListener('click', () => {
-    // キャッシュを回避しつつリロード
-    location.reload();
+    // v722: URL 末尾に ?bust=timestamp を付けてブラウザキャッシュを強制回避
+    //   (location.reload() だけでは Chrome が index.html をキャッシュから返す事があった)
+    location.href = location.pathname + '?bust=' + Date.now();
   });
   document.getElementById('update-later-btn').addEventListener('click', () => {
     bar.style.transition = 'transform 0.2s'; bar.style.transform = 'translateY(-100%)';

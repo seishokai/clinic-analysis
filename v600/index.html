@@ -5,7 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#ffffff">
-<title>Aladdin v721 — 清翔会</title>
+<meta http-equiv="cache-control" content="no-cache, no-store, must-revalidate">
+<meta http-equiv="pragma" content="no-cache">
+<meta http-equiv="expires" content="0">
+<title>Aladdin — 清翔会</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🧾%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="app.css?v=37">
@@ -358,6 +361,25 @@
     </div>
   </template>
 
-  <script src="app.js?v=55"></script>
+  <!-- v722: version.txt を no-cache で fetch → その値を cache-buster にして app.js を動的読み込み。
+       これで版更新は version.txt bump 1 発だけで OK、index.html/app.js の ?v= 手動更新不要。 -->
+  <script>
+    (async () => {
+      let ver = 'unknown';
+      try {
+        const r = await fetch('./version.txt?t=' + Date.now(), { cache: 'no-store' });
+        if (r.ok) ver = (await r.text()).trim() || 'unknown';
+      } catch (_) { /* offline: fallback to timestamp */ }
+      const s = document.createElement('script');
+      s.src = './app.js?v=' + encodeURIComponent(ver);
+      s.onerror = () => {
+        // 最後の砦: fetch 失敗しても app.js は timestamp で読む
+        const s2 = document.createElement('script');
+        s2.src = './app.js?bust=' + Date.now();
+        document.body.appendChild(s2);
+      };
+      document.body.appendChild(s);
+    })();
+  </script>
 </body>
 </html>
