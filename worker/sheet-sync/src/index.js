@@ -238,6 +238,8 @@ async function runSync(env, triggerName) {
         apply_date: c.book_date,
         apply_at: applyAtIso,   // sync_source から決定的にユニーク化
         status: '未対応',
+        service: c.reason,       // v708: 来院理由 (ブラックフィルム相談/矯正相談/インプラント相談 等)
+                                 //         → Aladdin の getTreatment が治療分類を判定する
         source_tool: 'sheet',
         source_channel: c.source_channel,
         sync_source: c.sync_source,
