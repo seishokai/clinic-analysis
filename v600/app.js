@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v716';
+const APP_VERSION = 'v717';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -1127,10 +1127,13 @@ async function fetchBookings() {
   try {
     const results = await Promise.all(BK_SHEETS.map(fetchBkSheet));
     const all = results.flat();
-    // v600 fix: 来院管理と同じソート = book_date DESC
+    // v717 fix: DXHUB (2026/8/16 9:30) と セレクト (2026年9月8日(火) 18時30分) の
+    //   bookDate 文字列 sort は 年 > / (Unicode) で セレクトが常に上位に来て、
+    //   上位行が全部「矯正」に見える bug の原因になっていた。
+    //   → parseBkDate で ISO 化してから比較。
     all.sort((a, b) => {
-      const ad = a.bookDate || a.applyDate || '';
-      const bd = b.bookDate || b.applyDate || '';
+      const ad = parseBkDate(a.bookDate) || parseBkDate(a.applyDate) || '';
+      const bd = parseBkDate(b.bookDate) || parseBkDate(b.applyDate) || '';
       return bd.localeCompare(ad);
     });
     state.bookings = { rows: all, fetchedAt: new Date().toISOString() };
@@ -1214,6 +1217,15 @@ function renderBookingsTable() {
     tbody.insertAdjacentHTML('beforeend',
       `<tr><td colspan="9" class="empty-msg">…他 ${rows.length - 500} 件 (フィルタで絞ってください)</td></tr>`);
   }
+}
+
+// v717: bookDate/applyDate を ISO "YYYY-MM-DD" に統一 (sort/比較用)
+function parseBkDate(raw) {
+  if (!raw) return '';
+  const s = String(raw).trim();
+  let m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
+  if (m) return `${m[1]}-${String(m[2]).padStart(2,'0')}-${String(m[3]).padStart(2,'0')}`;
+  return '';
 }
 
 // v715: 予約シートの日付表記統一 (DXHUB "2026/8/16 9:30" / セレクト "2026年9月8日(火) 18時30分" / ISO どれでも)
