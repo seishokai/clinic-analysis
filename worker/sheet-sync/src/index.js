@@ -167,14 +167,18 @@ function sbHeaders(env, extra = {}) {
   };
 }
 
-// v800: 「触った」判定 (どれか 1 つでも当てはまれば touched)
+// v802: 「触った」判定 — updated_by は email 形式 (@ 含む) のみ実ユーザ扱い
+//   sheet-direct / sheet-came / system-sync / migrate:v600 等の bot marker は非ユーザ
 function isTouched(visit) {
   if (visit.status && visit.status !== '未対応') return true;
   if (visit.memo != null && String(visit.memo).length > 0) return true;
   if (visit.contract_amount != null && Number(visit.contract_amount) > 0) return true;
   if (visit.next_visit_date != null) return true;
+  // updated_by に '@' 含む = メールアドレス形式 = 実ユーザ (touched)
+  //   例: adachi@aladdin.local, tkm.koike@gmail.com, seishokai.koukoku@gmail.com
+  //   除外: migrate:v600, system-sync, sheet-direct, sheet-came, unknown, NULL
   const u = visit.updated_by;
-  if (u && !['system-sync', 'sheet-came', 'sheet-direct', 'unknown', ''].includes(u)) return true;
+  if (u && String(u).includes('@')) return true;
   return false;
 }
 
