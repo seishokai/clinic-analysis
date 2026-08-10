@@ -150,23 +150,25 @@ async function runSync(env, triggerName) {
     return await finalize(env, triggerName, startMs, perTab, 0, 0, 0);
   }
 
-  // --- Phase 2: 既存 patients を一括 SELECT (1 subrequest) ---
-  //   normalized_name の unique な集合を IN() で問い合わせ
+  // --- Phase 2: 既存 patients を chunk SELECT ---
+  //   IN() の URL が 16KB 超え不可 → 200 名ずつ複数リクエストに分割
+  //   3169 candidates → 約 2000 unique names → 200/req = 10 subrequests 程度
   const uniqueNames = Array.from(new Set(allCandidates.map(c => c.normalized_name)));
-  const inList = uniqueNames.map(n => `"${n.replace(/"/g, '\\"')}"`).join(',');
-  const selUrl = `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=in.(${encodeURIComponent(inList)})&select=id,normalized_name,phone_last4`;
-  const selRes = await fetch(selUrl, { headers: sbHeaders(env) });
-  if (!selRes.ok) {
-    return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, allCandidates.length,
-      `patients SELECT failed: ${selRes.status} ${await selRes.text()}`);
-  }
-  const existingPatients = await selRes.json();
-  // Map: normalized_name → id (電話一致優先、なければ最初のを採用)
+  const CHUNK = 200;
   const patientMap = new Map();
-  for (const p of existingPatients) {
-    const key = p.normalized_name;
-    if (!patientMap.has(key)) patientMap.set(key, p.id);
-    // 電話一致するのがあればそちらを優先 (candidates ループで差し替え)
+  for (let i = 0; i < uniqueNames.length; i += CHUNK) {
+    const chunk = uniqueNames.slice(i, i + CHUNK);
+    const inList = chunk.map(n => `"${n.replace(/"/g, '\\"')}"`).join(',');
+    const selUrl = `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=in.(${encodeURIComponent(inList)})&select=id,normalized_name,phone_last4`;
+    const selRes = await fetch(selUrl, { headers: sbHeaders(env) });
+    if (!selRes.ok) {
+      return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, allCandidates.length,
+        `patients SELECT chunk ${i} failed: ${selRes.status} ${await selRes.text()}`);
+    }
+    const existingPatients = await selRes.json();
+    for (const p of existingPatients) {
+      if (!patientMap.has(p.normalized_name)) patientMap.set(p.normalized_name, p.id);
+    }
   }
 
   // --- Phase 3: 不足 patients を bulk INSERT (0 or 1 subrequest) ---
@@ -183,22 +185,27 @@ async function runSync(env, triggerName) {
     });
   }
   if (missingByKey.size > 0) {
-    const insUrl = `${env.SUPABASE_URL}/rest/v1/patients`;
-    const insRes = await fetch(insUrl, {
-      method: 'POST',
-      headers: sbHeaders(env, {
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation,resolution=merge-duplicates',
-      }),
-      body: JSON.stringify(Array.from(missingByKey.values())),
-    });
-    if (!insRes.ok) {
-      return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, allCandidates.length,
-        `patients INSERT failed: ${insRes.status} ${await insRes.text()}`);
-    }
-    const created = await insRes.json();
-    for (const p of (Array.isArray(created) ? created : [])) {
-      patientMap.set(p.normalized_name, p.id);
+    // POST body は URL 制限ないが 100 件ずつで response size も抑える
+    const arr = Array.from(missingByKey.values());
+    const BATCH = 100;
+    for (let i = 0; i < arr.length; i += BATCH) {
+      const batch = arr.slice(i, i + BATCH);
+      const insRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patients`, {
+        method: 'POST',
+        headers: sbHeaders(env, {
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation,resolution=merge-duplicates',
+        }),
+        body: JSON.stringify(batch),
+      });
+      if (!insRes.ok) {
+        return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, allCandidates.length,
+          `patients INSERT batch ${i} failed: ${insRes.status} ${await insRes.text()}`);
+      }
+      const created = await insRes.json();
+      for (const p of (Array.isArray(created) ? created : [])) {
+        patientMap.set(p.normalized_name, p.id);
+      }
     }
   }
 
@@ -224,22 +231,25 @@ async function runSync(env, triggerName) {
     });
 
   let inserted = 0, skipped = 0;
-  if (visitPayload.length > 0) {
+  const BATCH_V = 200;
+  for (let i = 0; i < visitPayload.length; i += BATCH_V) {
+    const batch = visitPayload.slice(i, i + BATCH_V);
     const visRes = await fetch(`${env.SUPABASE_URL}/rest/v1/patient_visits`, {
       method: 'POST',
       headers: sbHeaders(env, {
         'Content-Type': 'application/json',
         'Prefer': 'return=representation,resolution=ignore-duplicates',
       }),
-      body: JSON.stringify(visitPayload),
+      body: JSON.stringify(batch),
     });
     if (visRes.ok) {
       const created = await visRes.json();
-      inserted = Array.isArray(created) ? created.length : 0;
-      skipped = visitPayload.length - inserted;
+      const ins = Array.isArray(created) ? created.length : 0;
+      inserted += ins;
+      skipped += batch.length - ins;
     } else {
-      return await finalize(env, triggerName, startMs, perTab, allCandidates.length, 0, allCandidates.length,
-        `visits INSERT failed: ${visRes.status} ${await visRes.text()}`);
+      return await finalize(env, triggerName, startMs, perTab, allCandidates.length, inserted, skipped + (visitPayload.length - i - batch.length),
+        `visits INSERT batch ${i} failed: ${visRes.status} ${await visRes.text()}`);
     }
   }
 
