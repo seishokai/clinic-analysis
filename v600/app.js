@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v720';
+const APP_VERSION = 'v721';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -76,6 +76,7 @@ const state = {
   bookings: null,       // 予約一覧 (Sheets 読取) の生データ
   bookingFilters: { search: '', facility: '', tool: '' },
   a2Period: 'all',      // v719: 分析タブの期間フィルタ
+  a2Filters: { facility: '', treatment: '', promo: '' },   // v721: 分析タブの絞込
   visits: [],           // v_visits_with_patient rows
   patients: [],         // patients rows
   loading: false,
@@ -1392,6 +1393,7 @@ function renderAnalyticsView(main) {
     $('#a2-period').addEventListener('change', e => {
       state.a2Period = e.target.value;
       a2UpdateQuickButtons();
+      a2PopulateFilters();
       renderAnalyticsTable();
     });
     document.querySelectorAll('.analytics-view .quick-period-btn').forEach(btn => {
@@ -1400,11 +1402,62 @@ function renderAnalyticsView(main) {
         const sel = $('#a2-period');
         if (sel) sel.value = state.a2Period;
         a2UpdateQuickButtons();
+        a2PopulateFilters();
         renderAnalyticsTable();
       });
     });
+    // v721: 3 軸絞込フィルタ
+    ['facility', 'treatment', 'promo'].forEach(key => {
+      $(`#a2-${key}`).addEventListener('change', e => {
+        state.a2Filters[key] = e.target.value;
+        renderAnalyticsTable();
+      });
+    });
+    $('#a2-reset').addEventListener('click', () => {
+      state.a2Filters = { facility: '', treatment: '', promo: '' };
+      state.a2Period = 'all';
+      $('#a2-facility').value = ''; $('#a2-treatment').value = ''; $('#a2-promo').value = '';
+      $('#a2-period').value = 'all';
+      a2UpdateQuickButtons();
+      renderAnalyticsTable();
+    });
   }
+  a2PopulateFilters();
   renderAnalyticsTable();
+}
+// v721: フィルタ select の option を state.visits から動的生成
+function a2PopulateFilters() {
+  const facSel = $('#a2-facility');
+  const treatSel = $('#a2-treatment');
+  const promoSel = $('#a2-promo');
+  if (!facSel) return;
+  const period = a2FilterByPeriod(state.visits || []);
+  const facs = new Set(), treats = new Set(), promos = new Set();
+  for (const v of period) {
+    if (v._normFacility) facs.add(v._normFacility);
+    if (v._treatment) treats.add(v._treatment);
+    if (v.promo_code) promos.add(v.promo_code === 'セレクトタイプ' ? 'セレクト' : v.promo_code);
+  }
+  const buildOpts = (curr, all, prefix) => {
+    return `<option value="">${prefix}:全て</option>` +
+      [...all].sort().map(x => `<option value="${esc(x)}" ${x === curr ? 'selected' : ''}>${esc(x)}</option>`).join('');
+  };
+  facSel.innerHTML = buildOpts(state.a2Filters.facility, facs, '医院');
+  treatSel.innerHTML = buildOpts(state.a2Filters.treatment, treats, '治療');
+  promoSel.innerHTML = buildOpts(state.a2Filters.promo, promos, 'プロモ');
+}
+// v721: 絞込フィルタ適用
+function a2ApplyFilters(visits) {
+  const f = state.a2Filters;
+  return visits.filter(v => {
+    if (f.facility && (v._normFacility || '') !== f.facility) return false;
+    if (f.treatment && (v._treatment || '') !== f.treatment) return false;
+    if (f.promo) {
+      const p = v.promo_code === 'セレクトタイプ' ? 'セレクト' : (v.promo_code || '');
+      if (p !== f.promo) return false;
+    }
+    return true;
+  });
 }
 function a2UpdateQuickButtons() {
   document.querySelectorAll('.analytics-view .quick-period-btn').forEach(btn => {
@@ -1455,7 +1508,7 @@ function renderAnalyticsTable() {
     body.innerHTML = '<div class="empty-msg">来院データがロードされていません。来院タブを一度開いてください。</div>';
     return;
   }
-  const visits = a2FilterByPeriod(state.visits);
+  const visits = a2ApplyFilters(a2FilterByPeriod(state.visits));   // v721: 期間 + 3軸絞込
 
   // ---- 全体サマリー ----
   //   予約 = 予約由来のみ (walkin除く) / 来院 = 実来院 (walkin含む) / 成約は厳格化
