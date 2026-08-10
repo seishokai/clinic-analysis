@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v713';
+const APP_VERSION = 'v714';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -285,20 +285,22 @@ async function fetchVisits() {
   let hitCap = false;
   for (let page = 0; page < 20; page++) {
     // v711 fix: view が deleted 列を持ってないと Supabase が 400 返す → try/catch で fallback
+    // v714 fix: paging で同一行が複数ページに出る問題 (order 不安定) → visit_id を secondary sort に
     let { data, error } = await sb
       .from('v_visits_with_patient')
       .select('*')
       .or(`book_date.is.null,book_date.lte.${todayIso}`)
-      .eq('deleted', false)   // v711: 削除済 visits を除外
+      .eq('deleted', false)
       .order('book_date', { ascending: false, nullsFirst: false })
+      .order('visit_id', { ascending: true })   // v714: ページング安定化
       .range(from, from + pageSize - 1);
-    // deleted 列が View に無い場合の fallback (列不明エラー 42703)
     if (error && String(error.code) === '42703') {
       const retry = await sb
         .from('v_visits_with_patient')
         .select('*')
         .or(`book_date.is.null,book_date.lte.${todayIso}`)
         .order('book_date', { ascending: false, nullsFirst: false })
+        .order('visit_id', { ascending: true })
         .range(from, from + pageSize - 1);
       data = retry.data; error = retry.error;
     }
