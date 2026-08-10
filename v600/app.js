@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v715';
+const APP_VERSION = 'v716';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -134,6 +134,7 @@ const CONTRACT_SERVICE_OPTIONS = ['', 'BF', '矯正(表)', '矯正(裏)', '矯�
 // プロモコード → 表示ラベル短縮
 function shortPromo(p) {
   if (!p) return '';
+  if (p === 'セレクトタイプ') return 'セレクト';   // v716: 略記 (両タブ共通)
   return p.length > 14 ? p.slice(0, 14) + '…' : p;
 }
 
@@ -1192,13 +1193,17 @@ function renderBookingsTable() {
   empty.hidden = true;
   const shown = rows.slice(0, 500);
   tbody.innerHTML = shown.map(r => {
-    const treatment = getTreatment(r.service, '');   // v715: 相談内容から治療分類
+    const treatment = getTreatment(r.service, '');
+    // v716: promo は来院タブと同じロジックに統一 (セレクトタイプ chip も同じ表示)
+    const displayPromo = r.tool === 'セレクト' ? 'セレクトタイプ' : (r.source || '');
+    const isSel = displayPromo === 'セレクトタイプ';
+    const promoCls = !displayPromo ? 'promo-chip empty' : isSel ? 'promo-chip select-type' : 'promo-chip';
     return `<tr>
     <td class="c-book">${esc(bkFmtDate(r.bookDate))}</td>
     <td class="c-name">${esc(r.name || '')}</td>
     <td class="c-facility">${esc(normFac(r.facility) || '-')}</td>
     <td class="c-treatment">${treatment ? `<span class="treatment-chip" data-t="${esc(treatment)}">${esc(treatment)}</span>` : '<span class="tx-empty">-</span>'}</td>
-    <td class="c-promo"><span class="promo-chip ${r.tool==='セレクト'?'select-type':''}" title="${esc(r.source||'')}">${r.tool==='セレクト' ? '—' : esc(shortPromo(r.source||'') || '-')}</span></td>
+    <td class="c-promo"><span class="${promoCls}" title="${esc(displayPromo)}">${displayPromo ? esc(shortPromo(displayPromo)) : '-'}</span></td>
     <td style="font-size:12px">${esc(r.service || '-')}</td>
     <td style="font-size:11px;color:var(--ink-mute);font-family:var(--font-mono)">${esc(r.email || '-')}</td>
     <td style="font-family:var(--font-mono);font-size:11px">${esc(r.phone || '-')}</td>
