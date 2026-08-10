@@ -150,18 +150,31 @@ async function syncOneTab(env, tab, aliases, cutoffIso) {
   // Supabase upsert (dedup on unique index → 既存行はスキップ、新規のみ INSERT)
   let inserted = 0, skipped = 0, errored = 0;
   for (const c of candidates) {
-    // patients を先に upsert (normalized_name + facility で見つけて既存なら patient_id 使う)
+    // patients を先に upsert (normalized_name で照合、facility は比較に使わない
+    //   ← DB は「BF銀座歯科・矯正歯科」等のフル名、シートは短縮名で不一致するため)
     let patientId;
     try {
-      // 1) 既存 patient を探す
+      // 1) 既存 patient を探す (電話下 4 桁あれば優先マッチ)
+      const nnQ = encodeURIComponent(c.normalized_name);
+      const phoneQ = c.phone ? `&phone_last4=eq.${encodeURIComponent(c.phone.slice(-4))}` : '';
       const r1 = await fetch(
-        `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=eq.${encodeURIComponent(c.normalized_name)}&primary_facility=eq.${encodeURIComponent(c.facility)}&limit=1`,
+        `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=eq.${nnQ}${phoneQ}&limit=1`,
         { headers: sbHeaders(env) }
       );
       const existing = await r1.json();
       if (Array.isArray(existing) && existing.length > 0) {
         patientId = existing[0].id;
-      } else {
+      } else if (c.phone) {
+        // 電話マッチで見つからなければ、name だけで再検索
+        const r1b = await fetch(
+          `${env.SUPABASE_URL}/rest/v1/patients?normalized_name=eq.${nnQ}&limit=1`,
+          { headers: sbHeaders(env) }
+        );
+        const ex2 = await r1b.json();
+        if (Array.isArray(ex2) && ex2.length > 0) patientId = ex2[0].id;
+      }
+
+      if (!patientId) {
         // 2) 新規 patient
         const r2 = await fetch(
           `${env.SUPABASE_URL}/rest/v1/patients`,
