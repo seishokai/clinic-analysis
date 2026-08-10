@@ -551,6 +551,7 @@ main {
 .status-sel[data-value="来院済"]     { background: var(--info-soft); color: var(--info); font-weight: 600; }
 .status-sel[data-value="検討中"]     { background: #fff5d6; color: #8a6d1a; font-weight: 600; }
 .status-sel[data-value="除外"]       { background: var(--line-soft); color: var(--ink-mute); }
+.status-sel[data-value="重複削除"]   { background: #e5e7eb; color: #6b7280; text-decoration: line-through; }
 .status-sel.saving { outline: 2px solid var(--info); }
 .status-sel.saved  { outline: 2px solid var(--ok); }
 .status-sel.failed { outline: 2px solid var(--warn); }

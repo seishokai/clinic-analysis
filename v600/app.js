@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v706';
+const APP_VERSION = 'v707';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -42,9 +42,10 @@ const STATUS_OPTIONS = [
   '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
   '印象待ち(治療無)', '印象待ち(治療有)', '治療中',
   'セット日確定待ち', 'セット待ち', 'セット完了',
-  '除外',
+  '除外', '重複削除',
 ];
-const STATUS_HIDDEN_BY_DEFAULT = new Set(['除外', 'キャンセル']);
+// v707: '重複削除' はデフォルト非表示 & カウント除外 (staff がシート重複を潰した行の墓場)
+const STATUS_HIDDEN_BY_DEFAULT = new Set(['重複削除']);
 
 const FACILITIES = [
   'BF銀座', 'エスカ', 'アール', 'ウィズ', 'ルミナス',
@@ -426,8 +427,13 @@ function filteredVisits() {
     if (f.facility && v._normFacility !== f.facility) return false;
     if (f.treatment && v._treatment !== f.treatment) return false;
     if (f.promo && (v.promo_code || '') !== f.promo) return false;
-    // v604: STATUS_HIDDEN_BY_DEFAULT 撤回 — キャンセル/除外 も見たい (ユーザー要望)
-    if (f.status && v._effStatus !== f.status) return false;
+    // v707: status filter が空なら '重複削除' はデフォルト非表示 & カウント除外
+    //       (キャンセル/除外 は v604 で再表示)
+    if (f.status) {
+      if (v._effStatus !== f.status) return false;
+    } else {
+      if (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus)) return false;
+    }
     if ((fromMs || toMs) && v._bookMs) {
       if (fromMs && v._bookMs < fromMs) return false;
       if (toMs && v._bookMs > toMs) return false;
@@ -725,7 +731,9 @@ function renderVisitsTable() {
   //   #v-tbody / #v-empty / #v-count / #v-updated は visits view でしか存在しない
   if (state.view !== 'visits' || !$('#v-tbody')) return;
   const rows = filteredVisits();
-  $('#v-count').innerHTML = `<strong>${rows.length}</strong> / ${state.visits.length} 件`;
+  // v707: 分母も '重複削除' を除いた実来院ベース数にする
+  const totalNoDup = state.visits.reduce((n, v) => n + (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus) ? 0 : 1), 0);
+  $('#v-count').innerHTML = `<strong>${rows.length}</strong> / ${totalNoDup} 件`;
   $('#v-updated').textContent = `更新: ${new Date().toLocaleTimeString()}`;
   const tbody = $('#v-tbody');
   const empty = $('#v-empty');
