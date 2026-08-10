@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v717';
+const APP_VERSION = 'v718';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -1228,13 +1228,13 @@ function parseBkDate(raw) {
   return '';
 }
 
-// v715: 予約シートの日付表記統一 (DXHUB "2026/8/16 9:30" / セレクト "2026年9月8日(火) 18時30分" / ISO どれでも)
+// v715/v718: 予約シートの日付表記統一 (DXHUB "2026/8/16 9:30" / セレクト "2026年9月8日(火) 18時30分" / ISO どれでも)
+// v718: 予約日 と 申込日 の見た目統一 (M/D、leading 0 を必ず削る)
 function bkFmtDate(raw) {
   if (!raw) return '-';
   const s = String(raw).trim();
   let m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
-  if (!m) m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})日/);
-  if (m) return `${m[2]}/${m[3]}`;
+  if (m) return `${Number(m[2])}/${Number(m[3])}`;
   return s.slice(0, 10);
 }
 
