@@ -14,7 +14,7 @@
  *   でユニーク → 既存行は onConflict do nothing で touch しない (v700 SQL 参照)
  * ============================================================ */
 
-import CONFIG from '../config/sheet-tabs.json' with { type: 'json' };
+import CONFIG from '../config/sheet-tabs.js';
 
 // ==================== Utils ====================
 const normName = (n) => (n == null ? '' : String(n).replace(/[\s　]+/g, '').toLowerCase());
