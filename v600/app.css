@@ -955,18 +955,25 @@ main {
 
   .visits-view .v-table tbody tr {
     display: grid;
-    /* 5 列: date(auto) name(1fr, 最低 90px) clinic(auto) treat(auto) promo(auto)
-       secondary は col1-2 で status、col3 で amount(auto)、col4-5 で memo */
-    grid-template-columns: minmax(30px, auto) minmax(90px, 1fr) minmax(48px, auto) auto minmax(70px, auto);
-    grid-template-rows: auto auto;
-    column-gap: 7px;
-    row-gap: 8px;
+    /* 3 段 × 3 列 レイアウト:
+       Row 1: 日付 · 名前(spans2)
+       Row 2: 医院 · 治療tag · プロモpill
+       Row 3: ステータス(spans2) · 売上 · メモ(下段) */
+    grid-template-columns: minmax(72px, auto) minmax(0, 1fr) minmax(80px, auto);
+    grid-template-rows: auto auto auto auto;
+    grid-template-areas:
+      "book   name    name"
+      "fac    treat   promo"
+      "status amount  amount"
+      "memo   memo    memo";
+    column-gap: 8px;
+    row-gap: 6px;
     align-items: center;
     background: #ffffff;
     border: 1px solid #dfe3df;
     border-radius: 12px;
-    padding: 11px 12px;
-    margin: 0 0 8px;
+    padding: 10px 12px;
+    margin: 0 0 7px;
     box-shadow: 0 1px 2px rgba(0,0,0,.04);
     width: 100%;
   }
@@ -984,16 +991,49 @@ main {
   }
   .visits-view .v-table tbody td::before { content: none; }
 
-  /* Row 1: date name clinic treat promo (5 cols) */
-  .visits-view .v-table tbody td.c-book      { grid-column: 1; grid-row: 1; font-size: 12px; color: #62706a; font-variant-numeric: tabular-nums; }
-  .visits-view .v-table tbody td.c-name      { grid-column: 2; grid-row: 1; font-size: 14px; font-weight: 500; color: #17201d; margin-right: 2px; }
-  .visits-view .v-table tbody td.c-facility  { grid-column: 3; grid-row: 1; font-size: 11px; color: #56635e; }
-  .visits-view .v-table tbody td.c-treatment { grid-column: 4; grid-row: 1; overflow: visible; white-space: nowrap; }
-  .visits-view .v-table tbody td.c-promo     { grid-column: 5; grid-row: 1; font-size: 11px; max-width: 76px; }
+  /* Row 1: date + name */
+  .visits-view .v-table tbody td.c-book {
+    grid-area: book;
+    font-size: 12px;
+    color: #62706a;
+    font-variant-numeric: tabular-nums;
+  }
+  .visits-view .v-table tbody td.c-name {
+    grid-area: name;
+    font-size: 15px;
+    font-weight: 600;
+    color: #17201d;
+  }
+
+  /* Row 2: clinic · treat · promo — 3 cols, each with own space */
+  .visits-view .v-table tbody td.c-facility {
+    grid-area: fac;
+    font-size: 12px;
+    color: #56635e;
+    font-weight: 500;
+  }
+  .visits-view .v-table tbody td.c-treatment {
+    grid-area: treat;
+    overflow: visible;
+    text-align: center;
+  }
+  .visits-view .v-table tbody td.c-treatment > span {
+    font-size: 11px !important;
+    font-weight: 500;
+    padding: 3px 8px !important;
+    border-radius: 5px !important;
+    display: inline-block;
+    white-space: nowrap;
+  }
+  .visits-view .v-table tbody td.c-promo {
+    grid-area: promo;
+    text-align: right;
+    overflow: hidden;
+  }
   .visits-view .v-table tbody td.c-promo > span {
     display: inline-block;
     max-width: 100%;
-    padding: 3px 7px;
+    padding: 3px 8px;
     background: #e0efff;
     color: #24527d;
     border-radius: 999px;
@@ -1001,18 +1041,15 @@ main {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-  }
-  .visits-view .v-table tbody td.c-treatment > span {
-    font-size: 11px !important;
-    font-weight: 500;
-    padding: 4px 7px !important;
-    border-radius: 6px !important;
+    vertical-align: middle;
   }
 
-  /* Row 2: status | amount | memo */
-  .visits-view .v-table tbody td.c-status  { grid-column: 1 / span 2; grid-row: 2; }
-  .visits-view .v-table tbody td.c-amount  { grid-column: 3;         grid-row: 2; }
-  .visits-view .v-table tbody td.c-memo    { grid-column: 4 / -1;    grid-row: 2; overflow: hidden; }
+  /* Row 3: status · amount */
+  .visits-view .v-table tbody td.c-status  { grid-area: status; }
+  .visits-view .v-table tbody td.c-amount  { grid-area: amount; }
+
+  /* Row 4: memo (full width) */
+  .visits-view .v-table tbody td.c-memo    { grid-area: memo; overflow: hidden; }
 
   /* モバイル非表示 (詳細編集は デスクトップで) */
   .visits-view .v-table tbody td.c-next,
