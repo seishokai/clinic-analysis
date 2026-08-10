@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v627';
+const APP_VERSION = 'v628';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -703,6 +703,9 @@ function populatePromoOptions() {
 // v603 fix #11 / P2: 500 行 → 「もっと見る」でページ拡張
 let _visitsShownLimit = 500;
 function renderVisitsTable() {
+  // v628 bug fix: search debounce (200ms) が別 view に遷移した後に発火して null crash する対策
+  //   #v-tbody / #v-empty / #v-count / #v-updated は visits view でしか存在しない
+  if (state.view !== 'visits' || !$('#v-tbody')) return;
   const rows = filteredVisits();
   $('#v-count').innerHTML = `<strong>${rows.length}</strong> / ${state.visits.length} 件`;
   $('#v-updated').textContent = `更新: ${new Date().toLocaleTimeString()}`;
@@ -1290,7 +1293,10 @@ function renderActivityView(main) {
     setSaveStatus('更新中…', 'saving');
     await fetchVisits();
     setSaveStatus('更新完了 ✓', 'saved');
-    renderActivityView(main);   // 再描画
+    // v628 bug fix: fetch 完了までにユーザが別 view に移動していたら再描画しない
+    //   (main に閉じ込めた ref で他 view を上書きしてしまうバグ)
+    if (state.view !== 'activity') return;
+    renderActivityView(main);
   });
 
   renderActivityTable();
@@ -1437,6 +1443,11 @@ async function checkForUpdate() {
   } catch(_) { /* ネット断・404 は無視 */ }
 }
 function showUpdateBanner(newVer) {
+  // v628 bug fix: 既存 banner を先に削除 (id 重複 & リスナ 2 重登録防止)
+  //   自動チェックで banner が出てる状態で 🔍 更新確認 押すと banner が 2 個並んで
+  //   新しい方の「更新する/後で」が動かなくなっていた
+  const existing = document.getElementById('update-banner');
+  if (existing) existing.remove();
   const bar = document.createElement('div');
   bar.id = 'update-banner';
   bar.setAttribute('role', 'alert');
