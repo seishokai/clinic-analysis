@@ -4,6 +4,8 @@
  * ============================================================ */
 
 :root {
+  /* v616: iOS Safari 等の自動ダークモードを止めて常にライト固定 */
+  color-scheme: light only;
   --bg: #f5f4f0;
   --paper: #ffffff;
   --card: #ffffff;
@@ -30,27 +32,7 @@
   --font-mono: "SF Mono", Menlo, "Cascadia Mono", "Consolas", "MS Gothic", monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #16181c;
-    --paper: #1e2126;
-    --card: #23272d;
-    --ink: #ebeae6;
-    --ink-soft: #b0b1b2;
-    --ink-mute: #7c7e82;
-    --line: #34383e;
-    --line-soft: #292c31;
-    --accent: #4bb39f;
-    --accent-soft: #1e3e39;
-    --accent-ink: #7dd3c0;
-    --warn: #e05a4d;
-    --warn-soft: #3a221e;
-    --ok: #6dd88a;
-    --ok-soft: #1f3524;
-    --info: #6ea9dd;
-    --info-soft: #1c2b3e;
-  }
-}
+/* v616: prefers-color-scheme:dark override は撤廃。全端末で白基調に固定。 */
 
 *, *::before, *::after { box-sizing: border-box; }
 html { -webkit-font-smoothing: antialiased; }
@@ -878,11 +860,12 @@ main {
   .toolbar { padding: 10px 12px; }
 }
 
-/* ------- Mobile (< 720px) ------- */
+/* ============================================================
+ * v616: Mobile (< 720px) — テーブルを「カード一覧」に全面刷新
+ *   - 医院名・成約情報も全部見える (横スクロール不要)
+ *   - 各行 = カード。中に ラベル: 値 の行が縦に並ぶ
+ * ============================================================ */
 @media (max-width: 720px) {
-  :root {
-    /* モバイルでは文字を少し詰める */
-  }
   /* ---- Header ---- */
   .hdr {
     padding: 6px 10px;
@@ -894,13 +877,13 @@ main {
   .hdr-right .link-btn, .hdr-right button {
     padding: 6px 8px;
     font-size: 11px;
-    min-height: 36px;    /* タップターゲット確保 */
+    min-height: 36px;
   }
   .hdr-count, .hdr-updated {
     font-size: 10px;
     padding: 2px 6px;
   }
-  .hdr-updated { display: none; }   /* モバイルは件数のみ、時刻は省略 */
+  .hdr-updated { display: none; }
   .save-status { min-width: auto; font-size: 10px; }
   .nav-btn { padding: 7px 10px; font-size: 12px; min-height: 36px; }
   .nav-btn.nav-ext { padding: 7px 8px; }
@@ -917,7 +900,7 @@ main {
   .tb-search {
     flex: 1 1 100%;
     min-width: 0;
-    font-size: 14px;   /* iOS で 16px 未満はズーム発火するが 14px で許容 */
+    font-size: 14px;
     padding: 8px 10px;
   }
   .tb-select {
@@ -934,22 +917,121 @@ main {
   .link-btn { padding: 8px 10px; font-size: 12px; min-height: 36px; }
   .v-date-inp { flex: 1 1 40%; width: auto; min-width: 0; }
 
-  /* ---- Table ---- */
-  .table-wrap { border-radius: 6px; }
-  .v-table { font-size: 12px; min-width: 900px; }   /* モバイルは横スクロール */
-  .v-table thead th { padding: 8px 6px; font-size: 10px; letter-spacing: 0.02em; }
-  .v-table tbody td { padding: 6px 6px; }
-
-  /* モバイルで隠す列 — 縦幅節約 */
-  .c-updated, .c-cs, .c-cmonth { display: none; }
-
-  /* 入力コントロールのモバイル最適化 */
-  .status-select, .field-input {
-    padding: 5px 4px;
-    font-size: 12px;
-    min-height: 32px;
+  /* ---- ★ Table → Card layout (visits/bookings/patients — activity は除外) ---- */
+  .visits-view .table-wrap,
+  .bookings-view .table-wrap {
+    border-radius: 6px;
+    background: transparent;
+    border: none;
+    padding: 4px;
+    overflow-y: auto;
+    overflow-x: hidden;
   }
-  .memo-btn { font-size: 11px; padding: 4px 6px; }
+  .visits-view .v-table,
+  .visits-view .v-table thead,
+  .visits-view .v-table tbody,
+  .visits-view .v-table tr,
+  .visits-view .v-table tbody td,
+  .bookings-view .v-table,
+  .bookings-view .v-table thead,
+  .bookings-view .v-table tbody,
+  .bookings-view .v-table tr,
+  .bookings-view .v-table tbody td {
+    display: block;
+    width: auto !important;
+    min-width: 0 !important;
+  }
+  .visits-view .v-table,
+  .bookings-view .v-table { min-width: 0; }
+  .visits-view .v-table thead,
+  .bookings-view .v-table thead { display: none; }
+  .visits-view .v-table tbody tr,
+  .bookings-view .v-table tbody tr {
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    margin: 0 0 10px;
+    box-shadow: var(--shadow-sm);
+  }
+  .visits-view .v-table tbody td,
+  .bookings-view .v-table tbody td {
+    padding: 5px 0;
+    border-bottom: 1px dashed var(--line-soft);
+    overflow: visible;
+    text-overflow: unset;
+    white-space: normal;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 30px;
+  }
+  .visits-view .v-table tbody td:last-child,
+  .bookings-view .v-table tbody td:last-child { border-bottom: none; }
+  .visits-view .v-table tbody td::before,
+  .bookings-view .v-table tbody td::before {
+    flex: 0 0 66px;
+    font-size: 10.5px;
+    color: var(--ink-mute);
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+  }
+  .visits-view .v-table tbody td.c-book::before     { content: '来院'; }
+  .visits-view .v-table tbody td.c-treatment::before{ content: '治療'; }
+  .visits-view .v-table tbody td.c-facility::before { content: '医院'; }
+  .visits-view .v-table tbody td.c-promo::before    { content: 'プロモ'; }
+  .visits-view .v-table tbody td.c-status::before   { content: 'STATUS'; }
+  .visits-view .v-table tbody td.c-next::before     { content: '次回予定'; }
+  .visits-view .v-table tbody td.c-cs::before       { content: '成約商材'; }
+  .visits-view .v-table tbody td.c-cmonth::before   { content: '成約月'; }
+  .visits-view .v-table tbody td.c-amount::before   { content: '売上'; }
+  .visits-view .v-table tbody td.c-memo::before     { content: 'メモ'; align-self: flex-start; padding-top: 2px; }
+  .visits-view .v-table tbody td.c-updated::before  { content: '更新'; }
+  .bookings-view .v-table tbody td.c-book::before     { content: '来院'; }
+  .bookings-view .v-table tbody td.c-facility::before { content: '医院'; }
+  .bookings-view .v-table tbody td.c-promo::before    { content: 'プロモ'; }
+
+  /* 名前は見出しとしてラベル無し・大きく表示 */
+  .visits-view .v-table tbody td.c-name,
+  .bookings-view .v-table tbody td.c-name {
+    display: block;
+    padding: 4px 0 10px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid var(--line);
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--ink);
+    white-space: normal;
+  }
+  .visits-view .v-table tbody td.c-name::before,
+  .bookings-view .v-table tbody td.c-name::before { display: none; }
+
+  /* 入力コントロールを右側に伸縮 */
+  .visits-view .v-table tbody td .status-select,
+  .visits-view .v-table tbody td select,
+  .visits-view .v-table tbody td input[type="date"],
+  .visits-view .v-table tbody td input[type="month"],
+  .visits-view .v-table tbody td .amount-input,
+  .visits-view .v-table tbody td .cs-select {
+    flex: 1;
+    min-width: 0;
+    font-size: 14px !important;
+    min-height: 36px;
+    padding: 6px 8px;
+  }
+  .visits-view .v-table tbody td .memo-cell {
+    flex: 1;
+    min-height: 40px;
+    font-size: 13px;
+    -webkit-line-clamp: 6;
+  }
+  .visits-view .v-table tbody td.c-facility { font-size: 13px; font-weight: 600; }
+  .visits-view .v-table tbody td.c-book { font-size: 12px; }
+  .visits-view .v-table tbody td.c-updated { font-size: 11px; color: var(--ink-mute); }
+
+  .visits-view .c-facility, .visits-view .c-cs,
+  .visits-view .c-cmonth, .visits-view .c-updated { display: flex !important; }
 
   /* ---- Modal ---- */
   .modal {
@@ -973,14 +1055,18 @@ main {
   .slots-title { font-size: 16px; }
   .slot-card { padding: 12px; }
   .slot-count { font-size: 22px; }
+
+  /* activity-view は table のまま (別スコープなので card 化されない) */
+  .activity-view .table-wrap { overflow-x: auto; }
+  .activity-view .v-table { font-size: 12px; min-width: 700px; }
 }
 
 /* ------- Very small (< 480px) ------- */
 @media (max-width: 480px) {
-  .hdr-right .link-btn[title="v521 に戻る"] { display: none; }   /* 極小画面では非表示 */
+  .hdr-right .link-btn[title="v521 に戻る"] { display: none; }
   .user-email { display: none; }
   .tb-select { flex: 1 1 100%; }
   .quick-period-btn { flex: 1 1 calc(50% - 3px); }
-  .v-table { min-width: 780px; }
-  .c-cs, .c-cmonth, .c-updated, .c-facility { display: none; }
+  /* カード内のラベル幅を少し詰める */
+  .v-table tbody td::before { flex: 0 0 58px; font-size: 10px; }
 }
