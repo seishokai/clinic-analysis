@@ -1009,26 +1009,29 @@ main {
   }
   .visits-view .v-table tbody td.c-name {
     order: 2;
-    flex: 0 1 auto;              /* v622: 名前は伸ばさず content 幅で。右側要素を近くに */
-    min-width: 40px;
-    max-width: calc(100% - 200px); /* clinic+treat+promo(約195) の分は残す */
+    /* v623 fix: flex-basis を 0 に (auto だと content 幅が加算されオーバーフロー→ promo が折り返す)
+       これで名前は残り幅ぴったりに固定され、医院/治療/プロモの x が全行で揃う */
+    flex: 1 1 0;
+    min-width: 0;
     font-size: 14.5px;
     font-weight: 600;
     color: #17201d;
   }
   .visits-view .v-table tbody td.c-facility {
     order: 3;
-    flex: 0 0 auto;
+    /* v623: 医院を固定 56px 幅 → インプラント行と矯正行で BF銀座/大森 が同じ x 位置 */
+    flex: 0 0 56px;
     font-size: 12px;
     color: #35443e;
     font-weight: 600;
-    max-width: 68px;
-    margin-left: auto;   /* v622: メタ群 (医院+治療+プロモ) を右に寄せて余白解消 */
+    text-align: right;
   }
   .visits-view .v-table tbody td.c-treatment {
     order: 4;
-    flex: 0 0 auto;
+    /* v623: 治療タグを固定 84px 幅 → インプラント(6文字) が余裕で入る */
+    flex: 0 0 84px;
     overflow: visible;
+    text-align: center;
   }
   .visits-view .v-table tbody td.c-treatment > span {
     font-size: 11px !important;
@@ -1037,12 +1040,14 @@ main {
     border-radius: 5px !important;
     display: inline-block;
     white-space: nowrap;
+    max-width: 100%;
   }
   .visits-view .v-table tbody td.c-promo {
     order: 5;
-    flex: 0 0 auto;
-    max-width: 76px;
+    /* v623: プロモも固定 78px 幅 → 全行で末尾位置が揃う */
+    flex: 0 0 78px;
     overflow: hidden;
+    text-align: right;
   }
   .visits-view .v-table tbody td.c-promo > span {
     display: inline-block;
