@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v718';
+const APP_VERSION = 'v719';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
@@ -75,6 +75,7 @@ const state = {
   slots: null,          // { shareconnect, apotool } fetched JSONs
   bookings: null,       // 予約一覧 (Sheets 読取) の生データ
   bookingFilters: { search: '', facility: '', tool: '' },
+  a2Period: 'all',      // v719: 分析タブの期間フィルタ
   visits: [],           // v_visits_with_patient rows
   patients: [],         // patients rows
   loading: false,
@@ -522,6 +523,7 @@ function render() {
   const main = $('#main');
   if (state.view === 'visits') renderVisitsView(main);
   else if (state.view === 'bookings') renderBookingsView(main);
+  else if (state.view === 'analytics') renderAnalyticsView(main);
   else if (state.view === 'patients') renderPatientsView(main);
   else if (state.view === 'slots') renderSlotsView(main);
   else if (state.view === 'activity') renderActivityView(main);
@@ -1236,6 +1238,174 @@ function bkFmtDate(raw) {
   let m = s.match(/(\d{4})[\/\-年](\d{1,2})[\/\-月](\d{1,2})/);
   if (m) return `${Number(m[2])}/${Number(m[3])}`;
   return s.slice(0, 10);
+}
+
+// ==================== v719: Analytics view (分析) ====================
+// state.visits を集計して 予約→来院率/来院→成約率/売上 を 治療別/プロモ別/医院別 に出す。
+// state.visits は既に fetchVisits でロード済み、deleted/テスト行は client filter で除外済み。
+const A2_NON_VISIT = new Set(['未対応', 'キャンセル', '予約変更', '離脱', '除外', '重複削除', '予約連絡待ち', '後追いLINE済み']);
+const A2_CONTRACT = new Set(['成約', 'ローン審査中', 'ローン審査落',
+  '矯正決定(BF保留)', 'ラブリエ決定(BF保留)', 'インプラント決定(BF保留)',
+  '印象待ち(治療無)', '印象待ち(治療有)', '治療中',
+  'セット日確定待ち', 'セット待ち', 'セット完了']);
+
+function a2Bucket(v, key) {
+  if (key === 'facility') return v._normFacility || '(不明)';
+  if (key === 'treatment') return v._treatment || '(未分類)';
+  if (key === 'promo') {
+    const p = v.promo_code;
+    return p ? (p === 'セレクトタイプ' ? 'セレクト' : p) : '(なし)';
+  }
+  return '?';
+}
+
+function a2Aggregate(visits, key) {
+  const buckets = new Map();
+  for (const v of visits) {
+    const k = a2Bucket(v, key);
+    if (!buckets.has(k)) buckets.set(k, { key: k, booking: 0, visited: 0, contract: 0, revenue: 0 });
+    const b = buckets.get(k);
+    b.booking += 1;
+    if (!A2_NON_VISIT.has(v._effStatus)) b.visited += 1;
+    if (A2_CONTRACT.has(v._effStatus)) b.contract += 1;
+    if (v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
+  }
+  const arr = [...buckets.values()];
+  for (const b of arr) {
+    b.visitRate = b.booking ? (b.visited / b.booking) : 0;
+    b.contractRate = b.visited ? (b.contract / b.visited) : 0;
+  }
+  arr.sort((a, b) => b.booking - a.booking);
+  return arr;
+}
+
+function a2FormatYen(n) {
+  return '¥' + (Number(n) || 0).toLocaleString('ja-JP');
+}
+function a2Pct(p) {
+  if (!isFinite(p)) return '—';
+  return (p * 100).toFixed(1) + '%';
+}
+
+function a2FilterByPeriod(visits) {
+  const p = state.a2Period || 'all';
+  if (p === 'all') return visits;
+  const now = new Date();
+  let from = null;
+  if (p === 'thisMonth') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (p === 'lastMonth') {
+    from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const to = new Date(now.getFullYear(), now.getMonth(), 1);
+    return visits.filter(v => v._bookMs && v._bookMs >= from.getTime() && v._bookMs < to.getTime());
+  } else if (p === '3m') {
+    from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+  } else if (p === '6m') {
+    from = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+  }
+  if (!from) return visits;
+  const fromMs = from.getTime();
+  return visits.filter(v => v._bookMs && v._bookMs >= fromMs);
+}
+
+function a2RenderTable(title, rows) {
+  const totalBooking = rows.reduce((s, r) => s + r.booking, 0);
+  const totalVisited = rows.reduce((s, r) => s + r.visited, 0);
+  const totalContract = rows.reduce((s, r) => s + r.contract, 0);
+  const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+  const totalVisitRate = totalBooking ? totalVisited / totalBooking : 0;
+  const totalContractRate = totalVisited ? totalContract / totalVisited : 0;
+  return `<section class="a2-section">
+    <h3 class="a2-title">${esc(title)}</h3>
+    <div class="a2-table-wrap">
+    <table class="a2-table">
+      <thead><tr>
+        <th style="text-align:left">分類</th>
+        <th style="text-align:right">予約</th>
+        <th style="text-align:right">来院</th>
+        <th style="text-align:right">来院率</th>
+        <th style="text-align:right">成約</th>
+        <th style="text-align:right">成約率</th>
+        <th style="text-align:right">売上</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr>
+          <td>${esc(r.key)}</td>
+          <td class="a2-num">${r.booking}</td>
+          <td class="a2-num">${r.visited}</td>
+          <td class="a2-num"><span class="a2-pct">${a2Pct(r.visitRate)}</span></td>
+          <td class="a2-num">${r.contract}</td>
+          <td class="a2-num"><span class="a2-pct">${a2Pct(r.contractRate)}</span></td>
+          <td class="a2-num a2-yen">${a2FormatYen(r.revenue)}</td>
+        </tr>`).join('')}
+        <tr class="a2-total">
+          <td><strong>合計</strong></td>
+          <td class="a2-num">${totalBooking}</td>
+          <td class="a2-num">${totalVisited}</td>
+          <td class="a2-num"><strong>${a2Pct(totalVisitRate)}</strong></td>
+          <td class="a2-num">${totalContract}</td>
+          <td class="a2-num"><strong>${a2Pct(totalContractRate)}</strong></td>
+          <td class="a2-num a2-yen"><strong>${a2FormatYen(totalRevenue)}</strong></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+  </section>`;
+}
+
+function renderAnalyticsView(main) {
+  if (!main.querySelector('.analytics-view')) {
+    main.innerHTML = '';
+    main.appendChild($('#tpl-analytics').content.cloneNode(true));
+    $('#a2-period').addEventListener('change', e => {
+      state.a2Period = e.target.value;
+      a2UpdateQuickButtons();
+      renderAnalyticsTable();
+    });
+    document.querySelectorAll('.analytics-view .quick-period-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        state.a2Period = btn.dataset.a2Period;
+        const sel = $('#a2-period');
+        if (sel) sel.value = state.a2Period;
+        a2UpdateQuickButtons();
+        renderAnalyticsTable();
+      });
+    });
+  }
+  renderAnalyticsTable();
+}
+function a2UpdateQuickButtons() {
+  document.querySelectorAll('.analytics-view .quick-period-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.a2Period === state.a2Period);
+  });
+}
+function renderAnalyticsTable() {
+  const body = $('#a2-body');
+  if (!body) return;
+  if (!state.visits || state.visits.length === 0) {
+    body.innerHTML = '<div class="empty-msg">来院データがロードされていません。来院タブを一度開いてください。</div>';
+    return;
+  }
+  const visits = a2FilterByPeriod(state.visits);
+  const total = a2Aggregate(visits, () => 'all').reduce((s, r) => ({
+    booking: s.booking + r.booking, visited: s.visited + r.visited,
+    contract: s.contract + r.contract, revenue: s.revenue + r.revenue,
+  }), { booking: 0, visited: 0, contract: 0, revenue: 0 });
+  const visitRate = total.booking ? (total.visited / total.booking) : 0;
+  const contractRate = total.visited ? (total.contract / total.visited) : 0;
+  const summary = `<section class="a2-summary">
+    <div class="a2-card"><div class="a2-card-lbl">予約</div><div class="a2-card-num">${total.booking.toLocaleString()}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">来院</div><div class="a2-card-num">${total.visited.toLocaleString()}</div><div class="a2-card-sub">${a2Pct(visitRate)}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">成約</div><div class="a2-card-num">${total.contract.toLocaleString()}</div><div class="a2-card-sub">${a2Pct(contractRate)}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">売上</div><div class="a2-card-num a2-yen">${a2FormatYen(total.revenue)}</div></div>
+  </section>`;
+  const byTreat = a2Aggregate(visits, 'treatment');
+  const byPromo = a2Aggregate(visits, 'promo');
+  const byFac = a2Aggregate(visits, 'facility');
+  body.innerHTML = summary
+    + a2RenderTable('治療別', byTreat)
+    + a2RenderTable('プロモ別', byPromo)
+    + a2RenderTable('医院別', byFac);
 }
 
 async function fetchSlots() {

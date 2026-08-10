@@ -1312,3 +1312,22 @@ main {
   /* カード内のラベル幅を少し詰める */
   .v-table tbody td::before { flex: 0 0 58px; font-size: 10px; }
 }
+
+/* ==================== v719 Analytics view ==================== */
+.analytics-view { padding: 16px; }
+.a2-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; margin-bottom: 24px; }
+.a2-card { padding: 14px 18px; border: 1px solid var(--line); border-radius: 8px; background: var(--paper); }
+.a2-card-lbl { font-size: 11px; color: var(--ink-mute); font-weight: 600; letter-spacing: .05em; }
+.a2-card-num { font-size: 22px; font-weight: 700; color: var(--ink); margin-top: 4px; font-family: var(--font-mono); }
+.a2-card-sub { font-size: 12px; color: var(--info); margin-top: 2px; font-weight: 600; }
+.a2-section { margin-bottom: 28px; }
+.a2-title { font-size: 14px; font-weight: 700; margin: 0 0 8px 0; color: var(--ink); border-left: 3px solid var(--accent); padding-left: 8px; }
+.a2-table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 6px; }
+.a2-table { width: 100%; border-collapse: collapse; font-size: 12px; background: var(--paper); }
+.a2-table th, .a2-table td { padding: 8px 10px; border-bottom: 1px solid var(--line-soft); white-space: nowrap; }
+.a2-table th { background: var(--bg); font-weight: 700; color: var(--ink); font-size: 11px; }
+.a2-table tr:last-child td { border-bottom: none; }
+.a2-num { font-family: var(--font-mono); text-align: right; }
+.a2-yen { color: var(--accent-ink); font-weight: 600; }
+.a2-pct { display: inline-block; padding: 1px 8px; background: var(--info-soft); color: var(--info); border-radius: 10px; font-size: 11px; font-weight: 700; }
+.a2-total td { background: var(--bg); border-top: 2px solid var(--line); font-weight: 700; }

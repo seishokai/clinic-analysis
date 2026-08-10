@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="color-scheme" content="light">
 <meta name="theme-color" content="#ffffff">
-<title>Aladdin v718 — 清翔会</title>
+<title>Aladdin v719 — 清翔会</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Ctext y='20' font-size='20'%3E🧾%3C/text%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <link rel="stylesheet" href="app.css?v=37">
@@ -19,7 +19,7 @@
   <template id="tpl-login">
     <div class="login-wrap">
       <div class="login-card">
-        <h1 class="login-title">Aladdin <span class="v-badge">v718</span></h1>
+        <h1 class="login-title">Aladdin <span class="v-badge">v719</span></h1>
         <p class="login-sub">Supabase 単一データ源版 — 入力したものは絶対に消えない</p>
         <div class="field">
           <label>社員 ID (例: adachi / yasui) またはメールアドレス</label>
@@ -48,11 +48,12 @@
       <div class="hdr-brand">
         <span class="hdr-logo">🧾</span>
         <span class="hdr-title">Aladdin</span>
-        <span class="v-badge">v718</span>
+        <span class="v-badge">v719</span>
       </div>
       <nav class="hdr-nav">
         <button class="nav-btn active" data-view="visits">🏥 来院</button>
         <button class="nav-btn" data-view="bookings">📋 予約一覧</button>
+        <button class="nav-btn" data-view="analytics">📈 分析</button>
         <button class="nav-btn" data-view="patients">👥 患者</button>
         <button class="nav-btn" data-view="slots">📅 予約枠</button>
         <button class="nav-btn" data-view="activity">📊 アクティビティ</button>
@@ -88,7 +89,7 @@
   <template id="tpl-visits">
     <div class="view visits-view">
       <div class="toolbar">
-        <!-- v718: モバイルでは検索だけ常時表示、他フィルタは折りたたみ -->
+        <!-- v719: モバイルでは検索だけ常時表示、他フィルタは折りたたみ -->
         <div class="tb-row tb-row-search">
           <input type="search" id="v-search" placeholder="🔍 患者名で検索" class="tb-search">
           <button type="button" id="v-filter-toggle" class="link-btn tb-filter-toggle" aria-expanded="false">▸ 絞込</button>
@@ -113,10 +114,10 @@
           <select id="v-status" class="tb-select">
             <option value="">ステータス:全て</option>
           </select>
-          <!-- v718: 今月/先月 のクイックボタン -->
+          <!-- v719: 今月/先月 のクイックボタン -->
           <button type="button" class="quick-period-btn" data-period="thisMonth">今月</button>
           <button type="button" class="quick-period-btn" data-period="lastMonth">先月</button>
-          <!-- v718: 重複だけを表示するトグル。同日同患者に複数行あるものが該当 -->
+          <!-- v719: 重複だけを表示するトグル。同日同患者に複数行あるものが該当 -->
           <button type="button" class="quick-dup-btn" id="v-dup-toggle" title="同日同患者に複数行ある行だけ表示">重複</button>
           <select id="v-period" class="tb-select">
             <option value="all" selected>期間:すべて</option>
@@ -228,6 +229,28 @@
     </div>
   </template>
 
+  <!-- Analytics view (分析) -->
+  <template id="tpl-analytics">
+    <div class="view analytics-view">
+      <div class="toolbar">
+        <div class="tb-row tb-row-filters">
+          <select id="a2-period" class="tb-select">
+            <option value="all" selected>期間:すべて</option>
+            <option value="thisMonth">今月</option>
+            <option value="lastMonth">先月</option>
+            <option value="3m">直近 3 ヶ月</option>
+            <option value="6m">直近 6 ヶ月</option>
+          </select>
+          <button type="button" class="quick-period-btn" data-a2-period="thisMonth">今月</button>
+          <button type="button" class="quick-period-btn" data-a2-period="lastMonth">先月</button>
+        </div>
+      </div>
+      <div class="a2-body" id="a2-body">
+        <div class="loader" style="min-height:120px"><div class="spinner"></div></div>
+      </div>
+    </div>
+  </template>
+
   <!-- Slots view (予約枠確認) -->
   <template id="tpl-slots">
     <div class="view slots-view">
@@ -331,6 +354,6 @@
     </div>
   </template>
 
-  <script src="app.js?v=52"></script>
+  <script src="app.js?v=53"></script>
 </body>
 </html>
