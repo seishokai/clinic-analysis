@@ -1,0 +1,24 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "sheet-sync",
+  "main": "src/index.js",
+  "compatibility_date": "2025-01-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+
+  // 10 分ごとに sync 実行
+  "triggers": {
+    "crons": ["*/10 * * * *"]
+  },
+
+  // 環境変数 (secret は wrangler secret put で登録)
+  //   SUPABASE_SERVICE_KEY → 秘密キー
+  "vars": {
+    "SUPABASE_URL": "https://ndlfqrvoejwgqfdtghmg.supabase.co",
+    "SHEET_ID": "167IYM21HW0DGPlL1CrnCn4yTaTyC0KJU4f7gWyKtHf4",
+    "CUTOFF_DATE": "2026-08-01",
+    "MANUAL_TRIGGER_TOKEN": "aladdin-sync-2026"
+  },
+
+  "observability": { "enabled": true }
+}

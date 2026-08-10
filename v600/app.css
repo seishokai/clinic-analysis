@@ -817,6 +817,26 @@ main {
 /* v627: 絞込ボタンはモバイル専用 (デスクトップでは常時フィルタ表示なので隠す) */
 .tb-filter-toggle { display: none; }
 
+/* v700: 初診管理シート 同期バッジ + 手動ボタン */
+.sheet-sync-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px !important;
+  padding: 4px 10px !important;
+  white-space: nowrap;
+  border: 1px solid var(--line) !important;
+  background: var(--accent-soft) !important;
+  color: var(--accent-ink) !important;
+  border-radius: 12px !important;
+}
+.sheet-sync-btn:hover { background: var(--accent) !important; color: #fff !important; }
+.sheet-sync-btn.syncing { opacity: .6; cursor: wait; }
+.sheet-sync-btn.error { background: var(--warn-soft) !important; color: var(--warn) !important; border-color: var(--warn) !important; }
+.ss-icon { font-size: 12px; }
+.ss-label { font-family: var(--font-mono); letter-spacing: .02em; }
+@media (max-width: 720px) { .sheet-sync-btn .ss-label { display: none; } }
+
 /* ------- v614: アクティビティビュー ------- */
 .activity-summary {
   padding: 10px 12px;

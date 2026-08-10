@@ -1,0 +1,14 @@
+{
+  "name": "sheet-sync",
+  "version": "0.1.0",
+  "description": "初診管理シート → Aladdin Supabase 自動同期",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "logs": "wrangler tail"
+  },
+  "devDependencies": {
+    "wrangler": "^3.90.0"
+  }
+}

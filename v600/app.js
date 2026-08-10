@@ -18,7 +18,11 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v628';
+const APP_VERSION = 'v700';
+
+// v700: 初診管理シート → Aladdin 同期 Worker
+const SHEET_SYNC_WORKER = 'https://sheet-sync.tkm-koike.workers.dev';
+const SHEET_SYNC_TOKEN = 'aladdin-sync-2026';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -493,6 +497,13 @@ function bindShell() {
   // v614: パスワード変更
   const pwBtn = $('#pw-change-btn');
   if (pwBtn) pwBtn.addEventListener('click', openPasswordModal);
+  // v700: シート同期バッジ + 手動同期ボタン
+  const ssBtn = $('#sheet-sync-btn');
+  if (ssBtn) {
+    ssBtn.addEventListener('click', () => runSheetSync(true));
+    // 起動時に最終同期時刻を取得
+    refreshSheetSyncStatus();
+  }
   // v622: 最新版チェック (旧 refresh-btn の代替) — 手動チェック + データ再取得を兼ねる
   const verBtn = $('#ver-check-btn');
   if (verBtn) verBtn.addEventListener('click', async () => {
@@ -1212,6 +1223,58 @@ function renderPatientsTable() {
     <td class="c-updated">${esc(fmtRelative(p.last_activity))}</td>
   </tr>`).join('');
 }
+
+// ==================== v700: 初診管理シート 同期 ====================
+async function refreshSheetSyncStatus() {
+  const label = $('#ss-label');
+  const btn = $('#sheet-sync-btn');
+  if (!label) return;
+  try {
+    // Supabase v_latest_sync を直接 SELECT
+    const { data, error } = await sb.from('v_latest_sync').select('*').limit(1).maybeSingle();
+    if (error) throw error;
+    if (!data) { label.textContent = 'シート同期: 未実行'; return; }
+    const secs = Math.floor(Number(data.seconds_ago || 0));
+    const rel = secs < 60 ? `${secs}秒前` : secs < 3600 ? `${Math.floor(secs/60)}分前` : `${Math.floor(secs/3600)}時間前`;
+    label.textContent = `シート同期: ${rel}`;
+    if (btn) btn.classList.toggle('error', (data.rows_error || 0) > 0);
+    btn.title = `最終同期: ${new Date(data.run_at).toLocaleString('ja-JP')}\n` +
+                `新規: ${data.rows_inserted || 0} / スキップ: ${data.rows_skipped || 0} / エラー: ${data.rows_error || 0}\n` +
+                `クリックで今すぐ取り込み`;
+  } catch(e) {
+    label.textContent = 'シート同期: —';
+  }
+}
+
+async function runSheetSync(showToast) {
+  const btn = $('#sheet-sync-btn');
+  const label = $('#ss-label');
+  if (!btn || btn.classList.contains('syncing')) return;
+  btn.classList.add('syncing');
+  if (label) label.textContent = 'シート同期中…';
+  try {
+    const res = await fetch(`${SHEET_SYNC_WORKER}/sync?token=${encodeURIComponent(SHEET_SYNC_TOKEN)}`);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const r = await res.json();
+    if (showToast) {
+      toast(`シート同期完了: 新規 ${r.rowsInserted} 件 / スキップ ${r.rowsSkipped} 件`, r.rowsError ? 'err' : 'ok', 4000);
+    }
+    // 新規行があれば visits を再取得
+    if (r.rowsInserted > 0) {
+      await fetchVisits();
+      if (state.view === 'visits') renderVisitsTable();
+    }
+  } catch(e) {
+    if (showToast) toast('シート同期失敗: ' + (e.message || e), 'err', 5000);
+    btn.classList.add('error');
+  } finally {
+    btn.classList.remove('syncing');
+    refreshSheetSyncStatus();
+  }
+}
+
+// 5 分ごとに status 更新 (Worker 側は 10 分毎 cron)
+setInterval(() => { if (state.user) refreshSheetSyncStatus(); }, 5 * 60 * 1000);
 
 // ==================== v614: パスワード変更モーダル ====================
 function openPasswordModal() {
