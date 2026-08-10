@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v624';
+const APP_VERSION = 'v625';
 
 // ==================== Config ====================
 const SUPABASE_URL = 'https://ndlfqrvoejwgqfdtghmg.supabase.co';
@@ -507,7 +507,10 @@ function bindShell() {
       setSaveStatus('データ更新完了 ✓', 'saved');
       render();
       if (remote && remote !== APP_VERSION) {
-        if (!_updateBannerShown) { _updateBannerShown = true; showUpdateBanner(remote); }
+        // v625 bug fix: 既に「後で」で dismiss していても新版があれば再度出す
+        _updateBannerShown = false;
+        showUpdateBanner(remote);
+        _updateBannerShown = true;
       } else {
         toast(`最新版です (${APP_VERSION})`, 'ok', 2500);
       }
@@ -1173,9 +1176,12 @@ function renderSlotCard(c) {
 }
 
 // v603 fix #18: 患者 view の template を初回のみ挿入
+// v625 bug fix: guard を .view から .patients-view にスコープ限定
+//   (他 view も .view クラスを持つため、来院 → 患者 切替時に
+//    テンプレ挿入がスキップされ、#p-search/#p-count/#p-tbody が null で crash していた)
 let _patientSearchQ = '';
 function renderPatientsView(main) {
-  if (!main.querySelector('.view')) {
+  if (!main.querySelector('.patients-view')) {
     main.innerHTML = '';
     main.appendChild($('#tpl-patients').content.cloneNode(true));
     $('#p-search').value = _patientSearchQ;
@@ -1458,6 +1464,8 @@ function showUpdateBanner(newVer) {
   document.getElementById('update-later-btn').addEventListener('click', () => {
     bar.style.transition = 'transform 0.2s'; bar.style.transform = 'translateY(-100%)';
     setTimeout(() => bar.remove(), 200);
+    // v625 bug fix: 「後で」dismiss したら次の自動チェックで再表示できるよう flag リセット
+    _updateBannerShown = false;
   });
 }
 // 初回チェック (5 秒後) + 5 分ごと + タブ復帰時
