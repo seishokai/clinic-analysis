@@ -584,12 +584,28 @@ async function runSync(env, triggerName) {
     }
   }
 
+  // v919: sync 直後に Supabase RPC auto_dedup() を呼んで NULL 正規化 & 重複整理を自動化
+  //   (ユーザは 1 度だけ SQL Editor で `CREATE FUNCTION auto_dedup()` を実行しておく必要あり)
+  let dedupResult = null;
+  try {
+    const rpcRes = await fetch(`${env.SUPABASE_URL}/rest/v1/rpc/auto_dedup`, {
+      method: 'POST',
+      headers: sbHeaders(env, { 'Content-Type': 'application/json' }),
+      body: '{}',
+    });
+    if (rpcRes.ok) {
+      dedupResult = await rpcRes.json();
+    } else {
+      dedupResult = { error: `rpc ${rpcRes.status}: ${(await rpcRes.text()).slice(0, 200)}` };
+    }
+  } catch (e) { dedupResult = { error: String(e.message || e) }; }
+
   return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab,
     bookingInserted, updated, walkinInserted, skippedTouched,
     bookingCandidates.length + initialCandidates.length, undefined, undefined,
     { patientMapSize: patientMap.size, uniquePatientsSize: uniquePatients.size, no_patient_id: dbg_no_patient,
       untouchedVisits: existingVisits.length, allExistingVisits: allExistingVisits.length,
-      touchedPatDate: touchedPatDate.size, bookingSkippedTouched });
+      touchedPatDate: touchedPatDate.size, bookingSkippedTouched, autoDedup: dedupResult });
 }
 
 async function finalize(env, trigger, startMs, bookingPerTab, initialPerTab,
@@ -697,12 +713,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v918',
+        service: 'sheet-sync v919',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v918\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v919\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
