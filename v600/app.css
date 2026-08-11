@@ -1546,3 +1546,14 @@ main {
 /* [Finding 15] toast err はデフォルト長め + タップで消せる */
 .toast { cursor: pointer; }
 
+
+/* v733: 予約一覧 sort ヘッダ */
+.bookings-view .b-sortable {
+  cursor: pointer;
+  user-select: none;
+  -webkit-user-select: none;
+  white-space: nowrap;
+}
+.bookings-view .b-sortable:hover { background: var(--bg); }
+.bookings-view .b-sortable.b-sort-active { color: var(--accent); }
+.bookings-view .b-sort-ind { font-size: 10px; margin-left: 2px; }

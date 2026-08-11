@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v732';
+const APP_VERSION = 'v733';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -92,6 +92,7 @@ const state = {
   slots: null,          // { shareconnect, apotool } fetched JSONs
   bookings: null,       // 予約一覧 (Sheets 読取) の生データ
   bookingFilters: { search: '', facility: '', tool: '' },
+  bookingSort: { key: 'applyDate', dir: 'desc' },   // v733: 予約一覧 sort (default 申込日 降順)
   a2Period: 'all',      // v719: 分析タブの期間フィルタ
   a2Filters: { facility: '', treatment: '', promo: '' },   // v721: 分析タブの絞込
   visits: [],           // v_visits_with_patient rows
@@ -1212,6 +1213,18 @@ function renderBookingsView(main) {
     });
     $('#b-facility').addEventListener('change', e => { state.bookingFilters.facility = e.target.value; renderBookingsTable(); });
     $('#b-tool').addEventListener('change', e => { state.bookingFilters.tool = e.target.value; renderBookingsTable(); });
+    // v733: 申込日 / 予約日 sort トグル
+    main.querySelectorAll('.b-sortable').forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sortKey;
+        if (state.bookingSort.key === key) {
+          state.bookingSort.dir = state.bookingSort.dir === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.bookingSort = { key, dir: 'desc' };
+        }
+        renderBookingsTable();
+      });
+    });
     $('#b-refresh').addEventListener('click', async () => {
       $('#b-tbody').innerHTML = '<tr><td colspan="9" class="empty-msg">読み込み中…</td></tr>';
       await fetchBookings();
@@ -1238,6 +1251,26 @@ function renderBookingsTable() {
     if (q && !(r.name || '').toLowerCase().includes(q)) return false;
     return true;
   });
+  // v733: sort (申込日 / 予約日 の 2キー)
+  const s = state.bookingSort || { key: 'applyDate', dir: 'desc' };
+  const cmpKey = (r) => {
+    if (s.key === 'bookDate') return parseBkDate(r.bookDate) || parseBkDate(r.applyDate) || '';
+    return parseBkDate(r.applyDate) || parseBkDate(r.bookDate) || '';
+  };
+  rows.sort((a, b) => {
+    const av = cmpKey(a), bv = cmpKey(b);
+    if (av === bv) return 0;
+    const d = av < bv ? -1 : 1;
+    return s.dir === 'asc' ? d : -d;
+  });
+  // sort インジケータ更新
+  document.querySelectorAll('.bookings-view .b-sortable').forEach(th => {
+    const ind = th.querySelector('.b-sort-ind');
+    if (!ind) return;
+    if (th.dataset.sortKey === s.key) ind.textContent = s.dir === 'asc' ? '▲' : '▼';
+    else ind.textContent = '';
+    th.classList.toggle('b-sort-active', th.dataset.sortKey === s.key);
+  });
   $('#b-count').innerHTML = `<strong>${rows.length}</strong> / ${(st.rows||[]).length} 件`;
   $('#b-updated').textContent = st.fetchedAt ? `更新: ${new Date(st.fetchedAt).toLocaleTimeString()}` : '更新: —';
   const tbody = $('#b-tbody');
@@ -1256,6 +1289,7 @@ function renderBookingsTable() {
     const isSel = displayPromo === 'セレクトタイプ';
     const promoCls = !displayPromo ? 'promo-chip empty' : isSel ? 'promo-chip select-type' : 'promo-chip';
     return `<tr>
+    <td class="c-book">${esc(bkFmtDate(r.applyDate))}</td>
     <td class="c-book">${esc(bkFmtDate(r.bookDate))}</td>
     <td class="c-name">${esc(r.name || '')}</td>
     <td class="c-facility">${esc(normFac(r.facility) || '-')}</td>
@@ -1264,7 +1298,6 @@ function renderBookingsTable() {
     <td style="font-size:12px">${esc(r.service || '-')}</td>
     <td style="font-size:11px;color:var(--ink-mute);font-family:var(--font-mono)">${esc(r.email || '-')}</td>
     <td style="font-family:var(--font-mono);font-size:11px">${esc(r.phone || '-')}</td>
-    <td class="c-book">${esc(bkFmtDate(r.applyDate))}</td>
   </tr>`;
   }).join('');
   if (rows.length > 500) {
@@ -1415,6 +1448,32 @@ function a2FormatYen(n) {
 function a2Pct(p) {
   if (!isFinite(p)) return '—';
   return (p * 100).toFixed(1) + '%';
+}
+
+// v733: 分析タブ期間ラベル (「先月 (2026-07)」等 具体年月付き)
+function a2PeriodLabel(p) {
+  if (!p || p === 'all') return '';
+  const now = new Date();
+  const y = now.getFullYear(), m = now.getMonth(); // 0-based
+  const fmt = (Y, M) => `${Y}-${String(M + 1).padStart(2, '0')}`;
+  if (p === 'thisMonth') return `今月 (${fmt(y, m)})`;
+  if (p === 'lastMonth') {
+    const d = new Date(y, m - 1, 1);
+    return `先月 (${fmt(d.getFullYear(), d.getMonth())})`;
+  }
+  if (p === 'prevMonth') {
+    const d = new Date(y, m - 2, 1);
+    return `先々月 (${fmt(d.getFullYear(), d.getMonth())})`;
+  }
+  if (p === '3m') {
+    const d = new Date(y, m - 3, 1);
+    return `直近 3 ヶ月 (${fmt(d.getFullYear(), d.getMonth())} 〜 ${fmt(y, m)})`;
+  }
+  if (p === '6m') {
+    const d = new Date(y, m - 6, 1);
+    return `直近 6 ヶ月 (${fmt(d.getFullYear(), d.getMonth())} 〜 ${fmt(y, m)})`;
+  }
+  return p;
 }
 
 // v729: 期間フィルタは 来院タブ (filteredVisits: `if ((fromMs||toMs) && v._bookMs)`) と
@@ -1660,8 +1719,10 @@ function renderAnalyticsTable() {
   const arpc = contract ? (revenue / contract) : 0;
   // 絞込条件表示
   const f = state.a2Filters || {};
+  // v733: 期間ラベル (相対月+実年月) — "先月 (2026-07)" 形式で表示月が一目で分かるように
+  const periodLabel = a2PeriodLabel(state.a2Period);
   const filterChips = [
-    (state.a2Period && state.a2Period !== 'all') ? `期間:${state.a2Period === 'thisMonth' ? '今月' : state.a2Period === 'lastMonth' ? '先月' : state.a2Period === 'prevMonth' ? '先々月' : state.a2Period}` : '',
+    periodLabel ? `期間:${periodLabel}` : '',
     f.facility ? `医院:${f.facility}` : '',
     f.treatment ? `治療:${f.treatment}` : '',
     f.promo ? `プロモ:${f.promo}` : '',
