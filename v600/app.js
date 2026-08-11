@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v731';
+const APP_VERSION = 'v732';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -1431,6 +1431,11 @@ function a2FilterByPeriod(visits) {
     from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
     const to = new Date(now.getFullYear(), now.getMonth(), 1);
     return visits.filter(v => !v._bookMs || (v._bookMs >= from.getTime() && v._bookMs < to.getTime()));
+  } else if (p === 'prevMonth') {
+    // v732: 先々月
+    from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+    const to = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return visits.filter(v => !v._bookMs || (v._bookMs >= from.getTime() && v._bookMs < to.getTime()));
   } else if (p === '3m') {
     from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
   } else if (p === '6m') {
@@ -1656,7 +1661,7 @@ function renderAnalyticsTable() {
   // 絞込条件表示
   const f = state.a2Filters || {};
   const filterChips = [
-    (state.a2Period && state.a2Period !== 'all') ? `期間:${state.a2Period === 'thisMonth' ? '今月' : state.a2Period === 'lastMonth' ? '先月' : state.a2Period}` : '',
+    (state.a2Period && state.a2Period !== 'all') ? `期間:${state.a2Period === 'thisMonth' ? '今月' : state.a2Period === 'lastMonth' ? '先月' : state.a2Period === 'prevMonth' ? '先々月' : state.a2Period}` : '',
     f.facility ? `医院:${f.facility}` : '',
     f.treatment ? `治療:${f.treatment}` : '',
     f.promo ? `プロモ:${f.promo}` : '',

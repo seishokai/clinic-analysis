@@ -1346,24 +1346,87 @@ main {
 .a2-notice { background: #fff9e6; border: 1px solid #f4d78e; color: #7a5a0f; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; line-height: 1.5; }
 .a2-notice strong { color: #a36f00; }
 
-/* ===== v727 分析タブ スマホUI 全面改善 ===== */
+/* body/app が overflow:hidden なので、分析ビュー自体を縦スクロール可能にする */
+.analytics-view {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+/* ============================================================
+ * v732 分析タブ モバイル 全面再設計
+ *   - 期間クイック 3等分 横並び (今月/先月/先々月)
+ *   - 期間 select + リセット は独立 1行
+ *   - 医院/治療/プロモ は 3列 横並び (小型 chip 風)
+ *   - Toolbar sticky で操作性↑
+ *   - サマリーカード 2列固定 + アラート全幅
+ *   - テーブル 分類列 sticky + 12px 詰め
+ * ============================================================ */
 @media (max-width: 720px) {
-  .analytics-view { padding: 8px; }
-  /* 期間+3軸フィルタ: 縦積み・全幅 */
-  .analytics-view .toolbar { padding: 4px 6px; }
-  .analytics-view .tb-row-filters { flex-wrap: wrap; gap: 6px; }
-  .analytics-view .tb-select { flex: 1 1 calc(50% - 6px); min-width: 0; font-size: 13px; padding: 6px 8px; }
-  .analytics-view .quick-period-btn { flex: 1 1 calc(50% - 6px); padding: 8px 10px; font-size: 13px; }
-  .analytics-view .link-btn { flex: 1 1 100%; padding: 6px 10px; text-align: center; }
-  /* サマリーカード: 2列 → 数字大きく */
+  .analytics-view { padding: 8px 8px 32px; }
+  .analytics-view .a2-toolbar {
+    padding: 8px;
+    background: var(--paper);
+    position: sticky; top: 0; z-index: 5;
+    border-bottom: 1px solid var(--border);
+    display: flex; flex-direction: column; gap: 8px;
+    margin: -8px -8px 12px;
+  }
+
+  /* [v732] 今月/先月/先々月 → 3等分 横並び */
+  .analytics-view .a2-quick-row {
+    display: flex; gap: 6px;
+  }
+  .analytics-view .a2-quick-row .quick-period-btn {
+    flex: 1 1 0; min-width: 0;
+    min-height: 44px;
+    font-size: 14px; font-weight: 600;
+    padding: 0 4px;
+    border-radius: 8px;
+  }
+  .analytics-view .a2-quick-row .quick-period-btn.active {
+    background: var(--accent); color: #fff; border-color: var(--accent);
+  }
+
+  /* [v732] 期間セレクト + リセット: [7:3] */
+  .analytics-view .a2-period-row {
+    display: flex; gap: 8px; align-items: stretch;
+  }
+  .analytics-view .a2-period-row #a2-period {
+    flex: 1 1 auto;
+    min-height: 40px; font-size: 13px;
+    padding: 6px 10px;
+    -webkit-appearance: menulist; appearance: menulist;
+  }
+  .analytics-view .a2-period-row #a2-reset {
+    flex: 0 0 auto;
+    min-height: 40px; padding: 0 12px;
+    font-size: 12px;
+    background: var(--bg); border: 1px solid var(--border); border-radius: 6px;
+  }
+
+  /* [v732] 医院/治療/プロモ: 3列 横並び (chip 風) */
+  .analytics-view .a2-filter-grid {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 6px; margin: 0;
+  }
+  .analytics-view .a2-filter-grid .tb-select {
+    flex: 1 1 0; min-width: 0; width: auto !important;
+    min-height: 38px; font-size: 12px; padding: 4px 6px;
+    -webkit-appearance: menulist; appearance: menulist;
+  }
+
+  /* サマリーカード: 2列 + 数字大きく */
   .a2-summary { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 16px; }
   .a2-card { padding: 10px 12px; }
   .a2-card-lbl { font-size: 10px; }
-  .a2-card-num { font-size: 18px; margin-top: 2px; }
+  .a2-card-num { font-size: 20px; margin-top: 2px; font-weight: 700; }
   .a2-card-sub { font-size: 10px; }
-  /* 未処理アラートだけ全幅で目立たせる */
   .a2-card-alert { grid-column: 1 / -1; }
-  /* テーブル: 横スクロール + font 縮小 + セル padding 減 */
+
+  /* テーブル: 横スクロール + font 縮小 + セル padding 減 + 分類列 sticky */
   .a2-section { margin-bottom: 18px; }
   .a2-title { font-size: 13px; padding-left: 6px; }
   .a2-table { font-size: 11px; }
@@ -1372,47 +1435,18 @@ main {
   .a2-pct { padding: 1px 5px; font-size: 10px; }
   .a2-filter-line { font-size: 11px; margin-bottom: 8px; }
   .a2-chip { padding: 2px 8px; font-size: 10px; }
-  /* 分類列は sticky で横スクロール中も見える */
   .a2-table thead th:first-child,
   .a2-table tbody td:first-child { position: sticky; left: 0; background: var(--paper); z-index: 1; }
   .a2-table thead th:first-child { background: var(--bg); }
   .a2-table tr.a2-total td:first-child { background: var(--bg); }
 }
 
-/* ===== v728 分析タブ スクロール & select タップ性 fix ===== */
-/* body/app が overflow:hidden なので、分析ビュー自体を縦スクロール可能にする */
-.analytics-view { 
-  overflow-y: auto; 
-  -webkit-overflow-scrolling: touch;
-  height: 100%; 
-  box-sizing: border-box;
-}
-
-@media (max-width: 720px) {
-  /* select を 1列全幅にして 指で確実に押せる高さに */
-  .analytics-view .tb-row-filters { flex-direction: column; gap: 8px; }
-  .analytics-view .tb-select { 
-    flex: 1 1 100% !important; 
-    width: 100%;
-    min-height: 40px; 
-    font-size: 14px; 
-    padding: 8px 10px;
-    -webkit-appearance: menulist;   /* iOS Safari で確実に native select にする */
-    appearance: menulist;
-  }
-  .analytics-view .quick-period-btn { 
-    flex: 1 1 calc(50% - 4px);
-    min-height: 40px;
-    font-size: 14px; 
-  }
-  .analytics-view .link-btn { 
-    flex: 1 1 100%; 
-    min-height: 38px;
-    padding: 8px 10px; 
-    text-align: center; 
-  }
-  /* Toolbar が sticky で下の内容を覆わないよう解除 */
-  .analytics-view .toolbar { position: static; }
+/* [v732] デスクトップは従来レイアウト維持 (period-row と quick-row は 1行に流し込み) */
+@media (min-width: 721px) {
+  .analytics-view .a2-toolbar { display: flex; flex-wrap: wrap; gap: 10px; padding: 8px; }
+  .analytics-view .a2-quick-row,
+  .analytics-view .a2-period-row,
+  .analytics-view .a2-filter-grid { display: flex; gap: 8px; flex-wrap: wrap; }
 }
 
 /* ============================================================
