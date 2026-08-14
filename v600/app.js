@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v735';
+const APP_VERSION = 'v736';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -1373,64 +1373,81 @@ function a2Bucket(v, key) {
   return '?';
 }
 
-// v735: 集計スコープ統一 — 全 visits を集計対象にし、合計行が治療別/医院別と一致するように。
-//   - 予約 (booking): 予約由来 (source_tool DXHUB/セレクト) のみ計上 — walk-in は「—」
-//   - 相談 (visited): 全 visits の 実来院 (walk-in も含む)
-//   - 予約→来院率 (visitRate): 予約由来かつ来院 / 予約由来 (walk-in はスコープ外なので null)
-//   - 成約/売上/客単価: 全 visits の来院ベース
+// v736: 集計スコープを 2 種類の期間判定に分離
+//   - booking/visited/bookedVisited: book_date 期間内 (来院月ベース)
+//   - contract/revenue:              contract_date 期間内 (成約月ベース)
+//   ex: 7月来院 8月成約 → 7月表示は 予約1・相談1・成約0・売上0、8月表示は 予約0・相談0・成約1・売上X
+//   期間 'all' の時は 全カウント (contract_date=null 行も含む)
 function a2AggregateBooked(visits, key) {
   const buckets = new Map();
-  for (const v of visits) {
-    const k = a2Bucket(v, key);
+  const isAll = !a2PeriodRangeMs();
+  const ensure = (k) => {
     if (!buckets.has(k)) buckets.set(k, {
       key: k, booking: 0, bookedVisited: 0, visited: 0, contract: 0, revenue: 0,
     });
-    const b = buckets.get(k);
+    return buckets.get(k);
+  };
+  for (const v of visits) {
+    const inBook = isAll ? true : (v._bookMs && (v._bookMs >= a2PeriodRangeMs().fromMs && v._bookMs < a2PeriodRangeMs().toMs));
+    const inContract = isAll ? true : a2InContractPeriod(v);
+    if (!inBook && !inContract) continue;
+    const k = a2Bucket(v, key);
+    const b = ensure(k);
     const isBk = a2IsBooked(v);
     const isVis = a2IsVisited(v);
-    if (isBk) b.booking += 1;
-    if (isVis) b.visited += 1;
-    if (isBk && isVis) b.bookedVisited += 1;
-    if (a2IsContracted(v)) b.contract += 1;
-    if (isVis && v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
+    if (inBook) {
+      if (isBk) b.booking += 1;
+      if (isVis) b.visited += 1;
+      if (isBk && isVis) b.bookedVisited += 1;
+    }
+    if (inContract) {
+      if (a2IsContracted(v)) b.contract += 1;
+      if (isVis && v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
+    }
   }
   const arr = [...buckets.values()];
   for (const b of arr) {
-    // 予約由来のみで来院率を出す (walk-in オンリーのバケットは null → 表で '—' 表示)
     b.visitRate = b.booking ? (b.bookedVisited / b.booking) : null;
     b.contractRate = b.visited ? (b.contract / b.visited) : 0;
     b.arpc = b.contract ? (b.revenue / b.contract) : 0;
   }
-  // 相談降順 → 予約降順で二次
   arr.sort((a, b) => (b.visited - a.visited) || (b.booking - a.booking));
   return arr;
 }
 
-// v723: 全治療の集計 (来院ベース + 予約→来院率は予約系のみ)
-// v729: 予約→来院率 の分子/分母のスコープ非対称を解消
-//   — visitRate は 予約由来 かつ 来院 のみ (bookedVisited) を分子に。
-//   売上も 実来院ベース で統一 (未対応キャンセル行の contract_amount ゴミを排除)。
+// v736: 治療別集計。予約/相談は book 期間、成約/売上は contract 期間。
 function a2AggregateByTreatment(visits) {
   const buckets = new Map();
+  const range = a2PeriodRangeMs();
+  const isAll = !range;
   for (const v of visits) {
+    const inBook = isAll ? true : (v._bookMs && v._bookMs >= range.fromMs && v._bookMs < range.toMs);
+    const inContract = isAll ? true : a2InContractPeriod(v);
+    if (!inBook && !inContract) continue;
     const t = v._treatment || '(未分類)';
-    if (!buckets.has(t)) buckets.set(t, { key: t, bookedVisited: 0, booking: 0, visited: 0, contract: 0, revenue: 0, isBookedTreat: A2_BOOKING_TREATS.has(t) });
+    if (!buckets.has(t)) buckets.set(t, {
+      key: t, bookedVisited: 0, booking: 0, visited: 0, contract: 0, revenue: 0,
+      isBookedTreat: A2_BOOKING_TREATS.has(t),
+    });
     const b = buckets.get(t);
     const isBk = a2IsBooked(v);
     const isVis = a2IsVisited(v);
-    if (isBk) b.booking += 1;
-    if (isVis) b.visited += 1;
-    if (isBk && isVis) b.bookedVisited += 1;   // v729: 予約→来院率 の正しい分子
-    if (a2IsContracted(v)) b.contract += 1;
-    if (isVis && v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
+    if (inBook) {
+      if (isBk) b.booking += 1;
+      if (isVis) b.visited += 1;
+      if (isBk && isVis) b.bookedVisited += 1;
+    }
+    if (inContract) {
+      if (a2IsContracted(v)) b.contract += 1;
+      if (isVis && v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
+    }
   }
   const arr = [...buckets.values()];
   for (const b of arr) {
     b.visitRate = (b.isBookedTreat && b.booking) ? (b.bookedVisited / b.booking) : null;
     b.contractRate = b.visited ? (b.contract / b.visited) : 0;
-    b.arpc = b.contract ? (b.revenue / b.contract) : 0;   // 客単価
+    b.arpc = b.contract ? (b.revenue / b.contract) : 0;
   }
-  // 予約系を上、非予約系(walkin)を下
   arr.sort((a, b) => {
     if (a.isBookedTreat !== b.isBookedTreat) return a.isBookedTreat ? -1 : 1;
     return b.visited - a.visited;
@@ -1439,23 +1456,34 @@ function a2AggregateByTreatment(visits) {
 }
 
 // v720: 医院別 × 治療分類 マトリクス
-// v735: 予約 (booking) と 未処理 (unhandled = 予約日過ぎ未対応) 列を追加
+// v735: 予約 (booking) と 未処理 (unhandled) 列を追加
+// v736: 売上は contract_date 期間内、予約/相談/未処理は book_date 期間内
 function a2FacilityMatrix(visits) {
   const byFac = new Map();
   const todayMs = Date.now();
+  const range = a2PeriodRangeMs();
+  const isAll = !range;
   for (const v of visits) {
+    const inBook = isAll ? true : (v._bookMs && v._bookMs >= range.fromMs && v._bookMs < range.toMs);
+    const inContract = isAll ? true : a2InContractPeriod(v);
+    if (!inBook && !inContract) continue;
     const fac = v._normFacility || '(不明)';
     if (!byFac.has(fac)) byFac.set(fac, {
       facility: fac, cells: {}, total: 0, booking: 0, unhandled: 0, revenue: 0,
     });
     const row = byFac.get(fac);
-    if (a2IsBooked(v)) row.booking += 1;
-    if (v._effStatus === '未対応' && v._bookMs && v._bookMs < todayMs - 86400000) row.unhandled += 1;
-    if (!a2IsVisited(v)) continue;   // 相談セル/合計/売上は実来院者のみ
-    const treat = v._treatment || '(未分類)';
-    row.cells[treat] = (row.cells[treat] || 0) + 1;
-    row.total += 1;
-    if (v.contract_amount) row.revenue += Number(v.contract_amount) || 0;
+    if (inBook) {
+      if (a2IsBooked(v)) row.booking += 1;
+      if (v._effStatus === '未対応' && v._bookMs && v._bookMs < todayMs - 86400000) row.unhandled += 1;
+      if (a2IsVisited(v)) {
+        const treat = v._treatment || '(未分類)';
+        row.cells[treat] = (row.cells[treat] || 0) + 1;
+        row.total += 1;
+      }
+    }
+    if (inContract) {
+      if (a2IsVisited(v) && v.contract_amount) row.revenue += Number(v.contract_amount) || 0;
+    }
   }
   const arr = [...byFac.values()];
   arr.sort((a, b) => b.total - a.total);
@@ -1541,11 +1569,10 @@ function a2PeriodLabel(p) {
 }
 
 // v735: 期間フィルタで book_date=NULL の行は期間指定時は必ず除外する。
-//   v729 の「NULL 通す」は誤カウント源だった (どの月で見ても 同じ NULL 群が加算されていた)。
-//   期間 'all' の時だけ NULL も含める。
-function a2FilterByPeriod(visits) {
+// v736: 期間範囲を返す helper に分離。visit ごとに book/contract の 2 種類を判定するため。
+function a2PeriodRangeMs() {
   const p = state.a2Period || 'all';
-  if (p === 'all') return visits;
+  if (p === 'all') return null;   // 期間指定なし
   const now = new Date();
   let from = null, to = null;
   if (p === 'thisMonth') {
@@ -1562,10 +1589,35 @@ function a2FilterByPeriod(visits) {
   } else if (p === '6m') {
     from = new Date(now.getFullYear(), now.getMonth() - 6, 1);
   }
-  if (!from) return visits;
-  const fromMs = from.getTime();
-  const toMs = to ? to.getTime() : Infinity;
+  if (!from) return null;
+  return { fromMs: from.getTime(), toMs: to ? to.getTime() : Infinity };
+}
+
+// v736: contract_date の JST ms を計算 (visit ごと、キャッシュ用)
+function a2ContractMs(v) {
+  if (v._contractMs !== undefined) return v._contractMs;
+  v._contractMs = v.contract_date
+    ? new Date(v.contract_date + 'T00:00:00+09:00').getTime()
+    : null;
+  return v._contractMs;
+}
+
+// v735: 予約/相談 は book_date で期間絞込
+function a2FilterByPeriod(visits) {
+  const range = a2PeriodRangeMs();
+  if (!range) return visits;
+  const { fromMs, toMs } = range;
   return visits.filter(v => v._bookMs && v._bookMs >= fromMs && v._bookMs < toMs);
+}
+
+// v736: 成約/売上 は contract_date で期間内なら加算 (contract_date=null は除外)
+//   期間 all の時は 全 visits を通す
+function a2InContractPeriod(v) {
+  const range = a2PeriodRangeMs();
+  if (!range) return true;
+  const c = a2ContractMs(v);
+  if (!c) return false;
+  return c >= range.fromMs && c < range.toMs;
 }
 
 // v734: drilldownType = 'promo' | 'treatment' | null で 分類セルを来院タブへの link に
@@ -1786,23 +1838,30 @@ function renderAnalyticsTable() {
     body.innerHTML = '<div class="empty-msg">来院データがロードされていません。来院タブを一度開いてください。</div>';
     return;
   }
-  // v729: 分析タブ集計から '重複削除' 行を除外 (来院タブと定義を揃える。
-  //   従来は a2IsBooked が status を見ないため 重複削除 でも booking にカウントされていた)
+  // v729: 分析タブ集計から '重複削除' 行を除外
+  // v736: 期間絞込は 集計関数内で book/contract 別に判定するため事前絞込しない
   const visitsRaw = state.visits.filter(v => !STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus));
-  const visits = a2ApplyFilters(a2FilterByPeriod(visitsRaw));
+  const visits = a2ApplyFilters(visitsRaw);   // 3軸絞込のみ (期間絞込は集計側)
 
   // ---- 全体サマリー + 未処理アラート ----
+  // v736: 予約/相談 は book_date 期間、成約/売上 は contract_date 期間で分離
   let booking=0, visited=0, contract=0, revenue=0, visitedAll=0, pendingOverdue=0;
   const todayMs = Date.now();
+  const range = a2PeriodRangeMs();
+  const isAll = !range;
   for (const v of visits) {
-    if (a2IsBooked(v)) booking++;
+    const inBook = isAll ? true : (v._bookMs && v._bookMs >= range.fromMs && v._bookMs < range.toMs);
+    const inContract = isAll ? true : a2InContractPeriod(v);
     const isVis = a2IsVisited(v);
-    if (isVis) { visitedAll++; if (a2IsBooked(v)) visited++; }
-    if (a2IsContracted(v)) contract++;
-    // v729: 売上は 実来院ベース で統一 (a2FacilityMatrix / 治療別 / プロモ別 と揃える)
-    if (isVis && v.contract_amount) revenue += Number(v.contract_amount) || 0;
-    // v723: 未処理 = 未対応 かつ 予約日が過ぎている (来院確認漏れの可能性)
-    if (v._effStatus === '未対応' && v._bookMs && v._bookMs < todayMs - 86400000) pendingOverdue++;
+    if (inBook) {
+      if (a2IsBooked(v)) booking++;
+      if (isVis) { visitedAll++; if (a2IsBooked(v)) visited++; }
+      if (v._effStatus === '未対応' && v._bookMs && v._bookMs < todayMs - 86400000) pendingOverdue++;
+    }
+    if (inContract) {
+      if (a2IsContracted(v)) contract++;
+      if (isVis && v.contract_amount) revenue += Number(v.contract_amount) || 0;
+    }
   }
   const visitRate = booking ? (visited / booking) : 0;
   const contractRate = visitedAll ? (contract / visitedAll) : 0;
@@ -1822,8 +1881,8 @@ function renderAnalyticsTable() {
   const summary = `${filterLine}<section class="a2-summary">
     <div class="a2-card"><div class="a2-card-lbl">予約</div><div class="a2-card-num">${booking.toLocaleString()}</div></div>
     <div class="a2-card"><div class="a2-card-lbl">相談</div><div class="a2-card-num">${visitedAll.toLocaleString()}</div><div class="a2-card-sub">予約由来 ${visited.toLocaleString()} → ${a2Pct(visitRate)}</div></div>
-    <div class="a2-card"><div class="a2-card-lbl">成約</div><div class="a2-card-num">${contract.toLocaleString()}</div><div class="a2-card-sub">相談比 ${a2Pct(contractRate)}</div></div>
-    <div class="a2-card"><div class="a2-card-lbl">売上</div><div class="a2-card-num a2-yen">${a2FormatYen(revenue)}</div><div class="a2-card-sub">客単価 ${contract ? a2FormatYen(arpc) : '—'}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">成約 <span style="font-size:9px;color:var(--ink-mute)">(成約月基準)</span></div><div class="a2-card-num">${contract.toLocaleString()}</div><div class="a2-card-sub">相談比 ${a2Pct(contractRate)}</div></div>
+    <div class="a2-card"><div class="a2-card-lbl">売上 <span style="font-size:9px;color:var(--ink-mute)">(成約月基準)</span></div><div class="a2-card-num a2-yen">${a2FormatYen(revenue)}</div><div class="a2-card-sub">客単価 ${contract ? a2FormatYen(arpc) : '—'}</div></div>
     <div class="a2-card a2-card-alert"><div class="a2-card-lbl">⚠ 未処理 (予約日過ぎ)</div><div class="a2-card-num">${pendingOverdue.toLocaleString()}</div><div class="a2-card-sub">来院タブ → 未対応 で確認</div></div>
   </section>`;
 
