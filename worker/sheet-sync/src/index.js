@@ -1,5 +1,5 @@
 /* ============================================================
- * sheet-sync Worker v910
+ * sheet-sync Worker v920
  *   Cron: なし (Aladdin ブラウザから 10 分毎 fetch)
  *   HTTP: /status, /sync (手動、要 token), /debug
  *
@@ -225,6 +225,11 @@ async function extractBookingCandidates(sheetId, tab, cutoffIso) {
     if (isTestName(rawName)) continue;   // v917: シート側のテストデータを sync 対象外
     const { date: bookDate, at: bookAt } = parseJpDateTime(rawBookAt);
     if (!bookDate || bookDate < cutoffIso) continue;
+    // v920: register_at (申込日 col) を apply_date に分離
+    //   従来は apply_date = book_date で「申込日 == 予約日」になり、来院タブで日付が同じで
+    //   セレクトタイプの申込タイミングが読めなかった。register_at を親候補にする。
+    const rawRegAt = cols.register_at != null ? r[cols.register_at] : null;
+    const { date: applyDateFromReg, at: applyAtFromReg } = parseJpDateTime(rawRegAt);
     const nn = normName(rawName);
     if (!nn) continue;
     // Facility 決定 — DXHUB は col 4 から動的、セレクトはタブ設定固定
@@ -238,6 +243,8 @@ async function extractBookingCandidates(sheetId, tab, cutoffIso) {
       facility,
       book_date: bookDate,
       book_at: bookAt,
+      apply_date: applyDateFromReg || bookDate,   // v920: 申込日 (register_at 由来)
+      apply_at: applyAtFromReg || bookAt,         // v920: 申込日時 (register_at 由来)
       patient_name: String(rawName).trim(),
       normalized_name: nn,
       phone: phone || null,
@@ -412,18 +419,19 @@ async function runSync(env, triggerName) {
       return true;
     })
     .map(c => {
+      // v920: apply_date/apply_at は candidate (register_at 由来) を優先。fallback で book_date。
       const sec = hashSec(c.sync_source);
       const hh = String(Math.floor(sec / 3600)).padStart(2, '0');
       const mm = String(Math.floor((sec % 3600) / 60)).padStart(2, '0');
       const ss = String(sec % 60).padStart(2, '0');
-      const applyAtIso = `${c.book_date}T${hh}:${mm}:${ss}+09:00`;
+      const applyAtFallback = `${c.book_date}T${hh}:${mm}:${ss}+09:00`;
       return {
         patient_id: patientMap.get(c.normalized_name),
         facility: c.facility,
         book_date: c.book_date,
         book_at: c.book_at,
-        apply_date: c.book_date,
-        apply_at: applyAtIso,
+        apply_date: c.apply_date || c.book_date,
+        apply_at: c.apply_at || applyAtFallback,
         status: '未対応',
         service: c.service,
         source_tool: c.tool,
