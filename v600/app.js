@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v734';
+const APP_VERSION = 'v735';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -1373,29 +1373,36 @@ function a2Bucket(v, key) {
   return '?';
 }
 
-// v720: 予約母数 = 予約由来 のみ の 予約→来院率 集計
-// v729: 売上は実来院ベースで統一 (a2FacilityMatrix と揃える)、arpc 計算漏れも補修
+// v735: 集計スコープ統一 — 全 visits を集計対象にし、合計行が治療別/医院別と一致するように。
+//   - 予約 (booking): 予約由来 (source_tool DXHUB/セレクト) のみ計上 — walk-in は「—」
+//   - 相談 (visited): 全 visits の 実来院 (walk-in も含む)
+//   - 予約→来院率 (visitRate): 予約由来かつ来院 / 予約由来 (walk-in はスコープ外なので null)
+//   - 成約/売上/客単価: 全 visits の来院ベース
 function a2AggregateBooked(visits, key) {
   const buckets = new Map();
   for (const v of visits) {
-    if (!a2IsBooked(v)) continue;
     const k = a2Bucket(v, key);
-    if (!buckets.has(k)) buckets.set(k, { key: k, bookedVisited: 0, booking: 0, visited: 0, contract: 0, revenue: 0 });
+    if (!buckets.has(k)) buckets.set(k, {
+      key: k, booking: 0, bookedVisited: 0, visited: 0, contract: 0, revenue: 0,
+    });
     const b = buckets.get(k);
-    b.booking += 1;
+    const isBk = a2IsBooked(v);
     const isVis = a2IsVisited(v);
-    if (isVis) { b.visited += 1; b.bookedVisited += 1; }
+    if (isBk) b.booking += 1;
+    if (isVis) b.visited += 1;
+    if (isBk && isVis) b.bookedVisited += 1;
     if (a2IsContracted(v)) b.contract += 1;
-    // v729: 売上は実来院者のみ加算 (未対応/キャンセル行の contract_amount ゴミを排除)
     if (isVis && v.contract_amount) b.revenue += Number(v.contract_amount) || 0;
   }
   const arr = [...buckets.values()];
   for (const b of arr) {
-    b.visitRate = b.booking ? (b.visited / b.booking) : 0;
+    // 予約由来のみで来院率を出す (walk-in オンリーのバケットは null → 表で '—' 表示)
+    b.visitRate = b.booking ? (b.bookedVisited / b.booking) : null;
     b.contractRate = b.visited ? (b.contract / b.visited) : 0;
-    b.arpc = b.contract ? (b.revenue / b.contract) : 0;   // v729: プロモ別 客単価 欠落 fix
+    b.arpc = b.contract ? (b.revenue / b.contract) : 0;
   }
-  arr.sort((a, b) => b.booking - a.booking);
+  // 相談降順 → 予約降順で二次
+  arr.sort((a, b) => (b.visited - a.visited) || (b.booking - a.booking));
   return arr;
 }
 
@@ -1431,15 +1438,21 @@ function a2AggregateByTreatment(visits) {
   return arr;
 }
 
-// v720: 医院別 × 治療分類 の 実来院数マトリクス
+// v720: 医院別 × 治療分類 マトリクス
+// v735: 予約 (booking) と 未処理 (unhandled = 予約日過ぎ未対応) 列を追加
 function a2FacilityMatrix(visits) {
   const byFac = new Map();
+  const todayMs = Date.now();
   for (const v of visits) {
-    if (!a2IsVisited(v)) continue;   // 実来院者のみ
     const fac = v._normFacility || '(不明)';
-    const treat = v._treatment || '(未分類)';
-    if (!byFac.has(fac)) byFac.set(fac, { facility: fac, cells: {}, total: 0, revenue: 0 });
+    if (!byFac.has(fac)) byFac.set(fac, {
+      facility: fac, cells: {}, total: 0, booking: 0, unhandled: 0, revenue: 0,
+    });
     const row = byFac.get(fac);
+    if (a2IsBooked(v)) row.booking += 1;
+    if (v._effStatus === '未対応' && v._bookMs && v._bookMs < todayMs - 86400000) row.unhandled += 1;
+    if (!a2IsVisited(v)) continue;   // 相談セル/合計/売上は実来院者のみ
+    const treat = v._treatment || '(未分類)';
     row.cells[treat] = (row.cells[treat] || 0) + 1;
     row.total += 1;
     if (v.contract_amount) row.revenue += Number(v.contract_amount) || 0;
@@ -1527,25 +1540,23 @@ function a2PeriodLabel(p) {
   return p;
 }
 
-// v729: 期間フィルタは 来院タブ (filteredVisits: `if ((fromMs||toMs) && v._bookMs)`) と
-//   同じセマンティクスに揃える — book_date=null は期間絞込を通す (両タブで件数が一致)。
-//   lastMonth は上限 (現月頭) があるため null を通さず現在の挙動を維持。
+// v735: 期間フィルタで book_date=NULL の行は期間指定時は必ず除外する。
+//   v729 の「NULL 通す」は誤カウント源だった (どの月で見ても 同じ NULL 群が加算されていた)。
+//   期間 'all' の時だけ NULL も含める。
 function a2FilterByPeriod(visits) {
   const p = state.a2Period || 'all';
   if (p === 'all') return visits;
   const now = new Date();
-  let from = null;
+  let from = null, to = null;
   if (p === 'thisMonth') {
     from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to = new Date(now.getFullYear(), now.getMonth() + 1, 1);
   } else if (p === 'lastMonth') {
     from = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    const to = new Date(now.getFullYear(), now.getMonth(), 1);
-    return visits.filter(v => !v._bookMs || (v._bookMs >= from.getTime() && v._bookMs < to.getTime()));
+    to = new Date(now.getFullYear(), now.getMonth(), 1);
   } else if (p === 'prevMonth') {
-    // v732: 先々月
     from = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-    const to = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    return visits.filter(v => !v._bookMs || (v._bookMs >= from.getTime() && v._bookMs < to.getTime()));
+    to = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   } else if (p === '3m') {
     from = new Date(now.getFullYear(), now.getMonth() - 3, 1);
   } else if (p === '6m') {
@@ -1553,19 +1564,19 @@ function a2FilterByPeriod(visits) {
   }
   if (!from) return visits;
   const fromMs = from.getTime();
-  return visits.filter(v => !v._bookMs || v._bookMs >= fromMs);
+  const toMs = to ? to.getTime() : Infinity;
+  return visits.filter(v => v._bookMs && v._bookMs >= fromMs && v._bookMs < toMs);
 }
 
 // v734: drilldownType = 'promo' | 'treatment' | null で 分類セルを来院タブへの link に
+// v735: 未処理 (booking - bookedVisited) 列を追加 — 予約したのに来院確認取れてない件数を可視化
 function a2RenderTable(title, rows, drilldownType = null) {
   const totalBooking = rows.reduce((s, r) => s + r.booking, 0);
   const totalVisited = rows.reduce((s, r) => s + r.visited, 0);
-  // v729: 治療別合計行の相談率が >100% になる不具合修正
-  //   — 分母(booking) は 予約由来のみ、分子は 予約由来かつ来院 の bookedVisited を使う。
-  //   walk-in 治療 (保険/WT/転院/審美/補綴) の visited は分子に混ぜない。
   const totalBookedVisited = rows.reduce((s, r) => s + (r.bookedVisited || 0), 0);
   const totalContract = rows.reduce((s, r) => s + r.contract, 0);
   const totalRevenue = rows.reduce((s, r) => s + r.revenue, 0);
+  const totalUnhandled = totalBooking - totalBookedVisited;
   const totalVisitRate = totalBooking ? totalBookedVisited / totalBooking : 0;
   const totalContractRate = totalVisited ? totalContract / totalVisited : 0;
   const totalArpc = totalContract ? (totalRevenue / totalContract) : 0;
@@ -1577,6 +1588,7 @@ function a2RenderTable(title, rows, drilldownType = null) {
         <th style="text-align:left">分類</th>
         <th style="text-align:right">予約</th>
         <th style="text-align:right">相談</th>
+        <th style="text-align:right">未処理</th>
         <th style="text-align:right">相談率</th>
         <th style="text-align:right">成約</th>
         <th style="text-align:right">成約率</th>
@@ -1586,7 +1598,11 @@ function a2RenderTable(title, rows, drilldownType = null) {
       <tbody>
         ${rows.map(r => {
           const showVR = (r.visitRate != null);
-          // v734: 分類コードをクリック → 来院タブに ドリルダウン (期間+医院+該当キー)
+          // v735: 未処理 = 予約したのに来院してない (booking - bookedVisited)。walk-in は booking=0 なので '—'
+          const unhandled = Math.max(0, (r.booking || 0) - (r.bookedVisited || 0));
+          const unhandledCell = r.booking
+            ? `<span style="${unhandled > 0 ? 'color:var(--warn);font-weight:600' : ''}">${unhandled}</span>`
+            : '<span class="a2-empty">—</span>';
           const keyCell = drilldownType
             ? `<a href="#" class="a2-drill" data-drill-type="${drilldownType}" data-drill-key="${esc(r.key)}">${esc(r.key)}</a>`
             : esc(r.key);
@@ -1594,6 +1610,7 @@ function a2RenderTable(title, rows, drilldownType = null) {
           <td>${keyCell}${r.isBookedTreat === false ? ' <span class="a2-badge-walkin">walk-in</span>' : ''}</td>
           <td class="a2-num">${r.booking || '—'}</td>
           <td class="a2-num">${r.visited}</td>
+          <td class="a2-num">${unhandledCell}</td>
           <td class="a2-num">${showVR ? `<span class="a2-pct">${a2Pct(r.visitRate)}</span>` : '<span class="a2-empty">—</span>'}</td>
           <td class="a2-num">${r.contract}</td>
           <td class="a2-num"><span class="a2-pct">${a2Pct(r.contractRate)}</span></td>
@@ -1603,10 +1620,11 @@ function a2RenderTable(title, rows, drilldownType = null) {
         }).join('')}
         <tr class="a2-total">
           <td><strong>合計</strong></td>
-          <td class="a2-num">${totalBooking}</td>
-          <td class="a2-num">${totalVisited}</td>
+          <td class="a2-num"><strong>${totalBooking}</strong></td>
+          <td class="a2-num"><strong>${totalVisited}</strong></td>
+          <td class="a2-num" style="${totalUnhandled > 0 ? 'color:var(--warn)' : ''}"><strong>${totalUnhandled || '—'}</strong></td>
           <td class="a2-num"><strong>${a2Pct(totalVisitRate)}</strong></td>
-          <td class="a2-num">${totalContract}</td>
+          <td class="a2-num"><strong>${totalContract}</strong></td>
           <td class="a2-num"><strong>${a2Pct(totalContractRate)}</strong></td>
           <td class="a2-num a2-yen"><strong>${a2FormatYen(totalRevenue)}</strong></td>
           <td class="a2-num a2-yen"><strong>${totalContract ? a2FormatYen(totalArpc) : '—'}</strong></td>
@@ -1718,33 +1736,42 @@ function a2UpdateQuickButtons() {
 // v720/v723: 医院別 治療内訳マトリクス render (suffix で絞込表示)
 function a2RenderFacilityMatrix(rows, suffix = '') {
   const treats = A2_TREAT_ORDER.filter(t => rows.some(r => r.cells[t]));
-  const colTotals = { total: 0, revenue: 0 };
+  // v735: 予約/未処理 列を追加。全カラムを一度に合計。
+  const colTotals = { total: 0, revenue: 0, booking: 0, unhandled: 0 };
   for (const t of treats) colTotals[t] = 0;
   for (const r of rows) {
     for (const t of treats) colTotals[t] += (r.cells[t] || 0);
     colTotals.total += r.total;
     colTotals.revenue += r.revenue;
+    colTotals.booking += (r.booking || 0);
+    colTotals.unhandled += (r.unhandled || 0);
   }
   return `<section class="a2-section">
-    <h3 class="a2-title">医院別 相談数${esc(suffix)}</h3>
+    <h3 class="a2-title">医院別${esc(suffix)}</h3>
     <div class="a2-table-wrap"><table class="a2-table">
       <thead><tr>
         <th style="text-align:left">医院</th>
+        <th style="text-align:right">予約</th>
+        <th style="text-align:right">相談</th>
+        <th style="text-align:right">未処理</th>
         ${treats.map(t => `<th style="text-align:right">${esc(t)}</th>`).join('')}
-        <th style="text-align:right">合計</th>
         <th style="text-align:right">売上</th>
       </tr></thead>
       <tbody>
         ${rows.map(r => `<tr>
           <td><a href="#" class="a2-drill" data-drill-type="facility" data-drill-key="${esc(r.facility)}"><strong>${esc(r.facility)}</strong></a></td>
-          ${treats.map(t => `<td class="a2-num">${r.cells[t] || 0}</td>`).join('')}
+          <td class="a2-num">${r.booking || '—'}</td>
           <td class="a2-num"><strong>${r.total}</strong></td>
+          <td class="a2-num" style="${r.unhandled ? 'color:var(--warn);font-weight:600' : ''}">${r.unhandled || '—'}</td>
+          ${treats.map(t => `<td class="a2-num">${r.cells[t] || 0}</td>`).join('')}
           <td class="a2-num a2-yen">${a2FormatYen(r.revenue)}</td>
         </tr>`).join('')}
         <tr class="a2-total">
           <td><strong>合計</strong></td>
-          ${treats.map(t => `<td class="a2-num">${colTotals[t]}</td>`).join('')}
+          <td class="a2-num"><strong>${colTotals.booking}</strong></td>
           <td class="a2-num"><strong>${colTotals.total}</strong></td>
+          <td class="a2-num" style="${colTotals.unhandled ? 'color:var(--warn)' : ''}"><strong>${colTotals.unhandled || '—'}</strong></td>
+          ${treats.map(t => `<td class="a2-num">${colTotals[t]}</td>`).join('')}
           <td class="a2-num a2-yen"><strong>${a2FormatYen(colTotals.revenue)}</strong></td>
         </tr>
       </tbody>
