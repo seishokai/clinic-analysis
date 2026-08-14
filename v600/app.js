@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v733';
+const APP_VERSION = 'v734';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -521,7 +521,12 @@ function filteredVisits() {
   return state.visits.filter(v => {
     if (f.facility && v._normFacility !== f.facility) return false;
     if (f.treatment && v._treatment !== f.treatment) return false;
-    if (f.promo && (v.promo_code || '') !== f.promo) return false;
+    // v734: promo フィルタ — 分析タブと同じ正規化 ('セレクト'=source_tool一致、'__none__'=なし絞込)
+    if (f.promo) {
+      const pv = a2NormPromo(v);
+      if (f.promo === '__none__') { if (pv) return false; }
+      else if (pv !== f.promo) return false;
+    }
     // v707: status filter が空なら '重複削除' はデフォルト非表示 & カウント除外
     if (f.status) {
       if (v._effStatus !== f.status) return false;
@@ -837,17 +842,19 @@ function updatePeriodExtraInputs() {
 function populatePromoOptions() {
   const promoSel = $('#v-promo');
   if (!promoSel) return;
-  // 件数集計 → 件数降順
+  // v734: promo は a2NormPromo で正規化して集計 (分析タブとキーを揃える)
   const counts = new Map();
+  let noneCount = 0;
   for (const v of state.visits) {
-    const p = v.promo_code || '';
-    if (!p) continue;
+    const p = a2NormPromo(v);
+    if (!p) { noneCount++; continue; }
     counts.set(p, (counts.get(p) || 0) + 1);
   }
   const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
   const current = state.filters.promo;
-  promoSel.innerHTML = '<option value="">プロモ:全て</option>' +
-    sorted.map(([p, n]) => `<option value="${esc(p)}" ${p === current ? 'selected' : ''}>${esc(p)} (${n})</option>`).join('');
+  promoSel.innerHTML = '<option value="">プロモ:全て</option>'
+    + (noneCount ? `<option value="__none__" ${current === '__none__' ? 'selected' : ''}>(なし) (${noneCount})</option>` : '')
+    + sorted.map(([p, n]) => `<option value="${esc(p)}" ${p === current ? 'selected' : ''}>${esc(p)} (${n})</option>`).join('');
 }
 
 // v603 fix #11 / P2: 500 行 → 「もっと見る」でページ拡張
@@ -1450,6 +1457,50 @@ function a2Pct(p) {
   return (p * 100).toFixed(1) + '%';
 }
 
+// v734: 分析タブ → 来院タブ ドリルダウン
+//   分析タブの (期間 + 3軸絞込) を来院タブの filters に写して view を切替える
+function a2DrillTo(type, key) {
+  // 期間: state.a2Period を 来院タブ filters (period/periodMonth) に変換
+  const p = state.a2Period || 'all';
+  const now = new Date();
+  let period = 'all', periodMonth = '', periodFrom = '', periodTo = '';
+  const fmtYM = (Y, M) => `${Y}-${String(M+1).padStart(2,'0')}`;
+  if (p === 'thisMonth') { period = 'month'; periodMonth = fmtYM(now.getFullYear(), now.getMonth()); }
+  else if (p === 'lastMonth') {
+    const d = new Date(now.getFullYear(), now.getMonth()-1, 1);
+    period = 'month'; periodMonth = fmtYM(d.getFullYear(), d.getMonth());
+  } else if (p === 'prevMonth') {
+    const d = new Date(now.getFullYear(), now.getMonth()-2, 1);
+    period = 'month'; periodMonth = fmtYM(d.getFullYear(), d.getMonth());
+  } else if (p === '3m' || p === '6m') {
+    const back = p === '3m' ? 3 : 6;
+    const dFrom = new Date(now.getFullYear(), now.getMonth()-back, 1);
+    period = 'range';
+    periodFrom = `${dFrom.getFullYear()}-${String(dFrom.getMonth()+1).padStart(2,'0')}-01`;
+    const dTo = new Date(now.getFullYear(), now.getMonth()+1, 0);
+    periodTo = `${dTo.getFullYear()}-${String(dTo.getMonth()+1).padStart(2,'0')}-${String(dTo.getDate()).padStart(2,'0')}`;
+  }
+  // 分析側の既存絞込 (医院/治療/プロモ) を来院タブに反映
+  const af = state.a2Filters || {};
+  const filters = {
+    search: '', status: '',
+    facility: af.facility || '', treatment: af.treatment || '', promo: af.promo || '',
+    period, periodMonth, periodFrom, periodTo,
+    dupOnly: false,
+  };
+  // クリックしたセルの key を該当軸に上書き
+  if (type === 'facility') filters.facility = key;
+  else if (type === 'treatment') filters.treatment = key === '(未分類)' ? '' : key;
+  else if (type === 'promo') filters.promo = key === '(なし)' ? '__none__' : key;
+  state.filters = filters;
+  _visitsShownLimit = 500;
+  state.view = 'visits';
+  document.body.classList.remove('filters-open');
+  render();
+  // scroll to top of visits table
+  setTimeout(() => { const w = document.querySelector('.table-wrap'); if (w) w.scrollTop = 0; }, 50);
+}
+
 // v733: 分析タブ期間ラベル (「先月 (2026-07)」等 具体年月付き)
 function a2PeriodLabel(p) {
   if (!p || p === 'all') return '';
@@ -1505,7 +1556,8 @@ function a2FilterByPeriod(visits) {
   return visits.filter(v => !v._bookMs || v._bookMs >= fromMs);
 }
 
-function a2RenderTable(title, rows) {
+// v734: drilldownType = 'promo' | 'treatment' | null で 分類セルを来院タブへの link に
+function a2RenderTable(title, rows, drilldownType = null) {
   const totalBooking = rows.reduce((s, r) => s + r.booking, 0);
   const totalVisited = rows.reduce((s, r) => s + r.visited, 0);
   // v729: 治療別合計行の相談率が >100% になる不具合修正
@@ -1534,8 +1586,12 @@ function a2RenderTable(title, rows) {
       <tbody>
         ${rows.map(r => {
           const showVR = (r.visitRate != null);
+          // v734: 分類コードをクリック → 来院タブに ドリルダウン (期間+医院+該当キー)
+          const keyCell = drilldownType
+            ? `<a href="#" class="a2-drill" data-drill-type="${drilldownType}" data-drill-key="${esc(r.key)}">${esc(r.key)}</a>`
+            : esc(r.key);
           return `<tr>
-          <td>${esc(r.key)}${r.isBookedTreat === false ? ' <span class="a2-badge-walkin">walk-in</span>' : ''}</td>
+          <td>${keyCell}${r.isBookedTreat === false ? ' <span class="a2-badge-walkin">walk-in</span>' : ''}</td>
           <td class="a2-num">${r.booking || '—'}</td>
           <td class="a2-num">${r.visited}</td>
           <td class="a2-num">${showVR ? `<span class="a2-pct">${a2Pct(r.visitRate)}</span>` : '<span class="a2-empty">—</span>'}</td>
@@ -1565,6 +1621,13 @@ function renderAnalyticsView(main) {
   if (!main.querySelector('.analytics-view')) {
     main.innerHTML = '';
     main.appendChild($('#tpl-analytics').content.cloneNode(true));
+    // v734: 各セル (医院/治療/プロモ) クリック → 来院タブへ ドリルダウン
+    main.addEventListener('click', (e) => {
+      const el = e.target.closest && e.target.closest('.a2-drill');
+      if (!el) return;
+      e.preventDefault();
+      a2DrillTo(el.dataset.drillType, el.dataset.drillKey);
+    });
     $('#a2-period').addEventListener('change', e => {
       state.a2Period = e.target.value;
       a2UpdateQuickButtons();
@@ -1673,7 +1736,7 @@ function a2RenderFacilityMatrix(rows, suffix = '') {
       </tr></thead>
       <tbody>
         ${rows.map(r => `<tr>
-          <td><strong>${esc(r.facility)}</strong></td>
+          <td><a href="#" class="a2-drill" data-drill-type="facility" data-drill-key="${esc(r.facility)}"><strong>${esc(r.facility)}</strong></a></td>
           ${treats.map(t => `<td class="a2-num">${r.cells[t] || 0}</td>`).join('')}
           <td class="a2-num"><strong>${r.total}</strong></td>
           <td class="a2-num a2-yen">${a2FormatYen(r.revenue)}</td>
@@ -1745,8 +1808,8 @@ function renderAnalyticsTable() {
 
   body.innerHTML = summary
     + a2RenderFacilityMatrix(facMatrix, suffix)
-    + a2RenderTable('治療別' + suffix, byTreat)
-    + a2RenderTable('プロモ別' + suffix, byPromo);
+    + a2RenderTable('治療別' + suffix, byTreat, 'treatment')
+    + a2RenderTable('プロモ別' + suffix, byPromo, 'promo');
 }
 
 async function fetchSlots() {

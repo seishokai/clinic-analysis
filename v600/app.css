@@ -1557,3 +1557,13 @@ main {
 .bookings-view .b-sortable:hover { background: var(--bg); }
 .bookings-view .b-sortable.b-sort-active { color: var(--accent); }
 .bookings-view .b-sort-ind { font-size: 10px; margin-left: 2px; }
+
+/* v734: 分析タブ ドリルダウンリンク */
+.a2-drill {
+  color: var(--accent-ink);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.a2-drill:hover { background: var(--accent-soft); color: var(--accent); text-decoration-style: solid; border-radius: 3px; }
