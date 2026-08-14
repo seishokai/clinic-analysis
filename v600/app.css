@@ -560,6 +560,7 @@ main {
   background: var(--paper);
   cursor: pointer;
 }
+.status-sel[data-value="要確認"]     { background: #ffe5b4; color: #a24800; font-weight: 700; border: 1px solid #d17b00; }
 .status-sel[data-value="キャンセル"] { background: var(--warn-soft); color: var(--warn); font-weight: 600; }
 .status-sel[data-value="成約"]       { background: var(--ok-soft); color: var(--ok); font-weight: 600; }
 .status-sel[data-value="来院済"]     { background: var(--info-soft); color: var(--info); font-weight: 600; }

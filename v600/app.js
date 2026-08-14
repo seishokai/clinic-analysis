@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v736';
+const APP_VERSION = 'v737';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -52,7 +52,7 @@ const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
 // Status options — 使用頻度順 (ユーザー指定: 未対応 → キャンセル → 検討中 → 残り)
 // v606: 「確認済」は使わないので削除
 const STATUS_OPTIONS = [
-  '未対応', 'キャンセル', '検討中',
+  '未対応', '要確認', 'キャンセル', '検討中',
   '来院済', '予約変更',
   '予約連絡待ち', '後追いLINE済み', '離脱',
   '成約', 'ローン審査中', 'ローン審査落',
@@ -2051,12 +2051,20 @@ async function runSheetSync(showToast) {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const r = await res.json();
     if (showToast) {
-      toast(`シート同期完了: 新規 ${r.rowsInserted} 件 / スキップ ${r.rowsSkipped} 件`, r.rowsError ? 'err' : 'ok', 4000);
+      const parts = [`新規 ${r.rowsInserted} 件`];
+      if (r.rowsUpdatedInitial) parts.push(`更新 ${r.rowsUpdatedInitial} 件`);
+      if (r.flaggedCancel) parts.push(`要確認 ${r.flaggedCancel} 件`);
+      toast(`シート同期完了: ${parts.join(' / ')}`, r.rowsError ? 'err' : 'ok', 4000);
     }
-    // 新規行があれば visits を再取得
-    if (r.rowsInserted > 0) {
-      await fetchVisits();
-      if (state.view === 'visits') renderVisitsTable();
+    // v921 A4: 新規 or 更新 or キャンセル→要確認 のいずれかがあれば visits を再取得
+    //   従来は rowsInserted のみだったので、初診シート更新だけの sync で Aladdin が古い表示のままだった
+    const changed = (r.rowsInserted || 0) + (r.rowsUpdatedInitial || 0) + (r.flaggedCancel || 0);
+    if (changed > 0) {
+      // 編集中フィールドを守りつつ再取得
+      if (!isEditingField()) {
+        await fetchVisits();
+        if (state.view === 'visits') renderVisitsTable();
+      }
     }
   } catch(e) {
     if (showToast) toast('シート同期失敗: ' + (e.message || e), 'err', 5000);

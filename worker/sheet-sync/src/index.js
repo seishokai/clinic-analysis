@@ -1,5 +1,9 @@
 /* ============================================================
- * sheet-sync Worker v920
+ * sheet-sync Worker v921
+ *   A0: キャンセル入力 + 実来院 → status='要確認' に強制昇格 (isTouched 例外)
+ *   A1: Phase 7 PATCH に status=eq.未対応 楽観排他 (Aladdin 保存優先)
+ *   A3: 同名別電話 検出時 warning ログ (真の分離は DB migration 要)
+ *   A4: rowsInserted / flaggedCancel を response に追加 (Aladdin 側視覚更新用)
  *   Cron: なし (Aladdin ブラウザから 10 分毎 fetch)
  *   HTTP: /status, /sync (手動、要 token), /debug
  *
@@ -348,9 +352,14 @@ async function runSync(env, triggerName) {
   //   これで「同じ人が sheet の複数場所に出て、片方だけ電話あり」でも既存電話を潰さない。
   //   primary_facility は多院利用者を守るため payload に一切含めない (新規 INSERT では NULL)。
   const uniquePatients = new Map();
+  const suspectSamenameDiffPhone = [];   // v921 A3: 同名別電話 検出ログ用
   for (const c of allCandidates) {
     const existing = uniquePatients.get(c.normalized_name);
     if (existing) {
+      // v921 A3: 別電話で来た同姓同名は警告 (DB unique index の関係で今は分離できない)
+      if (existing.phone_last4 && c.phone_last4 && existing.phone_last4 !== c.phone_last4) {
+        suspectSamenameDiffPhone.push({ name: c.patient_name, p1: existing.phone_last4, p2: c.phone_last4 });
+      }
       if (!existing.phone && c.phone) existing.phone = c.phone;
       if (!existing.phone_last4 && c.phone_last4) existing.phone_last4 = c.phone_last4;
       continue;
@@ -361,6 +370,9 @@ async function runSync(env, triggerName) {
       phone: c.phone || null,
       phone_last4: c.phone_last4 || null,
     });
+  }
+  if (suspectSamenameDiffPhone.length > 0) {
+    console.log('v921 A3 WARN 同名別電話検出:', suspectSamenameDiffPhone.slice(0, 20));
   }
   const patientMap = new Map();
   const patArr = Array.from(uniquePatients.values());
@@ -460,25 +472,31 @@ async function runSync(env, triggerName) {
   }
 
   // ---- Phase 6: 初診管理シート → マッチ + UPDATE/INSERT ----
-  //   v916: Phase 5 前の allExistingVisits を再利用 (subreq 節約)。未対応行のみ Phase 6 対象。
-  //   今回 Phase 5 で INSERT した booking は id 未確定なので Phase 6 では扱わず、次回 sync で処理。
-  //   代わりに Phase 8 walk-in で 触った pat+date に INSERT しないガードを入れる。
+  //   v921: Aladdin 優先原則 — status が '未対応' の行だけを '来院済' へ更新するのが基本。
+  //         唯一の例外 = **キャンセル入力なのに実来院あり** → status='要確認' に強制上書き
+  //         (打ち間違い / 来院確認漏れ を可視化)
   const existingVisits = allExistingVisits.filter(v => v.status === '未対応');
+  const cancelledVisits = allExistingVisits.filter(v => v.status === 'キャンセル');
 
-  // v911 Phase 2: matcher の日付マッチを撤廃。
-  //   ユーザー方針: 「来院日は初診管理シートが正」
-  //   (patient_id, facility) のみで match し、最も近い日付の untouched booking を選ぶ。
-  //   選ばれた booking の book_date は sheet の来院日で上書きする。
+  // v911 Phase 2: matcher (patient_id, facility) — 未対応行対象
   const visitsByPatFac = new Map();
   for (const v of existingVisits) {
     const key = `${v.patient_id}|${normFac(v.facility)}`;
     if (!visitsByPatFac.has(key)) visitsByPatFac.set(key, []);
     visitsByPatFac.get(key).push(v);
   }
+  // v921: A0 用 — キャンセル行の (patient_id, facility) index
+  const cancelByPatFac = new Map();
+  for (const v of cancelledVisits) {
+    const key = `${v.patient_id}|${normFac(v.facility)}`;
+    if (!cancelByPatFac.has(key)) cancelByPatFac.set(key, []);
+    cancelByPatFac.get(key).push(v);
+  }
 
   const toUpdate = [];
   const promoUpdates = [];
   const toInsert = [];
+  const toFlagCancel = [];   // v921 A0: キャンセル→要確認 に昇格する id リスト
   const claimed = new Set();
   let skippedTouched = 0;
   let dbg_no_patient = 0;
@@ -487,6 +505,14 @@ async function runSync(env, triggerName) {
     const patientId = patientMap.get(c.normalized_name);
     if (!patientId) { dbg_no_patient++; continue; }
     const key = `${patientId}|${c.facility}`;
+    // v921 A0: キャンセル入力があるのに 初診シートで来院確認 → '要確認' に強制昇格
+    const cancels = cancelByPatFac.get(key) || [];
+    for (const cv of cancels) {
+      if (!claimed.has(cv.id)) {
+        claimed.add(cv.id);
+        toFlagCancel.push(cv.id);
+      }
+    }
     const matches = (visitsByPatFac.get(key) || []).filter(m => !claimed.has(m.id));
     const sheetPromo = promoFromSource(c.source_channel);
     if (matches.length > 0) {
@@ -496,13 +522,12 @@ async function runSync(env, triggerName) {
         const target = untouched[0];
         claimed.add(target.id);
         toUpdate.push({ id: target.id, newBookDate: c.book_date });
-        // v915: シート由来の promo を **NULL の時のみ** 書き込む (空文字は「意図的な空」として保護)
         if (sheetPromo && target.promo_code == null) promoUpdates.push({ id: target.id, promo: sheetPromo });
       } else {
         skippedTouched++;
       }
-    } else {
-      // v918: 同 patient+book_date に何らかの行があれば walk-in INSERT しない (完全重複防止)
+    } else if (cancels.length === 0) {
+      // v918: キャンセルで既に flag 済ならもう INSERT しない
       if (existingPatDate.has(`${patientId}|${c.book_date}`)) {
         skippedTouched++;
       } else {
@@ -512,17 +537,17 @@ async function runSync(env, triggerName) {
   }
 
   // ---- Phase 7: UPDATE (booking 行 → 来院済) ----
-  //   v915: book_date 別グループ化を廃止 (150日分 sync で 150 subreq 発生し Free tier 50 超過)。
-  //   status のみ単発 PATCH。book_date のシート追従が必要な場合は初回 SQL 直バックフィル or
-  //   将来 Postgres RPC 経由 (VALUES+UPDATE FROM) に置換予定。
+  // v921 A1: 楽観排他。SELECT した瞬間に status='未対応' でも、PATCH までの数秒間に
+  //   Aladdin 側でユーザーが status を別値に変更した可能性がある。
+  //   `?status=eq.未対応` を URL 条件に追加することで、PATCH は「まだ未対応の行だけ」を対象にする。
+  //   Aladdin で '成約' 等に手動更新した行は自然に上書きから守られる。
   let updated = 0;
   if (toUpdate.length > 0) {
-    // v915: 100 IDs × 40 char UUID ≈ 4KB URL — HTTP header 8KB 制限内で安全
     const BATCH_U = 100;
     for (let i = 0; i < toUpdate.length; i += BATCH_U) {
       const chunk = toUpdate.slice(i, i + BATCH_U);
       const idList = chunk.map(u => `"${u.id}"`).join(',');
-      const patchUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?id=in.(${encodeURIComponent(idList)})`;
+      const patchUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?id=in.(${encodeURIComponent(idList)})&status=eq.${encodeURIComponent('未対応')}`;
       const patchRes = await fetch(patchUrl, {
         method: 'PATCH',
         headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
@@ -533,6 +558,30 @@ async function runSync(env, triggerName) {
         updated += Array.isArray(updatedRows) ? updatedRows.length : 0;
       } else {
         console.log('visits PATCH batch failed', patchRes.status, await patchRes.text());
+      }
+    }
+  }
+
+  // ---- Phase 7c (v921 A0): キャンセル → 要確認 昇格 ----
+  //   Aladdin で「キャンセル」入力しているのに 初診シートに来院記録あり → status='要確認' に強制。
+  //   isTouched 保護を突破する唯一の例外 (打ち間違い/漏れの可視化)。
+  let flaggedCancel = 0;
+  if (toFlagCancel.length > 0) {
+    const BATCH_F = 100;
+    for (let i = 0; i < toFlagCancel.length; i += BATCH_F) {
+      const chunk = toFlagCancel.slice(i, i + BATCH_F);
+      const idList = chunk.map(id => `"${id}"`).join(',');
+      const patchUrl = `${env.SUPABASE_URL}/rest/v1/patient_visits?id=in.(${encodeURIComponent(idList)})&status=eq.${encodeURIComponent('キャンセル')}`;
+      const patchRes = await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=representation' }),
+        body: JSON.stringify({ status: '要確認', updated_by: 'sheet-cancel-flag' }),
+      });
+      if (patchRes.ok) {
+        const updatedRows = await patchRes.json();
+        flaggedCancel += Array.isArray(updatedRows) ? updatedRows.length : 0;
+      } else {
+        console.log('cancel→要確認 PATCH failed', patchRes.status, await patchRes.text());
       }
     }
   }
@@ -618,11 +667,13 @@ async function runSync(env, triggerName) {
     bookingCandidates.length + initialCandidates.length, undefined, undefined,
     { patientMapSize: patientMap.size, uniquePatientsSize: uniquePatients.size, no_patient_id: dbg_no_patient,
       untouchedVisits: existingVisits.length, allExistingVisits: allExistingVisits.length,
-      touchedPatDate: touchedPatDate.size, bookingSkippedTouched, autoDedup: dedupResult });
+      touchedPatDate: touchedPatDate.size, bookingSkippedTouched, autoDedup: dedupResult,
+      samenameDiffPhoneCount: suspectSamenameDiffPhone.length,
+    }, flaggedCancel);
 }
 
 async function finalize(env, trigger, startMs, bookingPerTab, initialPerTab,
-                        bookingInserted, initialUpdated, walkinInserted, skippedTouched, rowsRead, rowsError, errorMessage, extraDbg) {
+                        bookingInserted, initialUpdated, walkinInserted, skippedTouched, rowsRead, rowsError, errorMessage, extraDbg, flaggedCancel = 0) {
   const durationMs = Date.now() - startMs;
   const errs = rowsError || 0;
   const tabsRead = (bookingPerTab.filter(d => !d.error).length) + (initialPerTab.filter(d => !d.error).length);
@@ -649,10 +700,14 @@ async function finalize(env, trigger, startMs, bookingPerTab, initialPerTab,
   return {
     tabsRead,
     rowsRead: rowsRead || 0,
+    // v921: Aladdin 側 UI が rowsInserted を参照するので新規追加 (bookingInserted + walkinInserted)
+    rowsInserted: (bookingInserted || 0) + (walkinInserted || 0),
+    rowsSkipped: (initialUpdated || 0) + (skippedTouched || 0),
     bookingInserted: bookingInserted || 0,
     rowsUpdatedInitial: initialUpdated || 0,
     walkinInserted: walkinInserted || 0,
     rowsSkippedTouched: skippedTouched || 0,
+    flaggedCancel: flaggedCancel || 0,   // v921 A0
     rowsError: errs,
     durationMs, errorMessage,
     dbg: extraDbg,
