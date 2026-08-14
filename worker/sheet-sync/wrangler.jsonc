@@ -2,6 +2,11 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "sheet-sync",
   "main": "src/index.js",
+
+  // v920: 誤アカウント誤爆防止。本番 sheet-sync は Seishokai.saiyo@gmail.com's Account 固定。
+  //   Account ID は公開情報 (dashboard URL に露出) なので git commit OK。
+  "account_id": "14cbc5eefb5c8cc4a763619ef03f1ed8",
+
   "compatibility_date": "2025-01-01",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
