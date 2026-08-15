@@ -1568,3 +1568,13 @@ main {
   cursor: pointer;
 }
 .a2-drill:hover { background: var(--accent-soft); color: var(--accent); text-decoration-style: solid; border-radius: 3px; }
+
+/* v738: 要確認 名前セル → 初診シートジャンプ link */
+.name-sheet-link {
+  color: #a24800;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  cursor: pointer;
+  font-weight: 700;
+}
+.name-sheet-link:hover { background: #ffe5b4; border-radius: 3px; text-decoration-style: solid; }

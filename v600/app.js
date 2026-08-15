@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v737';
+const APP_VERSION = 'v738';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -39,6 +39,32 @@ const APP_VERSION = 'v737';
 
 // v700: 初診管理シート → Aladdin 同期 Worker (v704: URL 修正: 実際は seishokai account)
 const SHEET_SYNC_WORKER = 'https://sheet-sync.seishokai.workers.dev';
+
+// v738: 初診管理シートの facility → タブ名 マップ (要確認 の名前クリックで タブ移動 + 検索)
+//   gid を staff から教えてもらったら 各 facility に gid: number を追加すれば直接タブに飛べる
+const INITIAL_SHEET_ID = '167IYM21HW0DGPlL1CrnCn4yTaTyC0KJU4f7gWyKtHf4';
+const INITIAL_SHEET_TAB_MAP = {
+  'BF銀座':  { tab: '①銀座初診' },
+  'BF中日':  { tab: '①中日初診' },
+  '京都':    { tab: '①京都初診' },
+  'ルミナス':{ tab: '①ルミナス初診' },
+  'エスカ':  { tab: '①エスカ初診' },
+  'アール':  { tab: '①アール初診' },
+  '茶屋':    { tab: '①茶屋初診' },
+  '八事':    { tab: '①八事初診' },
+  '知立':    { tab: '①知立初診' },
+  '小牧':    { tab: '①小牧初診' },
+  'ウィズ':  { tab: '①ウィズ初診' },
+  '大森':    { tab: '①大森初診' },
+};
+function openInitialSheetForPatient(facility, patientName) {
+  const map = INITIAL_SHEET_TAB_MAP[facility];
+  let url = `https://docs.google.com/spreadsheets/d/${INITIAL_SHEET_ID}/edit`;
+  if (map && map.gid != null) url += `#gid=${map.gid}`;
+  window.open(url, '_blank', 'noopener');
+  const tabName = map ? map.tab : '該当医院タブ';
+  toast(`シート開きました → ${tabName} タブに切替 → Ctrl+F で「${patientName}」を検索`, 'info', 6000);
+}
 const SHEET_SYNC_TOKEN = 'aladdin-sync-2026';
 
 // ==================== Config ====================
@@ -935,7 +961,10 @@ function rowHtml(v) {
   const memo = v.memo || '';
   return `<tr data-visit-id="${esc(v.visit_id)}">
     <td class="c-book">${esc(bookDisplay)}</td>
-    <td class="c-name" title="${esc(v.normalized_name || '')}">${esc(v.patient_name || '(名前なし)')}${(v._dupCount || 0) >= 2 ? `<span class="dup-badge" title="同日同患者に ${v._dupCount} 行あります">×${v._dupCount}</span>` : ''}</td>
+    <td class="c-name" title="${esc(v.normalized_name || '')}">${v._effStatus === '要確認'
+      ? `<a href="#" class="name-sheet-link" data-visit-id="${esc(v.visit_id)}" title="クリック → 初診管理シートで確認">${esc(v.patient_name || '(名前なし)')} <span style="font-size:10px">📋</span></a>`
+      : esc(v.patient_name || '(名前なし)')
+    }${(v._dupCount || 0) >= 2 ? `<span class="dup-badge" title="同日同患者に ${v._dupCount} 行あります">×${v._dupCount}</span>` : ''}</td>
     <td class="c-treatment">${treatment ? `<span class="treatment-chip" data-t="${esc(treatment)}">${esc(treatment)}</span>` : '<span class="tx-empty">-</span>'}</td>
     <td class="c-facility" title="${esc(v.facility || '')}">${esc(normFac(v.facility) || '-')}</td>
     <td class="c-promo"><span class="${promoChipCls}" title="${esc(promo)}">${promo ? esc(shortPromo(promo)) : '-'}</span></td>
@@ -1088,6 +1117,14 @@ function setupTbodyDelegation() {
   });
   // memo cell click
   tbody.addEventListener('click', (e) => {
+    // v738: 要確認 名前クリック → 初診管理シート ジャンプ
+    const nameLink = e.target.closest('.name-sheet-link');
+    if (nameLink) {
+      e.preventDefault();
+      const v = findVisitById(nameLink.dataset.visitId);
+      if (v) openInitialSheetForPatient(normFac(v.facility), v.patient_name || '');
+      return;
+    }
     const memo = e.target.closest('.memo-cell');
     if (!memo) return;
     const tr = memo.closest('tr[data-visit-id]');
