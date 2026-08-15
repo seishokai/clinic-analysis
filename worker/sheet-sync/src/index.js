@@ -1,5 +1,7 @@
 /* ============================================================
- * sheet-sync Worker v921
+ * sheet-sync Worker v922
+ *   A0 fix: 要確認 昇格判定に book_date 一致条件を追加
+ *           v921 は過去別日の来院記録で誤検出していた
  *   A0: キャンセル入力 + 実来院 → status='要確認' に強制昇格 (isTouched 例外)
  *   A1: Phase 7 PATCH に status=eq.未対応 楽観排他 (Aladdin 保存優先)
  *   A3: 同名別電話 検出時 warning ログ (真の分離は DB migration 要)
@@ -485,12 +487,14 @@ async function runSync(env, triggerName) {
     if (!visitsByPatFac.has(key)) visitsByPatFac.set(key, []);
     visitsByPatFac.get(key).push(v);
   }
-  // v921: A0 用 — キャンセル行の (patient_id, facility) index
-  const cancelByPatFac = new Map();
+  // v922: A0 用 — キャンセル行の (patient_id, facility, book_date) index
+  //   v921 は (patient_id, facility) だけで拾ってしまい、過去別日の来院記録がある人の
+  //   別日キャンセルまで誤検出していた。同日一致のみに絞る。
+  const cancelByPatFacDate = new Map();
   for (const v of cancelledVisits) {
-    const key = `${v.patient_id}|${normFac(v.facility)}`;
-    if (!cancelByPatFac.has(key)) cancelByPatFac.set(key, []);
-    cancelByPatFac.get(key).push(v);
+    const key = `${v.patient_id}|${normFac(v.facility)}|${v.book_date}`;
+    if (!cancelByPatFacDate.has(key)) cancelByPatFacDate.set(key, []);
+    cancelByPatFacDate.get(key).push(v);
   }
 
   const toUpdate = [];
@@ -505,8 +509,9 @@ async function runSync(env, triggerName) {
     const patientId = patientMap.get(c.normalized_name);
     if (!patientId) { dbg_no_patient++; continue; }
     const key = `${patientId}|${c.facility}`;
-    // v921 A0: キャンセル入力があるのに 初診シートで来院確認 → '要確認' に強制昇格
-    const cancels = cancelByPatFac.get(key) || [];
+    // v922 A0: 同日一致のみ 要確認 昇格 (patient_id + facility + book_date)
+    const cancelKey = `${patientId}|${c.facility}|${c.book_date}`;
+    const cancels = cancelByPatFacDate.get(cancelKey) || [];
     for (const cv of cancels) {
       if (!claimed.has(cv.id)) {
         claimed.add(cv.id);
