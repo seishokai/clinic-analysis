@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v738';
+const APP_VERSION = 'v739';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -333,8 +333,10 @@ async function logout() {
 }
 
 // ==================== Data fetch ====================
+let _lastFetchMs = 0;   // v739 新A4: fetch dead-lock 解除用の最終取得時刻
 async function fetchVisits() {
   state.loading = true;
+  _lastFetchMs = Date.now();
   // v603 fix #1: JST 基準で今日を求める (toISOString だと UTC → 朝の時間帯に本日消失)
   const todayIso = todayJst();
   let all = [];
@@ -546,7 +548,11 @@ function filteredVisits() {
   // v603 fix #4: status filter が空の時は 除外/キャンセル をデフォルト非表示
   return state.visits.filter(v => {
     if (f.facility && v._normFacility !== f.facility) return false;
-    if (f.treatment && v._treatment !== f.treatment) return false;
+    // v739: '(未分類)' フィルタは _treatment が空 (キーワード未マッチ) な行を絞る
+    if (f.treatment) {
+      if (f.treatment === '(未分類)') { if (v._treatment) return false; }
+      else if (v._treatment !== f.treatment) return false;
+    }
     // v734: promo フィルタ — 分析タブと同じ正規化 ('セレクト'=source_tool一致、'__none__'=なし絞込)
     if (f.promo) {
       const pv = a2NormPromo(v);
@@ -897,10 +903,19 @@ function renderVisitsTable() {
     ? state.visits.length
     : state.visits.reduce((n, v) => n + (STATUS_HIDDEN_BY_DEFAULT.has(v._effStatus) ? 0 : 1), 0);
   $('#v-count').innerHTML = `<strong>${rows.length}</strong> / ${totalDenom} 件`;
-  // v709 BUG#4 修正: フィルタ再描画時も「実データ取得時刻」を出す (renderVisitsTable 内で now() すると誤認)
-  $('#v-updated').textContent = state.visitsFetchedAt
-    ? `更新: ${new Date(state.visitsFetchedAt).toLocaleTimeString()}`
-    : '更新: —';
+  // v709 BUG#4 修正: フィルタ再描画時も「実データ取得時刻」を出す
+  // v739 新A4: 15 分以上前の取得なら警告表示 (staff に「表示古い」を可視化)
+  const upd = $('#v-updated');
+  if (state.visitsFetchedAt) {
+    const ageMin = Math.floor((Date.now() - new Date(state.visitsFetchedAt).getTime()) / 60000);
+    upd.textContent = `更新: ${new Date(state.visitsFetchedAt).toLocaleTimeString()}${ageMin >= 15 ? ` (${ageMin}分前・要更新)` : ''}`;
+    upd.style.color = ageMin >= 15 ? 'var(--warn)' : '';
+    upd.style.fontWeight = ageMin >= 15 ? '600' : '';
+  } else {
+    upd.textContent = '更新: —';
+    upd.style.color = '';
+    upd.style.fontWeight = '';
+  }
   const tbody = $('#v-tbody');
   const empty = $('#v-empty');
   if (!rows.length) {
@@ -1568,7 +1583,7 @@ function a2DrillTo(type, key) {
   };
   // クリックしたセルの key を該当軸に上書き
   if (type === 'facility') filters.facility = key;
-  else if (type === 'treatment') filters.treatment = key === '(未分類)' ? '' : key;
+  else if (type === 'treatment') filters.treatment = key;   // v739: '(未分類)' もそのまま渡す
   else if (type === 'promo') filters.promo = key === '(なし)' ? '__none__' : key;
   state.filters = filters;
   _visitsShownLimit = 500;
@@ -2080,7 +2095,11 @@ async function runSheetSync(showToast) {
   const label = $('#ss-label');
   if (!btn || btn.classList.contains('syncing')) return;
   // v730: 入力中の自動 sync は fetchVisits で focus / 値を奪う → skip
-  if (!showToast && isEditingField()) return;
+  // v739 新A4: dead-lock 解除 — タブ非アクティブ or 15分以上未 fetch なら skip しない
+  if (!showToast && isEditingField()) {
+    const staleMs = Date.now() - _lastFetchMs;
+    if (!document.hidden && staleMs < 15 * 60 * 1000) return;
+  }
   btn.classList.add('syncing');
   if (label) label.textContent = 'シート同期中…';
   try {

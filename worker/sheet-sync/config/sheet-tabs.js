@@ -4,7 +4,7 @@
 export default {
   // ============ 初診管理シート (実際に来院した人) ============
   sheet_id: "167IYM21HW0DGPlL1CrnCn4yTaTyC0KJU4f7gWyKtHf4",
-  cutoff_date: "2026-08-01",
+  cutoff_date: "2026-04-01",   // v923 B5: env.CUTOFF_DATE (wrangler.jsonc) が優先、これは fallback。誤解防止のため統一。
   header_aliases: {
     visit_date: ["来院日"],
     name: ["名前", "氏名"],

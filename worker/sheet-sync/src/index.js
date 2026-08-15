@@ -1,7 +1,8 @@
 /* ============================================================
- * sheet-sync Worker v922
- *   A0 fix: 要確認 昇格判定に book_date 一致条件を追加
- *           v921 は過去別日の来院記録で誤検出していた
+ * sheet-sync Worker v923
+ *   C6: PATCH/POST 失敗を patchErrs に集約 (従来 console.log のみ silent 失敗)
+ *   B5: cutoff_date fallback を 2026-04-01 に統一 (env.CUTOFF_DATE 優先)
+ * v922: A0 要確認 昇格判定に book_date 一致条件を追加
  *   A0: キャンセル入力 + 実来院 → status='要確認' に強制昇格 (isTouched 例外)
  *   A1: Phase 7 PATCH に status=eq.未対応 楽観排他 (Aladdin 保存優先)
  *   A3: 同名別電話 検出時 warning ログ (真の分離は DB migration 要)
@@ -313,6 +314,15 @@ async function runSync(env, triggerName) {
   const startMs = Date.now();
   const cutoffIso = env.CUTOFF_DATE || CONFIG.cutoff_date;
   const aliases = CONFIG.header_aliases;
+  // v923 C6: PATCH/POST 失敗を rowsError に集約 (従来は console.log のみ silent 失敗)
+  let patchErrs = 0;
+  const patchErrMsgs = [];
+  const recordErr = (label, res, body) => {
+    patchErrs++;
+    const msg = `${label} ${res.status} ${String(body || '').slice(0, 200)}`;
+    patchErrMsgs.push(msg);
+    console.log(msg);
+  };
 
   // ---- Phase 1: 予約管理シート candidates 抽出 ----
   const bookingCandidates = [];
@@ -469,7 +479,7 @@ async function runSync(env, triggerName) {
       const created = await iRes.json();
       bookingInserted += Array.isArray(created) ? created.length : 0;
     } else {
-      console.log('booking INSERT batch failed', iRes.status, await iRes.text());
+      recordErr('booking INSERT batch failed', iRes, await iRes.text());
     }
   }
 
@@ -562,7 +572,7 @@ async function runSync(env, triggerName) {
         const updatedRows = await patchRes.json();
         updated += Array.isArray(updatedRows) ? updatedRows.length : 0;
       } else {
-        console.log('visits PATCH batch failed', patchRes.status, await patchRes.text());
+        recordErr('visits PATCH batch failed', patchRes, await patchRes.text());
       }
     }
   }
@@ -586,7 +596,7 @@ async function runSync(env, triggerName) {
         const updatedRows = await patchRes.json();
         flaggedCancel += Array.isArray(updatedRows) ? updatedRows.length : 0;
       } else {
-        console.log('cancel→要確認 PATCH failed', patchRes.status, await patchRes.text());
+        recordErr('cancel→要確認 PATCH failed', patchRes, await patchRes.text());
       }
     }
   }
@@ -606,7 +616,7 @@ async function runSync(env, triggerName) {
       headers: sbHeaders(env, { 'Content-Type': 'application/json', 'Prefer': 'return=minimal' }),
       body: JSON.stringify({ promo_code: promo }),
     });
-    if (!res.ok) console.log('promo PATCH failed', res.status, await res.text());
+    if (!res.ok) recordErr('promo PATCH failed', res, await res.text());
   }
 
   // ---- Phase 8: INSERT (直予約 walk-in) ----
@@ -647,7 +657,7 @@ async function runSync(env, triggerName) {
       const created = await iRes.json();
       walkinInserted += Array.isArray(created) ? created.length : 0;
     } else {
-      console.log('walk-in INSERT batch failed', iRes.status, await iRes.text());
+      recordErr('walk-in INSERT batch failed', iRes, await iRes.text());
     }
   }
 
@@ -669,11 +679,14 @@ async function runSync(env, triggerName) {
 
   return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab,
     bookingInserted, updated, walkinInserted, skippedTouched,
-    bookingCandidates.length + initialCandidates.length, undefined, undefined,
+    bookingCandidates.length + initialCandidates.length,
+    patchErrs,                                                          // v923 C6: PATCH エラー数を rowsError に集約
+    patchErrs > 0 ? patchErrMsgs.slice(0, 5).join(' | ') : undefined,   // v923 C6: エラーメッセージ (先頭 5 件)
     { patientMapSize: patientMap.size, uniquePatientsSize: uniquePatients.size, no_patient_id: dbg_no_patient,
       untouchedVisits: existingVisits.length, allExistingVisits: allExistingVisits.length,
       touchedPatDate: touchedPatDate.size, bookingSkippedTouched, autoDedup: dedupResult,
       samenameDiffPhoneCount: suspectSamenameDiffPhone.length,
+      patchErrs,                                                        // v923 C6: 詳細確認用
     }, flaggedCancel);
 }
 
