@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v739';
+const APP_VERSION = 'v740';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -91,7 +91,7 @@ const STATUS_OPTIONS = [
 const STATUS_HIDDEN_BY_DEFAULT = new Set(['重複削除']);
 
 const FACILITIES = [
-  'BF銀座', 'エスカ', 'アール', 'ウィズ', 'ルミナス',
+  'BF銀座', 'BF中日', 'エスカ', 'アール', 'ウィズ', 'ルミナス',
   '茶屋', 'アサノ', '知立', '小牧', '八事', '岩田', '大森', '京都', '訪問',
 ];
 
