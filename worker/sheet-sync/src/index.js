@@ -1,5 +1,12 @@
 /* ============================================================
- * sheet-sync Worker v923
+ * sheet-sync Worker v924
+ *   booking sync_source を行番号 → 内容ベース (name|book_date|register_at) に変更。
+ *     元データ tab は新着が先頭 (降順) に入るため row=N が毎回ズレ、新規予約が
+ *     既存 sync_source と衝突 → ignore-duplicates で silent drop されていた
+ *     (2026-09 プロモ消失の根本原因)。
+ *   併せて deleted / 重複削除 行の (patient, book_date) も INSERT ガードに追加
+ *     (キー方式変更による削除済み行の復活を防止)。
+ * v923:
  *   C6: PATCH/POST 失敗を patchErrs に集約 (従来 console.log のみ silent 失敗)
  *   B5: cutoff_date fallback を 2026-04-01 に統一 (env.CUTOFF_DATE 優先)
  * v922: A0 要確認 昇格判定に book_date 一致条件を追加
@@ -16,7 +23,7 @@
  *      - 5 タブ (元データ + 4 セレクト) を fetch
  *      - source_tool='DXHUB' or 'セレクト' で INSERT
  *      - status='未対応' (来院待ち)
- *      - sync_source='booking:<tab>:row=<N>' で dedup
+ *      - sync_source='booking:<tab>:<normalized_name>|bk=<date>|reg=<register_at>' で dedup (v924)
  *
  *   Phase B: 初診管理シート (SHEET) → 来院確認 & 直予約追加
  *      - 予約行あり (Phase A で入ったもの or migrate:v600)
@@ -264,7 +271,9 @@ async function extractBookingCandidates(sheetId, tab, cutoffIso) {
       promo_code: cols.promo_code != null
         ? (String(r[cols.promo_code] || '').trim() || null)
         : (tab.tool === 'セレクト' ? 'セレクトタイプ' : null),
-      sync_source: `booking:${tab.name}:row=${i + 1}`,
+      // v924: 行番号は新着先頭挿入で毎回ズレるため、内容ベースの安定キーに変更。
+      //   register_at (申込日時) + 正規化名 + 予約日 は行位置に依存しない。
+      sync_source: `booking:${tab.name}:${nn}|bk=${bookDate}|reg=${String(rawRegAt || rawBookAt).trim()}`,
     });
   }
   return out;
@@ -429,6 +438,21 @@ async function runSync(env, triggerName) {
     const isTouchedV = (v.memo && v.memo.length > 0) || v.contract_amount != null || v.next_visit_date != null
       || (v.updated_by && String(v.updated_by).includes('@')) || (v.status && !SYNC_MANAGED_STATUS.has(v.status));
     if (isTouchedV) touchedPatDate.add(`${v.patient_id}|${v.book_date}`);
+  }
+  // v924: deleted / 重複削除 行の (patient, book_date) も INSERT ガードに追加。
+  //   sync_source が内容ベースになったため、過去に削除・重複整理した行が
+  //   「存在しない」扱いで再INSERT (復活) するのを防ぐ。existingPatDate のみに足し、
+  //   allExistingVisits (Phase 6 マッチ対象) には含めない。
+  const guardSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&or=(deleted.eq.true,status.eq.${encodeURIComponent('重複削除')})&select=patient_id,book_date&order=id`;
+  for (let offset = 0; offset < 20000; offset += VIS_CHUNK_ALL) {
+    const gRes = await fetch(`${guardSelBase}&offset=${offset}&limit=${VIS_CHUNK_ALL}`, { headers: sbHeaders(env) });
+    if (!gRes.ok) {
+      return await finalize(env, triggerName, startMs, bookingPerTab, initialPerTab, 0, 0, 0, 0, 0, initialCandidates.length,
+        `guard SELECT offset ${offset} failed: ${gRes.status} ${await gRes.text()}`);
+    }
+    const rows = await gRes.json();
+    for (const v of rows) existingPatDate.add(`${v.patient_id}|${v.book_date}`);
+    if (rows.length < VIS_CHUNK_ALL) break;
   }
 
   // ---- Phase 5: 予約管理シート → patient_visits INSERT (dedup on sync_source + touched patient+date) ----
@@ -799,12 +823,12 @@ export default {
       const r = await fetch(`${env.SUPABASE_URL}/rest/v1/v_latest_sync?select=*`, { headers: sbHeaders(env) });
       const latest = await r.json();
       return new Response(JSON.stringify({
-        service: 'sheet-sync v919',
+        service: 'sheet-sync v924',
         latest: Array.isArray(latest) && latest.length > 0 ? latest[0] : null,
       }, null, 2), { headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    return new Response('sheet-sync v919\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
+    return new Response('sheet-sync v924\n\nGET /status  → 最新の同期結果\nGET /sync?token=xxx → 手動同期\nGET /debug?token=xxx → 診断\n', {
       headers: { ...cors, 'Content-Type': 'text/plain' },
     });
   },
