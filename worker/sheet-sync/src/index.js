@@ -416,7 +416,7 @@ async function runSync(env, triggerName) {
   // ---- v916: Phase 5 の前に「触った (patient, book_date)」を SELECT して事前フィルタ ----
   //   sheet-sync が新規 booking を INSERT する前に、既に staff が処理済の (patient, date) は skip して重複防止。
   //   Phase 6 の visitsByPatFac 構築にも同じ結果を使い回して subreq 節約。
-  const allVisSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&status=neq.${encodeURIComponent('重複削除')}&select=id,patient_id,facility,book_date,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code&order=id`;
+  const allVisSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&deleted=eq.false&status=neq.${encodeURIComponent('重複削除')}&select=id,patient_id,facility,book_date,apply_at,status,memo,contract_amount,next_visit_date,updated_by,source_tool,promo_code&order=id`;
   const allExistingVisits = [];
   const VIS_CHUNK_ALL = 1000;
   for (let offset = 0; offset < 100000; offset += VIS_CHUNK_ALL) {
@@ -432,9 +432,11 @@ async function runSync(env, triggerName) {
   // v918: touched だけでなく「存在するだけ」で新規 INSERT を skip する (完全重複防止)。
   //   これで同 (patient, book_date) には常に 1 行しかない状態を維持。
   const existingPatDate = new Set();   // Phase 5 booking / Phase 8 walk-in の両方でチェック
+  const existingPatApply = new Set();  // v924: (patient_id, apply_at) unique 制約の事前衝突チェック用
   const touchedPatDate = new Set();    // Phase 6 で untouched 判定に使う (残す)
   for (const v of allExistingVisits) {
     existingPatDate.add(`${v.patient_id}|${v.book_date}`);
+    if (v.apply_at) existingPatApply.add(`${v.patient_id}|${Date.parse(v.apply_at)}`);
     const isTouchedV = (v.memo && v.memo.length > 0) || v.contract_amount != null || v.next_visit_date != null
       || (v.updated_by && String(v.updated_by).includes('@')) || (v.status && !SYNC_MANAGED_STATUS.has(v.status));
     if (isTouchedV) touchedPatDate.add(`${v.patient_id}|${v.book_date}`);
@@ -443,7 +445,7 @@ async function runSync(env, triggerName) {
   //   sync_source が内容ベースになったため、過去に削除・重複整理した行が
   //   「存在しない」扱いで再INSERT (復活) するのを防ぐ。existingPatDate のみに足し、
   //   allExistingVisits (Phase 6 マッチ対象) には含めない。
-  const guardSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&or=(deleted.eq.true,status.eq.${encodeURIComponent('重複削除')})&select=patient_id,book_date&order=id`;
+  const guardSelBase = `${env.SUPABASE_URL}/rest/v1/patient_visits?book_date=gte.${cutoffIso}&or=(deleted.eq.true,status.eq.${encodeURIComponent('重複削除')})&select=patient_id,book_date,apply_at&order=id`;
   for (let offset = 0; offset < 20000; offset += VIS_CHUNK_ALL) {
     const gRes = await fetch(`${guardSelBase}&offset=${offset}&limit=${VIS_CHUNK_ALL}`, { headers: sbHeaders(env) });
     if (!gRes.ok) {
@@ -451,7 +453,10 @@ async function runSync(env, triggerName) {
         `guard SELECT offset ${offset} failed: ${gRes.status} ${await gRes.text()}`);
     }
     const rows = await gRes.json();
-    for (const v of rows) existingPatDate.add(`${v.patient_id}|${v.book_date}`);
+    for (const v of rows) {
+      existingPatDate.add(`${v.patient_id}|${v.book_date}`);
+      if (v.apply_at) existingPatApply.add(`${v.patient_id}|${Date.parse(v.apply_at)}`);
+    }
     if (rows.length < VIS_CHUNK_ALL) break;
   }
 
@@ -488,6 +493,15 @@ async function runSync(env, triggerName) {
         updated_by: 'system-sync',
         created_by: 'system-sync',
       };
+    })
+    .filter(p => {
+      // v924: (patient_id, apply_at) unique 制約との衝突を事前除外。
+      //   on_conflict=sync_source では別キーの衝突が 409 になり batch 全体が落ちるため
+      //   (予約日変更でシート行が書き換わったケース等)。batch 内の重複も同時に除く。
+      const k = `${p.patient_id}|${Date.parse(p.apply_at)}`;
+      if (existingPatApply.has(k)) { bookingSkippedTouched++; return false; }
+      existingPatApply.add(k);
+      return true;
     });
   const BATCH_B = 2000;
   for (let i = 0; i < bookingPayload.length; i += BATCH_B) {
