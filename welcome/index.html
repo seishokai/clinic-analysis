@@ -606,8 +606,12 @@
       <div class="step-num">01</div>
       <div class="step-body">
         <div class="step-title">各種フォームを入力</div>
-        <p class="step-desc">まずは下記の <strong>3つのフォーム</strong> を入力してください。<br>所要時間 約7分。スマホからそのまま入力できます。</p>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
+        <p class="step-desc" id="step1Desc">まずは下記の <strong>3つのフォーム</strong> を入力してください。<br>所要時間 約7分。スマホからそのまま入力できます。</p>
+        <div id="step1Done" style="display:none;margin-top:14px;padding:14px 16px;border:1px solid #cfe3d2;border-radius:10px;background:#f2f9f4;color:#22633f;font-size:14px;line-height:1.8">
+          ✓ 入社手続きのご入力、ありがとうございました。この step 01 は完了しています。<br>
+          <span style="color:#4a7a5c;font-size:13px">続けて下の step 02 からお進みください。</span>
+        </div>
+        <div id="step1Forms" style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
           <a class="step-btn alt" href="https://docs.google.com/forms/d/e/1FAIpQLSchDqkAKsmQuJPlP7aI8_b6dQopDOnnB503jigFnWdjATZYUA/viewform" target="_blank" rel="noopener">📇 社員名簿フォーム</a>
           <a class="step-btn alt" id="onboardingFormLink" href="https://docs.google.com/forms/d/e/1FAIpQLSdTWF_bqq_44gbdEP5BKNTpw1U6fFCNXUadp7i0UBfPsBggiA/viewform" target="_blank" rel="noopener">📝 入社フォーム</a>
           <a class="step-btn alt" href="https://docs.google.com/forms/d/e/1FAIpQLScgiFT0G-KCwt_j_IMBUjREI_rR-gUQiigv0WnADrPj2g-AwA/viewform" target="_blank" rel="noopener">🚉 通勤経路フォーム</a>
@@ -960,6 +964,17 @@
     window.addEventListener('scroll', updateProgress, {passive:true});
     window.addEventListener('resize', updateProgress);
     updateProgress();
+
+    // 入社フォームを出し終えた人（?done=1）には、step 01 は済んだことを見せる。
+    (function(){
+      if(new URLSearchParams(location.search).get('done') !== '1') return;
+      const forms = document.getElementById('step1Forms');
+      const desc = document.getElementById('step1Desc');
+      const done = document.getElementById('step1Done');
+      if(forms) forms.style.display = 'none';
+      if(desc) desc.style.display = 'none';
+      if(done) done.style.display = 'block';
+    })();
 
     // オファーレターの共有リンク経由で来た人には、自分専用の入社フォーム（旧Googleフォームの代わり）に案内する。
     // ?ob=トークン が無い人（このページを直接開いた人など）には、今まで通りGoogleフォームを出す。
