@@ -609,7 +609,7 @@
         <p class="step-desc">まずは下記の <strong>3つのフォーム</strong> を入力してください。<br>所要時間 約7分。スマホからそのまま入力できます。</p>
         <div style="display:flex;gap:10px;flex-wrap:wrap;margin-top:14px">
           <a class="step-btn alt" href="https://docs.google.com/forms/d/e/1FAIpQLSchDqkAKsmQuJPlP7aI8_b6dQopDOnnB503jigFnWdjATZYUA/viewform" target="_blank" rel="noopener">📇 社員名簿フォーム</a>
-          <a class="step-btn alt" href="https://docs.google.com/forms/d/e/1FAIpQLSdTWF_bqq_44gbdEP5BKNTpw1U6fFCNXUadp7i0UBfPsBggiA/viewform" target="_blank" rel="noopener">📝 入社フォーム</a>
+          <a class="step-btn alt" id="onboardingFormLink" href="https://docs.google.com/forms/d/e/1FAIpQLSdTWF_bqq_44gbdEP5BKNTpw1U6fFCNXUadp7i0UBfPsBggiA/viewform" target="_blank" rel="noopener">📝 入社フォーム</a>
           <a class="step-btn alt" href="https://docs.google.com/forms/d/e/1FAIpQLScgiFT0G-KCwt_j_IMBUjREI_rR-gUQiigv0WnADrPj2g-AwA/viewform" target="_blank" rel="noopener">🚉 通勤経路フォーム</a>
         </div>
 
@@ -960,6 +960,17 @@
     window.addEventListener('scroll', updateProgress, {passive:true});
     window.addEventListener('resize', updateProgress);
     updateProgress();
+
+    // オファーレターの共有リンク経由で来た人には、自分専用の入社フォーム（旧Googleフォームの代わり）に案内する。
+    // ?ob=トークン が無い人（このページを直接開いた人など）には、今まで通りGoogleフォームを出す。
+    (function(){
+      const token = new URLSearchParams(location.search).get('ob');
+      if(!token) return;
+      const a = document.getElementById('onboardingFormLink');
+      if(!a) return;
+      a.href = 'https://share.seishokaisaiyo.com/i/' + encodeURIComponent(token);
+      a.textContent = '📝 入社フォーム（あなた専用）';
+    })();
 
     // アンカークリック時のオフセット調整 (sticky nav 分)
     items.forEach(a => {
