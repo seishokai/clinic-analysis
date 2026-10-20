@@ -18,7 +18,7 @@
 'use strict';
 
 // v607: このバージョン識別子と ../v600/version.txt を比較して更新バナーを出す
-const APP_VERSION = 'v740';
+const APP_VERSION = 'v741';
 
 // v725: 起動直後 self-heal — この app.js が古い cached HTML から呼ばれていたら即 auto-reload。
 //   HTML と app.js が cache 上ずれた状態を検出して 1回だけ URL bust リロードで直す。
@@ -1307,7 +1307,11 @@ function renderBookingsTable() {
   const rows = (st.rows || []).filter(r => {
     if (f.facility && normFac(r.facility) !== f.facility) return false;
     if (f.tool && r.tool !== f.tool) return false;
-    if (q && !(r.name || '').toLowerCase().includes(q)) return false;
+    // v741: 患者名 + プロモコード (セレクトは 'セレクトタイプ') で検索
+    if (q) {
+      const promo = r.tool === 'セレクト' ? 'セレクトタイプ' : (r.source || '');
+      if (!((r.name || '').toLowerCase().includes(q) || promo.toLowerCase().includes(q))) return false;
+    }
     return true;
   });
   // v733: sort (申込日 / 予約日 の 2キー)
