@@ -60,6 +60,10 @@
     background:#f5f5f5; border-left:1px solid var(--border); white-space:nowrap;
   }
   .field .hint{font-size:11px; color:var(--text-sub); margin-top:6px}
+  .term-grid{display:grid; grid-template-columns:1fr 1fr; gap:10px}
+  .term-grid .input-row input{padding:14px 8px; min-width:3em}
+  .term-grid .input-row .unit{padding:0 10px}
+  #term-label{font-size:13px; font-weight:700; color:var(--text)}
   .field .hint.warn{color:#c2410c}
   input[type="range"]{width:100%; margin-top:8px; accent-color:#1a1a1a}
   select.company{
@@ -132,7 +136,7 @@
   </nav>
 
   <h1>デンタルローン シミュレーション</h1>
-  <p class="lead">借入金額・年利・支払年数を入力すると、月々の支払額と支払総額がリアルタイムで表示されます。</p>
+  <p class="lead">借入金額・年利・支払期間（年 または 月）を入力すると、月々の支払額と支払総額がリアルタイムで表示されます。</p>
 
   <div class="disclaimer">
     <strong>※ 本シミュレーションは参考例です。</strong>
@@ -172,12 +176,19 @@
     </div>
 
     <div class="field">
-      <label for="years">支払年数</label>
-      <div class="input-row">
-        <input id="years" type="number" min="1" max="10" step="1" value="9" inputmode="numeric">
-        <span class="unit">年</span>
+      <label for="years">支払期間（最長 120ヶ月）</label>
+      <div class="term-grid">
+        <div class="input-row">
+          <input id="years" type="number" min="0" max="10" step="1" value="9" inputmode="numeric" aria-label="支払年数">
+          <span class="unit">年</span>
+        </div>
+        <div class="input-row">
+          <input id="months" type="number" min="1" max="120" step="1" value="108" inputmode="numeric" aria-label="支払月数">
+          <span class="unit">ヶ月</span>
+        </div>
       </div>
-      <input id="years-range" type="range" min="1" max="10" step="1" value="9">
+      <input id="months-range" type="range" min="1" max="120" step="1" value="108">
+      <div id="term-label" class="hint">9年0ヶ月（108回払い）</div>
     </div>
   </div>
 
@@ -201,12 +212,12 @@
 
   <div id="warn-min" class="warn-box" style="display:none;margin-top:10px;padding:10px 14px;background:#fef2f2;border:1.5px solid #fca5a5;border-radius:8px;color:#b91c1c;font-size:13px;font-weight:600;line-height:1.5">
     ⚠ 月々の支払が <strong>3,000円以下</strong> になっています。<br>
-    <span style="font-weight:500">借入額を増やすか、支払年数を減らしてください。</span>
+    <span style="font-weight:500">借入額を増やすか、支払期間を短くしてください。</span>
   </div>
 
   <div class="note">
     ※ 元利均等返済方式で計算。実際の返済額は提携ローン会社の審査・条件により異なります。<br>
-    ※ 支払年数は <strong>最長 10 年</strong>、月々支払は <strong>3,001 円以上</strong> でご利用いただけます。
+    ※ 支払期間は <strong>最長 10 年（120ヶ月）</strong>、月々支払は <strong>3,001 円以上</strong> でご利用いただけます。
   </div>
 
   <div class="compare">
@@ -250,9 +261,8 @@
   ];
 
   // 元利均等返済 月々支払額
-  function calcMonthly(principal, annualRate, years){
-    if (!(principal > 0) || !(years > 0)) return 0;
-    const n = years * 12;
+  function calcMonthly(principal, annualRate, n){
+    if (!(principal > 0) || !(n > 0)) return 0;
     const r = (annualRate / 100) / 12;
     if (r === 0) return principal / n;
     const factor = Math.pow(1 + r, n);
@@ -265,18 +275,18 @@
   function update(){
     const p = Math.max(0, parseNum($('amount').value));
     const r = Math.max(0, Number($('rate').value) || 0);
-    // 年数は 1〜10 の範囲にクランプ
-    let y = Math.max(1, Math.min(10, Math.floor(Number($('years').value) || 1)));
-    if (Number($('years').value) !== y) $('years').value = y;
-    const yrsRange = $('years-range');
-    if (yrsRange && Number(yrsRange.value) !== y) yrsRange.value = y;
+    // 支払回数(月数) は 1〜120 の範囲
+    const y = termMonths;
+    const yy = Math.floor(y / 12), mo = y % 12;
+    const ym = (yy ? `${yy}年` : '') + (mo ? `${mo}ヶ月` : '');
+    $('term-label').textContent = `${ym}（${y}回払い）`;
 
     const m = calcMonthly(p, r, y);
-    const total = m * y * 12;
+    const total = m * y;
     // 利息合計 = 支払総額 − 借入元金 (0未満になることはないが念のためclamp)
     const totalFee = Math.max(0, total - p);
     // 月平均利息 = 利息合計 / 月数
-    const monthlyFee = (y > 0) ? totalFee / (y * 12) : 0;
+    const monthlyFee = (y > 0) ? totalFee / y : 0;
     $('monthly').textContent = fmt(m);
     $('monthly-fee').textContent = fmt(monthlyFee);
     $('total').textContent = fmt(total);
@@ -300,8 +310,8 @@
     const tb = $('compare-tbody');
     tb.innerHTML = COMPANIES.map(c => {
       const mm = calcMonthly(p, c.rate, y);
-      const tt = mm * y * 12;
-      const mFee = (y > 0) ? Math.max(0, tt - p) / (y * 12) : 0;
+      const tt = mm * y;
+      const mFee = (y > 0) ? Math.max(0, tt - p) / y : 0;
       const rateLabel = c.rateLabel || `${fmtFix(c.rate)}%`;
       const isCurrent = c.id === selectedId;
       return `<tr class="${isCurrent ? 'current' : ''}">
@@ -372,11 +382,35 @@
     range.addEventListener('input', () => { num.value = range.value; update(); });
   }
   bind('rate','rate-range');
-  bind('years','years-range');
+
+  // 支払期間: 年・月・スライダーを連動 (内部は月数で保持, 1〜120)
+  let termMonths = 108;
+  const clampMonths = n => Math.max(1, Math.min(120, Math.round(n) || 1));
+  function setTerm(n, from){
+    termMonths = clampMonths(n);
+    if (from !== 'years') $('years').value = Math.round(termMonths / 12 * 10) / 10;
+    if (from !== 'months') $('months').value = termMonths;
+    $('months-range').value = termMonths;
+    update();
+  }
+  $('years').addEventListener('input', () => {
+    const v = Number($('years').value);
+    if ($('years').value === '' || !(v > 0)) return;
+    setTerm(Math.min(v, 10) * 12, 'years');
+  });
+  $('months').addEventListener('input', () => {
+    const v = Number($('months').value);
+    if ($('months').value === '' || !(v > 0)) return;
+    setTerm(v, 'months');
+  });
+  $('months-range').addEventListener('input', () => setTerm(Number($('months-range').value), 'range'));
+  // 入力欄を離れたら、範囲外・空欄の値を正しい値に戻す
+  $('years').addEventListener('change', () => setTerm(termMonths, 'range'));
+  $('months').addEventListener('change', () => setTerm(termMonths, 'range'));
 
   $('company').addEventListener('change', onCompanyChange);
 
-  update();
+  setTerm(termMonths, 'init');
 })();
 </script>
 <!-- v302: バージョン表示 (全ページ共通) -->
